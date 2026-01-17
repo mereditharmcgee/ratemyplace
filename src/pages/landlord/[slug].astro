@@ -1,0 +1,161 @@
+---
+import BaseLayout from '../../components/layout/BaseLayout.astro';
+import StarRating from '../../components/ratings/StarRating.astro';
+import ScoreCard from '../../components/ratings/ScoreCard.astro';
+import { getDB } from '../../lib/db';
+
+const { slug } = Astro.params;
+
+let landlord: any = null;
+let scores: any = null;
+let buildings: any[] = [];
+
+try {
+  const db = getDB((Astro.locals as any).runtime);
+
+  const landlordResult = await db.prepare(`
+    SELECT * FROM landlords WHERE slug = ?
+  `).bind(slug).first();
+
+  if (landlordResult) {
+    landlord = landlordResult;
+
+    const scoresResult = await db.prepare(`
+      SELECT * FROM landlord_scores WHERE landlord_id = ?
+    `).bind(landlord.id).first();
+
+    scores = scoresResult;
+
+    const buildingsResult = await db.prepare(`
+      SELECT b.*, bs.review_count, bs.avg_overall
+      FROM buildings b
+      LEFT JOIN building_scores bs ON b.id = bs.building_id
+      WHERE b.landlord_id = ?
+      ORDER BY bs.review_count DESC NULLS LAST
+    `).bind(landlord.id).all();
+
+    buildings = buildingsResult.results || [];
+  }
+} catch (error) {
+  console.error('Error loading landlord:', error);
+}
+
+if (!landlord) {
+  return Astro.redirect('/404');
+}
+---
+
+<BaseLayout title={landlord.name} description={`Reviews for landlord ${landlord.name} in Boston`}>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+      <nav class="text-sm text-gray-500 mb-4">
+        <a href="/" class="hover:text-blue-600">Home</a>
+        <span class="mx-2">/</span>
+        <a href="/search" class="hover:text-blue-600">Search</a>
+        <span class="mx-2">/</span>
+        <span class="text-gray-900">{landlord.name}</span>
+      </nav>
+
+      <div class="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900">{landlord.name}</h1>
+          {landlord.description && (
+            <p class="text-gray-600 mt-2 max-w-2xl">{landlord.description}</p>
+          )}
+          <div class="mt-4 flex flex-wrap gap-4 text-sm text-gray-500">
+            {landlord.website && (
+              <a href={landlord.website} target="_blank" rel="noopener noreferrer" class="hover:text-blue-600">
+                Website
+              </a>
+            )}
+            {landlord.phone && (
+              <span>{landlord.phone}</span>
+            )}
+            {landlord.email && (
+              <a href={`mailto:${landlord.email}`} class="hover:text-blue-600">
+                {landlord.email}
+              </a>
+            )}
+          </div>
+        </div>
+
+        <div class="text-right">
+          {scores?.avg_overall ? (
+            <div>
+              <div class="text-4xl font-bold text-blue-600">{scores.avg_overall.toFixed(1)}</div>
+              <StarRating rating={scores.avg_overall} />
+              <p class="text-sm text-gray-500 mt-1">
+                {scores.review_count} review{scores.review_count !== 1 ? 's' : ''} across {scores.building_count} building{scores.building_count !== 1 ? 's' : ''}
+              </p>
+            </div>
+          ) : (
+            <p class="text-gray-400">No reviews yet</p>
+          )}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-8">
+      <!-- Main Content -->
+      <div class="lg:col-span-2">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">
+          Properties ({buildings.length})
+        </h2>
+
+        {buildings.length > 0 ? (
+          <div class="space-y-4">
+            {buildings.map((building) => (
+              <a
+                href={`/building/${building.slug}`}
+                class="block bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+              >
+                <div class="flex justify-between items-start">
+                  <div>
+                    <h3 class="text-lg font-semibold text-gray-900">{building.address}</h3>
+                    <p class="text-gray-600">
+                      {building.neighborhood && `${building.neighborhood}, `}{building.city}
+                    </p>
+                  </div>
+                  <div class="text-right">
+                    {building.avg_overall ? (
+                      <div>
+                        <div class="text-2xl font-bold text-blue-600">{building.avg_overall.toFixed(1)}</div>
+                        <div class="text-sm text-gray-500">
+                          {building.review_count} review{building.review_count !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    ) : (
+                      <span class="text-sm text-gray-400">No reviews</span>
+                    )}
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <div class="bg-gray-50 rounded-lg p-8 text-center">
+            <p class="text-gray-600">No properties listed for this landlord yet.</p>
+          </div>
+        )}
+      </div>
+
+      <!-- Sidebar -->
+      <div class="lg:col-span-1">
+        {scores && <ScoreCard scores={scores} type="landlord" />}
+
+        {scores && scores.pct_would_recommend !== null && (
+          <div class="bg-white rounded-lg border border-gray-200 p-6 mt-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Recommendation Rate</h3>
+            <div class="text-center">
+              <div class="text-3xl font-bold text-green-600">
+                {Math.round(scores.pct_would_recommend)}%
+              </div>
+              <p class="text-sm text-gray-500">of tenants would recommend</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+</BaseLayout>

@@ -1,0 +1,111 @@
+---
+const user = Astro.locals.user;
+---
+
+<header class="bg-white shadow-sm border-b border-gray-200">
+  <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between h-16">
+      <div class="flex items-center">
+        <a href="/" class="flex items-center space-x-2">
+          <span class="text-2xl font-bold text-blue-600">RateMyPlace</span>
+          <span class="text-sm text-gray-500 hidden sm:inline">Boston</span>
+        </a>
+      </div>
+
+      <div class="hidden md:flex items-center space-x-8">
+        <a href="/search" class="text-gray-600 hover:text-blue-600 transition-colors">
+          Search
+        </a>
+        <a href="/about" class="text-gray-600 hover:text-blue-600 transition-colors">
+          About
+        </a>
+        {user ? (
+          <div class="flex items-center space-x-4">
+            <a
+              href="/review/new"
+              class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Write a Review
+            </a>
+            <form action="/api/auth/signout" method="POST">
+              <button
+                type="submit"
+                class="text-gray-600 hover:text-blue-600 transition-colors"
+              >
+                Sign Out
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div class="flex items-center space-x-4">
+            <a href="/auth/signin" class="text-gray-600 hover:text-blue-600 transition-colors">
+              Sign In
+            </a>
+            <a
+              href="/auth/signup"
+              class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Sign Up
+            </a>
+          </div>
+        )}
+      </div>
+
+      <!-- Mobile menu button -->
+      <div class="md:hidden flex items-center">
+        <button
+          type="button"
+          class="text-gray-600 hover:text-blue-600"
+          aria-label="Toggle menu"
+          id="mobile-menu-button"
+        >
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile menu -->
+    <div class="md:hidden hidden" id="mobile-menu">
+      <div class="pt-2 pb-3 space-y-1">
+        <a href="/search" class="block px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-md">
+          Search
+        </a>
+        <a href="/about" class="block px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-md">
+          About
+        </a>
+        {user ? (
+          <>
+            <a href="/review/new" class="block px-3 py-2 text-blue-600 hover:bg-gray-100 rounded-md">
+              Write a Review
+            </a>
+            <form action="/api/auth/signout" method="POST" class="px-3 py-2">
+              <button type="submit" class="text-gray-600 hover:text-blue-600">
+                Sign Out
+              </button>
+            </form>
+          </>
+        ) : (
+          <>
+            <a href="/auth/signin" class="block px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-md">
+              Sign In
+            </a>
+            <a href="/auth/signup" class="block px-3 py-2 text-blue-600 hover:bg-gray-100 rounded-md">
+              Sign Up
+            </a>
+          </>
+        )}
+      </div>
+    </div>
+  </nav>
+</header>
+
+<script>
+  const menuButton = document.getElementById('mobile-menu-button');
+  const mobileMenu = document.getElementById('mobile-menu');
+
+  menuButton?.addEventListener('click', () => {
+    mobileMenu?.classList.toggle('hidden');
+  });
+</script>

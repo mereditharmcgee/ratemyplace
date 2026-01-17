@@ -1,0 +1,103 @@
+---
+import BaseLayout from '../components/layout/BaseLayout.astro';
+---
+
+<BaseLayout title="About" description="Learn about RateMyPlace Boston's mission to help tenants find quality housing through honest reviews.">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    <h1 class="text-4xl font-bold text-gray-900 mb-8">About RateMyPlace Boston</h1>
+
+    <div class="prose prose-lg max-w-none">
+      <p class="text-xl text-gray-600 mb-8">
+        RateMyPlace Boston is a tenant-focused platform that helps renters make informed decisions
+        about their next home by providing honest, verified reviews from real tenants.
+      </p>
+
+      <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">Our Mission</h2>
+      <p class="text-gray-600 mb-6">
+        Finding a good apartment in Boston is challenging. Beyond the high rents and competitive market,
+        tenants often don't know what they're getting into until they've signed a lease. We believe
+        every renter deserves access to honest information about buildings and landlords before making
+        one of their biggest financial decisions.
+      </p>
+
+      <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">How We Rate</h2>
+      <p class="text-gray-600 mb-6">
+        Our comprehensive rating system covers 12 key aspects of the rental experience, organized
+        into three main categories:
+      </p>
+
+      <div class="grid md:grid-cols-3 gap-6 my-8">
+        <div class="bg-blue-50 p-6 rounded-lg">
+          <h3 class="font-semibold text-blue-900 mb-3">Building Quality</h3>
+          <ul class="text-sm text-blue-800 space-y-1">
+            <li>Overall condition</li>
+            <li>Maintenance response</li>
+            <li>Pest control</li>
+            <li>Safety & security</li>
+            <li>Noise levels</li>
+            <li>Amenities</li>
+          </ul>
+        </div>
+
+        <div class="bg-green-50 p-6 rounded-lg">
+          <h3 class="font-semibold text-green-900 mb-3">Landlord Experience</h3>
+          <ul class="text-sm text-green-800 space-y-1">
+            <li>Responsiveness</li>
+            <li>Communication</li>
+            <li>Fairness</li>
+            <li>Lease clarity</li>
+            <li>Deposit handling</li>
+          </ul>
+        </div>
+
+        <div class="bg-purple-50 p-6 rounded-lg">
+          <h3 class="font-semibold text-purple-900 mb-3">Value</h3>
+          <ul class="text-sm text-purple-800 space-y-1">
+            <li>Rent value for area</li>
+            <li>Would recommend</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">Privacy Protection</h2>
+      <p class="text-gray-600 mb-6">
+        We take reviewer privacy seriously. To protect tenants from potential retaliation:
+      </p>
+      <ul class="list-disc list-inside text-gray-600 mb-6 space-y-2">
+        <li>Move-in and move-out dates are displayed as seasons (e.g., "Fall 2023") rather than exact dates</li>
+        <li>No personally identifiable information is displayed on reviews</li>
+        <li>Reviews must meet a minimum threshold before being published to a building's profile</li>
+        <li>Users can delete their reviews at any time</li>
+      </ul>
+
+      <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">Review Guidelines</h2>
+      <p class="text-gray-600 mb-6">
+        To maintain the quality and trustworthiness of reviews, we require that all reviews:
+      </p>
+      <ul class="list-disc list-inside text-gray-600 mb-6 space-y-2">
+        <li>Come from verified tenants who lived at the property</li>
+        <li>Focus on factual experiences rather than personal attacks</li>
+        <li>Don't contain discriminatory language or threats</li>
+        <li>Don't include personally identifiable information about landlords or staff</li>
+      </ul>
+
+      <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">Landlord Responses</h2>
+      <p class="text-gray-600 mb-6">
+        We believe in fairness for all parties. Landlords can:
+      </p>
+      <ul class="list-disc list-inside text-gray-600 mb-6 space-y-2">
+        <li>Claim their properties and respond to reviews</li>
+        <li>Flag reviews that violate our guidelines for investigation</li>
+        <li>Provide context or their perspective on tenant experiences</li>
+      </ul>
+
+      <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">Contact Us</h2>
+      <p class="text-gray-600 mb-6">
+        Have questions, feedback, or need to report a problem? Email us at{' '}
+        <a href="mailto:contact@ratemyplace.org" class="text-blue-600 hover:text-blue-800">
+          contact@ratemyplace.org
+        </a>
+      </p>
+    </div>
+  </div>
+</BaseLayout>

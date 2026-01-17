@@ -1,0 +1,196 @@
+---
+import BaseLayout from '../../components/layout/BaseLayout.astro';
+import StarRating from '../../components/ratings/StarRating.astro';
+import ReviewCard from '../../components/reviews/ReviewCard.astro';
+import ScoreCard from '../../components/ratings/ScoreCard.astro';
+import { getDB } from '../../lib/db';
+import { formatFuzzyDate } from '../../lib/privacy';
+
+const { slug } = Astro.params;
+
+let building: any = null;
+let scores: any = null;
+let reviews: any[] = [];
+let landlord: any = null;
+
+try {
+  const db = getDB((Astro.locals as any).runtime);
+
+  const buildingResult = await db.prepare(`
+    SELECT b.*, l.name as landlord_name, l.slug as landlord_slug
+    FROM buildings b
+    LEFT JOIN landlords l ON b.landlord_id = l.id
+    WHERE b.slug = ?
+  `).bind(slug).first();
+
+  if (buildingResult) {
+    building = buildingResult;
+
+    const scoresResult = await db.prepare(`
+      SELECT * FROM building_scores WHERE building_id = ?
+    `).bind(building.id).first();
+
+    scores = scoresResult;
+
+    const reviewsResult = await db.prepare(`
+      SELECT * FROM reviews
+      WHERE building_id = ? AND status = 'approved'
+      ORDER BY created_at DESC
+      LIMIT 50
+    `).bind(building.id).all();
+
+    reviews = reviewsResult.results || [];
+  }
+} catch (error) {
+  console.error('Error loading building:', error);
+}
+
+if (!building) {
+  return Astro.redirect('/404');
+}
+---
+
+<BaseLayout title={building.address} description={`Reviews for ${building.address} in ${building.neighborhood || building.city}`}>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+      <nav class="text-sm text-gray-500 mb-4">
+        <a href="/" class="hover:text-blue-600">Home</a>
+        <span class="mx-2">/</span>
+        <a href="/search" class="hover:text-blue-600">Search</a>
+        <span class="mx-2">/</span>
+        <span class="text-gray-900">{building.address}</span>
+      </nav>
+
+      <div class="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900">{building.address}</h1>
+          <p class="text-lg text-gray-600">
+            {building.neighborhood && `${building.neighborhood}, `}{building.city}, {building.state} {building.zip_code}
+          </p>
+          {building.landlord_name && (
+            <p class="text-gray-500 mt-2">
+              Managed by{' '}
+              <a href={`/landlord/${building.landlord_slug}`} class="text-blue-600 hover:text-blue-800">
+                {building.landlord_name}
+              </a>
+            </p>
+          )}
+        </div>
+
+        <div class="flex flex-col items-end">
+          {scores?.avg_overall ? (
+            <div class="text-right">
+              <div class="text-4xl font-bold text-blue-600">{scores.avg_overall.toFixed(1)}</div>
+              <StarRating rating={scores.avg_overall} />
+              <p class="text-sm text-gray-500 mt-1">
+                {scores.review_count} review{scores.review_count !== 1 ? 's' : ''}
+              </p>
+            </div>
+          ) : (
+            <p class="text-gray-400">No reviews yet</p>
+          )}
+
+          <a
+            href={`/review/new?building=${building.id}`}
+            class="mt-4 inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Write a Review
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-8">
+      <!-- Main Content -->
+      <div class="lg:col-span-2">
+        <!-- Building Details -->
+        <div class="bg-white rounded-lg border border-gray-200 p-6 mb-8">
+          <h2 class="text-xl font-semibold text-gray-900 mb-4">Building Details</h2>
+          <dl class="grid grid-cols-2 gap-4">
+            {building.building_type && (
+              <>
+                <dt class="text-gray-500">Type</dt>
+                <dd class="text-gray-900">{building.building_type}</dd>
+              </>
+            )}
+            {building.year_built && (
+              <>
+                <dt class="text-gray-500">Year Built</dt>
+                <dd class="text-gray-900">{building.year_built}</dd>
+              </>
+            )}
+            {building.unit_count && (
+              <>
+                <dt class="text-gray-500">Units</dt>
+                <dd class="text-gray-900">{building.unit_count}</dd>
+              </>
+            )}
+          </dl>
+        </div>
+
+        <!-- Reviews -->
+        <div>
+          <h2 class="text-xl font-semibold text-gray-900 mb-4">
+            Reviews ({reviews.length})
+          </h2>
+
+          {reviews.length > 0 ? (
+            <div class="space-y-6">
+              {reviews.map((review) => (
+                <ReviewCard review={review} />
+              ))}
+            </div>
+          ) : (
+            <div class="bg-gray-50 rounded-lg p-8 text-center">
+              <p class="text-gray-600 mb-4">No reviews yet for this building.</p>
+              <a
+                href={`/review/new?building=${building.id}`}
+                class="text-blue-600 hover:text-blue-800"
+              >
+                Be the first to write a review
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="lg:col-span-1">
+        {scores && <ScoreCard scores={scores} type="building" />}
+
+        {scores && scores.review_count > 0 && (
+          <div class="bg-white rounded-lg border border-gray-200 p-6 mt-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Common Issues Reported</h3>
+            <ul class="space-y-2 text-sm">
+              {scores.pct_pest_issues > 0 && (
+                <li class="flex justify-between">
+                  <span class="text-gray-600">Pest issues</span>
+                  <span class="text-gray-900">{Math.round(scores.pct_pest_issues)}%</span>
+                </li>
+              )}
+              {scores.pct_heat_issues > 0 && (
+                <li class="flex justify-between">
+                  <span class="text-gray-600">Heat/hot water issues</span>
+                  <span class="text-gray-900">{Math.round(scores.pct_heat_issues)}%</span>
+                </li>
+              )}
+              {scores.pct_water_issues > 0 && (
+                <li class="flex justify-between">
+                  <span class="text-gray-600">Water/plumbing issues</span>
+                  <span class="text-gray-900">{Math.round(scores.pct_water_issues)}%</span>
+                </li>
+              )}
+              {scores.pct_deposit_issues > 0 && (
+                <li class="flex justify-between">
+                  <span class="text-gray-600">Deposit issues</span>
+                  <span class="text-gray-900">{Math.round(scores.pct_deposit_issues)}%</span>
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+</BaseLayout>

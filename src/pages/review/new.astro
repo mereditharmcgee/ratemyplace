@@ -1,0 +1,42 @@
+---
+import BaseLayout from '../../components/layout/BaseLayout.astro';
+import ReviewForm from '../../components/reviews/ReviewForm';
+import { getDB } from '../../lib/db';
+
+// Require authentication
+if (!Astro.locals.user) {
+  return Astro.redirect('/auth/signin?redirect=/review/new');
+}
+
+const buildingId = Astro.url.searchParams.get('building');
+let building: any = null;
+
+if (buildingId) {
+  try {
+    const db = getDB((Astro.locals as any).runtime);
+    building = await db.prepare('SELECT * FROM buildings WHERE id = ?').bind(buildingId).first();
+  } catch (error) {
+    console.error('Error loading building:', error);
+  }
+}
+---
+
+<BaseLayout title="Write a Review">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">Write a Review</h1>
+    <p class="text-gray-600 mb-8">
+      Share your experience to help other tenants make informed decisions.
+    </p>
+
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8">
+      <h2 class="font-semibold text-yellow-800 mb-2">Privacy Notice</h2>
+      <ul class="text-sm text-yellow-700 space-y-1">
+        <li>Your move-in and move-out dates will be shown as seasons (e.g., "Fall 2023"), not exact dates.</li>
+        <li>Your email address will never be displayed publicly.</li>
+        <li>Reviews are moderated before publishing to ensure they meet our guidelines.</li>
+      </ul>
+    </div>
+
+    <ReviewForm client:load building={building} />
+  </div>
+</BaseLayout>

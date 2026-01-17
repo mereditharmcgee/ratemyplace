@@ -1,0 +1,63 @@
+---
+interface Props {
+  scores: any;
+  type: 'building' | 'landlord';
+}
+
+const { scores, type } = Astro.props;
+
+const buildingCategories = [
+  { key: 'avg_building_quality', label: 'Building Quality' },
+  { key: 'avg_maintenance', label: 'Maintenance' },
+  { key: 'avg_pest_control', label: 'Pest Control' },
+  { key: 'avg_safety', label: 'Safety' },
+  { key: 'avg_noise', label: 'Noise Level' },
+  { key: 'avg_amenities', label: 'Amenities' },
+  { key: 'avg_rent_value', label: 'Rent Value' },
+];
+
+const landlordCategories = [
+  { key: 'avg_landlord_responsiveness', label: 'Responsiveness' },
+  { key: 'avg_landlord_communication', label: 'Communication' },
+  { key: 'avg_landlord_fairness', label: 'Fairness' },
+  { key: 'avg_lease_clarity', label: 'Lease Clarity' },
+  { key: 'avg_deposit_handling', label: 'Deposit Handling' },
+];
+
+const categories = type === 'building'
+  ? [...buildingCategories, ...landlordCategories.slice(0, 3)]
+  : landlordCategories;
+
+function getScoreColor(score: number): string {
+  if (score >= 4) return 'bg-green-500';
+  if (score >= 3) return 'bg-yellow-500';
+  if (score >= 2) return 'bg-orange-500';
+  return 'bg-red-500';
+}
+---
+
+<div class="bg-white rounded-lg border border-gray-200 p-6">
+  <h3 class="font-semibold text-gray-900 mb-4">Rating Breakdown</h3>
+
+  <div class="space-y-3">
+    {categories.map((category) => {
+      const score = scores[category.key];
+      if (score === null || score === undefined) return null;
+
+      return (
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-sm text-gray-600">{category.label}</span>
+            <span class="text-sm font-medium text-gray-900">{score.toFixed(1)}</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div
+              class={`h-2 rounded-full ${getScoreColor(score)}`}
+              style={`width: ${(score / 5) * 100}%`}
+            ></div>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>
