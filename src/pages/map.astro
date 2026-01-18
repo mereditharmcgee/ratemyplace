@@ -1,0 +1,93 @@
+---
+import BaseLayout from '../components/layout/BaseLayout.astro';
+import BuildingMap from '../components/BuildingMap';
+
+const runtime = (Astro.locals as any).runtime;
+const apiKey = runtime?.env?.GOOGLE_MAPS_API_KEY || '';
+---
+
+<BaseLayout title="Map" description="Explore Boston rental buildings on an interactive map. Find apartments with color-coded scores from tenant reviews.">
+  <div class="bg-slate-50 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">Explore Buildings</h1>
+        <p class="text-gray-600 mt-2">
+          Browse apartments on the map. Colors indicate tenant review scores.
+        </p>
+      </div>
+
+      {apiKey ? (
+        <BuildingMap client:load apiKey={apiKey} />
+      ) : (
+        <div class="w-full h-[500px] bg-gray-100 rounded-lg flex items-center justify-center">
+          <div class="text-center text-gray-600">
+            <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+            </svg>
+            <p class="font-medium">Map not available</p>
+            <p class="text-sm">Please configure Google Maps API key</p>
+          </div>
+        </div>
+      )}
+
+      <div class="mt-8 grid md:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-lg shadow-sm">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: #2D9B8320;">
+              <div class="w-4 h-4 rounded-full" style="background: #2D9B83;"></div>
+            </div>
+            <div>
+              <h3 class="font-semibold text-gray-900">Good (4-5)</h3>
+              <p class="text-sm text-gray-600">Highly rated by tenants</p>
+            </div>
+          </div>
+          <p class="text-sm text-gray-500">
+            Buildings with positive experiences reported. Most tenants would recommend.
+          </p>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-sm">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: #E8B44A20;">
+              <div class="w-4 h-4 rounded-full" style="background: #E8B44A;"></div>
+            </div>
+            <div>
+              <h3 class="font-semibold text-gray-900">Mixed (3-4)</h3>
+              <p class="text-sm text-gray-600">Average ratings</p>
+            </div>
+          </div>
+          <p class="text-sm text-gray-500">
+            Buildings with some positive and negative feedback. Check specific reviews for details.
+          </p>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-sm">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: #D9735620;">
+              <div class="w-4 h-4 rounded-full" style="background: #D97356;"></div>
+            </div>
+            <div>
+              <h3 class="font-semibold text-gray-900">Concerning (1-3)</h3>
+              <p class="text-sm text-gray-600">Issues reported</p>
+            </div>
+          </div>
+          <p class="text-sm text-gray-500">
+            Buildings with significant concerns reported by tenants. Review carefully before renting.
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-8 text-center">
+        <p class="text-gray-600 mb-4">
+          Don't see your building? Help other renters by adding a review.
+        </p>
+        <a
+          href="/review/new"
+          class="inline-block bg-teal-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-teal-700 transition-colors"
+        >
+          Write a Review
+        </a>
+      </div>
+    </div>
+  </div>
+</BaseLayout>

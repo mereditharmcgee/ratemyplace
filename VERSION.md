@@ -39,10 +39,10 @@
 
 ## Upcoming Milestones
 
-### v0.3.0-alpha - "Discovery" (Planned)
-- [ ] Google Maps address verification
-- [ ] Google Sign-In OAuth
-- [ ] Interactive map with building pins
+### v0.3.0-alpha - "Discovery" (In Progress)
+- [x] Google Maps address verification (Places Autocomplete API)
+- [x] Google Sign-In OAuth
+- [x] Interactive map with building pins
 - [ ] Search functionality improvements
 
 ### v0.4.0-beta - "Community" (Planned)
@@ -72,9 +72,9 @@
 | Rating Labels | Done | v0.2.0 |
 | Unit Details Form | Done | v0.2.0 |
 | Brand Colors | Done | v0.2.0 |
-| Google Maps API | Planned | v0.3.0 |
-| Google OAuth | Planned | v0.3.0 |
-| Interactive Map | Planned | v0.3.0 |
+| Google Maps API | Done | v0.3.0 |
+| Google OAuth | Done | v0.3.0 |
+| Interactive Map | Done | v0.3.0 |
 | Review Moderation | Planned | v0.4.0 |
 | Landlord Responses | Planned | v0.4.0 |
 

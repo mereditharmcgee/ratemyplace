@@ -17,7 +17,10 @@ export function initializeLucia(db: D1Database) {
     getUserAttributes: (attributes) => {
       return {
         email: attributes.email,
-        emailVerified: attributes.email_verified === 1
+        emailVerified: attributes.email_verified === 1,
+        name: attributes.name,
+        avatarUrl: attributes.avatar_url,
+        googleId: attributes.google_id
       };
     }
   });
@@ -33,6 +36,9 @@ declare module 'lucia' {
 interface DatabaseUserAttributes {
   email: string;
   email_verified: number;
+  name: string | null;
+  avatar_url: string | null;
+  google_id: string | null;
 }
 
 export type Auth = ReturnType<typeof initializeLucia>;

@@ -7,12 +7,17 @@ import {
   supplementaryItems,
   type SurveyItem,
 } from '../../lib/surveyItems';
+import AddressAutocomplete, { type PlaceDetails } from '../AddressAutocomplete';
 
 interface Building {
   id: string;
   address: string;
   neighborhood?: string;
   city: string;
+}
+
+interface PlaceData extends PlaceDetails {
+  existingBuilding?: Building | null;
 }
 
 interface Props {
@@ -67,9 +72,8 @@ export default function ReviewForm({ building }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   // Form state
-  const [addressSearch, setAddressSearch] = useState('');
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(building || null);
-  const [searchResults, setSearchResults] = useState<Building[]>([]);
+  const [selectedPlace, setSelectedPlace] = useState<PlaceData | null>(null);
 
   // Unit details
   const [unitDetails, setUnitDetails] = useState({
@@ -97,15 +101,86 @@ export default function ReviewForm({ building }: Props) {
     comments: '',
   });
 
-  const handleAddressSearch = async () => {
-    if (!addressSearch.trim()) return;
+  // Handle place selection from Google autocomplete
+  const handlePlaceSelect = async (place: PlaceDetails) => {
+    setLoading(true);
+    setError(null);
 
     try {
-      const response = await fetch(`/api/buildings?q=${encodeURIComponent(addressSearch)}`);
+      // Check if building already exists in our database
+      const response = await fetch(`/api/buildings?placeId=${encodeURIComponent(place.placeId)}`);
       const data = await response.json();
-      setSearchResults(data.buildings || []);
+
+      if (data.building) {
+        // Building exists - use it
+        setSelectedBuilding({
+          id: data.building.id,
+          address: data.building.address,
+          neighborhood: data.building.neighborhood,
+          city: data.building.city,
+        });
+        setSelectedPlace({ ...place, existingBuilding: data.building });
+      } else {
+        // New building - store place data for creation during submit
+        setSelectedPlace({ ...place, existingBuilding: null });
+        setSelectedBuilding(null);
+      }
     } catch (err) {
-      console.error('Search error:', err);
+      console.error('Building lookup error:', err);
+      setError('Failed to verify address. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Create building if needed and proceed
+  const handleAddressConfirm = async () => {
+    if (!selectedPlace) return;
+
+    // If building already exists, proceed
+    if (selectedBuilding) {
+      setStep('unit-details');
+      return;
+    }
+
+    // Create new building
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/buildings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          placeId: selectedPlace.placeId,
+          streetAddress: selectedPlace.streetAddress,
+          neighborhood: selectedPlace.neighborhood,
+          city: selectedPlace.city,
+          state: selectedPlace.state,
+          zipCode: selectedPlace.zipCode,
+          latitude: selectedPlace.latitude,
+          longitude: selectedPlace.longitude,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.building) {
+        setSelectedBuilding({
+          id: data.building.id,
+          address: selectedPlace.streetAddress,
+          neighborhood: selectedPlace.neighborhood,
+          city: selectedPlace.city,
+        });
+        setStep('unit-details');
+      } else {
+        setError(data.error || 'Failed to add building');
+      }
+    } catch (err) {
+      console.error('Building creation error:', err);
+      setError('Failed to add building. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -256,53 +331,65 @@ export default function ReviewForm({ building }: Props) {
   const renderAddressStep = () => (
     <div className="space-y-6">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Search for your building address</label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={addressSearch}
-            onChange={(e) => setAddressSearch(e.target.value)}
-            placeholder="Enter street address..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-          />
-          <button
-            type="button"
-            onClick={handleAddressSearch}
-            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
-          >
-            Search
-          </button>
-        </div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Search for your building address
+        </label>
+        <AddressAutocomplete
+          onPlaceSelect={handlePlaceSelect}
+          placeholder="Start typing your address..."
+        />
+        <p className="text-sm text-gray-500 mt-2">
+          Enter the street address of the building you want to review
+        </p>
       </div>
 
-      {searchResults.length > 0 && (
-        <div className="space-y-2">
-          {searchResults.map((b) => (
-            <button
-              key={b.id}
-              type="button"
-              onClick={() => {
-                setSelectedBuilding(b);
-                setStep('unit-details');
-              }}
-              className="w-full text-left p-4 border border-gray-200 rounded-lg hover:border-teal-500 hover:bg-teal-50"
-            >
-              <div className="font-medium">{b.address}</div>
-              <div className="text-sm text-gray-500">
-                {b.neighborhood && `${b.neighborhood}, `}
-                {b.city}
-              </div>
-            </button>
-          ))}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+          {error}
         </div>
       )}
 
-      <div className="text-center text-sm text-gray-500">
-        <p>Can't find your address?</p>
-        <button type="button" onClick={() => setStep('unit-details')} className="text-teal-600 hover:text-teal-800">
-          Add a new building
-        </button>
-      </div>
+      {selectedPlace && (
+        <div className="space-y-4">
+          <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="shrink-0 mt-0.5">
+                <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold text-teal-900">{selectedPlace.streetAddress}</div>
+                <div className="text-sm text-teal-700">
+                  {selectedPlace.neighborhood && `${selectedPlace.neighborhood}, `}
+                  {selectedPlace.city}, {selectedPlace.state} {selectedPlace.zipCode}
+                </div>
+                {selectedPlace.existingBuilding ? (
+                  <div className="mt-2 text-sm text-teal-600">
+                    This building is already in our system
+                  </div>
+                ) : (
+                  <div className="mt-2 text-sm text-teal-600">
+                    This will be a new building in our system
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleAddressConfirm}
+              disabled={loading}
+              className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+            >
+              {loading ? 'Verifying...' : 'Continue'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 
