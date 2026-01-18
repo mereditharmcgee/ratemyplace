@@ -1,5 +1,12 @@
 import { useState } from 'react';
-import { surveyItems, issueItems } from '../../lib/surveyItems';
+import {
+  unitItems,
+  buildingItems,
+  landlordItems,
+  RESPONSE_OPTIONS,
+  supplementaryItems,
+  type SurveyItem,
+} from '../../lib/surveyItems';
 
 interface Building {
   id: string;
@@ -12,29 +19,50 @@ interface Props {
   building?: Building | null;
 }
 
-type Step = 'address' | 'tenancy' | 'ratings' | 'issues' | 'review' | 'confirm';
+type Step = 'address' | 'unit-details' | 'unit-rating' | 'building-rating' | 'landlord-rating' | 'additional' | 'confirm';
 
-const seasons = [
-  { value: 'winter', label: 'Winter (Dec-Feb)' },
-  { value: 'spring', label: 'Spring (Mar-May)' },
-  { value: 'summer', label: 'Summer (Jun-Aug)' },
-  { value: 'fall', label: 'Fall (Sep-Nov)' },
-];
-
-const unitTypes = [
+const bedroomOptions = [
   { value: 'studio', label: 'Studio' },
-  { value: '1br', label: '1 Bedroom' },
-  { value: '2br', label: '2 Bedrooms' },
-  { value: '3br', label: '3 Bedrooms' },
-  { value: '4br+', label: '4+ Bedrooms' },
-  { value: 'house', label: 'House' },
+  { value: '1', label: '1 Bedroom' },
+  { value: '2', label: '2 Bedrooms' },
+  { value: '3', label: '3 Bedrooms' },
+  { value: '4', label: '4 Bedrooms' },
+  { value: '5+', label: '5+ Bedrooms' },
 ];
 
-const currentYear = new Date().getFullYear();
-const years = Array.from({ length: 30 }, (_, i) => currentYear - i);
+const bathroomOptions = [
+  { value: '1', label: '1 Bathroom' },
+  { value: '1.5', label: '1.5 Bathrooms' },
+  { value: '2', label: '2 Bathrooms' },
+  { value: '2.5', label: '2.5 Bathrooms' },
+  { value: '3+', label: '3+ Bathrooms' },
+];
+
+const amenityOptions = [
+  { id: 'ac', label: 'Air Conditioning' },
+  { id: 'in_unit_laundry', label: 'In-Unit Laundry' },
+  { id: 'dishwasher', label: 'Dishwasher' },
+  { id: 'balcony', label: 'Balcony/Patio' },
+  { id: 'storage', label: 'Storage Space' },
+  { id: 'pet_friendly', label: 'Pet Friendly' },
+  { id: 'doorman', label: 'Doorman/Concierge' },
+  { id: 'gym', label: 'Gym/Fitness Center' },
+  { id: 'pool', label: 'Pool' },
+  { id: 'elevator', label: 'Elevator' },
+];
+
+const utilityOptions = [
+  { id: 'heat', label: 'Heat' },
+  { id: 'hot_water', label: 'Hot Water' },
+  { id: 'electricity', label: 'Electricity' },
+  { id: 'gas', label: 'Gas' },
+  { id: 'water', label: 'Water/Sewer' },
+  { id: 'trash', label: 'Trash' },
+  { id: 'internet', label: 'Internet' },
+];
 
 export default function ReviewForm({ building }: Props) {
-  const [step, setStep] = useState<Step>(building ? 'tenancy' : 'address');
+  const [step, setStep] = useState<Step>(building ? 'unit-details' : 'address');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,30 +71,30 @@ export default function ReviewForm({ building }: Props) {
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(building || null);
   const [searchResults, setSearchResults] = useState<Building[]>([]);
 
-  const [tenancy, setTenancy] = useState({
-    moveInYear: currentYear,
-    moveInSeason: 'fall',
-    moveOutYear: currentYear,
-    moveOutSeason: 'fall',
-    isCurrentTenant: false,
-    unitType: '1br',
+  // Unit details
+  const [unitDetails, setUnitDetails] = useState({
+    unitNumber: '',
+    bedrooms: '1',
+    bathrooms: '1',
+    squareFootage: '',
     rentAmount: '',
+    amenities: [] as string[],
+    utilitiesIncluded: [] as string[],
   });
 
-  const [scores, setScores] = useState<Record<string, number>>({});
-
-  const [issues, setIssues] = useState<Record<string, boolean>>({
-    pest: false,
-    heat: false,
-    water: false,
-    deposit: false,
-    eviction: false,
+  // Tenancy info
+  const [tenancy, setTenancy] = useState({
+    tenure: 18,
+    moveOutYear: 'current',
   });
 
+  // Ratings
+  const [scores, setScores] = useState<Record<string, number | null>>({});
+
+  // Review
   const [review, setReview] = useState({
-    title: '',
-    text: '',
-    wouldRecommend: true,
+    wouldRecommend: 'yes',
+    comments: '',
   });
 
   const handleAddressSearch = async () => {
@@ -90,33 +118,30 @@ export default function ReviewForm({ building }: Props) {
     try {
       const formData = new FormData();
       formData.append('building_id', selectedBuilding.id);
-      formData.append('move_in_year', tenancy.moveInYear.toString());
-      formData.append('move_in_season', tenancy.moveInSeason);
-      formData.append('is_current_tenant', tenancy.isCurrentTenant ? '1' : '0');
 
-      if (!tenancy.isCurrentTenant) {
-        formData.append('move_out_year', tenancy.moveOutYear.toString());
-        formData.append('move_out_season', tenancy.moveOutSeason);
-      }
+      // Unit details
+      if (unitDetails.unitNumber) formData.append('unit_number', unitDetails.unitNumber);
+      formData.append('bedrooms', unitDetails.bedrooms);
+      formData.append('bathrooms', unitDetails.bathrooms);
+      if (unitDetails.squareFootage) formData.append('square_footage', unitDetails.squareFootage);
+      if (unitDetails.rentAmount) formData.append('rent_amount', unitDetails.rentAmount);
+      formData.append('amenities', JSON.stringify(unitDetails.amenities));
+      formData.append('utilities_included', JSON.stringify(unitDetails.utilitiesIncluded));
 
-      formData.append('unit_type', tenancy.unitType);
-      if (tenancy.rentAmount) {
-        formData.append('rent_amount', tenancy.rentAmount);
-      }
+      // Tenancy
+      formData.append('tenure_months', tenancy.tenure.toString());
+      formData.append('move_out_year', tenancy.moveOutYear);
 
-      // Add scores
+      // Scores
       for (const [key, value] of Object.entries(scores)) {
-        formData.append(`score_${key}`, value.toString());
+        if (value !== null) {
+          formData.append(key, value.toString());
+        }
       }
 
-      // Add issues
-      for (const [key, value] of Object.entries(issues)) {
-        formData.append(`had_${key}_issues`, value ? '1' : '0');
-      }
-
-      formData.append('would_recommend', review.wouldRecommend ? '1' : '0');
-      if (review.title) formData.append('review_title', review.title);
-      if (review.text) formData.append('review_text', review.text);
+      // Review
+      formData.append('would_recommend', review.wouldRecommend);
+      if (review.comments) formData.append('comments', review.comments);
 
       const response = await fetch('/api/reviews', {
         method: 'POST',
@@ -137,29 +162,93 @@ export default function ReviewForm({ building }: Props) {
     }
   };
 
-  const renderStepIndicator = () => {
-    const steps = ['Address', 'Tenancy', 'Ratings', 'Issues', 'Review', 'Submit'];
-    const stepIndex = ['address', 'tenancy', 'ratings', 'issues', 'review', 'confirm'].indexOf(step);
+  const steps: { id: Step; title: string }[] = [
+    { id: 'address', title: 'Address' },
+    { id: 'unit-details', title: 'Unit Details' },
+    { id: 'unit-rating', title: 'Your Unit' },
+    { id: 'building-rating', title: 'Building' },
+    { id: 'landlord-rating', title: 'Landlord' },
+    { id: 'additional', title: 'Additional' },
+    { id: 'confirm', title: 'Submit' },
+  ];
+
+  const currentStepIndex = steps.findIndex((s) => s.id === step);
+
+  const renderStepIndicator = () => (
+    <div className="flex items-center justify-between mb-8 overflow-x-auto">
+      {steps.map((s, i) => (
+        <div key={s.id} className="flex items-center">
+          <div
+            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium shrink-0 ${
+              i <= currentStepIndex ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-500'
+            }`}
+          >
+            {i + 1}
+          </div>
+          <span className="hidden sm:block ml-2 text-sm text-gray-600 whitespace-nowrap">{s.title}</span>
+          {i < steps.length - 1 && (
+            <div className={`w-4 sm:w-12 h-1 mx-2 ${i < currentStepIndex ? 'bg-teal-600' : 'bg-gray-200'}`} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderRatingScale = () => (
+    <div className="flex justify-between items-center text-xs text-gray-500 mb-4 px-2">
+      <span className="text-coral-600 font-medium">1 = Strongly Disagree</span>
+      <span className="text-gray-400">3 = Neutral</span>
+      <span className="text-emerald-600 font-medium">5 = Strongly Agree</span>
+    </div>
+  );
+
+  const renderRatingItem = (item: SurveyItem) => {
+    const value = scores[item.key];
 
     return (
-      <div className="flex items-center justify-between mb-8">
-        {steps.map((s, i) => (
-          <div key={s} className="flex items-center">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                i <= stepIndex
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-500'
+      <div key={item.key} className="py-4 border-b border-gray-100 last:border-0">
+        <div className="mb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <span className="text-xs text-gray-400 font-mono mr-2">{item.code}</span>
+              <span className="font-medium text-gray-900">{item.dimension}</span>
+              {item.required && <span className="text-coral-500 ml-1">*</span>}
+            </div>
+          </div>
+          <p className="text-sm text-gray-600 mt-1">{item.text}</p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {[1, 2, 3, 4, 5].map((rating) => (
+            <button
+              key={rating}
+              type="button"
+              onClick={() => setScores({ ...scores, [item.key]: rating })}
+              className={`w-10 h-10 rounded-full text-sm font-medium transition-all ${
+                value === rating
+                  ? rating <= 2
+                    ? 'bg-coral-500 text-white'
+                    : rating === 3
+                      ? 'bg-amber-400 text-slate-900'
+                      : 'bg-emerald-500 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              {i + 1}
-            </div>
-            <span className="hidden sm:block ml-2 text-sm text-gray-600">{s}</span>
-            {i < steps.length - 1 && (
-              <div className={`w-8 sm:w-16 h-1 mx-2 ${i < stepIndex ? 'bg-blue-600' : 'bg-gray-200'}`} />
-            )}
-          </div>
-        ))}
+              {rating}
+            </button>
+          ))}
+          {item.allowNA && (
+            <button
+              type="button"
+              onClick={() => setScores({ ...scores, [item.key]: null })}
+              className={`px-3 h-10 rounded-full text-sm font-medium transition-all ${
+                value === null ? 'bg-gray-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              N/A
+            </button>
+          )}
+        </div>
       </div>
     );
   };
@@ -167,21 +256,19 @@ export default function ReviewForm({ building }: Props) {
   const renderAddressStep = () => (
     <div className="space-y-6">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Search for your building address
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Search for your building address</label>
         <div className="flex gap-2">
           <input
             type="text"
             value={addressSearch}
             onChange={(e) => setAddressSearch(e.target.value)}
             placeholder="Enter street address..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
           <button
             type="button"
             onClick={handleAddressSearch}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
           >
             Search
           </button>
@@ -196,13 +283,14 @@ export default function ReviewForm({ building }: Props) {
               type="button"
               onClick={() => {
                 setSelectedBuilding(b);
-                setStep('tenancy');
+                setStep('unit-details');
               }}
-              className="w-full text-left p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50"
+              className="w-full text-left p-4 border border-gray-200 rounded-lg hover:border-teal-500 hover:bg-teal-50"
             >
               <div className="font-medium">{b.address}</div>
               <div className="text-sm text-gray-500">
-                {b.neighborhood && `${b.neighborhood}, `}{b.city}
+                {b.neighborhood && `${b.neighborhood}, `}
+                {b.city}
               </div>
             </button>
           ))}
@@ -211,21 +299,17 @@ export default function ReviewForm({ building }: Props) {
 
       <div className="text-center text-sm text-gray-500">
         <p>Can't find your address?</p>
-        <button
-          type="button"
-          onClick={() => setStep('tenancy')}
-          className="text-blue-600 hover:text-blue-800"
-        >
+        <button type="button" onClick={() => setStep('unit-details')} className="text-teal-600 hover:text-teal-800">
           Add a new building
         </button>
       </div>
     </div>
   );
 
-  const renderTenancyStep = () => (
+  const renderUnitDetailsStep = () => (
     <div className="space-y-6">
       {selectedBuilding && (
-        <div className="bg-gray-50 p-4 rounded-lg mb-6">
+        <div className="bg-slate-50 p-4 rounded-lg mb-6">
           <div className="font-medium">{selectedBuilding.address}</div>
           <div className="text-sm text-gray-500">
             {selectedBuilding.neighborhood && `${selectedBuilding.neighborhood}, `}
@@ -235,103 +319,157 @@ export default function ReviewForm({ building }: Props) {
       )}
 
       <div className="grid grid-cols-2 gap-4">
+        <div className="col-span-2 sm:col-span-1">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Unit Number <span className="text-gray-400">(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={unitDetails.unitNumber}
+            onChange={(e) => setUnitDetails({ ...unitDetails, unitNumber: e.target.value })}
+            placeholder="e.g., 2A, 301"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          />
+        </div>
+
+        <div className="col-span-2 sm:col-span-1">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Square Footage <span className="text-gray-400">(optional)</span>
+          </label>
+          <input
+            type="number"
+            value={unitDetails.squareFootage}
+            onChange={(e) => setUnitDetails({ ...unitDetails, squareFootage: e.target.value })}
+            placeholder="e.g., 750"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          />
+        </div>
+
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Move-in Year</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Bedrooms</label>
           <select
-            value={tenancy.moveInYear}
-            onChange={(e) => setTenancy({ ...tenancy, moveInYear: parseInt(e.target.value) })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+            value={unitDetails.bedrooms}
+            onChange={(e) => setUnitDetails({ ...unitDetails, bedrooms: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
-            {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
+            {bedroomOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
             ))}
           </select>
         </div>
+
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Move-in Season</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Bathrooms</label>
           <select
-            value={tenancy.moveInSeason}
-            onChange={(e) => setTenancy({ ...tenancy, moveInSeason: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+            value={unitDetails.bathrooms}
+            onChange={(e) => setUnitDetails({ ...unitDetails, bathrooms: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
-            {seasons.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
+            {bathroomOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
             ))}
           </select>
+        </div>
+
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Monthly Rent <span className="text-gray-400">(optional)</span>
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+            <input
+              type="number"
+              value={unitDetails.rentAmount}
+              onChange={(e) => setUnitDetails({ ...unitDetails, rentAmount: e.target.value })}
+              placeholder="e.g., 2500"
+              className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            />
+          </div>
         </div>
       </div>
 
       <div>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={tenancy.isCurrentTenant}
-            onChange={(e) => setTenancy({ ...tenancy, isCurrentTenant: e.target.checked })}
-            className="rounded border-gray-300"
-          />
-          <span className="text-sm font-medium text-gray-700">I currently live here</span>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Amenities <span className="text-gray-400">(select all that apply)</span>
         </label>
+        <div className="grid grid-cols-2 gap-2">
+          {amenityOptions.map((amenity) => (
+            <label
+              key={amenity.id}
+              className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                unitDetails.amenities.includes(amenity.id)
+                  ? 'border-teal-500 bg-teal-50'
+                  : 'border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={unitDetails.amenities.includes(amenity.id)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setUnitDetails({ ...unitDetails, amenities: [...unitDetails.amenities, amenity.id] });
+                  } else {
+                    setUnitDetails({
+                      ...unitDetails,
+                      amenities: unitDetails.amenities.filter((a) => a !== amenity.id),
+                    });
+                  }
+                }}
+                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              />
+              <span className="text-sm text-gray-700">{amenity.label}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
-      {!tenancy.isCurrentTenant && (
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Move-out Year</label>
-            <select
-              value={tenancy.moveOutYear}
-              onChange={(e) => setTenancy({ ...tenancy, moveOutYear: parseInt(e.target.value) })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Utilities Included in Rent <span className="text-gray-400">(select all that apply)</span>
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {utilityOptions.map((utility) => (
+            <label
+              key={utility.id}
+              className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                unitDetails.utilitiesIncluded.includes(utility.id)
+                  ? 'border-teal-500 bg-teal-50'
+                  : 'border-gray-200 hover:bg-gray-50'
+              }`}
             >
-              {years.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Move-out Season</label>
-            <select
-              value={tenancy.moveOutSeason}
-              onChange={(e) => setTenancy({ ...tenancy, moveOutSeason: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-            >
-              {seasons.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Unit Type</label>
-          <select
-            value={tenancy.unitType}
-            onChange={(e) => setTenancy({ ...tenancy, unitType: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-          >
-            {unitTypes.map((u) => (
-              <option key={u.value} value={u.value}>{u.label}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Monthly Rent (optional)</label>
-          <input
-            type="number"
-            value={tenancy.rentAmount}
-            onChange={(e) => setTenancy({ ...tenancy, rentAmount: e.target.value })}
-            placeholder="$ per month"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-          />
+              <input
+                type="checkbox"
+                checked={unitDetails.utilitiesIncluded.includes(utility.id)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setUnitDetails({
+                      ...unitDetails,
+                      utilitiesIncluded: [...unitDetails.utilitiesIncluded, utility.id],
+                    });
+                  } else {
+                    setUnitDetails({
+                      ...unitDetails,
+                      utilitiesIncluded: unitDetails.utilitiesIncluded.filter((u) => u !== utility.id),
+                    });
+                  }
+                }}
+                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              />
+              <span className="text-sm text-gray-700">{utility.label}</span>
+            </label>
+          ))}
         </div>
       </div>
 
       <div className="flex justify-end">
         <button
           type="button"
-          onClick={() => setStep('ratings')}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          onClick={() => setStep('unit-rating')}
+          className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
         >
           Continue
         </button>
@@ -339,60 +477,31 @@ export default function ReviewForm({ building }: Props) {
     </div>
   );
 
-  const renderRatingsStep = () => (
-    <div className="space-y-6">
-      <p className="text-sm text-gray-600 mb-4">
-        Rate each aspect from 1 (poor) to 5 (excellent). Skip any that don't apply.
-      </p>
+  const renderUnitRatingStep = () => (
+    <div className="space-y-4">
+      <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-6">
+        <h3 className="font-semibold text-teal-800 mb-1">Rate Your Unit</h3>
+        <p className="text-sm text-teal-700">
+          Think about the unit you lived in. Rate how much you agree with each statement.
+        </p>
+      </div>
 
-      {['building', 'landlord', 'value'].map((category) => (
-        <div key={category} className="mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 capitalize">
-            {category === 'building' ? 'Building Quality' : category === 'landlord' ? 'Landlord Experience' : 'Value'}
-          </h3>
-          <div className="space-y-4">
-            {surveyItems
-              .filter((item) => item.category === category)
-              .map((item) => (
-                <div key={item.id} className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-gray-900">{item.label}</div>
-                    <div className="text-sm text-gray-500">{item.description}</div>
-                  </div>
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5].map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setScores({ ...scores, [item.id]: value })}
-                        className={`w-10 h-10 rounded-full text-sm font-medium ${
-                          scores[item.id] === value
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {value}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-      ))}
+      {renderRatingScale()}
 
-      <div className="flex justify-between">
+      <div className="space-y-2">{unitItems.map(renderRatingItem)}</div>
+
+      <div className="flex justify-between pt-4">
         <button
           type="button"
-          onClick={() => setStep('tenancy')}
+          onClick={() => setStep('unit-details')}
           className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
         >
           Back
         </button>
         <button
           type="button"
-          onClick={() => setStep('issues')}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          onClick={() => setStep('building-rating')}
+          className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
         >
           Continue
         </button>
@@ -400,44 +509,31 @@ export default function ReviewForm({ building }: Props) {
     </div>
   );
 
-  const renderIssuesStep = () => (
-    <div className="space-y-6">
-      <p className="text-sm text-gray-600 mb-4">
-        Did you experience any of these issues during your tenancy?
-      </p>
-
-      <div className="space-y-4">
-        {issueItems.map((item) => (
-          <label
-            key={item.id}
-            className="flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-          >
-            <input
-              type="checkbox"
-              checked={issues[item.id] || false}
-              onChange={(e) => setIssues({ ...issues, [item.id]: e.target.checked })}
-              className="mt-1 rounded border-gray-300"
-            />
-            <div>
-              <div className="font-medium text-gray-900">{item.label}</div>
-              <div className="text-sm text-gray-500">{item.description}</div>
-            </div>
-          </label>
-        ))}
+  const renderBuildingRatingStep = () => (
+    <div className="space-y-4">
+      <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-6">
+        <h3 className="font-semibold text-teal-800 mb-1">Rate the Building</h3>
+        <p className="text-sm text-teal-700">
+          Think about the building as a whole. If something doesn't apply, select "N/A".
+        </p>
       </div>
 
-      <div className="flex justify-between">
+      {renderRatingScale()}
+
+      <div className="space-y-2">{buildingItems.map(renderRatingItem)}</div>
+
+      <div className="flex justify-between pt-4">
         <button
           type="button"
-          onClick={() => setStep('ratings')}
+          onClick={() => setStep('unit-rating')}
           className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
         >
           Back
         </button>
         <button
           type="button"
-          onClick={() => setStep('review')}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          onClick={() => setStep('landlord-rating')}
+          className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
         >
           Continue
         </button>
@@ -445,67 +541,112 @@ export default function ReviewForm({ building }: Props) {
     </div>
   );
 
-  const renderReviewStep = () => (
+  const renderLandlordRatingStep = () => (
+    <div className="space-y-4">
+      <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-6">
+        <h3 className="font-semibold text-teal-800 mb-1">Rate Your Landlord</h3>
+        <p className="text-sm text-teal-700">
+          Think about your landlord or property management company and your interactions with them.
+        </p>
+      </div>
+
+      {renderRatingScale()}
+
+      <div className="space-y-2">{landlordItems.map(renderRatingItem)}</div>
+
+      <div className="flex justify-between pt-4">
+        <button
+          type="button"
+          onClick={() => setStep('building-rating')}
+          className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          onClick={() => setStep('additional')}
+          className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+        >
+          Continue
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderAdditionalStep = () => (
     <div className="space-y-6">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Review Title (optional)
+          {supplementaryItems.tenure.text}
         </label>
-        <input
-          type="text"
-          value={review.title}
-          onChange={(e) => setReview({ ...review, title: e.target.value })}
-          placeholder="Summarize your experience in a few words"
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-          maxLength={200}
-        />
+        <select
+          value={tenancy.tenure}
+          onChange={(e) => setTenancy({ ...tenancy, tenure: parseInt(e.target.value) })}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        >
+          {supplementaryItems.tenure.options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Your Review (optional)
+          {supplementaryItems.moveOutTiming.text}
+        </label>
+        <select
+          value={tenancy.moveOutYear}
+          onChange={(e) => setTenancy({ ...tenancy, moveOutYear: e.target.value })}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        >
+          {supplementaryItems.moveOutTiming.options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          {supplementaryItems.wouldRecommend.text}
+        </label>
+        <div className="flex gap-4">
+          {supplementaryItems.wouldRecommend.options.map((opt) => (
+            <label key={opt.value} className="flex items-center gap-2">
+              <input
+                type="radio"
+                checked={review.wouldRecommend === opt.value}
+                onChange={() => setReview({ ...review, wouldRecommend: opt.value })}
+                className="text-teal-600 focus:ring-teal-500"
+              />
+              <span>{opt.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Additional Comments <span className="text-gray-400">(optional)</span>
         </label>
         <textarea
-          value={review.text}
-          onChange={(e) => setReview({ ...review, text: e.target.value })}
-          placeholder="Share details about your experience living here..."
-          rows={6}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-          maxLength={5000}
+          value={review.comments}
+          onChange={(e) => setReview({ ...review, comments: e.target.value })}
+          placeholder="Share any details that would help future tenants. Avoid including identifying information."
+          rows={4}
+          maxLength={1000}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         />
-        <p className="text-sm text-gray-500 mt-1">{review.text.length}/5000 characters</p>
-      </div>
-
-      <div className="p-4 bg-gray-50 rounded-lg">
-        <div className="font-medium text-gray-900 mb-3">
-          Would you recommend this building to other tenants?
-        </div>
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              checked={review.wouldRecommend}
-              onChange={() => setReview({ ...review, wouldRecommend: true })}
-              className="text-blue-600"
-            />
-            <span>Yes</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              checked={!review.wouldRecommend}
-              onChange={() => setReview({ ...review, wouldRecommend: false })}
-              className="text-blue-600"
-            />
-            <span>No</span>
-          </label>
-        </div>
+        <p className="text-sm text-gray-500 mt-1">{review.comments.length}/1000 characters</p>
       </div>
 
       <div className="flex justify-between">
         <button
           type="button"
-          onClick={() => setStep('issues')}
+          onClick={() => setStep('landlord-rating')}
           className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
         >
           Back
@@ -513,7 +654,7 @@ export default function ReviewForm({ building }: Props) {
         <button
           type="button"
           onClick={() => setStep('confirm')}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
         >
           Review & Submit
         </button>
@@ -521,86 +662,111 @@ export default function ReviewForm({ building }: Props) {
     </div>
   );
 
-  const renderConfirmStep = () => (
-    <div className="space-y-6">
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h3 className="font-semibold text-yellow-800 mb-2">Before you submit</h3>
-        <ul className="text-sm text-yellow-700 space-y-1">
-          <li>Your review will be checked by our team before publishing.</li>
-          <li>Make sure your review is honest and based on your actual experience.</li>
-          <li>Don't include personal information about landlords or other tenants.</li>
-        </ul>
-      </div>
+  const renderConfirmStep = () => {
+    const unitScoreCount = unitItems.filter((item) => scores[item.key] !== undefined).length;
+    const buildingScoreCount = buildingItems.filter((item) => scores[item.key] !== undefined).length;
+    const landlordScoreCount = landlordItems.filter((item) => scores[item.key] !== undefined).length;
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          {error}
-        </div>
-      )}
-
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Review Summary</h3>
-
-        {selectedBuilding && (
-          <div className="mb-4 pb-4 border-b border-gray-100">
-            <div className="text-sm text-gray-500">Building</div>
-            <div className="font-medium">{selectedBuilding.address}</div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-gray-500">Unit Type:</span>
-            <span className="ml-2 font-medium">
-              {unitTypes.find((u) => u.value === tenancy.unitType)?.label}
-            </span>
-          </div>
-          <div>
-            <span className="text-gray-500">Move-in:</span>
-            <span className="ml-2 font-medium">
-              {seasons.find((s) => s.value === tenancy.moveInSeason)?.label.split(' ')[0]} {tenancy.moveInYear}
-            </span>
-          </div>
-          <div>
-            <span className="text-gray-500">Scores rated:</span>
-            <span className="ml-2 font-medium">{Object.keys(scores).length}/12</span>
-          </div>
-          <div>
-            <span className="text-gray-500">Would recommend:</span>
-            <span className="ml-2 font-medium">{review.wouldRecommend ? 'Yes' : 'No'}</span>
+    return (
+      <div className="space-y-6">
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex gap-3">
+            <div className="shrink-0">
+              <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+            </div>
+            <div>
+              <h4 className="font-semibold text-amber-800 mb-1">Before you submit</h4>
+              <p className="text-sm text-amber-700">
+                Your landlord may be able to identify you based on details in your review. Avoid mentioning
+                specific dates, unit numbers, or personal details.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="flex justify-between">
-        <button
-          type="button"
-          onClick={() => setStep('review')}
-          className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={loading}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? 'Submitting...' : 'Submit Review'}
-        </button>
+        {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>}
+
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="font-semibold text-gray-900 mb-4">Review Summary</h3>
+
+          {selectedBuilding && (
+            <div className="mb-4 pb-4 border-b border-gray-100">
+              <div className="text-sm text-gray-500">Building</div>
+              <div className="font-medium">{selectedBuilding.address}</div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-gray-500">Unit:</span>
+              <span className="ml-2 font-medium">
+                {bedroomOptions.find((b) => b.value === unitDetails.bedrooms)?.label},{' '}
+                {bathroomOptions.find((b) => b.value === unitDetails.bathrooms)?.label}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500">Tenure:</span>
+              <span className="ml-2 font-medium">
+                {supplementaryItems.tenure.options.find((t) => t.value === tenancy.tenure)?.label}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500">Unit ratings:</span>
+              <span className="ml-2 font-medium">{unitScoreCount}/{unitItems.length}</span>
+            </div>
+            <div>
+              <span className="text-gray-500">Building ratings:</span>
+              <span className="ml-2 font-medium">{buildingScoreCount}/{buildingItems.length}</span>
+            </div>
+            <div>
+              <span className="text-gray-500">Landlord ratings:</span>
+              <span className="ml-2 font-medium">{landlordScoreCount}/{landlordItems.length}</span>
+            </div>
+            <div>
+              <span className="text-gray-500">Would recommend:</span>
+              <span className="ml-2 font-medium capitalize">{review.wouldRecommend}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between">
+          <button
+            type="button"
+            onClick={() => setStep('additional')}
+            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+          >
+            {loading ? 'Submitting...' : 'Submit Review'}
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div>
       {renderStepIndicator()}
 
       {step === 'address' && renderAddressStep()}
-      {step === 'tenancy' && renderTenancyStep()}
-      {step === 'ratings' && renderRatingsStep()}
-      {step === 'issues' && renderIssuesStep()}
-      {step === 'review' && renderReviewStep()}
+      {step === 'unit-details' && renderUnitDetailsStep()}
+      {step === 'unit-rating' && renderUnitRatingStep()}
+      {step === 'building-rating' && renderBuildingRatingStep()}
+      {step === 'landlord-rating' && renderLandlordRatingStep()}
+      {step === 'additional' && renderAdditionalStep()}
       {step === 'confirm' && renderConfirmStep()}
     </div>
   );
