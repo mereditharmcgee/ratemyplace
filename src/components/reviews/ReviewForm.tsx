@@ -101,6 +101,9 @@ export default function ReviewForm({ building }: Props) {
     comments: '',
   });
 
+  // Privacy acknowledgment
+  const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
+
   // Handle place selection from Google autocomplete
   const handlePlaceSelect = async (place: PlaceDetails) => {
     setLoading(true);
@@ -768,12 +771,33 @@ export default function ReviewForm({ building }: Props) {
                 />
               </svg>
             </div>
-            <div>
+            <div className="flex-1">
               <h4 className="font-semibold text-amber-800 mb-1">Before you submit</h4>
-              <p className="text-sm text-amber-700">
+              <p className="text-sm text-amber-700 mb-3">
                 Your landlord may be able to identify you based on details in your review. Avoid mentioning
                 specific dates, unit numbers, or personal details.
               </p>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={privacyAcknowledged}
+                  onChange={(e) => setPrivacyAcknowledged(e.target.checked)}
+                  className="mt-0.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+                />
+                <span className="text-sm text-amber-800">
+                  I understand that while my review is anonymous, details may allow the landlord to identify me.
+                  I confirm this review is based on my actual experience as a tenant at this property and complies
+                  with the{' '}
+                  <a href="/terms" target="_blank" className="underline font-medium hover:text-amber-900">
+                    Terms of Service
+                  </a>{' '}
+                  and{' '}
+                  <a href="/guidelines" target="_blank" className="underline font-medium hover:text-amber-900">
+                    Review Guidelines
+                  </a>
+                  .
+                </span>
+              </label>
             </div>
           </div>
         </div>
@@ -834,8 +858,8 @@ export default function ReviewForm({ building }: Props) {
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={loading}
-            className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+            disabled={loading || !privacyAcknowledged}
+            className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Submitting...' : 'Submit Review'}
           </button>

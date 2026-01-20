@@ -81,6 +81,19 @@ const availableUnitScores = unitScores.filter(s => review[s.key] != null);
 const availableBuildingScores = buildingScores.filter(s => review[s.key] != null);
 const availableLandlordScores = landlordScores.filter(s => review[s.key] != null);
 
+// Security deposit display helpers
+const hasDepositScore = review.landlord_deposit != null;
+const hasDepositIssues = review.had_security_deposit_issues === 1;
+const showDepositSection = hasDepositScore || hasDepositIssues;
+
+function getDepositStatus(score: number): { label: string; color: string; bgColor: string } {
+  if (score >= 4) return { label: 'Good', color: 'text-green-700', bgColor: 'bg-green-50 border-green-200' };
+  if (score >= 3) return { label: 'Fair', color: 'text-yellow-700', bgColor: 'bg-yellow-50 border-yellow-200' };
+  return { label: 'Concerning', color: 'text-red-700', bgColor: 'bg-red-50 border-red-200' };
+}
+
+const depositStatus = hasDepositScore ? getDepositStatus(review.landlord_deposit) : null;
+
 // Parse JSON arrays safely
 function parseJsonArray(value: string | null | undefined): string[] {
   if (!value) return [];
@@ -240,6 +253,49 @@ const parkingLabels: Record<string, string> = {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  )}
+
+  <!-- Security Deposit Highlight -->
+  {showDepositSection && (
+    <div class={`rounded-lg p-4 mb-4 border ${hasDepositIssues ? 'bg-amber-50 border-amber-300' : depositStatus?.bgColor || 'bg-gray-50 border-gray-200'}`}>
+      <div class="flex items-center gap-3">
+        <div class="shrink-0">
+          <svg class={`w-6 h-6 ${hasDepositIssues ? 'text-amber-600' : depositStatus?.color || 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center justify-between">
+            <h4 class={`text-sm font-semibold uppercase tracking-wide ${hasDepositIssues ? 'text-amber-800' : depositStatus?.color || 'text-gray-700'}`}>
+              Security Deposit
+            </h4>
+            {hasDepositScore && (
+              <div class="flex items-center gap-2">
+                <div class="flex gap-0.5">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div class={`w-3 h-3 rounded-sm ${i <= review.landlord_deposit ? (review.landlord_deposit >= 4 ? 'bg-green-500' : review.landlord_deposit >= 3 ? 'bg-yellow-500' : 'bg-red-500') : 'bg-gray-200'}`} />
+                  ))}
+                </div>
+                <span class={`text-sm font-bold ${depositStatus?.color}`}>{review.landlord_deposit}/5</span>
+              </div>
+            )}
+          </div>
+          {hasDepositIssues && (
+            <p class="text-sm text-amber-700 mt-1 flex items-center gap-1">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+              </svg>
+              Tenant reported issues with security deposit return
+            </p>
+          )}
+          {hasDepositScore && !hasDepositIssues && (
+            <p class={`text-sm mt-1 ${depositStatus?.color}`}>
+              {review.landlord_deposit >= 4 ? 'Deposit handled fairly' : review.landlord_deposit >= 3 ? 'Mixed experience with deposit' : 'Problems with deposit handling'}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )}
