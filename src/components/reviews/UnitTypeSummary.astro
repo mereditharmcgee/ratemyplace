@@ -1,0 +1,96 @@
+---
+import StarRating from '../ratings/StarRating.astro';
+
+interface UnitStats {
+  unitType: string;
+  reviewCount: number;
+  avgScore: number;
+  minRent: number | null;
+  maxRent: number | null;
+  wouldRecommendPct: number;
+}
+
+interface Props {
+  stats: UnitStats;
+  isExpanded?: boolean;
+}
+
+const { stats, isExpanded = false } = Astro.props;
+
+const unitTypeLabels: Record<string, string> = {
+  'studio': 'Studio',
+  '1br': '1 Bedroom',
+  '2br': '2 Bedrooms',
+  '3br': '3 Bedrooms',
+  '4br+': '4+ Bedrooms',
+  'house': 'House'
+};
+
+const label = unitTypeLabels[stats.unitType] || stats.unitType;
+
+function formatRent(amount: number): string {
+  return '$' + amount.toLocaleString();
+}
+
+const rentRange = stats.minRent && stats.maxRent
+  ? stats.minRent === stats.maxRent
+    ? formatRent(stats.minRent)
+    : `${formatRent(stats.minRent)} - ${formatRent(stats.maxRent)}`
+  : null;
+---
+
+<div
+  class="unit-type-card bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-teal-300 hover:shadow-sm transition-all"
+  data-unit-type={stats.unitType}
+  data-expanded={isExpanded ? "true" : "false"}
+>
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
+        <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+      </div>
+      <div>
+        <h4 class="font-semibold text-gray-900">{label}</h4>
+        <p class="text-sm text-gray-500">
+          {stats.reviewCount} review{stats.reviewCount !== 1 ? 's' : ''}
+        </p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-4">
+      {rentRange && (
+        <div class="text-right hidden sm:block">
+          <p class="text-xs text-gray-500">Rent Range</p>
+          <p class="text-sm font-medium text-gray-900">{rentRange}</p>
+        </div>
+      )}
+
+      <div class="text-right">
+        <div class="flex items-center gap-1">
+          <span class="text-lg font-bold text-teal-600">{stats.avgScore.toFixed(1)}</span>
+          <StarRating rating={stats.avgScore} size="sm" />
+        </div>
+        <p class="text-xs text-gray-500">
+          {Math.round(stats.wouldRecommendPct)}% recommend
+        </p>
+      </div>
+
+      <svg
+        class="w-5 h-5 text-gray-400 chevron-icon transition-transform"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+      </svg>
+    </div>
+  </div>
+</div>
+
+<style>
+  .unit-type-card[data-expanded="true"] .chevron-icon {
+    transform: rotate(180deg);
+  }
+</style>

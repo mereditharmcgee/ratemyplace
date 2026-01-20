@@ -11,14 +11,42 @@
 
 ---
 
-## Current Version: v0.2.0-alpha
+## Current Version: v1.0.0-alpha
 
 **Released:** January 2026
-**Codename:** "Foundation"
+**Codename:** "Complete Foundation"
 
 ### Changelog
 
-#### v0.2.0-alpha (January 2026) - Current
+#### v1.0.0-alpha (January 2026) - Current
+
+**New Features:**
+- Property Manager System: Buildings can have both landlord AND property manager
+- Property Manager profile pages with aggregated scores
+- Enhanced Review Display: Full 27-item survey breakdown in ReviewCard
+- Unit Number Grouping: Reviews grouped by unit number with collapsible cards
+- Landlord Profile Enhancement: Recent reviews from all buildings displayed
+- Score breakdown by category (Unit, Building, Landlord) in review cards
+- Amenities, utilities, and lease details display in reviews
+- Common issues tracking with visual tags
+
+**Bug Fixes:**
+- Fixed "0" appearing in review cards (truthy check vs explicit equality)
+- Fixed ReviewCard using old schema field names
+- Fixed session persistence in middleware for login state
+
+**Technical:**
+- Complete database schema with 27 review fields
+- Property manager tables and foreign key relationships
+- Build passing with no TypeScript errors
+- Client bundle: 169.44 KB total
+
+#### v0.3.0-alpha (January 2026)
+- Google Maps address verification (Places Autocomplete API)
+- Google Sign-In OAuth
+- Interactive map with building pins
+
+#### v0.2.0-alpha (January 2026)
 - Added 27-item survey instrument based on OHQS/PHQS research
 - Updated language: apartment/rental-focused (removed "Boston home" language)
 - Added password visibility toggle on signup
@@ -39,19 +67,14 @@
 
 ## Upcoming Milestones
 
-### v0.3.0-alpha - "Discovery" (In Progress)
-- [x] Google Maps address verification (Places Autocomplete API)
-- [x] Google Sign-In OAuth
-- [x] Interactive map with building pins
-- [ ] Search functionality improvements
-
-### v0.4.0-beta - "Community" (Planned)
-- [ ] Review moderation queue
+### v1.1.0-beta - "Community" (Planned)
+- [ ] Review moderation queue (admin)
 - [ ] Landlord response system
 - [ ] User profile pages
 - [ ] Email notifications
+- [ ] Search functionality improvements
 
-### v1.0.0-stable - "Launch" (Target)
+### v2.0.0-stable - "Launch" (Target)
 - [ ] Full feature set complete
 - [ ] Accessibility audit passed
 - [ ] Performance optimized
@@ -75,8 +98,48 @@
 | Google Maps API | Done | v0.3.0 |
 | Google OAuth | Done | v0.3.0 |
 | Interactive Map | Done | v0.3.0 |
-| Review Moderation | Planned | v0.4.0 |
-| Landlord Responses | Planned | v0.4.0 |
+| **Property Manager System** | **Done** | **v1.0.0** |
+| **Unit Number Grouping** | **Done** | **v1.0.0** |
+| **Enhanced Review Display** | **Done** | **v1.0.0** |
+| **Landlord Profile Reviews** | **Done** | **v1.0.0** |
+| **Score Breakdown Cards** | **Done** | **v1.0.0** |
+| Review Moderation | Planned | v1.1.0 |
+| Landlord Responses | Planned | v1.1.0 |
+
+---
+
+## Database Schema (v1.0.0)
+
+### Tables
+| Table | Purpose |
+|-------|---------|
+| `users` | User accounts (Lucia auth) |
+| `sessions` | Auth sessions |
+| `landlords` | Landlord/owner profiles |
+| `property_managers` | Property management companies |
+| `buildings` | Building/address records |
+| `reviews` | Tenant reviews (27 fields) |
+| `review_votes` | Helpful/not helpful votes |
+| `building_scores` | Aggregated building stats |
+| `landlord_scores` | Aggregated landlord stats |
+| `property_manager_scores` | Aggregated PM stats |
+
+### Review Score Fields
+
+**Unit Scores (10):**
+- unit_structural, unit_plumbing, unit_electrical, unit_climate
+- unit_ventilation, unit_pests, unit_mold, unit_appliances
+- unit_layout, unit_accuracy
+
+**Building Scores (9):**
+- building_common_areas, building_security, building_exterior
+- building_noise_neighbors, building_noise_external, building_mail
+- building_laundry, building_parking, building_trash
+
+**Landlord Scores (8):**
+- landlord_maintenance, landlord_communication, landlord_professionalism
+- landlord_lease_clarity, landlord_privacy, landlord_deposit
+- landlord_rent_practices, landlord_non_retaliation
 
 ---
 
@@ -102,3 +165,13 @@
 - 3 = Neutral
 - 2 = Disagree
 - 1 = Strongly Disagree (Worst)
+
+---
+
+## Build Information (v1.0.0-alpha)
+
+**Build Status:** Passing
+**TypeScript:** No errors (strict mode)
+**Client Bundle:** 169.44 KB total
+**Platform:** Cloudflare Pages (SSR)
+**Database:** Cloudflare D1 (SQLite)
