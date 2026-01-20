@@ -20,6 +20,25 @@
 
 ---
 
+## Worktree History
+
+Worktrees are used for parallel development. This section documents what each worktree accomplished.
+
+| Worktree | Branch | Date | Purpose | Status |
+|----------|--------|------|---------|--------|
+| `kind-hawking` | kind-hawking | Jan 2026 | v1.0.0-alpha release: Property Manager system, enhanced ReviewCard with 27-field display, unit number grouping, bug fixes ("0" display issue), full code audit, documentation (ARCHITECTURE.md, VERSION.md, CLAUDE_CONTEXT.md) | **Merged to main** - Kept as backup |
+
+### Worktree Locations
+- **kind-hawking**: `C:\Users\mmcge\.claude-worktrees\ratemyplace-boston\kind-hawking`
+
+### Creating New Worktrees
+```bash
+cd C:\Users\mmcge\ratemyplace-boston
+git worktree add ../.claude-worktrees/ratemyplace-boston/<name> -b <branch-name>
+```
+
+---
+
 ## Project Overview
 
 RateMyPlace Boston is a **tenant-focused housing review platform** for the Boston area. It allows renters to share anonymous reviews of their rental experiences, helping future tenants make informed decisions.
