@@ -5,9 +5,10 @@ import { formatFuzzyDate } from '../../lib/privacy';
 interface Props {
   review: any;
   showBuilding?: boolean;
+  compact?: boolean;
 }
 
-const { review, showBuilding = false } = Astro.props;
+const { review, showBuilding = false, compact = false } = Astro.props;
 
 const unitTypeLabels: Record<string, string> = {
   'studio': 'Studio',
@@ -18,15 +19,132 @@ const unitTypeLabels: Record<string, string> = {
   'house': 'House'
 };
 
+// Build unit display string
+const unitTypeLabel = unitTypeLabels[review.unit_type] || review.unit_type;
+const unitDisplay = review.unit_number
+  ? `Unit ${review.unit_number} (${unitTypeLabel})`
+  : unitTypeLabel;
+
 const moveInDate = formatFuzzyDate(review.move_in_year, review.move_in_season);
 const moveOutDate = review.is_current_tenant
   ? 'Present'
   : review.move_out_year
     ? formatFuzzyDate(review.move_out_year, review.move_out_season)
     : null;
+
+// New score categories based on actual schema
+const unitScores = [
+  { key: 'unit_structural', label: 'Structure' },
+  { key: 'unit_plumbing', label: 'Plumbing' },
+  { key: 'unit_electrical', label: 'Electrical' },
+  { key: 'unit_climate', label: 'Climate Control' },
+  { key: 'unit_ventilation', label: 'Ventilation' },
+  { key: 'unit_pests', label: 'Pest Control' },
+  { key: 'unit_mold', label: 'Mold/Moisture' },
+  { key: 'unit_appliances', label: 'Appliances' },
+  { key: 'unit_layout', label: 'Layout' },
+  { key: 'unit_accuracy', label: 'As Advertised' },
+];
+
+const buildingScores = [
+  { key: 'building_common_areas', label: 'Common Areas' },
+  { key: 'building_security', label: 'Security' },
+  { key: 'building_exterior', label: 'Exterior' },
+  { key: 'building_noise_neighbors', label: 'Neighbor Noise' },
+  { key: 'building_noise_external', label: 'External Noise' },
+  { key: 'building_mail', label: 'Mail/Packages' },
+  { key: 'building_laundry', label: 'Laundry' },
+  { key: 'building_parking', label: 'Parking' },
+  { key: 'building_trash', label: 'Trash' },
+];
+
+const landlordScores = [
+  { key: 'landlord_maintenance', label: 'Maintenance' },
+  { key: 'landlord_communication', label: 'Communication' },
+  { key: 'landlord_professionalism', label: 'Professionalism' },
+  { key: 'landlord_lease_clarity', label: 'Lease Clarity' },
+  { key: 'landlord_privacy', label: 'Privacy Respect' },
+  { key: 'landlord_deposit', label: 'Deposit Handling' },
+  { key: 'landlord_rent_practices', label: 'Rent Practices' },
+  { key: 'landlord_non_retaliation', label: 'Non-Retaliation' },
+];
+
+function getScoreColor(score: number): string {
+  if (score >= 4) return 'text-green-600';
+  if (score >= 3) return 'text-yellow-600';
+  if (score >= 2) return 'text-orange-600';
+  return 'text-red-600';
+}
+
+// Filter to only scores that exist
+const availableUnitScores = unitScores.filter(s => review[s.key] != null);
+const availableBuildingScores = buildingScores.filter(s => review[s.key] != null);
+const availableLandlordScores = landlordScores.filter(s => review[s.key] != null);
+
+// Parse JSON arrays safely
+function parseJsonArray(value: string | null | undefined): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+const amenities = parseJsonArray(review.amenities);
+const utilitiesIncluded = parseJsonArray(review.utilities_included);
+const petTypes = parseJsonArray(review.pet_types);
+
+// Labels for amenities
+const amenityLabels: Record<string, string> = {
+  'pet_friendly': 'Pet Friendly',
+  'laundry_in_unit': 'In-Unit Laundry',
+  'laundry_in_building': 'Building Laundry',
+  'dishwasher': 'Dishwasher',
+  'air_conditioning': 'A/C',
+  'parking': 'Parking',
+  'gym': 'Gym',
+  'pool': 'Pool',
+  'doorman': 'Doorman',
+  'elevator': 'Elevator',
+  'storage': 'Storage',
+  'bike_storage': 'Bike Storage',
+  'roof_deck': 'Roof Deck',
+  'outdoor_space': 'Outdoor Space',
+};
+
+// Labels for utilities
+const utilityLabels: Record<string, string> = {
+  'heat': 'Heat',
+  'hot_water': 'Hot Water',
+  'electricity': 'Electric',
+  'gas': 'Gas',
+  'water': 'Water',
+  'trash': 'Trash',
+  'internet': 'Internet',
+  'cable': 'Cable',
+};
+
+// Labels for laundry types
+const laundryLabels: Record<string, string> = {
+  'in_unit': 'In-Unit',
+  'in_building': 'In Building',
+  'coin_op': 'Coin-Op',
+  'none': 'None',
+};
+
+// Labels for parking types
+const parkingLabels: Record<string, string> = {
+  'included': 'Included',
+  'available': 'Available (Extra)',
+  'street': 'Street Only',
+  'none': 'None',
+};
 ---
 
 <article class="bg-white border border-gray-200 rounded-lg p-6">
+  <!-- Header -->
   <div class="flex justify-between items-start mb-4">
     <div>
       {review.review_title && (
@@ -40,45 +158,163 @@ const moveOutDate = review.is_current_tenant
       </div>
     </div>
     <div class="text-right text-sm text-gray-500">
-      <p>{unitTypeLabels[review.unit_type] || review.unit_type}</p>
+      <p class="font-medium text-gray-700">{unitDisplay}</p>
       <p>{moveInDate}{moveOutDate ? ` - ${moveOutDate}` : ''}</p>
+      {review.rent_amount && (
+        <p class="text-teal-600 font-medium">${review.rent_amount.toLocaleString()}/mo</p>
+      )}
     </div>
   </div>
 
-  {review.review_text && (
-    <p class="text-gray-700 mb-4 whitespace-pre-line">{review.review_text}</p>
+  <!-- Review Text / Comments -->
+  {(review.review_text || review.comments) && (
+    <p class="text-gray-700 mb-4 whitespace-pre-line">{review.review_text || review.comments}</p>
   )}
 
-  <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-    {review.score_building_quality && (
-      <div>
-        <span class="text-gray-500">Building Quality:</span>
-        <span class="ml-1 font-medium">{review.score_building_quality}/5</span>
-      </div>
-    )}
-    {review.score_maintenance && (
-      <div>
-        <span class="text-gray-500">Maintenance:</span>
-        <span class="ml-1 font-medium">{review.score_maintenance}/5</span>
-      </div>
-    )}
-    {review.score_landlord_responsiveness && (
-      <div>
-        <span class="text-gray-500">Responsiveness:</span>
-        <span class="ml-1 font-medium">{review.score_landlord_responsiveness}/5</span>
-      </div>
-    )}
-    {review.score_rent_value && (
-      <div>
-        <span class="text-gray-500">Value:</span>
-        <span class="ml-1 font-medium">{review.score_rent_value}/5</span>
-      </div>
-    )}
-  </div>
+  <!-- Unit Details -->
+  {(review.bedrooms || review.bathrooms || review.square_footage) && (
+    <div class="flex flex-wrap gap-3 mb-4 text-sm">
+      {review.bedrooms && (
+        <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded">
+          {review.bedrooms} bed{review.bedrooms !== '1' ? 's' : ''}
+        </span>
+      )}
+      {review.bathrooms && (
+        <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded">
+          {review.bathrooms} bath{review.bathrooms !== '1' ? 's' : ''}
+        </span>
+      )}
+      {review.square_footage && (
+        <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded">
+          {review.square_footage} sq ft
+        </span>
+      )}
+    </div>
+  )}
 
-  {(review.had_pest_issues || review.had_heat_issues || review.had_water_issues || review.had_security_deposit_issues) && (
-    <div class="mt-4 flex flex-wrap gap-2">
-      {review.had_pest_issues === 1 && (
+  <!-- Score Breakdown Grid -->
+  {(availableUnitScores.length > 0 || availableBuildingScores.length > 0 || availableLandlordScores.length > 0) && (
+    <div class="bg-gray-50 rounded-lg p-4 mb-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Unit Scores -->
+        {availableUnitScores.length > 0 && (
+          <div>
+            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Unit Condition</h4>
+            <div class="space-y-1">
+              {availableUnitScores.map(({ key, label }) => (
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600">{label}</span>
+                  <span class={`font-medium ${getScoreColor(review[key])}`}>{review[key]}/5</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <!-- Building Scores -->
+        {availableBuildingScores.length > 0 && (
+          <div>
+            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Building</h4>
+            <div class="space-y-1">
+              {availableBuildingScores.map(({ key, label }) => (
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600">{label}</span>
+                  <span class={`font-medium ${getScoreColor(review[key])}`}>{review[key]}/5</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <!-- Landlord Scores -->
+        {availableLandlordScores.length > 0 && (
+          <div>
+            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Landlord</h4>
+            <div class="space-y-1">
+              {availableLandlordScores.map(({ key, label }) => (
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600">{label}</span>
+                  <span class={`font-medium ${getScoreColor(review[key])}`}>{review[key]}/5</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )}
+
+  <!-- Amenities & Utilities -->
+  {(amenities.length > 0 || utilitiesIncluded.length > 0 || review.laundry_type || review.parking_type) && (
+    <div class="bg-blue-50 rounded-lg p-4 mb-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <!-- Utilities Included -->
+        {utilitiesIncluded.length > 0 && (
+          <div>
+            <h4 class="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">Utilities Included</h4>
+            <div class="flex flex-wrap gap-1">
+              {utilitiesIncluded.map(util => (
+                <span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+                  {utilityLabels[util] || util}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <!-- Amenities -->
+        {amenities.length > 0 && (
+          <div>
+            <h4 class="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">Amenities</h4>
+            <div class="flex flex-wrap gap-1">
+              {amenities.map(amenity => (
+                <span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+                  {amenityLabels[amenity] || amenity}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <!-- Laundry & Parking -->
+        {(review.laundry_type || review.parking_type) && (
+          <div class="sm:col-span-2 flex flex-wrap gap-4 text-sm">
+            {review.laundry_type && (
+              <span class="text-gray-600">
+                <strong>Laundry:</strong> {laundryLabels[review.laundry_type] || review.laundry_type}
+                {review.laundry_wash_cost && review.laundry_dry_cost && (
+                  <span class="text-gray-500"> (${review.laundry_wash_cost} wash / ${review.laundry_dry_cost} dry)</span>
+                )}
+              </span>
+            )}
+            {review.parking_type && (
+              <span class="text-gray-600">
+                <strong>Parking:</strong> {parkingLabels[review.parking_type] || review.parking_type}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )}
+
+  <!-- Pets -->
+  {petTypes.length > 0 && (
+    <div class="flex flex-wrap gap-2 mb-4">
+      <span class="text-sm text-gray-600 font-medium">Pets allowed:</span>
+      {petTypes.map(pet => (
+        <span class="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full capitalize">
+          {pet}
+        </span>
+      ))}
+    </div>
+  )}
+
+  <!-- Issues Tags -->
+  {(review.had_pest_issues === 1 || review.had_heat_issues === 1 || review.had_water_issues === 1 || review.had_security_deposit_issues === 1 || review.had_pests === 1) && (
+    <div class="flex flex-wrap gap-2 mb-4">
+      <span class="text-sm text-gray-600 font-medium">Issues reported:</span>
+      {(review.had_pest_issues === 1 || review.had_pests === 1) && (
         <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">Pest Issues</span>
       )}
       {review.had_heat_issues === 1 && (
@@ -93,9 +329,10 @@ const moveOutDate = review.is_current_tenant
     </div>
   )}
 
+  <!-- Footer -->
   <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm">
-    <span class={`px-2 py-1 rounded-full text-xs ${review.would_recommend ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-      {review.would_recommend ? 'Would recommend' : 'Would not recommend'}
+    <span class={`px-2 py-1 rounded-full text-xs ${review.would_recommend === 1 || review.would_recommend_new === 'yes' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+      {review.would_recommend === 1 || review.would_recommend_new === 'yes' ? 'Would recommend' : 'Would not recommend'}
     </span>
     <span class="text-gray-400">
       Posted {new Date(review.created_at * 1000).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
