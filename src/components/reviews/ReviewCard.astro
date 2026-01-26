@@ -1,5 +1,6 @@
 ---
 import StarRating from '../ratings/StarRating.astro';
+import VerifiedBadge from '../ui/VerifiedBadge.astro';
 import { formatFuzzyDate } from '../../lib/privacy';
 
 interface Props {
@@ -331,9 +332,12 @@ const parkingLabels: Record<string, string> = {
 
   <!-- Footer -->
   <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm">
-    <span class={`px-2 py-1 rounded-full text-xs ${review.would_recommend === 1 || review.would_recommend_new === 'yes' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-      {review.would_recommend === 1 || review.would_recommend_new === 'yes' ? 'Would recommend' : 'Would not recommend'}
-    </span>
+    <div class="flex items-center gap-3">
+      <span class={`px-2 py-1 rounded-full text-xs ${review.would_recommend === 1 || review.would_recommend_new === 'yes' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+        {review.would_recommend === 1 || review.would_recommend_new === 'yes' ? 'Would recommend' : 'Would not recommend'}
+      </span>
+      {review.is_verified === 1 && <VerifiedBadge size="sm" />}
+    </div>
     <span class="text-gray-400">
       Posted {new Date(review.created_at * 1000).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
     </span>

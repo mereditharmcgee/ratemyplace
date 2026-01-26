@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(npx astro build)",
+      "Bash(npm install:*)",
+      "mcp__mcp-registry__search_mcp_registry",
+      "Bash(npx wrangler d1 execute:*)",
+      "Bash(curl:*)",
+      "Bash(npm run deploy:*)",
+      "Bash(npm run:*)",
+      "Bash(npx wrangler pages deploy:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
