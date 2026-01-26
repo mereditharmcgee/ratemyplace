@@ -1,0 +1,45 @@
+---
+import BaseLayout from '../../components/layout/BaseLayout.astro';
+import VerificationQueue from '../../components/admin/VerificationQueue';
+
+const user = Astro.locals.user;
+
+// Redirect if not logged in
+if (!user) {
+  return Astro.redirect('/auth/signin');
+}
+
+// Redirect if not admin
+if (!user.isAdmin) {
+  return Astro.redirect('/');
+}
+---
+
+<BaseLayout title="Verification Queue" description="Admin verification queue for RateMyPlace Boston.">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">Verification Queue</h1>
+      <p class="text-gray-600 mt-1">
+        Review tenant verification documents to approve or reject.
+      </p>
+    </div>
+
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+      <div class="flex gap-3">
+        <svg class="w-5 h-5 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div class="text-sm text-blue-800">
+          <p class="font-medium mb-1">What to look for:</p>
+          <ul class="list-disc list-inside space-y-1">
+            <li>Document shows the user's name and the property address</li>
+            <li>Valid document types: lease agreement, utility bill, bank statement with address</li>
+            <li>Document appears genuine and unaltered</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <VerificationQueue client:load />
+  </div>
+</BaseLayout>

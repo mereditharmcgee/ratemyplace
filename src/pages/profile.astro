@@ -1,0 +1,36 @@
+---
+import BaseLayout from '../components/layout/BaseLayout.astro';
+import ProfileDashboard from '../components/profile/ProfileDashboard';
+import { getDB } from '../lib/db';
+
+const user = Astro.locals.user;
+
+// Redirect if not logged in
+if (!user) {
+  return Astro.redirect('/auth/signin?redirect=/profile');
+}
+
+// Get user created_at from database
+const db = getDB((Astro.locals as any).runtime);
+const dbUser = await db.prepare('SELECT created_at FROM users WHERE id = ?')
+  .bind(user.id)
+  .first<{ created_at: number }>();
+
+// Format member since date
+const memberSince = dbUser
+  ? new Date(dbUser.created_at * 1000).toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric'
+    })
+  : 'Unknown';
+---
+
+<BaseLayout title="My Profile" description="Manage your reviews and profile on RateMyPlace Boston.">
+  <ProfileDashboard
+    client:load
+    userEmail={user.email}
+    userName={user.name}
+    avatarUrl={user.avatarUrl}
+    memberSince={memberSince}
+  />
+</BaseLayout>

@@ -11,5 +11,11 @@
 			"database_name": "ratemyplace-db",
 			"database_id": "7dd2a722-fdd3-4986-b2f7-6d61d069438e"
 		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "VERIFICATION_BUCKET",
+			"bucket_name": "ratemyplace-verification"
+		}
 	]
 }

@@ -34,6 +34,14 @@ const user = Astro.locals.user;
             >
               Write a Review
             </a>
+            <a href="/profile" class="text-slate-600 hover:text-teal-600 transition-colors">
+              Profile
+            </a>
+            {user.isAdmin && (
+              <a href="/admin/verify" class="text-slate-600 hover:text-teal-600 transition-colors">
+                Admin
+              </a>
+            )}
             <form action="/api/auth/signout" method="POST">
               <button
                 type="submit"
@@ -90,6 +98,14 @@ const user = Astro.locals.user;
             <a href="/review/new" class="block px-3 py-2 text-teal-600 hover:bg-slate-100 rounded-md">
               Write a Review
             </a>
+            <a href="/profile" class="block px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-md">
+              Profile
+            </a>
+            {user.isAdmin && (
+              <a href="/admin/verify" class="block px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-md">
+                Admin
+              </a>
+            )}
             <form action="/api/auth/signout" method="POST" class="px-3 py-2">
               <button type="submit" class="text-slate-600 hover:text-teal-600">
                 Sign Out

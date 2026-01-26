@@ -20,7 +20,8 @@ export function initializeLucia(db: D1Database) {
         emailVerified: attributes.email_verified === 1,
         name: attributes.name,
         avatarUrl: attributes.avatar_url,
-        googleId: attributes.google_id
+        googleId: attributes.google_id,
+        isAdmin: attributes.is_admin === 1
       };
     }
   });
@@ -39,6 +40,7 @@ interface DatabaseUserAttributes {
   name: string | null;
   avatar_url: string | null;
   google_id: string | null;
+  is_admin: number;
 }
 
 export type Auth = ReturnType<typeof initializeLucia>;

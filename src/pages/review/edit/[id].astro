@@ -1,0 +1,67 @@
+---
+import BaseLayout from '../../../components/layout/BaseLayout.astro';
+import ReviewEditForm from '../../../components/reviews/ReviewEditForm';
+import { getDB } from '../../../lib/db';
+
+const { id } = Astro.params;
+const user = Astro.locals.user;
+
+// Redirect if not logged in
+if (!user) {
+  return Astro.redirect('/auth/signin?redirect=/profile');
+}
+
+// Fetch review
+const db = getDB((Astro.locals as any).runtime);
+const review = await db.prepare(`
+  SELECT
+    r.*,
+    b.address as building_address,
+    b.slug as building_slug,
+    b.neighborhood,
+    b.city
+  FROM reviews r
+  JOIN buildings b ON r.building_id = b.id
+  WHERE r.id = ?
+`).bind(id).first<any>();
+
+// Check if review exists
+if (!review) {
+  return Astro.redirect('/profile?error=not-found');
+}
+
+// Check ownership
+if (review.user_id !== user.id) {
+  return Astro.redirect('/profile?error=unauthorized');
+}
+
+// Convert integer booleans
+const reviewData = {
+  ...review,
+  is_current_tenant: review.is_current_tenant === 1,
+  had_pest_issues: review.had_pest_issues === 1,
+  had_heat_issues: review.had_heat_issues === 1,
+  had_water_issues: review.had_water_issues === 1,
+  had_security_deposit_issues: review.had_security_deposit_issues === 1,
+  had_eviction_threat: review.had_eviction_threat === 1,
+  would_recommend: review.would_recommend === 1,
+  is_verified: review.is_verified === 1
+};
+---
+
+<BaseLayout title="Edit Review" description="Edit your review on RateMyPlace Boston.">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mb-6">
+      <a href="/profile" class="inline-flex items-center gap-2 text-gray-600 hover:text-teal-600 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to Profile
+      </a>
+    </div>
+
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Edit Review</h1>
+
+    <ReviewEditForm client:load review={reviewData} />
+  </div>
+</BaseLayout>
