@@ -1,4 +1,4 @@
-# RateMyPlace Boston - Architecture Documentation
+# RateMyPlace - Architecture Documentation
 
 ## Version: v1.0.0-alpha
 **Last Updated:** January 2026
@@ -23,7 +23,7 @@
 
 ## Project Overview
 
-RateMyPlace Boston is a tenant-focused housing review platform for the Boston area. It allows renters to share anonymous reviews of their rental experiences, helping future tenants make informed decisions about housing.
+RateMyPlace is a tenant-focused housing review platform. It allows renters to share anonymous reviews of their rental experiences, helping future tenants make informed decisions about housing.
 
 ### Key Features (v1.0.0-alpha)
 - User authentication (email/password with Lucia)
@@ -75,7 +75,7 @@ RateMyPlace Boston is a tenant-focused housing review platform for the Boston ar
 ## Project Structure
 
 ```
-ratemyplace-boston/
+ratemyplace/
 ├── migrations/                    # Database migrations
 │   ├── 0001_initial.sql          # Core tables
 │   └── 0006_property_managers.sql # Property manager system
@@ -193,7 +193,7 @@ CREATE TABLE buildings (
     address TEXT NOT NULL,
     slug TEXT UNIQUE NOT NULL,
     neighborhood TEXT,
-    city TEXT NOT NULL DEFAULT 'Boston',
+    city TEXT,
     state TEXT NOT NULL DEFAULT 'MA',
     zip_code TEXT,
     latitude REAL,

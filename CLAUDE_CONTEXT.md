@@ -1,4 +1,4 @@
-# RateMyPlace Boston - Claude Context Document
+# RateMyPlace - Claude Context Document
 
 > **Purpose:** This document provides complete project context for new Claude instances working on this codebase. It contains everything needed to understand the project architecture, current state, and how to work effectively with the code.
 
@@ -41,7 +41,7 @@ git worktree add ../.claude-worktrees/ratemyplace-boston/<name> -b <branch-name>
 
 ## Project Overview
 
-RateMyPlace Boston is a **tenant-focused housing review platform** for the Boston area. It allows renters to share anonymous reviews of their rental experiences, helping future tenants make informed decisions.
+RateMyPlace is a **tenant-focused housing review platform**. It allows renters to share anonymous reviews of their rental experiences, helping future tenants make informed decisions.
 
 ### Core Concept
 - Tenants submit reviews about their rental units
@@ -102,7 +102,7 @@ landlords ─────────┐
 ## Project Structure
 
 ```
-ratemyplace-boston/
+ratemyplace/
 ├── migrations/                    # Database migrations (run manually)
 │   ├── 0001_initial.sql          # Core tables
 │   ├── 0004_survey_scores.sql    # 27-item survey fields
@@ -201,8 +201,8 @@ property_manager_id TEXT REFERENCES property_managers(id)
 address TEXT NOT NULL
 slug TEXT UNIQUE NOT NULL
 neighborhood TEXT
-city TEXT DEFAULT 'Boston'
-state TEXT DEFAULT 'MA'
+city TEXT
+state TEXT
 zip_code TEXT
 latitude REAL
 longitude REAL

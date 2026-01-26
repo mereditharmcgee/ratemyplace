@@ -1,4 +1,4 @@
--- RateMyPlace Boston Database Schema
+-- RateMyPlace Database Schema
 -- Initial migration
 
 -- Landlords table
@@ -24,8 +24,8 @@ CREATE TABLE IF NOT EXISTS buildings (
     address TEXT NOT NULL,
     slug TEXT UNIQUE NOT NULL,
     neighborhood TEXT,
-    city TEXT NOT NULL DEFAULT 'Boston',
-    state TEXT NOT NULL DEFAULT 'MA',
+    city TEXT,
+    state TEXT,
     zip_code TEXT,
     latitude REAL,
     longitude REAL,
