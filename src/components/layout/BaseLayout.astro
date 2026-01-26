@@ -8,7 +8,7 @@ interface Props {
   description?: string;
 }
 
-const { title, description = 'Tenant housing reviews for Boston - Real experiences from real renters' } = Astro.props;
+const { title, description = 'Tenant housing reviews - Real experiences from real renters' } = Astro.props;
 ---
 
 <!doctype html>
@@ -18,7 +18,7 @@ const { title, description = 'Tenant housing reviews for Boston - Real experienc
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>{title} | RateMyPlace Boston</title>
+    <title>{title} | RateMyPlace</title>
   </head>
   <body class="min-h-screen bg-gray-50 flex flex-col">
     <Header />

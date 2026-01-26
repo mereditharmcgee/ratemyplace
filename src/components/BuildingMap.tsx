@@ -34,7 +34,7 @@ function getScoreLabel(score: number | null): string {
 
 export default function BuildingMap({
   apiKey,
-  initialCenter = { lat: 42.3601, lng: -71.0589 }, // Boston
+  initialCenter = { lat: 39.8283, lng: -98.5795 }, // Center of USA
   initialZoom = 13
 }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);

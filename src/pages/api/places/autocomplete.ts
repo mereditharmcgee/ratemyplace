@@ -28,8 +28,6 @@ export async function GET(context: APIContext): Promise<Response> {
       key: apiKey,
       types: 'address',
       components: 'country:us',
-      // Bias results toward Boston area
-      locationbias: 'circle:50000@42.3601,-71.0589',
     });
 
     if (sessionToken) {
