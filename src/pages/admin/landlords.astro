@@ -1,0 +1,27 @@
+---
+import AdminLayout from '../../components/admin/AdminLayout.astro';
+import LandlordsTable from '../../components/admin/LandlordsTable';
+
+const user = Astro.locals.user;
+
+// Redirect if not logged in
+if (!user) {
+  return Astro.redirect('/auth/signin');
+}
+
+// Redirect if not admin
+if (!user.isAdmin) {
+  return Astro.redirect('/');
+}
+---
+
+<AdminLayout title="Landlord Management" currentPage="landlords">
+  <div class="space-y-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Landlord Management</h1>
+      <p class="text-gray-600 mt-1">View and manage all landlords in the system.</p>
+    </div>
+
+    <LandlordsTable client:load />
+  </div>
+</AdminLayout>

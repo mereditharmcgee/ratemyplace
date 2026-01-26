@@ -22,7 +22,8 @@
       "Bash(git checkout:*)",
       "Bash(git pull:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nRemove Boston-specific references for nationwide use\n\n- Update page titles and descriptions to remove \"Boston\"\n- Change package name from \"ratemyplace-boston\" to \"ratemyplace\"\n- Remove Boston location bias from Places API autocomplete\n- Update map default center to center of USA\n- Update documentation \\(ARCHITECTURE.md, CLAUDE_CONTEXT.md\\)\n- Remove default city/state values from database schema\n- Update Footer and BaseLayout branding\n\nRateMyPlace is now a city-agnostic platform that works for any location.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git cherry-pick:*)"
+      "Bash(git cherry-pick:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd new RateMyPlace logo\n\n- Add logo.png to public folder\n- Update Header to display logo image\n- Update Footer to display logo image\n- Create new favicon.svg matching the logo design \\(house with checkmark\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
