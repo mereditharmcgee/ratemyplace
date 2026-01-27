@@ -1,8 +1,8 @@
 # RateMyPlace - Architecture Documentation
 
-## Version: v1.0.0-alpha
-**Last Updated:** January 2026
-**Codename:** "Complete Foundation"
+## Version: v1.1.0-alpha
+**Last Updated:** January 27, 2026
+**Codename:** "Evidence-Based Scoring"
 
 ---
 
@@ -23,18 +23,28 @@
 
 ## Project Overview
 
-RateMyPlace is a tenant-focused housing review platform. It allows renters to share anonymous reviews of their rental experiences, helping future tenants make informed decisions about housing.
+RateMyPlace is a **public health-focused tenant housing review platform**. It helps renters make informed decisions by providing evidence-based ratings grounded in peer-reviewed housing quality research.
 
-### Key Features (v1.0.0-alpha)
-- User authentication (email/password with Lucia)
+### Mission & Core Principles
+1. **Evidence-Based**: Survey items drawn from validated instruments (OHQS, PHQS, WHO LARES)
+2. **Health-Focused**: Scores weighted by documented health/safety impacts
+3. **Transparent**: Methodology publicly documented with academic citations
+4. **Tenant-Centered**: Anonymous reviews to protect renters
+
+### Key Features (v1.1.0-alpha)
+- User authentication (email/password with Lucia + Google OAuth)
 - Building profile pages with aggregated scores
 - Landlord profile pages with recent reviews
 - Property Manager profile pages (buildings can have both)
 - Unit-level review grouping with collapsible cards
-- Comprehensive 27-item survey instrument
-- Review moderation system (admin)
+- Comprehensive 27-item survey instrument (OHQS/PHQS-based)
+- **Evidence-based weighted scoring** with health/safety factors
+- Review moderation system (admin dashboard)
 - Score breakdowns by category (Unit, Building, Landlord)
 - Amenities, utilities, and lease details display
+- **Public methodology page** with academic citations
+- Admin dashboard for building/review management
+- Interactive map with geolocation
 
 ---
 
@@ -87,20 +97,22 @@ ratemyplace/
 │   │   │   ├── Header.astro       # Navigation header
 │   │   │   └── Footer.astro       # Site footer
 │   │   ├── ratings/
-│   │   │   ├── ScoreCard.astro    # Score breakdown sidebar
+│   │   │   ├── ScoreCard.astro    # Score breakdown sidebar (domain scores)
 │   │   │   └── StarRating.astro   # Star display component
-│   │   └── reviews/
-│   │       ├── ReviewCard.astro   # Individual review display
-│   │       ├── ReviewForm.tsx     # React review form (island)
-│   │       └── UnitTypeSummary.astro
+│   │   ├── reviews/
+│   │   │   ├── ReviewCard.astro   # Individual review display (27 fields)
+│   │   │   ├── ReviewForm.tsx     # React review form (island)
+│   │   │   ├── HelpTooltip.tsx    # Contextual help for survey questions
+│   │   │   └── UnitTypeSummary.astro
+│   │   └── admin/                 # Admin dashboard components
 │   │
 │   ├── lib/
 │   │   ├── auth.ts               # Lucia initialization
 │   │   ├── db.ts                 # D1 database helper
-│   │   ├── password.ts           # Password hashing
+│   │   ├── password.ts           # PBKDF2-SHA256 hashing
 │   │   ├── privacy.ts            # Date formatting utilities
-│   │   ├── scoring.ts            # Score calculation logic
-│   │   ├── surveyItems.ts        # Survey question definitions
+│   │   ├── scoring.ts            # **CRITICAL** Weighted scoring system
+│   │   ├── surveyItems.ts        # 27 survey question definitions
 │   │   ├── types.ts              # TypeScript type definitions
 │   │   └── validation.ts         # Input validation
 │   │
@@ -129,9 +141,13 @@ ratemyplace/
 │   │   ├── review/
 │   │   │   └── new.astro         # New review page
 │   │   │
+│   │   ├── admin/                # Admin dashboard pages
 │   │   ├── index.astro           # Home page
 │   │   ├── search.astro          # Search page
+│   │   ├── map.astro             # Interactive building map
+│   │   ├── methodology.astro     # **NEW** Public scoring methodology
 │   │   ├── about.astro           # About page
+│   │   ├── contact.astro         # Contact form
 │   │   ├── guidelines.astro      # Review guidelines
 │   │   ├── privacy.astro         # Privacy policy
 │   │   └── terms.astro           # Terms of service
@@ -317,6 +333,59 @@ CREATE TABLE reviews (
 
 ---
 
+## Scoring Methodology
+
+RateMyPlace uses an **evidence-based weighted scoring system** grounded in peer-reviewed public health research. This is documented publicly at `/methodology`.
+
+### Survey Instrument Foundation
+
+The 27-item survey is adapted from validated housing quality assessment instruments:
+
+| Instrument | Source | Domain |
+|------------|--------|--------|
+| **OHQS** (Observational Housing Quality Scale) | Krieger & Higgins (2002) | Unit condition items |
+| **PHQS** (Physical Housing Quality Scale) | Jacobs et al. (2009) | Building-level items |
+| **WHO LARES** | Bonnefoy et al. (2003) | Landlord/management items |
+
+### Health/Safety Weighting
+
+Items with documented health impacts receive higher weights in score calculations:
+
+| Item | Weight | Evidence |
+|------|--------|----------|
+| Pest Control | 1.5x | Allergens, disease vectors |
+| Mold/Moisture | 1.5x | OR 1.5-3.5 respiratory illness |
+| Structural Integrity | 1.3x | Safety hazards |
+| Climate Control | 1.3x | Cardiovascular risk |
+| Plumbing | 1.2x | Mold pathway |
+| Security | 1.2x | Personal safety |
+| All others | 1.0x | Standard weight |
+
+### Domain Sub-Scores
+
+Reviews display three aggregated scores:
+- **Unit** (10 items): structural, plumbing, electrical, climate, ventilation, pests, mold, appliances, layout, accuracy
+- **Building** (9 items): common areas, security, exterior, noise (2), mail, laundry, parking, trash
+- **Landlord** (8 items): maintenance, communication, professionalism, lease clarity, privacy, deposit, rent practices, non-retaliation
+
+### Recency Weighting
+
+Aggregate scores apply gentle recency weighting (Hu, Pavlou & Zhang 2017):
+- 0-2 years: 100%
+- 3 years: 95%
+- 4 years: 90%
+- 5+ years: 85% (floor)
+
+### Key Scoring Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/scoring.ts` | All scoring calculations, weights, domain aggregation |
+| `src/lib/surveyItems.ts` | Survey question definitions with help text |
+| `src/pages/methodology.astro` | Public methodology page with citations |
+
+---
+
 ## API Endpoints
 
 ### Authentication
@@ -374,8 +443,11 @@ Displays a single review with:
 
 ### ScoreCard (`ScoreCard.astro`)
 Sidebar component showing:
-- Grouped score bars by category
+- **Domain scores** (Unit, Building, Landlord) as colored boxes
 - Color-coded by rating (green/yellow/orange/red)
+- **Would recommend** percentage
+- **Issues reported** section with percentages
+- **Methodology link** to `/methodology` page
 - Supports `type="building"` or `type="landlord"`
 
 ### StarRating (`StarRating.astro`)
@@ -387,10 +459,21 @@ Sidebar component showing:
 
 ## Library/Utility Files
 
-### `scoring.ts`
-- `calculateOverallScore()` - Weighted average of scores
-- `calculateBuildingAverages()` - Aggregate stats from reviews
-- `calculateLandlordAverages()` - Landlord-specific aggregates
+### `scoring.ts` (Critical File)
+Contains all scoring logic - this is the heart of the evidence-based methodology:
+- `ITEM_WEIGHTS` - Health/safety weights for each survey field
+- `UNIT_FIELDS`, `BUILDING_FIELDS`, `LANDLORD_FIELDS` - Domain groupings
+- `calculateDomainScores()` - Computes Unit/Building/Landlord sub-scores
+- `calculateOverallScore()` - Weighted overall score
+- `calculateBuildingAverages()` - Aggregate scores with recency weighting
+- `calculateLandlordAverages()` - Landlord-specific aggregation
+- `getRecencyWeight()` - Time-based weighting function
+
+### `surveyItems.ts`
+Survey question definitions with help text for each of the 27 items. Includes:
+- Question text
+- Help text explaining what the question means
+- Domain mapping (unit/building/landlord)
 
 ### `privacy.ts`
 - `formatFuzzyDate()` - "Spring 2024" format
@@ -463,6 +546,24 @@ npx wrangler d1 execute ratemyplace-db --remote --file=migrations/XXXX_name.sql
 2. Implement email verification
 3. Add automated score aggregation triggers
 4. Consider adding search indexing for performance
+
+---
+
+## Academic References
+
+The scoring methodology is grounded in peer-reviewed public health research:
+
+### Survey Instruments
+- Krieger, J., & Higgins, D. L. (2002). Housing and health: Time again for public health action. *American Journal of Public Health, 92*(5), 758-768. DOI: 10.2105/AJPH.92.5.758
+- Jacobs, D. E., et al. (2009). The relationship of housing and population health. *Environmental Health Perspectives, 117*(4), 597-604. DOI: 10.1289/ehp.11498
+- Bonnefoy, X., et al. (2003). Housing and health in Europe. *American Journal of Public Health, 93*(9), 1559-1563. DOI: 10.2105/AJPH.93.9.1559
+
+### Health/Safety Evidence
+- Fisk, W. J., et al. (2007). Meta-analyses of respiratory health effects with dampness and mold. *Indoor Air, 17*(4), 284-296. DOI: 10.1111/j.1600-0668.2007.00475.x
+- WHO Regional Office for Europe. (2018). WHO Housing and Health Guidelines.
+
+### Methodology
+- Hu, N., Pavlou, P. A., & Zhang, J. (2017). On self-selection biases in online product reviews. *MIS Quarterly, 41*(2), 449-471.
 
 ---
 

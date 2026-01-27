@@ -1,4 +1,4 @@
-# Claude Code Handoff: RateMyPlace v0.3.0-alpha
+# Claude Code Handoff: RateMyPlace v1.1.0-alpha
 
 ## Quick Start Prompt
 
@@ -6,97 +6,74 @@ Copy everything below this line and paste into a new Claude Code session:
 
 ---
 
-I'm working on RateMyPlace, a tenant housing review platform. The project is at `C:\Users\mmcge\ratemyplace-boston`.
+I'm working on RateMyPlace, an evidence-based tenant housing review platform. The project is at `C:\Users\mmcge\ratemyplace-boston`.
 
-**Current version:** v0.2.0-alpha (just deployed)
-**Next version:** v0.3.0-alpha ("Discovery")
+**Current version:** v1.1.0-alpha "Evidence-Based Scoring"
+
+## Essential First Reads
+
+1. **CLAUDE_CONTEXT.md** - Complete project context, scoring methodology, all key information
+2. **src/lib/scoring.ts** - Weighted scoring system (critical file)
+3. **src/lib/surveyItems.ts** - 27 survey questions with help text
+
+## Project Mission
+
+RateMyPlace is a **public health-focused** tenant housing review platform:
+- Survey items from validated instruments (OHQS, PHQS, WHO LARES)
+- Health/safety weighted scoring (pests 1.5x, mold 1.5x, etc.)
+- Transparent methodology with academic citations
+- Anonymous reviews to protect tenants
 
 ## Tech Stack
-- Astro 5 (SSR mode)
-- Cloudflare Pages + D1 database
-- Lucia Auth (email/password)
-- React 18 (downgraded from 19 due to Cloudflare Workers compatibility)
+- Astro 5 (SSR mode) on Cloudflare Pages
+- Cloudflare D1 database (SQLite)
+- Lucia Auth (email/password + Google OAuth)
+- React 18 islands (not 19 - Cloudflare Workers compatibility)
 - Tailwind CSS 4
-- TypeScript
+- TypeScript strict mode
 
-## What's Done (v0.2.0)
-- Authentication working (email/password with Lucia)
-- 27-item survey based on OHQS/PHQS research
-- Review form with unit details (bed/bath, sqft, amenities, utilities)
-- Brand colors (teal primary, amber secondary, coral accent)
-- Password visibility toggles
-- VERSION.md tracking system
+## What's Done (v1.1.0)
 
-## Your Tasks for v0.3.0-alpha
+### Scoring System (Key Feature)
+- Evidence-based weighted scoring from peer-reviewed research
+- Health/safety weights: pests (1.5x), mold (1.5x), structural (1.3x), climate (1.3x), plumbing (1.2x), security (1.2x)
+- Domain sub-scores: Unit (10 items), Building (9 items), Landlord (8 items)
+- Recency weighting: 100% (0-2y) → 85% (5+y) floor
+- Public methodology page at `/methodology` with citations
 
-### 1. Google Maps Places API Integration
-**Goal:** Address verification when users enter building addresses in the review form.
-
-Files to modify:
-- `src/components/reviews/ReviewForm.tsx` - Add Places Autocomplete to address step
-- `src/lib/maps.ts` - Create (new file for Maps utilities)
-- `astro.config.mjs` - May need env variable setup
-
-Requirements:
-- Use Google Places Autocomplete API
-- Extract structured address components (street, city, state, zip)
-- Store normalized addresses in D1 database
-- Handle cases where address isn't found
-
-### 2. Google Sign-In OAuth
-**Goal:** Add "Sign in with Google" option alongside email/password.
-
-Files to modify:
-- `src/lib/auth.ts` - Add Google OAuth provider to Lucia
-- `src/pages/api/auth/google/callback.ts` - Create OAuth callback handler
-- `src/pages/auth/signin.astro` - Add Google sign-in button
-- `src/pages/auth/signup.astro` - Add Google sign-up button
-
-Requirements:
-- Use Lucia's OAuth helpers
-- Link Google accounts to existing email accounts if same email
-- Store Google user ID for future logins
-
-### 3. Interactive Map with Building Pins
-**Goal:** Map showing reviewed buildings with score indicators.
-
-Files to create:
-- `src/components/map/BuildingMap.tsx` - React component for the map
-- `src/pages/map.astro` - Map page
-
-Requirements:
-- Use Google Maps JavaScript API
-- Show pins colored by score (green=good, amber=mixed, coral=concerning)
-- Click pin to see building summary
-- Filter by score range, neighborhood
+### Core Features
+- 27-item survey based on OHQS/PHQS/WHO LARES research
+- Building and landlord profile pages with aggregated scores
+- Property manager system (buildings can have both owner and PM)
+- Admin dashboard (`/admin`) for moderation
+- Interactive map with building markers
+- Google Maps Places autocomplete for address entry
+- HelpTooltip component for survey questions
 
 ## Key Files Reference
 
 ```
 src/
 ├── lib/
-│   ├── auth.ts          # Lucia auth config
-│   ├── db.ts            # D1 database access
-│   ├── surveyItems.ts   # 27-item survey specification
-│   ├── scoring.ts       # Score calculation
-│   └── types.ts         # TypeScript interfaces
+│   ├── scoring.ts        # **CRITICAL** - All scoring calculations & weights
+│   ├── surveyItems.ts    # 27 survey questions with help text
+│   ├── auth.ts           # Lucia auth config
+│   ├── db.ts             # D1 database access
+│   └── types.ts          # TypeScript interfaces
 ├── pages/
-│   ├── api/auth/        # Auth endpoints
-│   ├── auth/            # Signin/signup pages
-│   └── review/new.astro # Review form page
+│   ├── methodology.astro # Public scoring methodology page
+│   ├── admin/            # Admin dashboard pages
+│   ├── api/auth/         # Auth endpoints
+│   ├── building/[slug].astro
+│   └── landlord/[slug].astro
 ├── components/
-│   └── reviews/ReviewForm.tsx  # Multi-step review form
-└── middleware.ts        # Session validation
-```
-
-## Environment Variables Needed
-
-For Cloudflare Pages, these go in the dashboard under Settings > Environment Variables:
-
-```
-GOOGLE_CLIENT_ID=<from Google Cloud Console>
-GOOGLE_CLIENT_SECRET=<from Google Cloud Console>
-GOOGLE_MAPS_API_KEY=<from Google Cloud Console>
+│   ├── reviews/
+│   │   ├── ReviewForm.tsx    # Multi-step review form
+│   │   ├── ReviewCard.astro  # Review display (27 fields)
+│   │   └── HelpTooltip.tsx   # Contextual help tooltips
+│   └── ratings/
+│       └── ScoreCard.astro   # Score breakdown sidebar
+└── middleware.ts         # Session validation
 ```
 
 ## Database Info
@@ -104,27 +81,42 @@ GOOGLE_MAPS_API_KEY=<from Google Cloud Console>
 - Database ID: `7dd2a722-fdd3-4986-b2f7-6d61d069438e`
 - Binding name: `DB`
 
-## Brand Colors (from guidelines)
+## Academic References (for methodology)
+- **OHQS**: Krieger & Higgins (2002) - Unit condition items
+- **PHQS**: Jacobs et al. (2009) - Building-level items
+- **WHO LARES**: Bonnefoy et al. (2003) - Landlord/management items
+- **Recency weighting**: Hu, Pavlou & Zhang (2017)
+
+## Brand Colors
 - Primary Teal: #1A9A7D
 - Secondary Amber: #F59E0B
 - Accent Coral: #D97356
-- Good Score (4-5): #2D9B83
-- Mixed Score (3): #E8B44A
-- Concerning Score (1-2): #D97356
+- Good Score (4-5): emerald-500/600
+- Mixed Score (3): amber-500/600
+- Concerning Score (1-2): red-500/600
 
 ## Important Notes
 - React 19 doesn't work on Cloudflare Workers (MessageChannel error) - stay on React 18
-- wrangler.jsonc has `compatibility_date: "2024-12-01"`
-- The site is live at https://ratemyplace.org
+- Score aggregation tables may be stale - pages calculate from reviews directly
+- The site is live at https://ratemyplace.boston
+
+## Potential Next Tasks
+
+### v1.2.0-beta "Community"
+- [ ] Landlord response system (owners can reply to reviews)
+- [ ] User profile pages
+- [ ] Email notifications
+- [ ] Automated score recalculation triggers
+- [ ] Search improvements
+
+### Technical Debt
+- [ ] Add rate limiting to auth endpoints
+- [ ] Split large ReviewForm.tsx into smaller components
+- [ ] Add email verification
 
 ## Getting Started
 
-1. Read VERSION.md for version history
-2. Read the brand guidelines: `C:\Users\mmcge\Downloads\ratemyplace-brand-guidelines.jsx`
-3. Read the survey spec: `C:\Users\mmcge\Downloads\ratemyplace-survey-specification.md`
-4. Start with Google Maps Places API (most impactful for user experience)
-
-Please begin by reading the current auth.ts and ReviewForm.tsx files to understand the existing implementation, then outline your approach for adding Google Maps integration.
+Please begin by reading CLAUDE_CONTEXT.md for complete project context, then explore the scoring.ts file to understand the evidence-based methodology - it's central to the project's mission.
 
 ---
 

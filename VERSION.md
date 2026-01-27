@@ -11,14 +11,48 @@
 
 ---
 
-## Current Version: v1.0.0-alpha
+## Current Version: v1.1.0-alpha
 
-**Released:** January 2026
-**Codename:** "Complete Foundation"
+**Released:** January 27, 2026
+**Codename:** "Evidence-Based Scoring"
 
 ### Changelog
 
-#### v1.0.0-alpha (January 2026) - Current
+#### v1.1.0-alpha (January 27, 2026) - Current
+
+**Major Features:**
+- **Evidence-Based Scoring Methodology**: Implemented weighted scoring system grounded in peer-reviewed public health research
+  - Health/safety items receive higher weights (pests 1.5x, mold 1.5x, structural 1.3x, climate 1.3x, plumbing 1.2x, security 1.2x)
+  - Domain sub-scores (Unit, Building, Landlord) calculated and displayed
+  - Recency weighting for aggregate scores (100% for 0-2y, declining to 85% floor for 5+y)
+- **Public Methodology Page** (`/methodology`): Full transparency on scoring with academic citations
+  - Survey instrument sources (OHQS, PHQS, WHO LARES)
+  - All 27 survey items listed with research origins
+  - Health/safety weighting evidence explained
+  - Complete reference list with DOIs
+- **Admin Dashboard**: Comprehensive admin interface at `/admin`
+  - Building management (create, edit, delete)
+  - Review moderation queue (approve/reject)
+  - Verification handling
+  - User management
+- **HelpTooltip Component**: Contextual help for each survey question
+- **Interactive Map**: Building map with geolocation support
+
+**UI Improvements:**
+- ScoreCard now shows domain sub-scores (Unit/Building/Landlord)
+- "Learn more" link to methodology page in ScoreCard
+- Footer now includes Scoring Methodology link
+- New RateMyPlace logo with transparent background
+
+**Bug Fixes:**
+- Fixed favicon transparency
+
+**Documentation:**
+- Complete overhaul of CLAUDE_CONTEXT.md with scoring methodology
+- Updated ARCHITECTURE.md with methodology section
+- Added academic references throughout documentation
+
+#### v1.0.0-alpha (January 2026)
 
 **New Features:**
 - Property Manager System: Buildings can have both landlord AND property manager
@@ -67,18 +101,19 @@
 
 ## Upcoming Milestones
 
-### v1.1.0-beta - "Community" (Planned)
-- [ ] Review moderation queue (admin)
+### v1.2.0-beta - "Community" (Planned)
 - [ ] Landlord response system
 - [ ] User profile pages
 - [ ] Email notifications
 - [ ] Search functionality improvements
+- [ ] Automated score recalculation triggers
 
 ### v2.0.0-stable - "Launch" (Target)
 - [ ] Full feature set complete
 - [ ] Accessibility audit passed
 - [ ] Performance optimized
 - [ ] Security review complete
+- [ ] Rate limiting on API endpoints
 
 ---
 
@@ -98,13 +133,20 @@
 | Google Maps API | Done | v0.3.0 |
 | Google OAuth | Done | v0.3.0 |
 | Interactive Map | Done | v0.3.0 |
-| **Property Manager System** | **Done** | **v1.0.0** |
-| **Unit Number Grouping** | **Done** | **v1.0.0** |
-| **Enhanced Review Display** | **Done** | **v1.0.0** |
-| **Landlord Profile Reviews** | **Done** | **v1.0.0** |
-| **Score Breakdown Cards** | **Done** | **v1.0.0** |
-| Review Moderation | Planned | v1.1.0 |
-| Landlord Responses | Planned | v1.1.0 |
+| Property Manager System | Done | v1.0.0 |
+| Unit Number Grouping | Done | v1.0.0 |
+| Enhanced Review Display | Done | v1.0.0 |
+| Landlord Profile Reviews | Done | v1.0.0 |
+| Score Breakdown Cards | Done | v1.0.0 |
+| **Evidence-Based Scoring** | **Done** | **v1.1.0** |
+| **Health/Safety Weighting** | **Done** | **v1.1.0** |
+| **Domain Sub-Scores** | **Done** | **v1.1.0** |
+| **Recency Weighting** | **Done** | **v1.1.0** |
+| **Public Methodology Page** | **Done** | **v1.1.0** |
+| **Admin Dashboard** | **Done** | **v1.1.0** |
+| **HelpTooltip Component** | **Done** | **v1.1.0** |
+| Landlord Responses | Planned | v1.2.0 |
+| User Profile Pages | Planned | v1.2.0 |
 
 ---
 
@@ -124,22 +166,34 @@
 | `landlord_scores` | Aggregated landlord stats |
 | `property_manager_scores` | Aggregated PM stats |
 
-### Review Score Fields
+### Review Score Fields (with Health/Safety Weights)
 
 **Unit Scores (10):**
-- unit_structural, unit_plumbing, unit_electrical, unit_climate
-- unit_ventilation, unit_pests, unit_mold, unit_appliances
-- unit_layout, unit_accuracy
+- unit_structural (1.3x), unit_plumbing (1.2x), unit_electrical (1.0x), unit_climate (1.3x)
+- unit_ventilation (1.0x), unit_pests (1.5x), unit_mold (1.5x), unit_appliances (1.0x)
+- unit_layout (1.0x), unit_accuracy (1.0x)
 
 **Building Scores (9):**
-- building_common_areas, building_security, building_exterior
-- building_noise_neighbors, building_noise_external, building_mail
-- building_laundry, building_parking, building_trash
+- building_common_areas (1.0x), building_security (1.2x), building_exterior (1.0x)
+- building_noise_neighbors (1.0x), building_noise_external (1.0x), building_mail (1.0x)
+- building_laundry (1.0x), building_parking (1.0x), building_trash (1.0x)
 
 **Landlord Scores (8):**
-- landlord_maintenance, landlord_communication, landlord_professionalism
-- landlord_lease_clarity, landlord_privacy, landlord_deposit
-- landlord_rent_practices, landlord_non_retaliation
+- landlord_maintenance (1.0x), landlord_communication (1.0x), landlord_professionalism (1.0x)
+- landlord_lease_clarity (1.0x), landlord_privacy (1.0x), landlord_deposit (1.0x)
+- landlord_rent_practices (1.0x), landlord_non_retaliation (1.0x)
+
+### Scoring Methodology
+
+The scoring system is grounded in public health research:
+
+| Survey Instrument | Source | Domain |
+|-------------------|--------|--------|
+| OHQS (Observational Housing Quality Scale) | Krieger & Higgins (2002) | Unit condition |
+| PHQS (Physical Housing Quality Scale) | Jacobs et al. (2009) | Building-level |
+| WHO LARES | Bonnefoy et al. (2003) | Landlord/management |
+
+See `/methodology` page and `src/lib/scoring.ts` for full implementation details.
 
 ---
 
@@ -168,10 +222,10 @@
 
 ---
 
-## Build Information (v1.0.0-alpha)
+## Build Information (v1.1.0-alpha)
 
 **Build Status:** Passing
 **TypeScript:** No errors (strict mode)
-**Client Bundle:** 169.44 KB total
 **Platform:** Cloudflare Pages (SSR)
 **Database:** Cloudflare D1 (SQLite)
+**Production URL:** ratemyplace.boston
