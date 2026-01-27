@@ -8,6 +8,7 @@ import {
   type SurveyItem,
 } from '../../lib/surveyItems';
 import AddressAutocomplete, { type PlaceDetails } from '../AddressAutocomplete';
+import { HelpTooltip } from './HelpTooltip';
 
 interface Building {
   id: string;
@@ -294,6 +295,7 @@ export default function ReviewForm({ building }: Props) {
               <span className="text-xs text-gray-400 font-mono mr-2">{item.code}</span>
               <span className="font-medium text-gray-900">{item.dimension}</span>
               {item.required && <span className="text-coral-500 ml-1">*</span>}
+              <HelpTooltip help={item.help} dimension={item.dimension} />
             </div>
           </div>
           <p className="text-sm text-gray-600 mt-1">{item.text}</p>

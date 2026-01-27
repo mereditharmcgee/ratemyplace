@@ -1,6 +1,15 @@
 // Survey items based on OHQS/PHQS research (v2.0 specification)
 // 27 items across three domains: Unit (10), Building (9), Landlord (8)
 
+export interface SurveyItemHelp {
+  description: string;
+  examples: {
+    high: string;  // What a 5 looks like
+    mid: string;   // What a 3 looks like
+    low: string;   // What a 1 looks like
+  };
+}
+
 export interface SurveyItem {
   key: string;
   code: string;
@@ -9,6 +18,7 @@ export interface SurveyItem {
   required: boolean;
   allowNA: boolean;
   category: 'unit' | 'building' | 'landlord';
+  help: SurveyItemHelp;
 }
 
 // Unit Rating Items (10 items, all required)
@@ -21,6 +31,14 @@ export const unitItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'unit',
+    help: {
+      description: 'Consider the physical condition of walls, floors, ceilings, doors, and windows. Look for cracks, holes, water stains, peeling paint, warped floors, or damaged surfaces.',
+      examples: {
+        high: 'Everything in excellent condition. No visible damage, paint intact, floors level, doors and windows work smoothly.',
+        mid: 'Minor cosmetic issues like small nail holes or slight scuffs, but nothing affecting structural integrity or livability.',
+        low: 'Major problems: large cracks, holes in walls, water damage, peeling paint, warped floors, doors that don\'t close properly.',
+      },
+    },
   },
   {
     key: 'unit_plumbing',
@@ -30,6 +48,14 @@ export const unitItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'unit',
+    help: {
+      description: 'Think about water pressure in showers and sinks, hot water availability and consistency, any leaks under sinks or around toilets, and drain speed.',
+      examples: {
+        high: 'Strong water pressure, hot water always available within reasonable time, no leaks anywhere, drains work perfectly.',
+        mid: 'Occasional minor issues like slow drains or brief hot water delays, but generally functional.',
+        low: 'Frequent problems: low water pressure, no hot water or runs out quickly, visible leaks, clogged drains, running toilets.',
+      },
+    },
   },
   {
     key: 'unit_electrical',
@@ -39,6 +65,14 @@ export const unitItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'unit',
+    help: {
+      description: 'Consider the number and placement of outlets, whether lights flicker or dim, if circuit breakers trip frequently, and if all switches and outlets work.',
+      examples: {
+        high: 'Plenty of outlets where needed, all lights and switches work perfectly, no electrical issues whatsoever.',
+        mid: 'Could use more outlets in some rooms, but everything works safely. Maybe one minor issue that was fixed.',
+        low: 'Not enough outlets, flickering lights, frequent breaker trips, outlets that don\'t work, exposed wiring, or safety concerns.',
+      },
+    },
   },
   {
     key: 'unit_climate',
@@ -48,6 +82,14 @@ export const unitItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'unit',
+    help: {
+      description: 'Think about heating in winter (was it warm enough?), cooling in summer (AC or good ventilation?), and your ability to control the temperature.',
+      examples: {
+        high: 'Always comfortable. Heat works great in winter, AC or good airflow in summer, easy to adjust temperature.',
+        mid: 'Generally okay but some discomfort during extreme weather. Maybe heat takes a while to warm up or summer gets a bit stuffy.',
+        low: 'Serious issues: freezing in winter, unbearably hot in summer, heat doesn\'t work, no way to cool down, no temperature control.',
+      },
+    },
   },
   {
     key: 'unit_ventilation',
@@ -57,6 +99,14 @@ export const unitItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'unit',
+    help: {
+      description: 'Consider air circulation, bathroom and kitchen exhaust fans, window placement for cross-ventilation, and any lingering odors or humidity issues.',
+      examples: {
+        high: 'Fresh air, good circulation, exhaust fans work well, no stuffiness or odors, windows allow good airflow.',
+        mid: 'Adequate but not great. Maybe bathroom gets steamy or kitchen odors linger longer than ideal.',
+        low: 'Stuffy, stale air, no exhaust fans or they don\'t work, persistent odors, moisture buildup on windows, poor air quality.',
+      },
+    },
   },
   {
     key: 'unit_pests',
@@ -66,6 +116,14 @@ export const unitItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'unit',
+    help: {
+      description: 'Think about any encounters with cockroaches, mice, rats, bedbugs, ants, or other pests during your tenancy.',
+      examples: {
+        high: 'Never saw any pests during entire tenancy. No signs of mice, roaches, bedbugs, or other infestations.',
+        mid: 'Occasional minor issue (like a few ants in summer) that was quickly resolved and didn\'t persist.',
+        low: 'Ongoing pest problems: regular sightings of roaches or mice, bedbug infestation, pests that management failed to address.',
+      },
+    },
   },
   {
     key: 'unit_mold',
@@ -75,6 +133,14 @@ export const unitItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'unit',
+    help: {
+      description: 'Look for visible mold or mildew (especially in bathrooms, around windows, or in closets), musty smells, or condensation problems.',
+      examples: {
+        high: 'No mold or mildew anywhere. Bathroom stays dry, no musty smells, windows don\'t condensate excessively.',
+        mid: 'Minor mildew in bathroom that\'s manageable with regular cleaning, but no serious mold issues.',
+        low: 'Visible mold growth, persistent musty smell, mold keeps returning after cleaning, moisture problems causing damage.',
+      },
+    },
   },
   {
     key: 'unit_appliances',
@@ -84,6 +150,14 @@ export const unitItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'unit',
+    help: {
+      description: 'Consider the stove/oven, refrigerator, dishwasher, microwave, garbage disposal, and any other appliances that came with the unit.',
+      examples: {
+        high: 'All appliances worked perfectly the entire time. No breakdowns, everything functioned as expected.',
+        mid: 'Appliances worked but showed their age. Maybe one needed a repair that was handled reasonably.',
+        low: 'Appliances frequently broke down, didn\'t work properly (oven uneven, fridge not cold enough), or weren\'t repaired when reported.',
+      },
+    },
   },
   {
     key: 'unit_layout',
@@ -93,6 +167,14 @@ export const unitItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'unit',
+    help: {
+      description: 'Think about room sizes, closet space, kitchen workspace, bathroom layout, and how well the space worked for your daily routine.',
+      examples: {
+        high: 'Well-designed layout. Rooms are good sizes, plenty of storage, kitchen functional, everything flows well.',
+        mid: 'Layout works but has quirks. Maybe closets are small or kitchen is tight, but you made it work.',
+        low: 'Poorly designed. Rooms too small, no storage, awkward layout that makes daily life difficult, wasted space.',
+      },
+    },
   },
   {
     key: 'unit_accuracy',
@@ -102,6 +184,14 @@ export const unitItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'unit',
+    help: {
+      description: 'Compare what you saw in the listing/tour to what you got: photos, described amenities, stated square footage, included features.',
+      examples: {
+        high: 'Everything exactly as advertised. Photos were accurate, all promised amenities present, no surprises.',
+        mid: 'Mostly accurate with minor differences. Maybe lighting made it look bigger in photos, but nothing misleading.',
+        low: 'Significantly misrepresented. Photos were misleading, promised amenities missing, hidden problems not disclosed.',
+      },
+    },
   },
 ];
 
@@ -115,6 +205,14 @@ export const buildingItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'building',
+    help: {
+      description: 'Think about hallways, stairwells, lobby, elevators, and any other shared indoor spaces. Were they clean and well-maintained?',
+      examples: {
+        high: 'Always clean and well-lit. Floors swept, walls in good condition, no trash or debris, repairs done promptly.',
+        mid: 'Generally acceptable but not spotless. Occasional mess that gets cleaned up, minor wear and tear.',
+        low: 'Dirty, poorly lit, trash accumulates, broken fixtures not repaired, graffiti, general neglect.',
+      },
+    },
   },
   {
     key: 'building_security',
@@ -124,6 +222,14 @@ export const buildingItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'building',
+    help: {
+      description: 'Consider entry door locks, intercom/buzzer systems, hallway lighting, and your overall sense of security in the building.',
+      examples: {
+        high: 'Very secure. All locks work, good lighting everywhere, secure entry system, felt safe at all hours.',
+        mid: 'Reasonably secure but not perfect. Maybe a light was out occasionally or buzzer was finicky.',
+        low: 'Security concerns. Broken locks, main door often propped open, poor lighting, non-functional intercom, felt unsafe.',
+      },
+    },
   },
   {
     key: 'building_exterior',
@@ -133,6 +239,14 @@ export const buildingItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'building',
+    help: {
+      description: 'Think about the building\'s outside appearance, landscaping, snow/ice removal in winter, and outdoor trash/recycling areas.',
+      examples: {
+        high: 'Well-maintained exterior, landscaping neat, snow removed promptly, trash areas clean and organized.',
+        mid: 'Acceptable but basic maintenance. Snow removal takes a day or two, landscaping minimal but tidy.',
+        low: 'Neglected exterior, overgrown landscaping, snow/ice not cleared (safety hazard), trash overflowing, eyesore.',
+      },
+    },
   },
   {
     key: 'building_noise_neighbors',
@@ -142,6 +256,14 @@ export const buildingItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'building',
+    help: {
+      description: 'Consider noise from neighbors (footsteps, music, voices), building systems (heating, plumbing), and general sound insulation.',
+      examples: {
+        high: 'Very quiet. Rarely heard neighbors, good soundproofing between units, building systems quiet.',
+        mid: 'Some noise but livable. Occasionally hear neighbors during normal activities, nothing excessive.',
+        low: 'Very noisy. Thin walls, hear everything from neighbors, loud building systems, disrupts sleep or work.',
+      },
+    },
   },
   {
     key: 'building_noise_external',
@@ -151,6 +273,14 @@ export const buildingItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'building',
+    help: {
+      description: 'Think about street noise, traffic, nearby bars/restaurants, construction, sirens, or other external sounds.',
+      examples: {
+        high: 'Very quiet location or excellent sound insulation. Outside noise rarely noticeable inside.',
+        mid: 'Some street noise but manageable. Typical city sounds, nothing that seriously disrupts daily life.',
+        low: 'Extremely noisy. Constant traffic, frequent sirens, loud nightlife, construction, disrupts sleep and peace.',
+      },
+    },
   },
   {
     key: 'building_mail',
@@ -160,6 +290,14 @@ export const buildingItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'building',
+    help: {
+      description: 'Consider your mailbox security, package delivery options, whether packages were stolen or left in weather.',
+      examples: {
+        high: 'Secure mailboxes, packages kept in secure area or locker, never had theft or weather damage issues.',
+        mid: 'Basic mail security. Packages left in lobby which is reasonably secure, occasional concern but no actual problems.',
+        low: 'Mail/package theft occurred, packages left outside in weather, broken mailboxes, no secure delivery option.',
+      },
+    },
   },
   {
     key: 'building_laundry',
@@ -169,6 +307,14 @@ export const buildingItems: SurveyItem[] = [
     required: false,
     allowNA: true,
     category: 'building',
+    help: {
+      description: 'If your building had shared laundry, consider machine availability, working condition, cleanliness, and cost. Select N/A if you had in-unit laundry or no building facilities.',
+      examples: {
+        high: 'Machines always available and working, clean facilities, reasonable prices, well-maintained.',
+        mid: 'Usually functional but occasional out-of-order machines. Basic cleanliness, acceptable wait times.',
+        low: 'Machines frequently broken, dirty facilities, long waits, overpriced, or laundry room felt unsafe.',
+      },
+    },
   },
   {
     key: 'building_parking',
@@ -178,6 +324,14 @@ export const buildingItems: SurveyItem[] = [
     required: false,
     allowNA: true,
     category: 'building',
+    help: {
+      description: 'If parking was included or available, consider spot availability, safety, lighting, snow clearing, and whether it matched what was promised. Select N/A if parking wasn\'t relevant to you.',
+      examples: {
+        high: 'Assigned spot always available, well-lit, secure, properly maintained and cleared of snow.',
+        mid: 'Parking available but not perfect. Maybe shared lot gets full occasionally or snow clearing is slow.',
+        low: 'Parking problems: spot not available as promised, unsafe area, never cleared of snow, damage to vehicle.',
+      },
+    },
   },
   {
     key: 'building_trash',
@@ -187,6 +341,14 @@ export const buildingItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'building',
+    help: {
+      description: 'Think about trash room/bin accessibility, pickup frequency, overflow issues, recycling options, and cleanliness.',
+      examples: {
+        high: 'Convenient trash access, regular pickup, never overflows, recycling available, area kept clean.',
+        mid: 'Adequate but basic. Occasional overflow before pickup day, functional but not ideal location.',
+        low: 'Trash overflows regularly, infrequent pickup, no recycling, smelly or pest-attracting conditions, inconvenient access.',
+      },
+    },
   },
 ];
 
@@ -200,6 +362,14 @@ export const landlordItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'landlord',
+    help: {
+      description: 'Think about how quickly maintenance issues were acknowledged and resolved. Consider both emergency and non-emergency repairs.',
+      examples: {
+        high: 'Requests acknowledged same day, repairs completed quickly, emergencies handled immediately.',
+        mid: 'Reasonable response time (few days for non-emergencies), eventually fixed but not lightning fast.',
+        low: 'Requests ignored or took weeks/months, had to follow up repeatedly, some issues never fixed.',
+      },
+    },
   },
   {
     key: 'landlord_communication',
@@ -209,6 +379,14 @@ export const landlordItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'landlord',
+    help: {
+      description: 'Consider how easy it was to contact your landlord/management and how quickly they responded to calls, emails, or messages.',
+      examples: {
+        high: 'Always responsive. Returns calls/emails within a day, clear communication channels, easy to reach.',
+        mid: 'Generally reachable but may take a few days to respond. Gets back to you eventually.',
+        low: 'Very hard to reach. Ignores messages, no response for days/weeks, unclear how to contact them.',
+      },
+    },
   },
   {
     key: 'landlord_professionalism',
@@ -218,6 +396,14 @@ export const landlordItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'landlord',
+    help: {
+      description: 'Think about how you were treated in all interactions. Were they respectful, courteous, and businesslike?',
+      examples: {
+        high: 'Always professional and respectful. Courteous communication, treated you as a valued tenant.',
+        mid: 'Generally professional, maybe occasionally curt or slow, but nothing disrespectful.',
+        low: 'Rude, dismissive, aggressive, or unprofessional behavior. Made you feel uncomfortable or unwelcome.',
+      },
+    },
   },
   {
     key: 'landlord_lease_clarity',
@@ -227,6 +413,14 @@ export const landlordItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'landlord',
+    help: {
+      description: 'Consider whether the lease was clear and understandable, and whether the landlord followed through on all promises and terms.',
+      examples: {
+        high: 'Clear, straightforward lease. All verbal promises put in writing, landlord honored every agreement.',
+        mid: 'Lease was standard, mostly clear. No major issues with honoring terms, maybe minor confusion resolved.',
+        low: 'Confusing lease, hidden fees, landlord didn\'t honor promises, tried to change terms mid-lease.',
+      },
+    },
   },
   {
     key: 'landlord_privacy',
@@ -236,6 +430,14 @@ export const landlordItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'landlord',
+    help: {
+      description: 'Think about whether the landlord gave proper notice before entering (typically 24-48 hours required by law), and respected your space and privacy.',
+      examples: {
+        high: 'Always gave proper advance notice, respected your schedule, never entered without permission.',
+        mid: 'Usually gave notice, maybe once entered with short notice for legitimate emergency.',
+        low: 'Entered without notice, showed up unannounced, didn\'t respect boundaries, made you feel surveilled.',
+      },
+    },
   },
   {
     key: 'landlord_deposit',
@@ -245,6 +447,14 @@ export const landlordItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'landlord',
+    help: {
+      description: 'Consider how the security deposit was handled at move-in and move-out. Was it returned on time with clear documentation of any deductions?',
+      examples: {
+        high: 'Full deposit returned promptly (within legal timeframe), clear itemized statement, fair deductions if any.',
+        mid: 'Deposit returned but took longer than ideal, or minor disagreement about deductions that was resolved.',
+        low: 'Deposit withheld unfairly, excessive deductions, no itemization, had to fight to get money back, or never returned.',
+      },
+    },
   },
   {
     key: 'landlord_rent_practices',
@@ -254,6 +464,14 @@ export const landlordItems: SurveyItem[] = [
     required: false,
     allowNA: true,
     category: 'landlord',
+    help: {
+      description: 'If you experienced a rent increase, was it reasonable and communicated properly? Select N/A if rent never increased during your tenancy.',
+      examples: {
+        high: 'Increases were modest and market-appropriate, given with plenty of advance notice, clearly communicated.',
+        mid: 'Increase was noticeable but not outrageous, adequate notice given, understandable reasoning.',
+        low: 'Excessive increases, short notice, felt like price gouging, or increases used to push you out.',
+      },
+    },
   },
   {
     key: 'landlord_non_retaliation',
@@ -263,6 +481,14 @@ export const landlordItems: SurveyItem[] = [
     required: true,
     allowNA: false,
     category: 'landlord',
+    help: {
+      description: 'Think about whether you felt safe reporting problems or requesting repairs. Did you worry about rent increases, non-renewal, or other consequences?',
+      examples: {
+        high: 'Completely comfortable reporting issues. Landlord welcomed feedback and fixed problems without any negative consequences.',
+        mid: 'Generally comfortable, maybe slight hesitation but no actual retaliation experienced.',
+        low: 'Afraid to report issues. Experienced or feared retaliation like rent increase, eviction threats, or harassment after complaints.',
+      },
+    },
   },
 ];
 
