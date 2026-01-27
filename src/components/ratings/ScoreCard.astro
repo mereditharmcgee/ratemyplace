@@ -7,6 +7,14 @@ interface Props {
 
 const { scores, type, grouped = true } = Astro.props;
 
+// New domain-based categories
+const domainCategories = [
+  { key: 'avg_unit', label: 'Unit Quality', icon: 'home' },
+  { key: 'avg_building', label: 'Building', icon: 'building' },
+  { key: 'avg_landlord', label: 'Landlord', icon: 'user' },
+];
+
+// Legacy categories (for backward compatibility)
 const buildingCategories = [
   { key: 'avg_building_quality', label: 'Building Quality' },
   { key: 'avg_maintenance', label: 'Maintenance' },
@@ -24,29 +32,106 @@ const landlordCategories = [
   { key: 'avg_deposit_handling', label: 'Deposit Handling' },
 ];
 
-const valueCategory = [
-  { key: 'avg_rent_value', label: 'Rent Value' },
-];
-
 function getScoreColor(score: number): string {
-  if (score >= 4) return 'bg-green-500';
-  if (score >= 3) return 'bg-yellow-500';
+  if (score >= 4) return 'bg-emerald-500';
+  if (score >= 3) return 'bg-amber-500';
   if (score >= 2) return 'bg-orange-500';
   return 'bg-red-500';
 }
 
+function getScoreTextColor(score: number): string {
+  if (score >= 4) return 'text-emerald-600';
+  if (score >= 3) return 'text-amber-600';
+  if (score >= 2) return 'text-orange-600';
+  return 'text-red-600';
+}
+
+// Check if we have new domain scores
+const hasNewDomainScores = scores?.avg_unit != null || scores?.avg_building != null || scores?.avg_landlord != null;
+
 // Filter available scores
-const availableBuilding = buildingCategories.filter(c => scores[c.key] != null);
-const availableLandlord = landlordCategories.filter(c => scores[c.key] != null);
-const availableValue = valueCategory.filter(c => scores[c.key] != null);
+const availableDomains = domainCategories.filter(c => scores?.[c.key] != null);
+const availableBuilding = buildingCategories.filter(c => scores?.[c.key] != null);
+const availableLandlord = landlordCategories.filter(c => scores?.[c.key] != null);
+
+// Issue percentages
+const issues = [
+  { key: 'pct_pest_issues', label: 'Reported pest issues', threshold: 20 },
+  { key: 'pct_heat_issues', label: 'Reported heat/hot water issues', threshold: 20 },
+  { key: 'pct_water_issues', label: 'Reported plumbing issues', threshold: 20 },
+  { key: 'pct_deposit_issues', label: 'Reported deposit issues', threshold: 30 },
+];
+
+const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.key] > 0);
 ---
 
 <div class="bg-white rounded-lg border border-gray-200 p-6">
   <h3 class="font-semibold text-gray-900 mb-4">Rating Breakdown</h3>
 
-  {grouped && type === 'building' ? (
+  {hasNewDomainScores ? (
+    <!-- New domain-based display -->
     <div class="space-y-6">
-      <!-- Building Scores Section -->
+      <!-- Domain Scores Overview -->
+      {availableDomains.length > 0 && (
+        <div class="grid grid-cols-3 gap-3 mb-4">
+          {availableDomains.map((domain) => {
+            const score = scores[domain.key];
+            return (
+              <div class={`text-center p-3 rounded-lg ${score >= 4 ? 'bg-emerald-50' : score >= 3 ? 'bg-amber-50' : 'bg-red-50'}`}>
+                <div class={`text-2xl font-bold ${getScoreTextColor(score)}`}>
+                  {score.toFixed(1)}
+                </div>
+                <div class="text-xs text-gray-600 mt-1">{domain.label}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <!-- Would Recommend -->
+      {scores?.pct_would_recommend != null && (
+        <div class="flex items-center justify-between py-3 border-t border-gray-100">
+          <span class="text-sm text-gray-600">Would recommend</span>
+          <span class={`text-lg font-bold ${scores.pct_would_recommend >= 70 ? 'text-emerald-600' : scores.pct_would_recommend >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+            {scores.pct_would_recommend}%
+          </span>
+        </div>
+      )}
+
+      <!-- Issues Section -->
+      {availableIssues.length > 0 && (
+        <div class="pt-3 border-t border-gray-100">
+          <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            Issues Reported
+          </h4>
+          <div class="space-y-2">
+            {availableIssues.map((issue) => {
+              const pct = scores[issue.key];
+              const isHigh = pct >= issue.threshold;
+              return (
+                <div class={`flex items-center justify-between text-sm p-2 rounded ${isHigh ? 'bg-red-50' : 'bg-gray-50'}`}>
+                  <span class={isHigh ? 'text-red-700' : 'text-gray-600'}>{issue.label}</span>
+                  <span class={`font-medium ${isHigh ? 'text-red-700' : 'text-gray-700'}`}>{pct}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <!-- Methodology Note -->
+      <div class="pt-3 border-t border-gray-100">
+        <p class="text-xs text-gray-400">
+          Scores are weighted by health/safety factors. Recent reviews weighted more heavily.
+        </p>
+      </div>
+    </div>
+  ) : grouped && type === 'building' ? (
+    <!-- Legacy building display -->
+    <div class="space-y-6">
       {availableBuilding.length > 0 && (
         <div>
           <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -77,7 +162,6 @@ const availableValue = valueCategory.filter(c => scores[c.key] != null);
         </div>
       )}
 
-      <!-- Landlord Scores Section -->
       {availableLandlord.length > 0 && (
         <div>
           <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -107,41 +191,11 @@ const availableValue = valueCategory.filter(c => scores[c.key] != null);
           </div>
         </div>
       )}
-
-      <!-- Value Score Section -->
-      {availableValue.length > 0 && (
-        <div>
-          <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Value
-          </h4>
-          <div class="space-y-3">
-            {availableValue.map((category) => {
-              const score = scores[category.key];
-              return (
-                <div>
-                  <div class="flex justify-between items-center mb-1">
-                    <span class="text-sm text-gray-600">{category.label}</span>
-                    <span class="text-sm font-medium text-gray-900">{score.toFixed(1)}</span>
-                  </div>
-                  <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      class={`h-2 rounded-full ${getScoreColor(score)}`}
-                      style={`width: ${(score / 5) * 100}%`}
-                    ></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   ) : (
+    <!-- Landlord-only view -->
     <div class="space-y-3">
-      {[...availableLandlord].map((category) => {
+      {availableLandlord.map((category) => {
         const score = scores[category.key];
         return (
           <div>

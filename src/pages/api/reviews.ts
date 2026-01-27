@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../lib/db';
-import { calculateOverallScore } from '../../lib/scoring';
+import { calculateOverallScore, calculateDomainScores, ALL_SCORE_FIELDS } from '../../lib/scoring';
 import { generateIdFromEntropySize } from 'lucia';
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -16,46 +16,47 @@ export async function POST(context: APIContext): Promise<Response> {
     const formData = await context.request.formData();
 
     const buildingId = formData.get('building_id') as string;
-    const moveInYear = parseInt(formData.get('move_in_year') as string);
-    const moveInSeason = formData.get('move_in_season') as string;
-    const isCurrentTenant = formData.get('is_current_tenant') === '1';
-    const moveOutYear = !isCurrentTenant ? parseInt(formData.get('move_out_year') as string) : null;
-    const moveOutSeason = !isCurrentTenant ? formData.get('move_out_season') as string : null;
-    const unitType = formData.get('unit_type') as string;
+    if (!buildingId) {
+      return new Response(JSON.stringify({ error: 'Building ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Tenancy info
+    const tenureMonths = formData.get('tenure_months') ? parseInt(formData.get('tenure_months') as string) : null;
+    const moveOutYearNew = formData.get('move_out_year') as string || null;
+    const isCurrentTenant = moveOutYearNew === 'current' ? 1 : 0;
+
+    // Unit details
+    const unitType = formData.get('unit_type') as string || 'unknown';
+    const unitNumber = formData.get('unit_number') as string || null;
+    const bedrooms = formData.get('bedrooms') as string || null;
+    const bathrooms = formData.get('bathrooms') as string || null;
+    const squareFootage = formData.get('square_footage') ? parseInt(formData.get('square_footage') as string) : null;
     const rentAmount = formData.get('rent_amount') ? parseInt(formData.get('rent_amount') as string) : null;
+    const amenities = formData.get('amenities') as string || '[]';
+    const utilitiesIncluded = formData.get('utilities_included') as string || '[]';
 
-    // Collect scores
-    const scores: Record<string, number | null> = {
-      building_quality: formData.get('score_building_quality') ? parseInt(formData.get('score_building_quality') as string) : null,
-      maintenance: formData.get('score_maintenance') ? parseInt(formData.get('score_maintenance') as string) : null,
-      pest_control: formData.get('score_pest_control') ? parseInt(formData.get('score_pest_control') as string) : null,
-      safety: formData.get('score_safety') ? parseInt(formData.get('score_safety') as string) : null,
-      noise: formData.get('score_noise') ? parseInt(formData.get('score_noise') as string) : null,
-      landlord_responsiveness: formData.get('score_landlord_responsiveness') ? parseInt(formData.get('score_landlord_responsiveness') as string) : null,
-      landlord_communication: formData.get('score_landlord_communication') ? parseInt(formData.get('score_landlord_communication') as string) : null,
-      landlord_fairness: formData.get('score_landlord_fairness') ? parseInt(formData.get('score_landlord_fairness') as string) : null,
-      lease_clarity: formData.get('score_lease_clarity') ? parseInt(formData.get('score_lease_clarity') as string) : null,
-      deposit_handling: formData.get('score_deposit_handling') ? parseInt(formData.get('score_deposit_handling') as string) : null,
-      rent_value: formData.get('score_rent_value') ? parseInt(formData.get('score_rent_value') as string) : null,
-      amenities: formData.get('score_amenities') ? parseInt(formData.get('score_amenities') as string) : null,
-    };
+    // Laundry info
+    const laundryType = formData.get('laundry_type') as string || null;
+    const laundryCostPerLoad = formData.get('laundry_cost_per_load') ? parseFloat(formData.get('laundry_cost_per_load') as string) : null;
+    const estimatedMonthlyUtilities = formData.get('estimated_monthly_utilities') ? parseInt(formData.get('estimated_monthly_utilities') as string) : null;
 
-    // Calculate overall score
-    const validScores = Object.fromEntries(
-      Object.entries(scores).filter(([_, v]) => v !== null)
-    ) as Record<string, number>;
-    const overallScore = calculateOverallScore(validScores);
+    // Collect all 27 survey scores
+    const scores: Record<string, number | null> = {};
+    for (const field of ALL_SCORE_FIELDS) {
+      const value = formData.get(field);
+      scores[field] = value ? parseInt(value as string) : null;
+    }
 
-    // Issues
-    const hadPestIssues = formData.get('had_pest_issues') === '1';
-    const hadHeatIssues = formData.get('had_heat_issues') === '1';
-    const hadWaterIssues = formData.get('had_water_issues') === '1';
-    const hadSecurityDepositIssues = formData.get('had_deposit_issues') === '1';
-    const hadEvictionThreat = formData.get('had_eviction_issues') === '1';
-    const wouldRecommend = formData.get('would_recommend') === '1';
+    // Calculate domain scores and overall
+    const domainScores = calculateDomainScores(scores);
+    const overallScore = domainScores.overall ?? 0;
 
-    const reviewTitle = formData.get('review_title') as string || null;
-    const reviewText = formData.get('review_text') as string || null;
+    // Additional info
+    const wouldRecommendNew = formData.get('would_recommend') as string || null;
+    const comments = formData.get('comments') as string || null;
 
     const db = getDB((context.locals as any).runtime);
 
@@ -73,58 +74,108 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const reviewId = generateIdFromEntropySize(10);
 
+    // Insert review with all 27 score fields
     await db.prepare(`
       INSERT INTO reviews (
         id, user_id, building_id,
-        move_in_year, move_in_season, move_out_year, move_out_season, is_current_tenant,
-        unit_type, rent_amount,
-        score_building_quality, score_maintenance, score_pest_control, score_safety, score_noise,
-        score_landlord_responsiveness, score_landlord_communication, score_landlord_fairness,
-        score_lease_clarity, score_deposit_handling, score_rent_value, score_amenities,
+        tenure_months, move_out_year_new, is_current_tenant,
+        unit_type, unit_number, bedrooms, bathrooms, square_footage, rent_amount,
+        amenities, utilities_included,
+        laundry_type, laundry_cost_per_load, estimated_monthly_utilities,
+        unit_structural, unit_plumbing, unit_electrical, unit_climate, unit_ventilation,
+        unit_pests, unit_mold, unit_appliances, unit_layout, unit_accuracy,
+        building_common_areas, building_security, building_exterior,
+        building_noise_neighbors, building_noise_external, building_mail,
+        building_laundry, building_parking, building_trash,
+        landlord_maintenance, landlord_communication, landlord_professionalism,
+        landlord_lease_clarity, landlord_privacy, landlord_deposit,
+        landlord_rent_practices, landlord_non_retaliation,
         overall_score,
-        review_title, review_text,
-        had_pest_issues, had_heat_issues, had_water_issues, had_security_deposit_issues, had_eviction_threat,
-        would_recommend, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        would_recommend_new, comments,
+        status,
+        move_in_year, move_in_season
+      ) VALUES (
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
+        ?, ?,
+        ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?,
+        ?,
+        ?, ?,
+        ?,
+        ?, ?
+      )
     `).bind(
       reviewId,
       context.locals.user.id,
       buildingId,
-      moveInYear,
-      moveInSeason,
-      moveOutYear,
-      moveOutSeason,
-      isCurrentTenant ? 1 : 0,
+      tenureMonths,
+      moveOutYearNew,
+      isCurrentTenant,
       unitType,
+      unitNumber,
+      bedrooms,
+      bathrooms,
+      squareFootage,
       rentAmount,
-      scores.building_quality,
-      scores.maintenance,
-      scores.pest_control,
-      scores.safety,
-      scores.noise,
-      scores.landlord_responsiveness,
+      amenities,
+      utilitiesIncluded,
+      laundryType,
+      laundryCostPerLoad,
+      estimatedMonthlyUtilities,
+      // Unit scores (10)
+      scores.unit_structural,
+      scores.unit_plumbing,
+      scores.unit_electrical,
+      scores.unit_climate,
+      scores.unit_ventilation,
+      scores.unit_pests,
+      scores.unit_mold,
+      scores.unit_appliances,
+      scores.unit_layout,
+      scores.unit_accuracy,
+      // Building scores (9)
+      scores.building_common_areas,
+      scores.building_security,
+      scores.building_exterior,
+      scores.building_noise_neighbors,
+      scores.building_noise_external,
+      scores.building_mail,
+      scores.building_laundry,
+      scores.building_parking,
+      scores.building_trash,
+      // Landlord scores (8)
+      scores.landlord_maintenance,
       scores.landlord_communication,
-      scores.landlord_fairness,
-      scores.lease_clarity,
-      scores.deposit_handling,
-      scores.rent_value,
-      scores.amenities,
+      scores.landlord_professionalism,
+      scores.landlord_lease_clarity,
+      scores.landlord_privacy,
+      scores.landlord_deposit,
+      scores.landlord_rent_practices,
+      scores.landlord_non_retaliation,
+      // Overall
       overallScore,
-      reviewTitle,
-      reviewText,
-      hadPestIssues ? 1 : 0,
-      hadHeatIssues ? 1 : 0,
-      hadWaterIssues ? 1 : 0,
-      hadSecurityDepositIssues ? 1 : 0,
-      hadEvictionThreat ? 1 : 0,
-      wouldRecommend ? 1 : 0,
-      'pending'
+      wouldRecommendNew,
+      comments,
+      'pending',
+      // Legacy fields with defaults
+      new Date().getFullYear(),
+      'winter'
     ).run();
 
     return new Response(JSON.stringify({
       success: true,
       reviewId,
-      buildingSlug: building.slug
+      buildingSlug: building.slug,
+      domainScores
     }), {
       headers: { 'Content-Type': 'application/json' }
     });

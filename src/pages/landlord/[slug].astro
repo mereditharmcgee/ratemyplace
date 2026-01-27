@@ -4,6 +4,7 @@ import StarRating from '../../components/ratings/StarRating.astro';
 import ScoreCard from '../../components/ratings/ScoreCard.astro';
 import ReviewCard from '../../components/reviews/ReviewCard.astro';
 import { getDB } from '../../lib/db';
+import { calculateLandlordAverages } from '../../lib/scoring';
 
 const { slug } = Astro.params;
 
@@ -53,6 +54,34 @@ try {
       `).bind(...buildingIds).all();
 
       recentReviews = reviewsResult.results || [];
+
+      // If we have reviews but landlord_scores doesn't have domain scores,
+      // calculate them from the reviews
+      if (recentReviews.length > 0 && scores && !scores.avg_landlord) {
+        // Fetch all reviews for this landlord to calculate accurate scores
+        const allReviewsResult = await db.prepare(`
+          SELECT r.* FROM reviews r
+          JOIN buildings b ON r.building_id = b.id
+          WHERE b.landlord_id = ? AND r.status = 'approved'
+        `).bind(landlord.id).all();
+        const allReviews = allReviewsResult.results || [];
+        if (allReviews.length > 0) {
+          const calculatedScores = calculateLandlordAverages(allReviews);
+          scores = { ...scores, ...calculatedScores };
+        }
+      } else if (recentReviews.length > 0 && !scores) {
+        // No landlord_scores record at all, calculate everything
+        const allReviewsResult = await db.prepare(`
+          SELECT r.* FROM reviews r
+          JOIN buildings b ON r.building_id = b.id
+          WHERE b.landlord_id = ? AND r.status = 'approved'
+        `).bind(landlord.id).all();
+        const allReviews = allReviewsResult.results || [];
+        if (allReviews.length > 0) {
+          scores = calculateLandlordAverages(allReviews);
+          scores.building_count = buildings.length;
+        }
+      }
     }
   }
 } catch (error) {

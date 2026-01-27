@@ -4,6 +4,7 @@ import StarRating from '../../components/ratings/StarRating.astro';
 import ReviewCard from '../../components/reviews/ReviewCard.astro';
 import ScoreCard from '../../components/ratings/ScoreCard.astro';
 import { getDB } from '../../lib/db';
+import { calculateBuildingAverages, calculateDomainScores } from '../../lib/scoring';
 
 const { slug } = Astro.params;
 
@@ -53,6 +54,16 @@ try {
     `).bind(building.id).all();
 
     reviews = reviewsResult.results || [];
+
+    // If we have reviews but building_scores doesn't have domain scores,
+    // calculate them from the reviews
+    if (reviews.length > 0 && scores && !scores.avg_unit && !scores.avg_building && !scores.avg_landlord) {
+      const calculatedScores = calculateBuildingAverages(reviews);
+      scores = { ...scores, ...calculatedScores };
+    } else if (reviews.length > 0 && !scores) {
+      // No building_scores record at all, calculate everything
+      scores = calculateBuildingAverages(reviews);
+    }
   }
 } catch (error) {
   console.error('Error loading building:', error);
@@ -109,10 +120,23 @@ reviews.forEach(review => {
   stats.reviewCount++;
 });
 
-// Calculate aggregated stats for each unit
+// Calculate aggregated stats for each unit using weighted scoring
 reviewsByUnit.forEach((stats) => {
-  const totalScore = stats.reviews.reduce((sum, r) => sum + (r.overall_score || 0), 0);
-  stats.avgScore = stats.reviewCount > 0 ? totalScore / stats.reviewCount : 0;
+  // Calculate weighted average score using the same methodology
+  let scoreSum = 0;
+  let scoreCount = 0;
+  stats.reviews.forEach(review => {
+    const domainScores = calculateDomainScores(review);
+    if (domainScores.overall !== null) {
+      scoreSum += domainScores.overall;
+      scoreCount++;
+    } else if (review.overall_score) {
+      // Fallback to stored overall_score if available
+      scoreSum += review.overall_score;
+      scoreCount++;
+    }
+  });
+  stats.avgScore = scoreCount > 0 ? scoreSum / scoreCount : 0;
 
   const rents = stats.reviews.filter(r => r.rent_amount).map(r => r.rent_amount);
   if (rents.length > 0) {
@@ -120,7 +144,10 @@ reviewsByUnit.forEach((stats) => {
     stats.maxRent = Math.max(...rents);
   }
 
-  const recommends = stats.reviews.filter(r => r.would_recommend === 1).length;
+  // Check both old and new would_recommend fields
+  const recommends = stats.reviews.filter(r =>
+    r.would_recommend === 1 || r.would_recommend_new === 'yes'
+  ).length;
   stats.wouldRecommendPct = stats.reviewCount > 0 ? (recommends / stats.reviewCount) * 100 : 0;
 });
 
