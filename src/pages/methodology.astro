@@ -1,0 +1,302 @@
+---
+import BaseLayout from '../components/layout/BaseLayout.astro';
+---
+
+<BaseLayout title="Scoring Methodology" description="How RateMyPlace calculates building and landlord ratings using evidence-based weighting">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <!-- Header -->
+    <div class="mb-12">
+      <h1 class="text-3xl font-bold text-gray-900 mb-4">Our Scoring Methodology</h1>
+      <p class="text-lg text-gray-600">
+        RateMyPlace uses an evidence-based scoring system grounded in public health research.
+        Our methodology prioritizes health and safety factors that have documented associations
+        with tenant wellbeing.
+      </p>
+    </div>
+
+    <!-- Overview Section -->
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4">How Scores Are Calculated</h2>
+      <div class="bg-white border border-gray-200 rounded-lg p-6">
+        <p class="text-gray-600 mb-4">
+          Each review collects ratings across <strong>27 individual items</strong> organized into three domains:
+        </p>
+        <div class="grid md:grid-cols-3 gap-4 mb-6">
+          <div class="bg-teal-50 rounded-lg p-4">
+            <h3 class="font-semibold text-teal-800 mb-2">Unit Quality</h3>
+            <p class="text-sm text-teal-700">10 items covering structural integrity, systems, and livability</p>
+          </div>
+          <div class="bg-blue-50 rounded-lg p-4">
+            <h3 class="font-semibold text-blue-800 mb-2">Building</h3>
+            <p class="text-sm text-blue-700">9 items covering common areas, security, and amenities</p>
+          </div>
+          <div class="bg-purple-50 rounded-lg p-4">
+            <h3 class="font-semibold text-purple-800 mb-2">Landlord</h3>
+            <p class="text-sm text-purple-700">8 items covering responsiveness, communication, and practices</p>
+          </div>
+        </div>
+        <p class="text-gray-600">
+          Rather than treating all items equally, we apply <strong>health/safety weighting</strong> to
+          items with documented impacts on tenant health outcomes.
+        </p>
+      </div>
+    </section>
+
+    <!-- Health/Safety Weighting -->
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Health & Safety Weighting</h2>
+      <p class="text-gray-600 mb-6">
+        Based on epidemiological research, certain housing conditions have stronger associations with
+        health outcomes. We weight these items more heavily in our overall scores:
+      </p>
+
+      <div class="space-y-4">
+        <!-- Pests -->
+        <div class="bg-white border border-gray-200 rounded-lg p-6">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2 mb-2">
+                <span class="px-2 py-1 bg-red-100 text-red-700 text-sm font-bold rounded">1.5x Weight</span>
+                <h3 class="font-semibold text-gray-900">Pest Control</h3>
+              </div>
+              <p class="text-gray-600 text-sm">
+                Pest infestations (cockroaches, rodents, bed bugs) are strongly associated with asthma,
+                allergic reactions, and disease transmission. Cockroach allergen is a major trigger for
+                childhood asthma in urban environments.
+              </p>
+            </div>
+          </div>
+          <div class="mt-3 text-xs text-gray-500">
+            Reference: Krieger & Higgins (2002), American Journal of Public Health
+          </div>
+        </div>
+
+        <!-- Mold -->
+        <div class="bg-white border border-gray-200 rounded-lg p-6">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2 mb-2">
+                <span class="px-2 py-1 bg-red-100 text-red-700 text-sm font-bold rounded">1.5x Weight</span>
+                <h3 class="font-semibold text-gray-900">Mold & Moisture</h3>
+              </div>
+              <p class="text-gray-600 text-sm">
+                Visible mold and dampness are associated with a 1.5-3.5x increased odds ratio for
+                respiratory symptoms, including asthma, wheeze, and upper respiratory infections.
+                This is one of the most well-documented housing-health relationships.
+              </p>
+            </div>
+          </div>
+          <div class="mt-3 text-xs text-gray-500">
+            Reference: Jacobs et al. (2009), Environmental Health Perspectives
+          </div>
+        </div>
+
+        <!-- Structural -->
+        <div class="bg-white border border-gray-200 rounded-lg p-6">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2 mb-2">
+                <span class="px-2 py-1 bg-orange-100 text-orange-700 text-sm font-bold rounded">1.3x Weight</span>
+                <h3 class="font-semibold text-gray-900">Structural Integrity</h3>
+              </div>
+              <p class="text-gray-600 text-sm">
+                Structural deficiencies including damaged floors, walls, and ceilings pose direct
+                injury risks from falls, collapses, and accidents. Poor structural condition also
+                often indicates deferred maintenance affecting other systems.
+              </p>
+            </div>
+          </div>
+          <div class="mt-3 text-xs text-gray-500">
+            Reference: Bonnefoy et al. (2003), WHO LARES Study
+          </div>
+        </div>
+
+        <!-- Climate -->
+        <div class="bg-white border border-gray-200 rounded-lg p-6">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2 mb-2">
+                <span class="px-2 py-1 bg-orange-100 text-orange-700 text-sm font-bold rounded">1.3x Weight</span>
+                <h3 class="font-semibold text-gray-900">Climate Control (Heating/Cooling)</h3>
+              </div>
+              <p class="text-gray-600 text-sm">
+                Inadequate heating is associated with cardiovascular stress, hypothermia risk, and
+                respiratory illness. This is particularly important in Boston's climate where winter
+                temperatures regularly drop below freezing.
+              </p>
+            </div>
+          </div>
+          <div class="mt-3 text-xs text-gray-500">
+            Reference: Bonnefoy et al. (2003), WHO LARES Study
+          </div>
+        </div>
+
+        <!-- Plumbing -->
+        <div class="bg-white border border-gray-200 rounded-lg p-6">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2 mb-2">
+                <span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-sm font-bold rounded">1.2x Weight</span>
+                <h3 class="font-semibold text-gray-900">Plumbing</h3>
+              </div>
+              <p class="text-gray-600 text-sm">
+                Plumbing issues create pathways to mold growth through water damage and leaks.
+                Persistent moisture from plumbing problems is a primary cause of indoor mold,
+                creating indirect health effects.
+              </p>
+            </div>
+          </div>
+          <div class="mt-3 text-xs text-gray-500">
+            Reference: Jacobs et al. (2009), Environmental Health Perspectives
+          </div>
+        </div>
+
+        <!-- Security -->
+        <div class="bg-white border border-gray-200 rounded-lg p-6">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2 mb-2">
+                <span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-sm font-bold rounded">1.2x Weight</span>
+                <h3 class="font-semibold text-gray-900">Security</h3>
+              </div>
+              <p class="text-gray-600 text-sm">
+                Building security features (working locks, secure entry, lighting) directly impact
+                personal safety and are associated with reduced risk of break-ins, assault, and
+                psychological stress from fear of crime.
+              </p>
+            </div>
+          </div>
+          <div class="mt-3 text-xs text-gray-500">
+            Reference: Bonnefoy et al. (2003), WHO LARES Study
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recency Weighting -->
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Recency Weighting</h2>
+      <div class="bg-white border border-gray-200 rounded-lg p-6">
+        <p class="text-gray-600 mb-4">
+          When calculating aggregate scores for buildings and landlords, we apply a gentle recency
+          weight. This reflects that housing conditions and management practices can change over time,
+          while still valuing historical reviews.
+        </p>
+        <div class="bg-gray-50 rounded-lg p-4">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-gray-500">
+                <th class="pb-2">Review Age</th>
+                <th class="pb-2">Weight Applied</th>
+              </tr>
+            </thead>
+            <tbody class="text-gray-700">
+              <tr><td class="py-1">0-2 years</td><td>100%</td></tr>
+              <tr><td class="py-1">3 years</td><td>95%</td></tr>
+              <tr><td class="py-1">4 years</td><td>90%</td></tr>
+              <tr><td class="py-1">5+ years</td><td>85% (floor)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-4 text-xs text-gray-500">
+          Reference: Hu, Pavlou & Zhang (2017), MIS Quarterly - Research on review recency effects
+        </div>
+      </div>
+    </section>
+
+    <!-- Score Interpretation -->
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Interpreting Scores</h2>
+      <div class="bg-white border border-gray-200 rounded-lg p-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="text-center p-4 bg-emerald-50 rounded-lg">
+            <div class="text-2xl font-bold text-emerald-600">4.0-5.0</div>
+            <div class="text-sm text-emerald-700 font-medium">Excellent</div>
+            <div class="text-xs text-emerald-600 mt-1">Few or no issues</div>
+          </div>
+          <div class="text-center p-4 bg-amber-50 rounded-lg">
+            <div class="text-2xl font-bold text-amber-600">3.0-3.9</div>
+            <div class="text-sm text-amber-700 font-medium">Average</div>
+            <div class="text-xs text-amber-600 mt-1">Some minor issues</div>
+          </div>
+          <div class="text-center p-4 bg-orange-50 rounded-lg">
+            <div class="text-2xl font-bold text-orange-600">2.0-2.9</div>
+            <div class="text-sm text-orange-700 font-medium">Below Average</div>
+            <div class="text-xs text-orange-600 mt-1">Notable problems</div>
+          </div>
+          <div class="text-center p-4 bg-red-50 rounded-lg">
+            <div class="text-2xl font-bold text-red-600">1.0-1.9</div>
+            <div class="text-sm text-red-700 font-medium">Poor</div>
+            <div class="text-xs text-red-600 mt-1">Serious concerns</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Academic References -->
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4">References</h2>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
+        <ol class="space-y-4 text-sm text-gray-700">
+          <li>
+            <strong>Krieger, J., & Higgins, D. L. (2002).</strong> Housing and health: Time again for public health action.
+            <em>American Journal of Public Health, 92</em>(5), 758-768.
+            <a href="https://doi.org/10.2105/AJPH.92.5.758" target="_blank" rel="noopener" class="text-teal-600 hover:underline ml-1">
+              doi:10.2105/AJPH.92.5.758
+            </a>
+          </li>
+          <li>
+            <strong>Jacobs, D. E., Wilson, J., Dixon, S. L., Smith, J., & Evens, A. (2009).</strong> The relationship of housing
+            and population health: A 30-year retrospective analysis.
+            <em>Environmental Health Perspectives, 117</em>(4), 597-604.
+            <a href="https://doi.org/10.1289/ehp.0800086" target="_blank" rel="noopener" class="text-teal-600 hover:underline ml-1">
+              doi:10.1289/ehp.0800086
+            </a>
+          </li>
+          <li>
+            <strong>Bonnefoy, X., Braubach, M., Moissonnier, B., Monolbaev, K., & Röbbel, N. (2003).</strong> Housing and health
+            in Europe: Preliminary results of a pan-European study.
+            <em>American Journal of Public Health, 93</em>(9), 1559-1563. (WHO LARES Study)
+            <a href="https://doi.org/10.2105/AJPH.93.9.1559" target="_blank" rel="noopener" class="text-teal-600 hover:underline ml-1">
+              doi:10.2105/AJPH.93.9.1559
+            </a>
+          </li>
+          <li>
+            <strong>Hu, N., Pavlou, P. A., & Zhang, J. (2017).</strong> On self-selection biases in online product reviews.
+            <em>MIS Quarterly, 41</em>(2), 449-471.
+            <a href="https://doi.org/10.25300/MISQ/2017/41.2.06" target="_blank" rel="noopener" class="text-teal-600 hover:underline ml-1">
+              doi:10.25300/MISQ/2017/41.2.06
+            </a>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Transparency Note -->
+    <section class="mb-12">
+      <div class="bg-teal-50 border border-teal-200 rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-teal-900 mb-2">Our Commitment to Transparency</h2>
+        <p class="text-teal-800 text-sm">
+          We believe tenants deserve access to reliable information about housing quality. By grounding
+          our methodology in peer-reviewed public health research, we aim to provide scores that reflect
+          what matters most for your health and safety. All reviews display both raw scores and weighted
+          domain scores so you can see exactly how ratings are calculated.
+        </p>
+        <p class="text-teal-700 text-sm mt-3">
+          Items marked with <span class="text-red-500">*</span> in review breakdowns indicate health/safety
+          weighted categories.
+        </p>
+      </div>
+    </section>
+
+    <!-- Questions -->
+    <section>
+      <div class="text-center">
+        <p class="text-gray-600 mb-4">Have questions about our methodology?</p>
+        <a href="/contact" class="inline-block bg-teal-600 text-white px-6 py-2 rounded-lg hover:bg-teal-700 transition-colors">
+          Contact Us
+        </a>
+      </div>
+    </section>
+  </div>
+</BaseLayout>
