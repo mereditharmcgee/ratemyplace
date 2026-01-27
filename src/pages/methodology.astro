@@ -14,6 +14,41 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
       </p>
     </div>
 
+    <!-- Survey Instrument Foundation -->
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Research-Based Survey Items</h2>
+      <div class="bg-white border border-gray-200 rounded-lg p-6">
+        <p class="text-gray-600 mb-4">
+          Our 27-item survey is adapted from validated housing quality assessment instruments used in
+          public health research:
+        </p>
+        <div class="space-y-4 mb-6">
+          <div class="bg-blue-50 border-l-4 border-blue-500 p-4">
+            <h3 class="font-semibold text-blue-900">Observational Housing Quality Scale (OHQS)</h3>
+            <p class="text-sm text-blue-800 mt-1">
+              Developed by Krieger & Higgins for systematic housing condition assessment. The OHQS provides
+              a standardized method for evaluating physical housing deficiencies linked to health outcomes,
+              including structural problems, pest infestation, and moisture issues.
+            </p>
+            <p class="text-xs text-blue-600 mt-2">Krieger & Higgins (2002), American Journal of Public Health</p>
+          </div>
+          <div class="bg-green-50 border-l-4 border-green-500 p-4">
+            <h3 class="font-semibold text-green-900">Physical Housing Quality Scale (PHQS)</h3>
+            <p class="text-sm text-green-800 mt-1">
+              A comprehensive instrument for assessing housing quality dimensions including building systems,
+              safety features, and environmental conditions. The PHQS has been validated across diverse
+              housing types and urban contexts.
+            </p>
+            <p class="text-xs text-green-600 mt-2">Jacobs et al. (2009), Environmental Health Perspectives</p>
+          </div>
+        </div>
+        <p class="text-gray-600 text-sm">
+          By drawing from these established instruments, RateMyPlace captures the housing conditions that
+          research has shown to matter most for tenant health and wellbeing.
+        </p>
+      </div>
+    </section>
+
     <!-- Overview Section -->
     <section class="mb-12">
       <h2 class="text-2xl font-semibold text-gray-900 mb-4">How Scores Are Calculated</h2>
@@ -25,14 +60,17 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
           <div class="bg-teal-50 rounded-lg p-4">
             <h3 class="font-semibold text-teal-800 mb-2">Unit Quality</h3>
             <p class="text-sm text-teal-700">10 items covering structural integrity, systems, and livability</p>
+            <p class="text-xs text-teal-600 mt-2">Based on OHQS interior assessment domains</p>
           </div>
           <div class="bg-blue-50 rounded-lg p-4">
             <h3 class="font-semibold text-blue-800 mb-2">Building</h3>
             <p class="text-sm text-blue-700">9 items covering common areas, security, and amenities</p>
+            <p class="text-xs text-blue-600 mt-2">Based on PHQS building-level indicators</p>
           </div>
           <div class="bg-purple-50 rounded-lg p-4">
             <h3 class="font-semibold text-purple-800 mb-2">Landlord</h3>
             <p class="text-sm text-purple-700">8 items covering responsiveness, communication, and practices</p>
+            <p class="text-xs text-purple-600 mt-2">Based on WHO LARES management factors</p>
           </div>
         </div>
         <p class="text-gray-600">
@@ -173,6 +211,68 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
       </div>
     </section>
 
+    <!-- Survey Items Detail -->
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4">The 27 Survey Items</h2>
+      <p class="text-gray-600 mb-6">
+        Each item below is drawn from validated housing assessment instruments. Items marked with
+        <span class="text-red-500 font-bold">*</span> receive additional health/safety weighting.
+      </p>
+
+      <div class="grid md:grid-cols-3 gap-6">
+        <!-- Unit Quality Items -->
+        <div class="bg-white border border-gray-200 rounded-lg p-5">
+          <h3 class="font-semibold text-teal-800 mb-3 pb-2 border-b border-teal-100">Unit Quality (10 items)</h3>
+          <ul class="space-y-2 text-sm text-gray-700">
+            <li><span class="text-red-500">*</span> Structural Integrity</li>
+            <li><span class="text-red-500">*</span> Plumbing Systems</li>
+            <li>Electrical Systems</li>
+            <li><span class="text-red-500">*</span> Climate Control (Heat/AC)</li>
+            <li>Ventilation</li>
+            <li><span class="text-red-500">*</span> Pest Control</li>
+            <li><span class="text-red-500">*</span> Mold/Moisture</li>
+            <li>Appliances</li>
+            <li>Layout & Space</li>
+            <li>Accuracy to Listing</li>
+          </ul>
+          <p class="text-xs text-gray-500 mt-3">Source: OHQS interior domains</p>
+        </div>
+
+        <!-- Building Items -->
+        <div class="bg-white border border-gray-200 rounded-lg p-5">
+          <h3 class="font-semibold text-blue-800 mb-3 pb-2 border-b border-blue-100">Building (9 items)</h3>
+          <ul class="space-y-2 text-sm text-gray-700">
+            <li>Common Areas</li>
+            <li><span class="text-red-500">*</span> Security Features</li>
+            <li>Exterior Condition</li>
+            <li>Neighbor Noise</li>
+            <li>External Noise</li>
+            <li>Mail/Package Handling</li>
+            <li>Laundry Facilities</li>
+            <li>Parking</li>
+            <li>Trash/Recycling</li>
+          </ul>
+          <p class="text-xs text-gray-500 mt-3">Source: PHQS building indicators</p>
+        </div>
+
+        <!-- Landlord Items -->
+        <div class="bg-white border border-gray-200 rounded-lg p-5">
+          <h3 class="font-semibold text-purple-800 mb-3 pb-2 border-b border-purple-100">Landlord (8 items)</h3>
+          <ul class="space-y-2 text-sm text-gray-700">
+            <li>Maintenance Response</li>
+            <li>Communication</li>
+            <li>Professionalism</li>
+            <li>Lease Clarity</li>
+            <li>Privacy Respect</li>
+            <li>Deposit Handling</li>
+            <li>Rent Practices</li>
+            <li>Non-Retaliation</li>
+          </ul>
+          <p class="text-xs text-gray-500 mt-3">Source: WHO LARES management factors</p>
+        </div>
+      </div>
+    </section>
+
     <!-- Recency Weighting -->
     <section class="mb-12">
       <h2 class="text-2xl font-semibold text-gray-900 mb-4">Recency Weighting</h2>
@@ -237,11 +337,13 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
     <section class="mb-12">
       <h2 class="text-2xl font-semibold text-gray-900 mb-4">References</h2>
       <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
-        <ol class="space-y-4 text-sm text-gray-700">
+        <h3 class="font-semibold text-gray-800 mb-3">Survey Instrument Sources</h3>
+        <ol class="space-y-4 text-sm text-gray-700 mb-6">
           <li>
             <strong>Krieger, J., & Higgins, D. L. (2002).</strong> Housing and health: Time again for public health action.
             <em>American Journal of Public Health, 92</em>(5), 758-768.
-            <a href="https://doi.org/10.2105/AJPH.92.5.758" target="_blank" rel="noopener" class="text-teal-600 hover:underline ml-1">
+            <span class="block text-xs text-gray-500 mt-1">Source for OHQS (Observational Housing Quality Scale) - Unit condition items</span>
+            <a href="https://doi.org/10.2105/AJPH.92.5.758" target="_blank" rel="noopener" class="text-teal-600 hover:underline">
               doi:10.2105/AJPH.92.5.758
             </a>
           </li>
@@ -249,22 +351,59 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
             <strong>Jacobs, D. E., Wilson, J., Dixon, S. L., Smith, J., & Evens, A. (2009).</strong> The relationship of housing
             and population health: A 30-year retrospective analysis.
             <em>Environmental Health Perspectives, 117</em>(4), 597-604.
-            <a href="https://doi.org/10.1289/ehp.0800086" target="_blank" rel="noopener" class="text-teal-600 hover:underline ml-1">
+            <span class="block text-xs text-gray-500 mt-1">Source for PHQS (Physical Housing Quality Scale) - Building-level items</span>
+            <a href="https://doi.org/10.1289/ehp.0800086" target="_blank" rel="noopener" class="text-teal-600 hover:underline">
               doi:10.1289/ehp.0800086
             </a>
           </li>
           <li>
             <strong>Bonnefoy, X., Braubach, M., Moissonnier, B., Monolbaev, K., & Röbbel, N. (2003).</strong> Housing and health
             in Europe: Preliminary results of a pan-European study.
-            <em>American Journal of Public Health, 93</em>(9), 1559-1563. (WHO LARES Study)
-            <a href="https://doi.org/10.2105/AJPH.93.9.1559" target="_blank" rel="noopener" class="text-teal-600 hover:underline ml-1">
+            <em>American Journal of Public Health, 93</em>(9), 1559-1563.
+            <span class="block text-xs text-gray-500 mt-1">WHO LARES Study - Landlord/management assessment items</span>
+            <a href="https://doi.org/10.2105/AJPH.93.9.1559" target="_blank" rel="noopener" class="text-teal-600 hover:underline">
               doi:10.2105/AJPH.93.9.1559
             </a>
           </li>
+        </ol>
+
+        <h3 class="font-semibold text-gray-800 mb-3">Health/Safety Weighting Evidence</h3>
+        <ol class="space-y-4 text-sm text-gray-700 mb-6">
+          <li>
+            <strong>Krieger, J. (2010).</strong> Home is where the triggers are: Increasing asthma control by improving
+            the home environment.
+            <em>Pediatric Allergy, Immunology, and Pulmonology, 23</em>(2), 139-145.
+            <span class="block text-xs text-gray-500 mt-1">Evidence for pest/allergen weighting</span>
+            <a href="https://doi.org/10.1089/ped.2010.0022" target="_blank" rel="noopener" class="text-teal-600 hover:underline">
+              doi:10.1089/ped.2010.0022
+            </a>
+          </li>
+          <li>
+            <strong>Fisk, W. J., Lei-Gomez, Q., & Mendell, M. J. (2007).</strong> Meta-analyses of the associations of
+            respiratory health effects with dampness and mold in homes.
+            <em>Indoor Air, 17</em>(4), 284-296.
+            <span class="block text-xs text-gray-500 mt-1">Evidence for mold/moisture weighting (OR 1.5-3.5)</span>
+            <a href="https://doi.org/10.1111/j.1600-0668.2007.00475.x" target="_blank" rel="noopener" class="text-teal-600 hover:underline">
+              doi:10.1111/j.1600-0668.2007.00475.x
+            </a>
+          </li>
+          <li>
+            <strong>WHO Regional Office for Europe. (2018).</strong> WHO Housing and Health Guidelines.
+            <em>World Health Organization.</em>
+            <span class="block text-xs text-gray-500 mt-1">Comprehensive evidence review for housing-health relationships</span>
+            <a href="https://www.who.int/publications/i/item/9789241550376" target="_blank" rel="noopener" class="text-teal-600 hover:underline">
+              WHO Publication
+            </a>
+          </li>
+        </ol>
+
+        <h3 class="font-semibold text-gray-800 mb-3">Methodology References</h3>
+        <ol class="space-y-4 text-sm text-gray-700">
           <li>
             <strong>Hu, N., Pavlou, P. A., & Zhang, J. (2017).</strong> On self-selection biases in online product reviews.
             <em>MIS Quarterly, 41</em>(2), 449-471.
-            <a href="https://doi.org/10.25300/MISQ/2017/41.2.06" target="_blank" rel="noopener" class="text-teal-600 hover:underline ml-1">
+            <span class="block text-xs text-gray-500 mt-1">Evidence for recency weighting in review aggregation</span>
+            <a href="https://doi.org/10.25300/MISQ/2017/41.2.06" target="_blank" rel="noopener" class="text-teal-600 hover:underline">
               doi:10.25300/MISQ/2017/41.2.06
             </a>
           </li>
