@@ -27,9 +27,11 @@ Worktrees are used for parallel development. This section documents what each wo
 | Worktree | Branch | Date | Purpose | Status |
 |----------|--------|------|---------|--------|
 | `kind-hawking` | kind-hawking | Jan 2026 | v1.0.0-alpha release: Property Manager system, enhanced ReviewCard with 27-field display, unit number grouping, bug fixes ("0" display issue), full code audit, documentation (ARCHITECTURE.md, VERSION.md, CLAUDE_CONTEXT.md) | **Merged to main** - Kept as backup |
+| `clever-vaughan` | clever-vaughan | Jan 2026 | UI improvements (logos), map geolocation, laundry/utility fields, admin building delete, admin cleanup tool, admin info system, contact page, security audit (PBKDF2 password hashing), code audit | **Active** |
 
 ### Worktree Locations
 - **kind-hawking**: `C:\Users\mmcge\.claude-worktrees\ratemyplace-boston\kind-hawking`
+- **clever-vaughan**: `C:\Users\mmcge\.claude-worktrees\ratemyplace-boston\clever-vaughan`
 
 ### Creating New Worktrees
 ```bash
@@ -76,7 +78,7 @@ landlords ─────────┐
 ### Authentication
 - **Lucia v3.2.2** - Session-based auth
 - **@lucia-auth/adapter-sqlite** - D1 adapter
-- **@oslojs/crypto** - SHA-256 password hashing
+- **PBKDF2-SHA256** - Password hashing (100k iterations, with salt)
 - **Google OAuth** - Social sign-in option
 
 ### Frontend
@@ -325,10 +327,10 @@ Collapsible cards that group reviews by unit number/type on building pages.
 
 ## Authentication Flow
 
-1. **Sign Up**: User submits email/password → password hashed with SHA-256 → user created → session created → cookie set
+1. **Sign Up**: User submits email/password → password hashed with PBKDF2-SHA256 (100k iterations, random salt) → user created → session created → cookie set
 2. **Sign In**: User submits credentials → password verified → session created → cookie set
 3. **Middleware**: Every request validates session cookie → sets `Astro.locals.user` and `Astro.locals.session`
-4. **Sign Out**: Session destroyed → cookie cleared
+4. **Sign Out**: Session destroyed → cookie cleared → redirect to home
 
 Google OAuth is also available as alternative sign-in method.
 
@@ -413,9 +415,18 @@ Current worktree: `kind-hawking` at `C:\Users\mmcge\.claude-worktrees\ratemyplac
 ## Known Issues & Technical Debt
 
 1. **ScoreCard.astro** uses some legacy field names (still functional)
-2. **Admin routes** not protected by role check (needs implementation)
-3. **Score aggregation** is manual (consider database triggers)
-4. **No rate limiting** on auth endpoints
+2. **Score aggregation** is manual (consider database triggers)
+3. **No rate limiting** on auth endpoints (recommended for production)
+4. **types.ts** has some old field names that don't match current database schema
+5. **Large components** - ReviewForm.tsx (948 lines) could be split into smaller components
+
+## Security Considerations
+
+See `SECURITY.md` for detailed security documentation, including:
+- Password hashing (PBKDF2-SHA256 with salt)
+- Session management
+- Input validation
+- Known limitations and recommendations
 
 ---
 
@@ -476,4 +487,4 @@ When starting work on this project, read these files first:
 
 ---
 
-*Last Updated: January 2026 | Version: v1.0.0-alpha*
+*Last Updated: January 27, 2026 | Version: v1.0.0-alpha*

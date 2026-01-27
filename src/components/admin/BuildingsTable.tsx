@@ -20,6 +20,11 @@ interface Building {
   review_count: number;
   avg_score: number | null;
   created_at: number;
+  // Admin-editable info
+  admin_notes: string | null;
+  owner_name: string | null;
+  owner_entity: string | null;
+  owner_website: string | null;
 }
 
 export default function BuildingsTable() {
@@ -31,6 +36,8 @@ export default function BuildingsTable() {
   const [editingBuilding, setEditingBuilding] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Building>>({});
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [cleaning, setCleaning] = useState(false);
 
   useEffect(() => {
     fetchBuildings();
@@ -65,6 +72,10 @@ export default function BuildingsTable() {
       year_built: building.year_built,
       unit_count: building.unit_count,
       building_type: building.building_type || '',
+      admin_notes: building.admin_notes || '',
+      owner_name: building.owner_name || '',
+      owner_entity: building.owner_entity || '',
+      owner_website: building.owner_website || '',
     });
   };
 
@@ -98,6 +109,70 @@ export default function BuildingsTable() {
       alert('Failed to save building');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const deleteBuilding = async (buildingId: string, address: string) => {
+    if (!confirm(`Are you sure you want to delete "${address}"? This will also delete all reviews for this building. This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeleting(buildingId);
+    try {
+      const response = await fetch(`/api/admin/buildings/${buildingId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setBuildings((prev) => prev.filter((b) => b.id !== buildingId));
+        setExpandedBuilding(null);
+        alert(`Successfully deleted "${data.deleted}". ${data.reviewsDeleted} review(s) were also deleted.`);
+      } else {
+        alert(data.error || 'Failed to delete building');
+      }
+    } catch (err) {
+      alert('Failed to delete building');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const cleanupEmptyBuildings = async () => {
+    // First, preview what would be deleted
+    try {
+      const previewRes = await fetch('/api/admin/cleanup');
+      const previewData = await previewRes.json();
+
+      if (previewData.count === 0) {
+        alert('No buildings without reviews found.');
+        return;
+      }
+
+      const confirmMsg = `This will delete ${previewData.count} building(s) with no reviews:\n\n${previewData.emptyBuildings.slice(0, 5).map((b: any) => `- ${b.address}`).join('\n')}${previewData.count > 5 ? `\n...and ${previewData.count - 5} more` : ''}\n\nThis action cannot be undone. Continue?`;
+
+      if (!confirm(confirmMsg)) {
+        return;
+      }
+
+      setCleaning(true);
+      const response = await fetch('/api/admin/cleanup', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(data.message);
+        fetchBuildings();
+      } else {
+        alert(data.error || 'Cleanup failed');
+      }
+    } catch (err) {
+      alert('Cleanup failed');
+    } finally {
+      setCleaning(false);
     }
   };
 
@@ -143,9 +218,9 @@ export default function BuildingsTable() {
 
   return (
     <div className="space-y-4">
-      {/* Search */}
-      <div className="flex gap-4">
-        <div className="flex-1">
+      {/* Search and Actions */}
+      <div className="flex flex-wrap gap-4">
+        <div className="flex-1 min-w-[200px]">
           <input
             type="text"
             placeholder="Search by address, city, neighborhood, or landlord..."
@@ -159,6 +234,13 @@ export default function BuildingsTable() {
           className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
         >
           Refresh
+        </button>
+        <button
+          onClick={cleanupEmptyBuildings}
+          disabled={cleaning}
+          className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 disabled:opacity-50"
+        >
+          {cleaning ? 'Cleaning...' : 'Cleanup Empty Buildings'}
         </button>
       </div>
 
@@ -346,7 +428,70 @@ export default function BuildingsTable() {
                         />
                       </div>
                     </div>
-                    <div className="flex gap-2">
+
+                    {/* Admin Info Section */}
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">Ownership & Admin Info</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Owner Name
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.owner_name || ''}
+                            onChange={(e) => setEditForm({ ...editForm, owner_name: e.target.value })}
+                            placeholder="e.g., John Smith, ABC Properties LLC"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Owner Entity Type
+                          </label>
+                          <select
+                            value={editForm.owner_entity || ''}
+                            onChange={(e) => setEditForm({ ...editForm, owner_entity: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          >
+                            <option value="">Select type...</option>
+                            <option value="individual">Individual</option>
+                            <option value="llc">LLC</option>
+                            <option value="corporation">Corporation</option>
+                            <option value="trust">Trust</option>
+                            <option value="partnership">Partnership</option>
+                            <option value="reit">REIT</option>
+                            <option value="other">Other</option>
+                          </select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Owner Website
+                          </label>
+                          <input
+                            type="url"
+                            value={editForm.owner_website || ''}
+                            onChange={(e) => setEditForm({ ...editForm, owner_website: e.target.value })}
+                            placeholder="https://..."
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Admin Notes (internal only)
+                          </label>
+                          <textarea
+                            value={editForm.admin_notes || ''}
+                            onChange={(e) => setEditForm({ ...editForm, admin_notes: e.target.value })}
+                            rows={3}
+                            placeholder="Internal notes about this building..."
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 mt-4">
                       <button
                         onClick={() => saveBuilding(building.id)}
                         disabled={saving}
@@ -420,7 +565,45 @@ export default function BuildingsTable() {
                         </dl>
                       </div>
                     </div>
-                    <div className="flex gap-2 pt-4 border-t border-gray-200">
+
+                    {/* Admin Info Display */}
+                    {(building.owner_name || building.owner_entity || building.admin_notes) && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">Admin Info</h4>
+                        <dl className="space-y-1 text-sm">
+                          {building.owner_name && (
+                            <div className="flex justify-between">
+                              <dt className="text-gray-500">Owner:</dt>
+                              <dd className="text-gray-900">{building.owner_name}</dd>
+                            </div>
+                          )}
+                          {building.owner_entity && (
+                            <div className="flex justify-between">
+                              <dt className="text-gray-500">Entity Type:</dt>
+                              <dd className="text-gray-900 capitalize">{building.owner_entity}</dd>
+                            </div>
+                          )}
+                          {building.owner_website && (
+                            <div className="flex justify-between">
+                              <dt className="text-gray-500">Website:</dt>
+                              <dd className="text-gray-900">
+                                <a href={building.owner_website} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">
+                                  {building.owner_website.replace(/^https?:\/\//, '')}
+                                </a>
+                              </dd>
+                            </div>
+                          )}
+                          {building.admin_notes && (
+                            <div className="mt-2">
+                              <dt className="text-gray-500 mb-1">Notes:</dt>
+                              <dd className="text-gray-900 bg-gray-50 p-2 rounded text-xs whitespace-pre-wrap">{building.admin_notes}</dd>
+                            </div>
+                          )}
+                        </dl>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-200">
                       <button
                         onClick={() => startEditing(building)}
                         className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium"
@@ -441,6 +624,13 @@ export default function BuildingsTable() {
                           View Landlord
                         </a>
                       )}
+                      <button
+                        onClick={() => deleteBuilding(building.id, building.address)}
+                        disabled={deleting === building.id}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 text-sm font-medium ml-auto"
+                      >
+                        {deleting === building.id ? 'Deleting...' : 'Delete Building'}
+                      </button>
                     </div>
                   </>
                 )}

@@ -22,6 +22,14 @@ const unitTypeOptions = [
   { value: 'house', label: 'House' },
 ];
 
+const bathroomOptions = [
+  { value: '1', label: '1 Bathroom' },
+  { value: '1.5', label: '1.5 Bathrooms' },
+  { value: '2', label: '2 Bathrooms' },
+  { value: '2.5', label: '2.5 Bathrooms' },
+  { value: '3+', label: '3+ Bathrooms' },
+];
+
 export default function ReviewEditForm({ review }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +37,9 @@ export default function ReviewEditForm({ review }: Props) {
 
   // Form state - initialized from existing review
   const [unitType, setUnitType] = useState(review.unit_type);
+  const [bathrooms, setBathrooms] = useState((review as any).bathrooms || '1');
+  const [unitNumber, setUnitNumber] = useState((review as any).unit_number || '');
+  const [squareFootage, setSquareFootage] = useState((review as any).square_footage?.toString() || '');
   const [rentAmount, setRentAmount] = useState(review.rent_amount?.toString() || '');
   const [reviewTitle, setReviewTitle] = useState(review.review_title || '');
   const [reviewText, setReviewText] = useState(review.review_text || '');
@@ -233,6 +244,47 @@ export default function ReviewEditForm({ review }: Props) {
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Bathrooms</label>
+            <select
+              value={bathrooms}
+              onChange={(e) => setBathrooms(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            >
+              {bathroomOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Unit Number <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={unitNumber}
+              onChange={(e) => setUnitNumber(e.target.value)}
+              placeholder="e.g., 2A, 301"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Square Footage <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="number"
+              value={squareFootage}
+              onChange={(e) => setSquareFootage(e.target.value)}
+              placeholder="e.g., 750"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            />
+          </div>
+
+          <div className="col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Monthly Rent <span className="text-gray-400">(optional)</span>
             </label>
@@ -259,7 +311,7 @@ export default function ReviewEditForm({ review }: Props) {
           </p>
         </div>
         {renderRatingScale()}
-        <div className="space-y-2">{unitItems.slice(0, 5).map(renderRatingItem)}</div>
+        <div className="space-y-2">{unitItems.map(renderRatingItem)}</div>
       </div>
 
       {/* Building Ratings */}
@@ -267,11 +319,11 @@ export default function ReviewEditForm({ review }: Props) {
         <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
           <h3 className="font-semibold text-teal-800 mb-1">Rate the Building</h3>
           <p className="text-sm text-teal-700">
-            Think about the building as a whole.
+            Think about the building as a whole. If something doesn't apply, select "N/A".
           </p>
         </div>
         {renderRatingScale()}
-        <div className="space-y-2">{buildingItems.slice(0, 5).map(renderRatingItem)}</div>
+        <div className="space-y-2">{buildingItems.map(renderRatingItem)}</div>
       </div>
 
       {/* Landlord Ratings */}
@@ -283,7 +335,7 @@ export default function ReviewEditForm({ review }: Props) {
           </p>
         </div>
         {renderRatingScale()}
-        <div className="space-y-2">{landlordItems.slice(0, 5).map(renderRatingItem)}</div>
+        <div className="space-y-2">{landlordItems.map(renderRatingItem)}</div>
       </div>
 
       {/* Issues */}

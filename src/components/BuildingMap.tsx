@@ -34,7 +34,7 @@ function getScoreLabel(score: number | null): string {
 
 export default function BuildingMap({
   apiKey,
-  initialCenter = { lat: 39.8283, lng: -98.5795 }, // Center of USA
+  initialCenter = { lat: 42.3601, lng: -71.0589 }, // Default to Boston
   initialZoom = 13
 }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -47,6 +47,36 @@ export default function BuildingMap({
   const [error, setError] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationRequested, setLocationRequested] = useState(false);
+
+  // Try to get user's location
+  useEffect(() => {
+    if (locationRequested) return;
+    setLocationRequested(true);
+
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          setUserLocation(newLocation);
+          // If map is already initialized, pan to user location
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.panTo(newLocation);
+            mapInstanceRef.current.setZoom(14);
+          }
+        },
+        (err) => {
+          console.log('Geolocation not available or denied, using default location');
+          // User denied or error - we'll use the default (Boston)
+        },
+        { timeout: 5000, enableHighAccuracy: false }
+      );
+    }
+  }, [locationRequested]);
 
   // Load Google Maps script
   useEffect(() => {
@@ -134,9 +164,11 @@ export default function BuildingMap({
 
     // Initialize map
     if (!mapInstanceRef.current) {
+      // Use user location if available, otherwise use initialCenter
+      const mapCenter = userLocation || initialCenter;
       mapInstanceRef.current = new google.maps.Map(mapRef.current, {
-        center: initialCenter,
-        zoom: initialZoom,
+        center: mapCenter,
+        zoom: userLocation ? 14 : initialZoom,
         mapId: 'ratemyplace-map', // Required for AdvancedMarkerElement
         disableDefaultUI: false,
         zoomControl: true,
@@ -215,7 +247,7 @@ export default function BuildingMap({
       markersRef.current.push(marker);
     });
 
-  }, [mapLoaded, buildings, initialCenter, initialZoom, createMarkerElement]);
+  }, [mapLoaded, buildings, initialCenter, initialZoom, createMarkerElement, userLocation]);
 
   if (error) {
     return (

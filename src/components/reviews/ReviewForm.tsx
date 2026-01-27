@@ -84,6 +84,9 @@ export default function ReviewForm({ building }: Props) {
     rentAmount: '',
     amenities: [] as string[],
     utilitiesIncluded: [] as string[],
+    laundryType: 'none' as 'in_unit' | 'in_building' | 'coin_op' | 'none',
+    laundryCostPerLoad: '',
+    estimatedMonthlyUtilities: '',
   });
 
   // Tenancy info
@@ -553,6 +556,67 @@ export default function ReviewForm({ building }: Props) {
             </label>
           ))}
         </div>
+      </div>
+
+      {/* Estimated monthly utilities for non-included utilities */}
+      {unitDetails.utilitiesIncluded.length < utilityOptions.length && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Estimated Monthly Utility Cost <span className="text-gray-400">(for utilities not included)</span>
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+            <input
+              type="number"
+              value={unitDetails.estimatedMonthlyUtilities}
+              onChange={(e) => setUnitDetails({ ...unitDetails, estimatedMonthlyUtilities: e.target.value })}
+              placeholder="e.g., 150"
+              className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Approximate monthly cost for utilities you paid separately
+          </p>
+        </div>
+      )}
+
+      {/* Laundry Section */}
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Laundry Situation</label>
+          <select
+            value={unitDetails.laundryType}
+            onChange={(e) => setUnitDetails({ ...unitDetails, laundryType: e.target.value as any })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          >
+            <option value="in_unit">In-unit washer/dryer</option>
+            <option value="in_building">Building laundry (free)</option>
+            <option value="coin_op">Building laundry (coin-op/paid)</option>
+            <option value="none">No building laundry</option>
+          </select>
+        </div>
+
+        {unitDetails.laundryType === 'coin_op' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Cost per Load (wash + dry) <span className="text-gray-400">(optional)</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+              <input
+                type="number"
+                step="0.25"
+                value={unitDetails.laundryCostPerLoad}
+                onChange={(e) => setUnitDetails({ ...unitDetails, laundryCostPerLoad: e.target.value })}
+                placeholder="e.g., 3.50"
+                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Total cost for one wash + one dry cycle
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end">

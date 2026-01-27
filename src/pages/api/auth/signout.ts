@@ -19,9 +19,10 @@ export async function POST(context: APIContext): Promise<Response> {
 
     context.cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
+    // Redirect to home page
+    return new Response(null, {
+      status: 302,
+      headers: { 'Location': '/' }
     });
   } catch (error) {
     console.error('Sign out error:', error);

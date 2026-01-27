@@ -39,6 +39,10 @@ export async function PATCH(context: APIContext): Promise<Response> {
       building_type,
       landlord_id,
       property_manager_id,
+      admin_notes,
+      owner_name,
+      owner_entity,
+      owner_website,
     } = body;
 
     const db = getDB((context.locals as any).runtime);
@@ -96,6 +100,22 @@ export async function PATCH(context: APIContext): Promise<Response> {
       updates.push('property_manager_id = ?');
       values.push(property_manager_id || null);
     }
+    if (admin_notes !== undefined) {
+      updates.push('admin_notes = ?');
+      values.push(admin_notes || null);
+    }
+    if (owner_name !== undefined) {
+      updates.push('owner_name = ?');
+      values.push(owner_name || null);
+    }
+    if (owner_entity !== undefined) {
+      updates.push('owner_entity = ?');
+      values.push(owner_entity || null);
+    }
+    if (owner_website !== undefined) {
+      updates.push('owner_website = ?');
+      values.push(owner_website || null);
+    }
 
     if (updates.length === 0) {
       return new Response(JSON.stringify({ error: 'No fields to update' }), {
@@ -119,6 +139,65 @@ export async function PATCH(context: APIContext): Promise<Response> {
   } catch (error) {
     console.error('Error updating building:', error);
     return new Response(JSON.stringify({ error: 'Failed to update building' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+export async function DELETE(context: APIContext): Promise<Response> {
+  // Require authentication
+  if (!context.locals.user) {
+    return new Response(JSON.stringify({ error: 'Authentication required' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // Require admin
+  if (!context.locals.user.isAdmin) {
+    return new Response(JSON.stringify({ error: 'Admin access required' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  const buildingId = context.params.id;
+  if (!buildingId) {
+    return new Response(JSON.stringify({ error: 'Building ID required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  try {
+    const db = getDB((context.locals as any).runtime);
+
+    // Check if building exists
+    const building = await db.prepare('SELECT id, address FROM buildings WHERE id = ?').bind(buildingId).first<{ id: string; address: string }>();
+    if (!building) {
+      return new Response(JSON.stringify({ error: 'Building not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Check if building has reviews - warn but still allow deletion
+    const reviewCount = await db.prepare('SELECT COUNT(*) as count FROM reviews WHERE building_id = ?').bind(buildingId).first<{ count: number }>();
+
+    // Delete building (cascades to reviews, building_scores due to ON DELETE CASCADE)
+    await db.prepare('DELETE FROM buildings WHERE id = ?').bind(buildingId).run();
+
+    return new Response(JSON.stringify({
+      success: true,
+      deleted: building.address,
+      reviewsDeleted: reviewCount?.count || 0
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Error deleting building:', error);
+    return new Response(JSON.stringify({ error: 'Failed to delete building' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });

@@ -22,39 +22,53 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
 
       <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">How We Rate</h2>
       <p class="text-gray-600 mb-6">
-        Our comprehensive rating system covers 12 key aspects of the rental experience, organized
-        into three main categories:
+        Our comprehensive rating system is based on housing quality research and covers 27 aspects
+        of the rental experience, organized into three main categories:
       </p>
 
       <div class="grid md:grid-cols-3 gap-6 my-8">
-        <div class="bg-blue-50 p-6 rounded-lg">
-          <h3 class="font-semibold text-blue-900 mb-3">Building Quality</h3>
-          <ul class="text-sm text-blue-800 space-y-1">
-            <li>Overall condition</li>
-            <li>Maintenance response</li>
+        <div class="bg-teal-50 p-6 rounded-lg">
+          <h3 class="font-semibold text-teal-900 mb-3">Unit Quality (10 items)</h3>
+          <ul class="text-sm text-teal-800 space-y-1">
+            <li>Structural integrity</li>
+            <li>Plumbing & water</li>
+            <li>Electrical systems</li>
+            <li>Temperature control</li>
+            <li>Ventilation & air quality</li>
             <li>Pest control</li>
-            <li>Safety & security</li>
-            <li>Noise levels</li>
-            <li>Amenities</li>
+            <li>Mold & moisture</li>
+            <li>Appliances</li>
+            <li>Layout & functionality</li>
+            <li>Listing accuracy</li>
+          </ul>
+        </div>
+
+        <div class="bg-blue-50 p-6 rounded-lg">
+          <h3 class="font-semibold text-blue-900 mb-3">Building Quality (9 items)</h3>
+          <ul class="text-sm text-blue-800 space-y-1">
+            <li>Common areas</li>
+            <li>Building security</li>
+            <li>Exterior & grounds</li>
+            <li>Internal noise levels</li>
+            <li>External noise levels</li>
+            <li>Mail & package security</li>
+            <li>Laundry facilities</li>
+            <li>Parking</li>
+            <li>Trash & recycling</li>
           </ul>
         </div>
 
         <div class="bg-green-50 p-6 rounded-lg">
-          <h3 class="font-semibold text-green-900 mb-3">Landlord Experience</h3>
+          <h3 class="font-semibold text-green-900 mb-3">Landlord Experience (8 items)</h3>
           <ul class="text-sm text-green-800 space-y-1">
-            <li>Responsiveness</li>
+            <li>Maintenance response</li>
             <li>Communication</li>
-            <li>Fairness</li>
+            <li>Professionalism</li>
             <li>Lease clarity</li>
-            <li>Deposit handling</li>
-          </ul>
-        </div>
-
-        <div class="bg-purple-50 p-6 rounded-lg">
-          <h3 class="font-semibold text-purple-900 mb-3">Value</h3>
-          <ul class="text-sm text-purple-800 space-y-1">
-            <li>Rent value for area</li>
-            <li>Would recommend</li>
+            <li>Privacy & boundaries</li>
+            <li>Security deposit handling</li>
+            <li>Rent practices</li>
+            <li>Non-retaliation</li>
           </ul>
         </div>
       </div>
@@ -83,13 +97,16 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
 
       <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">Landlord Responses</h2>
       <p class="text-gray-600 mb-6">
-        We believe in fairness for all parties. Landlords can:
+        We believe in fairness for all parties. In future updates, landlords will be able to:
       </p>
       <ul class="list-disc list-inside text-gray-600 mb-6 space-y-2">
         <li>Claim their properties and respond to reviews</li>
         <li>Flag reviews that violate our guidelines for investigation</li>
         <li>Provide context or their perspective on tenant experiences</li>
       </ul>
+      <p class="text-sm text-gray-500 mb-6">
+        <em>This feature is coming soon. If you're a landlord interested in participating, please contact us.</em>
+      </p>
 
       <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">Contact Us</h2>
       <p class="text-gray-600 mb-6">
