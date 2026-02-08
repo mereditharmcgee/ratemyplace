@@ -3,6 +3,7 @@ import { initializeLucia } from '../../../lib/auth';
 import { getDB } from '../../../lib/db';
 import { hashPassword } from '../../../lib/password';
 import { generateIdFromEntropySize } from 'lucia';
+import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
 
 export async function POST(context: APIContext): Promise<Response> {
   const formData = await context.request.formData();
@@ -40,6 +41,23 @@ export async function POST(context: APIContext): Promise<Response> {
 
   try {
     const db = getDB((context.locals as any).runtime);
+
+    // Rate limiting: 3 accounts per hour per IP
+    const clientIP = getClientIP(context);
+    const rateLimit = await checkRateLimit(db, clientIP, 'signup', 3, 3600);
+
+    if (!rateLimit.allowed) {
+      return new Response(JSON.stringify({
+        error: `Too many sign-up attempts. Please try again in ${Math.ceil(rateLimit.retryAfterSeconds / 60)} minutes.`
+      }), {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': rateLimit.retryAfterSeconds.toString()
+        }
+      });
+    }
+
     const lucia = initializeLucia(db);
 
     // Check if user already exists

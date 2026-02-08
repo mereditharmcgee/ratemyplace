@@ -2,6 +2,7 @@ import type { APIContext } from 'astro';
 import { initializeLucia } from '../../../lib/auth';
 import { getDB } from '../../../lib/db';
 import { verifyPassword } from '../../../lib/password';
+import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
 
 export async function POST(context: APIContext): Promise<Response> {
   const formData = await context.request.formData();
@@ -31,6 +32,23 @@ export async function POST(context: APIContext): Promise<Response> {
 
   try {
     const db = getDB((context.locals as any).runtime);
+
+    // Rate limiting: 5 attempts per 15 minutes per IP
+    const clientIP = getClientIP(context);
+    const rateLimit = await checkRateLimit(db, clientIP, 'signin', 5, 900);
+
+    if (!rateLimit.allowed) {
+      return new Response(JSON.stringify({
+        error: `Too many sign-in attempts. Please try again in ${Math.ceil(rateLimit.retryAfterSeconds / 60)} minutes.`
+      }), {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': rateLimit.retryAfterSeconds.toString()
+        }
+      });
+    }
+
     const lucia = initializeLucia(db);
 
     const result = await db.prepare(

@@ -7,28 +7,19 @@ import {
   supplementaryItems,
   type SurveyItem,
 } from '../../lib/surveyItems';
+import {
+  bedroomOptions,
+  bathroomOptions,
+  amenityOptions,
+  utilityOptions,
+  laundryTypeOptions,
+} from '../../lib/formOptions';
+import { HelpTooltip } from './HelpTooltip';
 import type { ReviewDetail } from '../../pages/api/reviews/[id]';
 
 interface Props {
   review: ReviewDetail;
 }
-
-const unitTypeOptions = [
-  { value: 'studio', label: 'Studio' },
-  { value: '1br', label: '1 Bedroom' },
-  { value: '2br', label: '2 Bedrooms' },
-  { value: '3br', label: '3 Bedrooms' },
-  { value: '4br+', label: '4+ Bedrooms' },
-  { value: 'house', label: 'House' },
-];
-
-const bathroomOptions = [
-  { value: '1', label: '1 Bathroom' },
-  { value: '1.5', label: '1.5 Bathrooms' },
-  { value: '2', label: '2 Bathrooms' },
-  { value: '2.5', label: '2.5 Bathrooms' },
-  { value: '3+', label: '3+ Bathrooms' },
-];
 
 export default function ReviewEditForm({ review }: Props) {
   const [loading, setLoading] = useState(false);
@@ -36,14 +27,48 @@ export default function ReviewEditForm({ review }: Props) {
   const [success, setSuccess] = useState(false);
 
   // Form state - initialized from existing review
-  const [unitType, setUnitType] = useState(review.unit_type);
+  const [unitType, setUnitType] = useState(review.unit_type || 'unknown');
+  const [bedrooms, setBedrooms] = useState((review as any).bedrooms || '1');
   const [bathrooms, setBathrooms] = useState((review as any).bathrooms || '1');
   const [unitNumber, setUnitNumber] = useState((review as any).unit_number || '');
   const [squareFootage, setSquareFootage] = useState((review as any).square_footage?.toString() || '');
   const [rentAmount, setRentAmount] = useState(review.rent_amount?.toString() || '');
   const [reviewTitle, setReviewTitle] = useState(review.review_title || '');
-  const [reviewText, setReviewText] = useState(review.review_text || '');
-  const [wouldRecommend, setWouldRecommend] = useState(review.would_recommend);
+  const [reviewText, setReviewText] = useState(review.review_text || review.comments || '');
+
+  // Would recommend - support new text format with fallback to legacy boolean
+  const [wouldRecommend, setWouldRecommend] = useState<string>(() => {
+    if (review.would_recommend_new) return review.would_recommend_new;
+    return review.would_recommend ? 'yes' : 'no';
+  });
+
+  // Amenities & utilities
+  const [amenities, setAmenities] = useState<string[]>(() => {
+    try {
+      const parsed = typeof review.amenities === 'string' ? JSON.parse(review.amenities) : review.amenities;
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  });
+
+  const [utilitiesIncluded, setUtilitiesIncluded] = useState<string[]>(() => {
+    try {
+      const parsed = typeof review.utilities_included === 'string' ? JSON.parse(review.utilities_included) : review.utilities_included;
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  });
+
+  // Laundry
+  const [laundryType, setLaundryType] = useState(review.laundry_type || 'none');
+  const [laundryCostPerLoad, setLaundryCostPerLoad] = useState(review.laundry_cost_per_load?.toString() || '');
+  const [estimatedMonthlyUtilities, setEstimatedMonthlyUtilities] = useState(
+    review.estimated_monthly_utilities?.toString() || ''
+  );
+
+  // Tenure & move-out
+  const [tenureMonths, setTenureMonths] = useState(review.tenure_months || 18);
+  const [moveOutYear, setMoveOutYear] = useState(
+    review.is_current_tenant ? 'current' : (review.move_out_year_new || review.move_out_year?.toString() || 'current')
+  );
 
   // Issue flags
   const [hadPestIssues, setHadPestIssues] = useState(review.had_pest_issues);
@@ -52,28 +77,16 @@ export default function ReviewEditForm({ review }: Props) {
   const [hadDepositIssues, setHadDepositIssues] = useState(review.had_security_deposit_issues);
   const [hadEvictionThreat, setHadEvictionThreat] = useState(review.had_eviction_threat);
 
-  // Initialize scores from existing review
+  // Initialize scores from existing review using the actual 27 field keys
   const [scores, setScores] = useState<Record<string, number | null>>(() => {
     const initial: Record<string, number | null> = {};
-    // Map existing scores to survey item keys
-    const scoreMapping: Record<string, keyof ReviewDetail> = {
-      unit_structural: 'score_building_quality',
-      unit_plumbing: 'score_maintenance',
-      unit_pests: 'score_pest_control',
-      building_security: 'score_safety',
-      building_noise_neighbors: 'score_noise',
-      landlord_maintenance: 'score_landlord_responsiveness',
-      landlord_communication: 'score_landlord_communication',
-      landlord_professionalism: 'score_landlord_fairness',
-      landlord_lease_clarity: 'score_lease_clarity',
-      landlord_deposit: 'score_deposit_handling',
-      building_common_areas: 'score_rent_value',
-      building_exterior: 'score_amenities',
-    };
+    const allItems = [...unitItems, ...buildingItems, ...landlordItems];
 
-    Object.entries(scoreMapping).forEach(([key, reviewKey]) => {
-      initial[key] = review[reviewKey] as number | null;
-    });
+    for (const item of allItems) {
+      // Read directly from the review using the actual field key (e.g., unit_structural)
+      const value = (review as any)[item.key];
+      initial[item.key] = typeof value === 'number' ? value : null;
+    }
 
     return initial;
   });
@@ -89,28 +102,29 @@ export default function ReviewEditForm({ review }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           unit_type: unitType,
+          unit_number: unitNumber || null,
+          bedrooms,
+          bathrooms,
+          square_footage: squareFootage || null,
           rent_amount: rentAmount ? parseInt(rentAmount) : null,
+          amenities: JSON.stringify(amenities),
+          utilities_included: JSON.stringify(utilitiesIncluded),
+          laundry_type: laundryType,
+          laundry_cost_per_load: laundryCostPerLoad || null,
+          estimated_monthly_utilities: estimatedMonthlyUtilities || null,
+          tenure_months: tenureMonths,
+          move_out_year_new: moveOutYear,
           review_title: reviewTitle || null,
           review_text: reviewText || null,
-          would_recommend: wouldRecommend,
+          comments: reviewText || null,
+          would_recommend_new: wouldRecommend,
           had_pest_issues: hadPestIssues,
           had_heat_issues: hadHeatIssues,
           had_water_issues: hadWaterIssues,
           had_security_deposit_issues: hadDepositIssues,
           had_eviction_threat: hadEvictionThreat,
-          // Map survey keys back to score columns
-          score_building_quality: scores.unit_structural,
-          score_maintenance: scores.unit_plumbing,
-          score_pest_control: scores.unit_pests,
-          score_safety: scores.building_security,
-          score_noise: scores.building_noise_neighbors,
-          score_landlord_responsiveness: scores.landlord_maintenance,
-          score_landlord_communication: scores.landlord_communication,
-          score_landlord_fairness: scores.landlord_professionalism,
-          score_lease_clarity: scores.landlord_lease_clarity,
-          score_deposit_handling: scores.landlord_deposit,
-          score_rent_value: scores.building_common_areas,
-          score_amenities: scores.building_exterior,
+          // Send all 27 score fields directly
+          ...scores,
         }),
       });
 
@@ -151,6 +165,7 @@ export default function ReviewEditForm({ review }: Props) {
               <span className="text-xs text-gray-400 font-mono mr-2">{item.code}</span>
               <span className="font-medium text-gray-900">{item.dimension}</span>
               {item.required && <span className="text-coral-500 ml-1">*</span>}
+              <HelpTooltip help={item.help} dimension={item.dimension} />
             </div>
           </div>
           <p className="text-sm text-gray-600 mt-1">{item.text}</p>
@@ -213,7 +228,7 @@ export default function ReviewEditForm({ review }: Props) {
         </div>
         <div className="text-xs text-gray-400 mt-1">
           Move-in: {review.move_in_season} {review.move_in_year}
-          {review.is_current_tenant ? ' (Current tenant)' : review.move_out_year && ` - Move-out: ${review.move_out_season} ${review.move_out_year}`}
+          {review.is_current_tenant ? ' (Current tenant)' : review.move_out_year && ` - Move-out: ${(review as any).move_out_season} ${review.move_out_year}`}
         </div>
       </div>
 
@@ -228,36 +243,6 @@ export default function ReviewEditForm({ review }: Props) {
         <h3 className="text-lg font-semibold text-gray-900">Unit Details</h3>
 
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Unit Type</label>
-            <select
-              value={unitType}
-              onChange={(e) => setUnitType(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-            >
-              {unitTypeOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Bathrooms</label>
-            <select
-              value={bathrooms}
-              onChange={(e) => setBathrooms(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-            >
-              {bathroomOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Unit Number <span className="text-gray-400">(optional)</span>
@@ -284,6 +269,36 @@ export default function ReviewEditForm({ review }: Props) {
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Bedrooms</label>
+            <select
+              value={bedrooms}
+              onChange={(e) => setBedrooms(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            >
+              {bedroomOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Bathrooms</label>
+            <select
+              value={bathrooms}
+              onChange={(e) => setBathrooms(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            >
+              {bathroomOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Monthly Rent <span className="text-gray-400">(optional)</span>
@@ -299,6 +314,137 @@ export default function ReviewEditForm({ review }: Props) {
               />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Amenities */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Amenities & Utilities</h3>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Amenities <span className="text-gray-400">(select all that apply)</span>
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {amenityOptions.map((amenity) => (
+              <label
+                key={amenity.id}
+                className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                  amenities.includes(amenity.id)
+                    ? 'border-teal-500 bg-teal-50'
+                    : 'border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={amenities.includes(amenity.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setAmenities([...amenities, amenity.id]);
+                    } else {
+                      setAmenities(amenities.filter((a) => a !== amenity.id));
+                    }
+                  }}
+                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                />
+                <span className="text-sm text-gray-700">{amenity.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Utilities Included in Rent <span className="text-gray-400">(select all that apply)</span>
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {utilityOptions.map((utility) => (
+              <label
+                key={utility.id}
+                className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                  utilitiesIncluded.includes(utility.id)
+                    ? 'border-teal-500 bg-teal-50'
+                    : 'border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={utilitiesIncluded.includes(utility.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setUtilitiesIncluded([...utilitiesIncluded, utility.id]);
+                    } else {
+                      setUtilitiesIncluded(utilitiesIncluded.filter((u) => u !== utility.id));
+                    }
+                  }}
+                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                />
+                <span className="text-sm text-gray-700">{utility.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Estimated monthly utilities for non-included utilities */}
+        {utilitiesIncluded.length < utilityOptions.length && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Estimated Monthly Utility Cost <span className="text-gray-400">(for utilities not included)</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+              <input
+                type="number"
+                value={estimatedMonthlyUtilities}
+                onChange={(e) => setEstimatedMonthlyUtilities(e.target.value)}
+                placeholder="e.g., 150"
+                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Approximate monthly cost for utilities you paid separately
+            </p>
+          </div>
+        )}
+
+        {/* Laundry Section */}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Laundry Situation</label>
+            <select
+              value={laundryType}
+              onChange={(e) => setLaundryType(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            >
+              {laundryTypeOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {laundryType === 'coin_op' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Cost per Load (wash + dry) <span className="text-gray-400">(optional)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <input
+                  type="number"
+                  step="0.25"
+                  value={laundryCostPerLoad}
+                  onChange={(e) => setLaundryCostPerLoad(e.target.value)}
+                  placeholder="e.g., 3.50"
+                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Total cost for one wash + one dry cycle
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -367,28 +513,64 @@ export default function ReviewEditForm({ review }: Props) {
         </div>
       </div>
 
+      {/* Tenure & Move-out */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Tenancy Details</h3>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {supplementaryItems.tenure.text}
+            </label>
+            <select
+              value={tenureMonths}
+              onChange={(e) => setTenureMonths(parseInt(e.target.value))}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            >
+              {supplementaryItems.tenure.options.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {supplementaryItems.moveOutTiming.text}
+            </label>
+            <select
+              value={moveOutYear}
+              onChange={(e) => setMoveOutYear(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            >
+              {supplementaryItems.moveOutTiming.options.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* Recommendation */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Would you recommend this place?</h3>
+        <h3 className="text-lg font-semibold text-gray-900">
+          {supplementaryItems.wouldRecommend.text}
+        </h3>
         <div className="flex gap-4">
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              checked={wouldRecommend}
-              onChange={() => setWouldRecommend(true)}
-              className="text-teal-600 focus:ring-teal-500"
-            />
-            <span>Yes</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              checked={!wouldRecommend}
-              onChange={() => setWouldRecommend(false)}
-              className="text-teal-600 focus:ring-teal-500"
-            />
-            <span>No</span>
-          </label>
+          {supplementaryItems.wouldRecommend.options.map((opt) => (
+            <label key={opt.value} className="flex items-center gap-2">
+              <input
+                type="radio"
+                checked={wouldRecommend === opt.value}
+                onChange={() => setWouldRecommend(opt.value)}
+                className="text-teal-600 focus:ring-teal-500"
+              />
+              <span>{opt.label}</span>
+            </label>
+          ))}
         </div>
       </div>
 
