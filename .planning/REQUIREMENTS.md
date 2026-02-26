@@ -7,7 +7,7 @@
 
 ### Email Verification
 
-- [ ] **EMAIL-01**: User receives verification email after signup with secure token link (infrastructure ready)
+- [x] **EMAIL-01**: User receives verification email after signup with secure token link (infrastructure ready)
 - [ ] **EMAIL-02**: User can click verification link to mark email as verified (infrastructure ready)
 - [x] **EMAIL-03**: Verified users display "Verified" badge on their reviews
 - [x] **EMAIL-04**: Unverified users can still submit reviews (no blocking)
