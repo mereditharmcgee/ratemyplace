@@ -1,0 +1,45 @@
+---
+import BaseLayout from '../components/layout/BaseLayout.astro';
+
+const user = (Astro.locals as any).user;
+---
+
+<BaseLayout title="Email Verified">
+  <div class="min-h-[60vh] flex items-center justify-center">
+    <div class="max-w-md w-full mx-auto p-8 text-center">
+      <div class="w-16 h-16 mx-auto mb-6 bg-green-100 rounded-full flex items-center justify-center">
+        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+
+      <h1 class="text-2xl font-bold text-gray-900 mb-4">Email Verified!</h1>
+
+      <p class="text-gray-600 mb-6">
+        Thank you for verifying your email address. Your reviews will now display the
+        <span class="inline-flex items-center gap-1 text-green-600 font-medium">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          Email Verified
+        </span>
+        badge.
+      </p>
+
+      <div class="space-y-3">
+        {user ? (
+          <a href="/profile" class="block w-full bg-teal-600 text-white py-2 px-4 rounded-lg hover:bg-teal-700 transition">
+            Go to Profile
+          </a>
+        ) : (
+          <a href="/auth/signin" class="block w-full bg-teal-600 text-white py-2 px-4 rounded-lg hover:bg-teal-700 transition">
+            Sign In
+          </a>
+        )}
+        <a href="/" class="block w-full text-gray-600 hover:text-gray-800 transition">
+          Return to Home
+        </a>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
