@@ -1,0 +1,40 @@
+---
+interface Props {
+  size?: 'sm' | 'md' | 'lg';
+  showText?: boolean;
+}
+
+const { size = 'md', showText = true } = Astro.props;
+
+const sizeClasses = {
+  sm: 'w-4 h-4',
+  md: 'w-5 h-5',
+  lg: 'w-6 h-6',
+};
+
+const textSizeClasses = {
+  sm: 'text-xs',
+  md: 'text-sm',
+  lg: 'text-base',
+};
+---
+
+<span
+  class="inline-flex items-center gap-1 text-green-600"
+  title="Email verified - This user has confirmed their email address"
+>
+  <svg
+    class={sizeClasses[size]}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+    />
+  </svg>
+  {showText && <span class={`font-medium ${textSizeClasses[size]}`}>Email Verified</span>}
+</span>
