@@ -4,6 +4,8 @@ import { getDB } from '../../../lib/db';
 import { hashPassword } from '../../../lib/password';
 import { generateIdFromEntropySize } from 'lucia';
 import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
+import { createVerificationToken } from '../../../lib/tokens';
+import { sendVerificationEmail } from '../../../lib/email';
 
 export async function POST(context: APIContext): Promise<Response> {
   const formData = await context.request.formData();
@@ -78,6 +80,27 @@ export async function POST(context: APIContext): Promise<Response> {
     await db.prepare(
       'INSERT INTO users (id, email, hashed_password) VALUES (?, ?, ?)'
     ).bind(userId, email.toLowerCase(), hashedPassword).run();
+
+    // Create verification token and send email
+    const runtime = (context.locals as any).runtime;
+    try {
+      const token = await createVerificationToken(db, userId);
+      const siteUrl = runtime.env.SITE_URL || context.url.origin;
+      const emailResult = await sendVerificationEmail(
+        runtime.env.RESEND_API_KEY,
+        siteUrl,
+        email.toLowerCase(),
+        token
+      );
+
+      if (!emailResult.success) {
+        // Log but don't fail signup - user can request new email later
+        console.error('Verification email failed:', emailResult.error);
+      }
+    } catch (emailError) {
+      // Log but don't fail signup
+      console.error('Verification email error:', emailError);
+    }
 
     const session = await lucia.createSession(userId, {});
     const sessionCookie = lucia.createSessionCookie(session.id);
