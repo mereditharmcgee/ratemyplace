@@ -1,6 +1,7 @@
 ---
 import StarRating from '../ratings/StarRating.astro';
 import VerifiedBadge from '../ui/VerifiedBadge.astro';
+import EmailVerifiedBadge from '../ui/EmailVerifiedBadge.astro';
 import { formatFuzzyDate } from '../../lib/privacy';
 import { calculateDomainScores, ITEM_WEIGHTS } from '../../lib/scoring';
 
@@ -448,6 +449,7 @@ const parkingLabels: Record<string, string> = {
       <span class={`px-2 py-1 rounded-full text-xs ${review.would_recommend === 1 || review.would_recommend_new === 'yes' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
         {review.would_recommend === 1 || review.would_recommend_new === 'yes' ? 'Would recommend' : 'Would not recommend'}
       </span>
+      {review.user_email_verified === 1 && <EmailVerifiedBadge size="sm" />}
       {review.is_verified === 1 && <VerifiedBadge size="sm" />}
     </div>
     <span class="text-gray-400">
