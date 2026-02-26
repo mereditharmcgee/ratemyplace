@@ -7,11 +7,11 @@
 
 ### Email Verification
 
-- [ ] **EMAIL-01**: User receives verification email after signup with secure token link
-- [ ] **EMAIL-02**: User can click verification link to mark email as verified
+- [ ] **EMAIL-01**: User receives verification email after signup with secure token link (infrastructure ready)
+- [ ] **EMAIL-02**: User can click verification link to mark email as verified (infrastructure ready)
 - [x] **EMAIL-03**: Verified users display "Verified" badge on their reviews
 - [x] **EMAIL-04**: Unverified users can still submit reviews (no blocking)
-- [ ] **EMAIL-05**: User can request new verification email if original expired
+- [ ] **EMAIL-05**: User can request new verification email if original expired (infrastructure ready)
 
 ### Landlord Disputes
 
@@ -47,11 +47,11 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EMAIL-01 | Phase 1 | Pending |
-| EMAIL-02 | Phase 1 | Pending |
+| EMAIL-01 | Phase 1 | In Progress (infrastructure ready) |
+| EMAIL-02 | Phase 1 | In Progress (infrastructure ready) |
 | EMAIL-03 | Phase 1 | Complete |
 | EMAIL-04 | Phase 1 | Complete |
-| EMAIL-05 | Phase 1 | Pending |
+| EMAIL-05 | Phase 1 | In Progress (infrastructure ready) |
 | DISP-01 | Phase 2 | Pending |
 | DISP-02 | Phase 2 | Pending |
 | DISP-03 | Phase 2 | Pending |

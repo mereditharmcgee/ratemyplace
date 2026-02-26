@@ -23,7 +23,7 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Phase 1: Email Verification**
 - Status: In progress
-- Current Plan: 01-02 (completed)
+- Current Plan: 01-02 (completed), 01-01 (completed)
 - Next action: Continue with 01-03-PLAN.md
 
 ## Decisions Made
@@ -35,17 +35,21 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 | Parallel execution enabled | 2026-02-26 | Independent phases |
 | Green EmailVerifiedBadge vs blue VerifiedBadge | 2026-02-26 | Plan 01-02: Clear visual distinction between email and tenant verification |
 | EmailVerifiedBadge before VerifiedBadge in footer | 2026-02-26 | Plan 01-02: Logical ordering from basic to advanced verification |
+| Web Crypto API for token generation | 2026-02-26 | Plan 01-01: Universal compatibility in Workers and test environments |
+| 64-char alphanumeric tokens with 24h expiry | 2026-02-26 | Plan 01-01: Balance security (381 bits entropy) with user convenience |
+| One active token per user | 2026-02-26 | Plan 01-01: Prevent token accumulation and simplify management |
 
 ## Performance Metrics
 
 | Phase | Plan | Duration | Tasks | Files | Date |
 |-------|------|----------|-------|-------|------|
 | 01 | 02 | 2.8 min | 3 | 3 | 2026-02-26 |
+| 01 | 01 | 4.0 min | 2 | 3 | 2026-02-26 |
 
 ## Last Session
 
-**Timestamp:** 2026-02-26T21:28:25Z
-**Stopped At:** Completed 01-02-PLAN.md
+**Timestamp:** 2026-02-26T21:29:16Z
+**Stopped At:** Completed 01-01-PLAN.md
 
 ## Blockers
 

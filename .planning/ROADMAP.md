@@ -28,7 +28,7 @@
 **Plans:** 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Database schema and token management library
+- [x] 01-01-PLAN.md — Database schema and token management library (completed 2026-02-26)
 - [x] 01-02-PLAN.md — Email verified badge on reviews (completed 2026-02-26)
 - [ ] 01-03-PLAN.md — Resend integration and signup email
 - [ ] 01-04-PLAN.md — Verification endpoints and profile UI
