@@ -25,6 +25,14 @@
 
 **Requirements:** EMAIL-01, EMAIL-02, EMAIL-03, EMAIL-04, EMAIL-05
 
+**Plans:** 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Database schema and token management library
+- [ ] 01-02-PLAN.md — Email verified badge on reviews
+- [ ] 01-03-PLAN.md — Resend integration and signup email
+- [ ] 01-04-PLAN.md — Verification endpoints and profile UI
+
 **Success Criteria:**
 1. User receives email with verification link within 60 seconds of signup
 2. Clicking verification link marks `email_verified = true` in database
