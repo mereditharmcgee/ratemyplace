@@ -47,9 +47,11 @@ try {
     scores = scoresResult;
 
     const reviewsResult = await db.prepare(`
-      SELECT * FROM reviews
-      WHERE building_id = ? AND status = 'approved'
-      ORDER BY created_at DESC
+      SELECT r.*, u.email_verified as user_email_verified
+      FROM reviews r
+      LEFT JOIN users u ON r.user_id = u.id
+      WHERE r.building_id = ? AND r.status = 'approved'
+      ORDER BY r.created_at DESC
       LIMIT 50
     `).bind(building.id).all();
 
