@@ -23,11 +23,13 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 - ✓ Google Maps address autocomplete — v0.3.0
 - ✓ Public methodology page with citations — v1.1.0
 - ✓ Email verification for reviewers — v1.2.1
+- ✓ Landlord dispute form with admin review queue — v1.2.2
+- ✓ Fail-closed rate limiting with structured logging — v1.2.2
+- ✓ Admin action audit trail with viewer — v1.2.2
 
 ### Active
 
-- [ ] Landlord dispute form (submission form, admin review queue, notification system)
-- [ ] Rate limiting hardening (fail-closed on DB errors, not fail-open)
+(None — ready for next milestone)
 
 ### Out of Scope
 
@@ -38,15 +40,15 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 ## Context
 
 - **Tech stack**: Astro 5 + Cloudflare Pages + D1 (SQLite) + Lucia Auth + Tailwind CSS 4 + Resend
-- **Current version**: v1.2.1 "Email Verification"
+- **Current version**: v1.2.2 "Launch Ready"
 - **Production URL**: ratemyplace.boston
-- **Test suite**: 130 tests passing
-- **Build**: Clean, no TypeScript errors
+- **Database tables**: 10 (users, sessions, reviews, buildings, landlords, property_managers, email_verification_tokens, rate_limits, disputes, audit_logs)
+- **Admin pages**: Dashboard, Users, Reviews, Buildings, Landlords, Managers, Verification, Disputes, Audit Log
 
 ## Constraints
 
 - **Platform**: Cloudflare Workers (no Node.js APIs, React 18 only)
-- **Email**: Need to select email provider (Resend, Mailgun, or Cloudflare Email Workers)
+- **Email**: Resend (selected and integrated)
 - **Database**: D1 (SQLite) — single-region, no transactions across requests
 
 ## Key Decisions
@@ -54,11 +56,14 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Evidence-based scoring | Grounded in peer-reviewed public health research | ✓ Good |
-| Fail-open rate limiting | Prevent auth breakage if migration missing | ⚠️ Revisit — security concern |
+| Fail-closed rate limiting | Security-first: block on DB error, return 503 | ✓ Good (replaced fail-open in v1.2.2) |
 | Resend for email | Cloudflare-compatible, developer-friendly API | ✓ Good |
 | Web Crypto API for tokens | Cross-environment compatibility (Workers + Node.js) | ✓ Good |
 | 64-char alphanumeric tokens | 381 bits entropy, URL-safe | ✓ Good |
 | Graceful email failure | Signup succeeds even if email fails | ✓ Good |
+| Best-effort audit logging | Audit failures don't break admin actions | ✓ Good |
+| UNIQUE constraint on dispute review_id | One dispute per review, enforced at DB level | ✓ Good |
+| Structured JSON logging | Machine-parseable logs for Cloudflare dashboard | ✓ Good |
 
 ---
-*Last updated: 2026-02-26 after v1.2.1 milestone*
+*Last updated: 2026-02-27 after v1.2.2 milestone*
