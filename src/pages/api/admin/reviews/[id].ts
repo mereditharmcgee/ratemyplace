@@ -1,5 +1,7 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
+import { createAuditLog } from '../../../../lib/audit';
+import { getClientIP } from '../../../../lib/rateLimit';
 
 export async function PATCH(context: APIContext): Promise<Response> {
   // Require authentication
@@ -40,14 +42,16 @@ export async function PATCH(context: APIContext): Promise<Response> {
 
     const db = getDB((context.locals as any).runtime);
 
-    // Check if review exists
-    const review = await db.prepare('SELECT id FROM reviews WHERE id = ?').bind(reviewId).first();
+    // Check if review exists and get current status (for audit log)
+    const review = await db.prepare('SELECT id, status FROM reviews WHERE id = ?').bind(reviewId).first();
     if (!review) {
       return new Response(JSON.stringify({ error: 'Review not found' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' }
       });
     }
+
+    const oldStatus = review.status || 'unknown';
 
     // Build update query dynamically
     const updates: string[] = [];
@@ -71,6 +75,20 @@ export async function PATCH(context: APIContext): Promise<Response> {
       SET ${updates.join(', ')}
       WHERE id = ?
     `).bind(...values).run();
+
+    // Audit log the status change
+    if (status) {
+      await createAuditLog(db, {
+        adminUserId: context.locals.user.id,
+        adminIp: getClientIP(context),
+        actionType: `review_${status}`,  // review_approved, review_rejected, etc.
+        entityType: 'review',
+        entityId: reviewId,
+        oldValue: { status: oldStatus },
+        newValue: { status },
+        notes: moderation_notes || undefined
+      });
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }
@@ -180,6 +198,17 @@ export async function DELETE(context: APIContext): Promise<Response> {
         headers: { 'Content-Type': 'application/json' }
       });
     }
+
+    // Audit log the deletion
+    await createAuditLog(db, {
+      adminUserId: context.locals.user.id,
+      adminIp: getClientIP(context),
+      actionType: 'review_deleted',
+      entityType: 'review',
+      entityId: reviewId,
+      oldValue: { deleted: false },
+      newValue: { deleted: true }
+    });
 
     // Delete the review (cascades to verification_images, review_votes)
     await db.prepare('DELETE FROM reviews WHERE id = ?').bind(reviewId).run();
