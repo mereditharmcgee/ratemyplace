@@ -29,7 +29,22 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 
 ### Active
 
-(None — ready for next milestone)
+- [ ] Seed realistic test data (buildings, reviews, landlords, disputes) to validate UI at scale
+- [ ] Automated E2E tests for all user flows (review, auth, dispute, admin)
+- [ ] Edge case testing (long inputs, special characters, empty states, concurrent requests)
+- [ ] Security validation (auth bypass, injection, rate limiting, admin access)
+- [ ] UI stress testing (responsive layout, many items, error states)
+
+## Current Milestone: v1.3.0 "Battle Tested"
+
+**Goal:** Comprehensive QA and stress testing to ensure every user flow works, edge cases are handled, and the site is production-ready before real users arrive.
+
+**Target features:**
+- Realistic test data seeding (buildings, reviews, landlords, disputes at volume)
+- Automated E2E testing of all user journeys
+- Edge case and boundary testing across forms and flows
+- Security and auth validation
+- UI/responsive stress testing at scale
 
 ### Out of Scope
 
@@ -40,7 +55,7 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 ## Context
 
 - **Tech stack**: Astro 5 + Cloudflare Pages + D1 (SQLite) + Lucia Auth + Tailwind CSS 4 + Resend
-- **Current version**: v1.2.2 "Launch Ready"
+- **Current version**: v1.3.0 "Battle Tested" (in progress)
 - **Production URL**: ratemyplace.boston
 - **Database tables**: 10 (users, sessions, reviews, buildings, landlords, property_managers, email_verification_tokens, rate_limits, disputes, audit_logs)
 - **Admin pages**: Dashboard, Users, Reviews, Buildings, Landlords, Managers, Verification, Disputes, Audit Log
@@ -66,4 +81,4 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 | Structured JSON logging | Machine-parseable logs for Cloudflare dashboard | ✓ Good |
 
 ---
-*Last updated: 2026-02-27 after v1.2.2 milestone*
+*Last updated: 2026-02-27 after starting v1.3.0 milestone*
