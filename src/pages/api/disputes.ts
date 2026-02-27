@@ -82,8 +82,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
             dispute_reasons,
             dispute_explanation,
             status,
-            created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now'))
+            created_at,
+            updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', unixepoch(), unixepoch())
         `)
         .bind(
           disputeId,
@@ -138,6 +139,61 @@ export const POST: APIRoute = async ({ request, locals }) => {
     console.error('Dispute submission error:', error);
     return new Response(
       JSON.stringify({ error: 'Failed to submit dispute' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+};
+
+/**
+ * GET /api/disputes
+ * Get all disputes with joined review and building data (admin only)
+ */
+export const GET: APIRoute = async ({ locals }) => {
+  try {
+    // Check authentication
+    const user = locals.user;
+    if (!user) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check admin permission
+    if (!user.isAdmin) {
+      return new Response(
+        JSON.stringify({ error: 'Admin access required' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get database
+    const db = getDB(locals.runtime);
+
+    // Query disputes with joined review and building data
+    const disputes = await db
+      .prepare(`
+        SELECT
+          d.*,
+          b.address as building_address,
+          r.review_text,
+          r.review_title,
+          r.overall_score as review_overall_score
+        FROM disputes d
+        JOIN reviews r ON d.review_id = r.id
+        JOIN buildings b ON r.building_id = b.id
+        ORDER BY d.created_at ASC
+      `)
+      .all();
+
+    return new Response(
+      JSON.stringify({ disputes: disputes.results || [] }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('Error fetching disputes:', error);
+    return new Response(
+      JSON.stringify({ error: 'Failed to fetch disputes' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
