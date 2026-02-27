@@ -104,7 +104,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 4) return 'text-green-600';
+    if (score >= 4) return 'text-emerald-600';
     if (score >= 3) return 'text-amber-600';
     return 'text-red-600';
   };
