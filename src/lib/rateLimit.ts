@@ -7,6 +7,7 @@ interface RateLimitResult {
   allowed: boolean;
   remaining: number;
   retryAfterSeconds: number;
+  error?: boolean;
 }
 
 /**
@@ -64,13 +65,14 @@ export async function checkRateLimit(
       retryAfterSeconds: 0,
     };
   } catch (error) {
-    // If rate limiting fails (e.g., table doesn't exist), allow the request
-    // This prevents rate limiting from breaking auth if the migration hasn't run
+    // Fail-closed: block requests when rate limit check fails
+    // This prevents bypassing rate limits via DB attacks
     console.error('Rate limit check error:', error);
     return {
-      allowed: true,
-      remaining: maxAttempts,
-      retryAfterSeconds: 0,
+      allowed: false,
+      remaining: 0,
+      retryAfterSeconds: 60,
+      error: true,
     };
   }
 }
