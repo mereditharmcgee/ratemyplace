@@ -22,10 +22,10 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 - ✓ Google OAuth authentication — v0.3.0
 - ✓ Google Maps address autocomplete — v0.3.0
 - ✓ Public methodology page with citations — v1.1.0
+- ✓ Email verification for reviewers — v1.2.1
 
 ### Active
 
-- [ ] Email verification for reviewers (send verification link, validate token, show verified badge)
 - [ ] Landlord dispute form (submission form, admin review queue, notification system)
 - [ ] Rate limiting hardening (fail-closed on DB errors, not fail-open)
 
@@ -37,10 +37,10 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 
 ## Context
 
-- **Tech stack**: Astro 5 + Cloudflare Pages + D1 (SQLite) + Lucia Auth + Tailwind CSS 4
-- **Current version**: v1.1.0-alpha "Evidence-Based Scoring"
+- **Tech stack**: Astro 5 + Cloudflare Pages + D1 (SQLite) + Lucia Auth + Tailwind CSS 4 + Resend
+- **Current version**: v1.2.1 "Email Verification"
 - **Production URL**: ratemyplace.boston
-- **Test suite**: 122 tests passing
+- **Test suite**: 130 tests passing
 - **Build**: Clean, no TypeScript errors
 
 ## Constraints
@@ -55,7 +55,10 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 |----------|-----------|---------|
 | Evidence-based scoring | Grounded in peer-reviewed public health research | ✓ Good |
 | Fail-open rate limiting | Prevent auth breakage if migration missing | ⚠️ Revisit — security concern |
-| No email service yet | Deferred to reduce scope | — Pending |
+| Resend for email | Cloudflare-compatible, developer-friendly API | ✓ Good |
+| Web Crypto API for tokens | Cross-environment compatibility (Workers + Node.js) | ✓ Good |
+| 64-char alphanumeric tokens | 381 bits entropy, URL-safe | ✓ Good |
+| Graceful email failure | Signup succeeds even if email fails | ✓ Good |
 
 ---
-*Last updated: 2026-02-26 after gap analysis*
+*Last updated: 2026-02-26 after v1.2.1 milestone*

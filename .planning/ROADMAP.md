@@ -1,46 +1,25 @@
 # Roadmap: RateMyPlace Launch Prep
 
 **Created:** 2026-02-26
-**Milestone:** v1.2.0-beta "Launch Ready"
+**Current Milestone:** v1.2.2 "Launch Ready" (Phases 2-3)
 
-## Overview
+## Milestones
 
-| Phases | Requirements | Focus |
-|--------|--------------|-------|
-| 3 | 13 | Fix critical gaps for launch |
+- ✅ **v1.2.1 Email Verification** — Phase 1 (shipped 2026-02-26)
+- 🚧 **v1.2.2 Launch Ready** — Phases 2-3 (in progress)
 
-## Phase Summary
+## Phases
 
-| # | Phase | Goal | Requirements | Success Criteria |
-|---|-------|------|--------------|------------------|
-| 1 | Email Verification | Users can verify email and display verified badge | EMAIL-01 through EMAIL-05 | 5 |
-| 2 | Landlord Disputes | Landlords can submit disputes, admins can review | DISP-01 through DISP-05 | 5 |
-| 3 | Security Hardening | Rate limiting fails safely, admin audit trail | SEC-01 through SEC-03 | 3 |
+<details>
+<summary>✅ v1.2.1 Email Verification (Phase 1) — SHIPPED 2026-02-26</summary>
 
----
+- [x] Phase 1: Email Verification (4/4 plans) — completed 2026-02-26
 
-## Phase 1: Email Verification
+See: `.planning/milestones/v1.2.1-ROADMAP.md`
 
-**Goal:** Users receive verification emails after signup and verified users display a badge on their reviews.
+</details>
 
-**Requirements:** EMAIL-01, EMAIL-02, EMAIL-03, EMAIL-04, EMAIL-05
-
-**Plans:** 4 plans
-
-Plans:
-- [x] 01-01-PLAN.md — Database schema and token management library (completed 2026-02-26)
-- [x] 01-02-PLAN.md — Email verified badge on reviews (completed 2026-02-26)
-- [ ] 01-03-PLAN.md — Resend integration and signup email
-- [ ] 01-04-PLAN.md — Verification endpoints and profile UI
-
-**Success Criteria:**
-1. User receives email with verification link within 60 seconds of signup
-2. Clicking verification link marks `email_verified = true` in database
-3. Reviews from verified users show "Verified" badge
-4. Unverified users can still submit reviews (no blocking)
-5. User can request new verification email from profile
-
-**Dependencies:** Email service provider (Resend recommended for Cloudflare)
+### 🚧 v1.2.2 Launch Ready (In Progress)
 
 ---
 
@@ -77,11 +56,18 @@ Plans:
 
 ---
 
+## Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Email Verification | v1.2.1 | 4/4 | Complete | 2026-02-26 |
+| 2. Landlord Disputes | v1.2.2 | 0/0 | Not started | - |
+| 3. Security Hardening | v1.2.2 | 0/0 | Not started | - |
+
 ## Execution Notes
 
-- Phases can run in parallel (no dependencies between them)
+- Phases 2-3 can run in parallel (no dependencies)
 - Estimated: 3-5 plans per phase
-- Email provider decision needed before Phase 1 planning
 
 ---
-*Roadmap created: 2026-02-26*
+*Roadmap updated: 2026-02-26 after v1.2.1 milestone*
