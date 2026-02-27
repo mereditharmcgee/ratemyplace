@@ -1,93 +1,102 @@
 # Handoff: RateMyPlace Boston
 
 **Created:** 2026-02-27
-**Context:** Post-milestone v1.2.2, pre-launch
+**Context:** Post-refactor, pre-launch UX audit
 
 ## What Just Happened
 
-- Completed Phase 3: Security Hardening (fail-closed rate limiting, audit trail, /admin/audit)
-- Completed milestone v1.2.2 "Launch Ready" — archived and tagged
-- Added landlord deletion feature (quick fix outside milestone)
-- Applied migrations to production D1 (0013_audit_logs, 0014_audit_landlord_actions)
-- Ran launch readiness check — found blockers
+- Created CLAUDE.md with coding conventions
+- Added centralized API types (`src/lib/api-types.ts`)
+- Refactored ReviewForm.tsx from 916 → 287 lines (extracted into `form-steps/`)
+- All changes pushed to main
 
-## Current State
+## Current Concern
 
-**Milestone:** v1.2.2 complete, v1.3 not started
-**Branch:** main
-**Tag:** v1.2.2 (pushed)
-**Deploy:** Auto-deploys to Cloudflare Pages
+**User-facing experience needs audit before launch:**
+1. UI consistency - are styles/components consistent across pages?
+2. Bug check - are there broken flows or edge cases?
+3. Language/copy - is text updated to match current features?
 
-## Launch Blockers (Must Fix)
+## Recommended Audit Plan
 
-1. **Remove /test.astro** — test page accessible in production
-   ```bash
-   rm src/pages/test.astro
-   git add -A && git commit -m "chore: remove test page" && git push
-   ```
+### Phase 1: Page-by-Page UX Audit
 
-2. **Add security headers** — create `public/_headers`:
-   ```
-   /*
-     X-Content-Type-Options: nosniff
-     X-Frame-Options: DENY
-     X-XSS-Protection: 1; mode=block
-     Referrer-Policy: strict-origin-when-cross-origin
-   ```
+Review each user-facing page for:
+- [ ] Consistent styling (buttons, forms, colors)
+- [ ] Clear language (no placeholder text, outdated copy)
+- [ ] Working links and navigation
+- [ ] Mobile responsiveness
 
-3. **Verify env vars in Cloudflare dashboard:**
-   - RESEND_API_KEY
-   - GOOGLE_CLIENT_ID
-   - GOOGLE_CLIENT_SECRET
-   - GOOGLE_MAPS_API_KEY
+**Pages to audit:**
+```
+Public:
+- / (home)
+- /search
+- /map
+- /building/[slug]
+- /landlord/[slug]
+- /methodology
+- /guidelines
+- /privacy
+- /terms
+- /contact
+- /about
+- /dispute
 
-4. **Test email addresses work** — 7 addresses referenced:
-   - contact@ratemyplace.org
-   - privacy@ratemyplace.org
-   - support@ratemyplace.org
-   - landlords@ratemyplace.org
-   - reviews@ratemyplace.org
-   - legal@ratemyplace.org
-   - noreply@ratemyplace.org (sending address)
+Auth:
+- /auth/signin
+- /auth/signup
 
-5. **Update README.md** — still has Astro boilerplate
+Authenticated:
+- /review/new (ReviewForm - just refactored)
+- /profile
 
-## Should Fix Before Launch
+Admin:
+- /admin/* (lower priority for launch)
+```
 
-- Rate limiting only on signin — add to signup, disputes, verification
-- Google Maps API key needs HTTP referrer restrictions in Google Cloud Console
+### Phase 2: Flow Testing
+
+Test complete user journeys:
+1. **New user signup → submit review → view on building page**
+2. **Search for building → view details → see reviews**
+3. **Landlord dispute submission flow**
+4. **Email verification flow**
+
+### Phase 3: Copy Review
+
+Check for:
+- "Coming Soon" placeholders
+- Lorem ipsum or test text
+- Outdated feature descriptions
+- Consistent terminology (landlord vs property owner, etc.)
+
+## Quick Start After Clear
+
+```bash
+# Resume this work
+/gsd:quick "Audit user-facing pages for consistency, bugs, and outdated copy"
+
+# Or explore manually
+# Read pages in src/pages/ and check for issues
+```
+
+## Key Files for UI Audit
+
+| Area | Files |
+|------|-------|
+| Layout | `src/components/layout/` (Header, Footer, BaseLayout) |
+| Home | `src/pages/index.astro` |
+| Review Form | `src/components/reviews/ReviewForm.tsx`, `form-steps/` |
+| Building Page | `src/pages/building/[slug].astro` |
+| Profile | `src/components/profile/ProfileDashboard.tsx` |
+| Public Pages | `src/pages/*.astro` |
+
+## Known Issues from Previous Handoff
+
 - "Coming Soon" text on /about and /contact for landlord responses
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `.planning/MILESTONES.md` | Shipped milestones history |
-| `.planning/STATE.md` | Current project state |
-| `.planning/PROJECT.md` | Project context |
-| `CLAUDE.md` | Project coding conventions |
-| `SECURITY.md` | Security documentation |
-
-## Resume Commands
-
-```bash
-# Quick launch fixes
-/gsd:quick "Remove test page, add security headers, update README"
-
-# Or start new milestone
-/gsd:new-milestone
-
-# Or check what needs doing
-/gsd:progress
-```
-
-## Local Dev Note
-
-Local D1 database was out of sync — migrations 0010-0014 were applied directly. If local dev breaks, reset with:
-```bash
-rm -rf .wrangler/state/v3/d1
-npx wrangler d1 migrations apply ratemyplace-db --local
-```
+- Rate limiting only on signin (not signup, disputes, verification)
+- Google Maps API key needs HTTP referrer restrictions
 
 ---
-*Handoff created: 2026-02-27 ~23:30*
+*Handoff created: 2026-02-27 after completing documentation improvements*
