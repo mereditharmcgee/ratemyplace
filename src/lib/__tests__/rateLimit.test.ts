@@ -113,12 +113,14 @@ describe('checkRateLimit', () => {
     expect(result.allowed).toBe(false);
   });
 
-  it('gracefully handles database errors', async () => {
+  it('gracefully handles database errors by failing closed', async () => {
     const db = mockDB(0, true);
     const result = await checkRateLimit(db, '1.2.3.4', 'signin', 5, 900);
-    // Should allow the request when DB fails
-    expect(result.allowed).toBe(true);
-    expect(result.remaining).toBe(5);
+    // Should BLOCK the request when DB fails (fail-closed)
+    expect(result.allowed).toBe(false);
+    expect(result.error).toBe(true);
+    expect(result.remaining).toBe(0);
+    expect(result.retryAfterSeconds).toBe(60);
   });
 
   it('returns correct remaining count', async () => {
