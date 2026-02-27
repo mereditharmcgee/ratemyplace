@@ -1,24 +1,5 @@
 import { useState, useEffect } from 'react';
-
-interface Dispute {
-  id: string;
-  review_id: string;
-  landlord_name: string;
-  landlord_email: string;
-  landlord_phone: string;
-  dispute_reasons: string; // JSON string
-  dispute_explanation: string | null;
-  status: 'pending' | 'resolved';
-  resolution_outcome: 'uphold' | 'dismiss' | 'partially_valid' | null;
-  resolution_notes: string | null;
-  created_at: number;
-  resolved_at: number | null;
-  // Joined review data:
-  building_address: string;
-  review_text: string | null;
-  review_title: string | null;
-  review_overall_score: number | null;
-}
+import type { Dispute } from '../../lib/api-types';
 
 export default function DisputesQueue() {
   const [disputes, setDisputes] = useState<Dispute[]>([]);

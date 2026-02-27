@@ -1,26 +1,13 @@
 import { useState, useEffect } from 'react';
-
-interface AuditLog {
-  id: number;
-  created_at: number;
-  admin_user_id: string;
-  admin_ip: string;
-  action_type: string;
-  entity_type: string;
-  entity_id: string;
-  old_value: string | null;
-  new_value: string | null;
-  notes: string | null;
-  admin_email?: string;
-}
+import type { AuditLogEntry, AuditLogsResponse, AuditFilterOption } from '../../lib/api-types';
 
 interface FilterOptions {
   actionTypes: string[];
-  adminUsers: { id: string; email: string }[];
+  adminUsers: AuditFilterOption[];
 }
 
 export default function AuditLogTable() {
-  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionFilter, setActionFilter] = useState('all');

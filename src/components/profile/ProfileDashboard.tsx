@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import ReviewListItem from './ReviewListItem';
 import VerificationModal from './VerificationModal';
-import type { UserReview } from '../../pages/api/reviews/user';
+import type { UserReview, UserReviewsResponse } from '../../lib/api-types';
 
 interface Props {
   userEmail: string;
