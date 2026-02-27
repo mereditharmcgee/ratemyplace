@@ -40,3 +40,35 @@ Email verification system enabling users to verify their email address and displ
 ---
 
 _Last updated: 2026-02-26_
+
+## v1.2.2 — Launch Ready
+
+**Shipped:** 2026-02-27
+**Phases:** 2 | **Plans:** 6 | **Tasks:** 17
+
+### Delivered
+
+Security hardening and landlord dispute system for production launch readiness.
+
+### Key Accomplishments
+
+1. Landlord dispute form at /dispute with review URL parsing, contact info collection, and reason selection
+2. Admin disputes queue at /admin/disputes with side-by-side review comparison and resolution workflow
+3. Fail-closed rate limiting — DB errors now return 503 (not silent pass), with structured JSON logging
+4. Comprehensive audit trail — all admin actions logged with who, what, when, old/new values
+5. Admin audit log viewer at /admin/audit with filtering by action type, admin user, and pagination
+6. Dispute email notifications to landlords on resolution
+
+### Stats
+
+- Requirements completed: DISP-01 through DISP-05, SEC-01 through SEC-03
+- New admin pages: /admin/disputes, /admin/audit
+- Database tables added: disputes, audit_logs
+
+### Archive
+
+- Roadmap: `.planning/milestones/v1.2.2-ROADMAP.md`
+- Requirements: `.planning/milestones/v1.2.2-REQUIREMENTS.md`
+
+---
+
