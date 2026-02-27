@@ -1,43 +1,51 @@
-# Astro Starter Kit: Minimal
+# RateMyPlace Boston
 
-```sh
-npm create astro@latest -- --template minimal
+A public health-focused tenant housing review platform for Boston renters.
+
+## About
+
+Tenants rate their apartment unit, building, and landlord using a 27-item structured survey grounded in validated housing quality research (OHQS, PHQS, WHO LARES). The platform addresses information asymmetry in rental markets by giving tenants a way to research landlords before signing a lease.
+
+## Features
+
+- 27-item evidence-based housing quality survey
+- Weighted scoring with health/safety priority factors
+- Building and landlord profile pages with aggregate scores
+- Privacy-preserving score aggregation
+- Email-verified anonymous reviews
+- Landlord dispute submission system
+- Admin moderation dashboard
+
+## Tech Stack
+
+- **Framework**: Astro 5
+- **Hosting**: Cloudflare Pages
+- **Database**: Cloudflare D1 (SQLite)
+- **Auth**: Lucia + Google OAuth
+- **Email**: Resend
+- **Styling**: Tailwind CSS 4
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
+
+# Run tests
+npm test
+
+# Build for production
+npm run build
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+## Links
 
-## 🚀 Project Structure
+- **Production**: https://ratemyplace.boston
+- **Methodology**: /methodology (citations and scoring approach)
 
-Inside of your Astro project, you'll see the following folders and files:
+## License
 
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
-```
-
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
-
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
-
-Any static assets, like images, can be placed in the `public/` directory.
-
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+All rights reserved.
