@@ -25,7 +25,7 @@
 
 - [x] **SEC-01**: Rate limiting fails closed (blocks requests on DB error, not allows)
 - [x] **SEC-02**: Rate limit failures logged with alerts
-- [ ] **SEC-03**: Admin actions logged with audit trail (who, what, when)
+- [x] **SEC-03**: Admin actions logged with audit trail (who, what, when)
 
 ## v2 Requirements
 
@@ -59,7 +59,7 @@
 | DISP-05 | Phase 2 | Complete |
 | SEC-01 | Phase 3 | Complete |
 | SEC-02 | Phase 3 | Complete |
-| SEC-03 | Phase 3 | Pending |
+| SEC-03 | Phase 3 | Complete (03-02) |
 
 **Coverage:**
 - v1 requirements: 13 total
