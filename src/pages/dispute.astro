@@ -1,0 +1,37 @@
+---
+import BaseLayout from '../components/layout/BaseLayout.astro';
+import DisputeForm from '../components/disputes/DisputeForm';
+---
+
+<BaseLayout
+  title="Submit a Dispute"
+  description="Dispute a review you believe is inaccurate or unfair. Our admin team will review your submission."
+>
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <h1 class="text-3xl font-bold text-gray-900 mb-4">Submit a Dispute</h1>
+
+    <p class="text-gray-600 mb-6">
+      If you believe a review on RateMyPlace Boston contains inaccurate or unfair information, you can submit a dispute for our admin team to review.
+    </p>
+
+    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-8">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-blue-800 mb-2">How the dispute process works:</h3>
+          <ul class="list-disc list-inside text-sm text-blue-700 space-y-1">
+            <li>You must provide a link to the specific review you want to dispute</li>
+            <li>Our admin team will carefully review your submission and the review in question</li>
+            <li>You will be notified by email if your dispute is upheld</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <DisputeForm client:load siteUrl={Astro.url.origin} />
+  </div>
+</BaseLayout>
