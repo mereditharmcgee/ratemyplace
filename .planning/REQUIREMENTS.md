@@ -15,8 +15,8 @@
 
 ### Landlord Disputes
 
-- [ ] **DISP-01**: Landlord can submit dispute form with building selection and explanation
-- [ ] **DISP-02**: Dispute form requires landlord contact information
+- [x] **DISP-01**: Landlord can submit dispute form with building selection and explanation
+- [x] **DISP-02**: Dispute form requires landlord contact information
 - [ ] **DISP-03**: Disputes appear in admin queue for review
 - [ ] **DISP-04**: Admin can view disputed review alongside dispute submission
 - [ ] **DISP-05**: Admin can mark dispute as resolved/dismissed with notes
@@ -52,8 +52,8 @@
 | EMAIL-03 | Phase 1 | Complete |
 | EMAIL-04 | Phase 1 | Complete |
 | EMAIL-05 | Phase 1 | In Progress (infrastructure ready) |
-| DISP-01 | Phase 2 | Pending |
-| DISP-02 | Phase 2 | Pending |
+| DISP-01 | Phase 2 | Complete (02-01) |
+| DISP-02 | Phase 2 | Complete (02-01) |
 | DISP-03 | Phase 2 | Pending |
 | DISP-04 | Phase 2 | Pending |
 | DISP-05 | Phase 2 | Pending |

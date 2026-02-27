@@ -32,7 +32,7 @@ See: `.planning/milestones/v1.2.1-ROADMAP.md`
 **Plans:** 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md - Foundation: database schema, URL utilities, email functions
+- [x] 02-01-PLAN.md - Foundation: database schema, URL utilities, email functions
 - [ ] 02-02-PLAN.md - Public dispute form at /dispute
 - [ ] 02-03-PLAN.md - Admin disputes queue at /admin/disputes
 
@@ -68,7 +68,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1. Email Verification | v1.2.1 | 4/4 | Complete | 2026-02-26 |
-| 2. Landlord Disputes | v1.2.2 | 0/3 | Planned | - |
+| 2. Landlord Disputes | v1.2.2 | 1/3 | In Progress | - |
 | 3. Security Hardening | v1.2.2 | 0/0 | Not started | - |
 
 ## Execution Notes
