@@ -23,8 +23,8 @@
 
 ### Security Hardening
 
-- [ ] **SEC-01**: Rate limiting fails closed (blocks requests on DB error, not allows)
-- [ ] **SEC-02**: Rate limit failures logged with alerts
+- [x] **SEC-01**: Rate limiting fails closed (blocks requests on DB error, not allows)
+- [x] **SEC-02**: Rate limit failures logged with alerts
 - [ ] **SEC-03**: Admin actions logged with audit trail (who, what, when)
 
 ## v2 Requirements
@@ -57,8 +57,8 @@
 | DISP-03 | Phase 2 | Complete |
 | DISP-04 | Phase 2 | Complete |
 | DISP-05 | Phase 2 | Complete |
-| SEC-01 | Phase 3 | Pending |
-| SEC-02 | Phase 3 | Pending |
+| SEC-01 | Phase 3 | Complete |
+| SEC-02 | Phase 3 | Complete |
 | SEC-03 | Phase 3 | Pending |
 
 **Coverage:**
