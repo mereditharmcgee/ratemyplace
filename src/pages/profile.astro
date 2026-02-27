@@ -26,9 +26,26 @@ const memberSince = dbUser
 
 // Get email verification status
 const emailVerified = dbUser ? Boolean(dbUser.email_verified) : false;
+
+const updated = Astro.url.searchParams.get('updated') === 'true';
 ---
 
 <BaseLayout title="My Profile" description="Manage your reviews and profile on RateMyPlace.">
+  {updated && (
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      <div class="bg-teal-50 border border-teal-200 rounded-lg p-4 flex items-start gap-3" id="updated-banner">
+        <svg class="w-5 h-5 text-teal-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p class="text-teal-800 font-medium flex-1">Your review has been updated.</p>
+        <button onclick="document.getElementById('updated-banner').remove()" class="text-teal-400 hover:text-teal-600">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  )}
   <ProfileDashboard
     client:load
     userEmail={user.email}

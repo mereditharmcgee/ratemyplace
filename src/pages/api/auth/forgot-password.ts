@@ -8,6 +8,8 @@ import { logError } from '../../../lib/logger';
 interface User {
   id: string;
   email: string;
+  hashed_password: string | null;
+  google_id: string | null;
 }
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -65,12 +67,18 @@ export async function POST(context: APIContext): Promise<Response> {
 
     // Look up user by email
     const user = await db
-      .prepare('SELECT id, email FROM users WHERE email = ?')
+      .prepare('SELECT id, email, hashed_password, google_id FROM users WHERE email = ?')
       .bind(email)
       .first<User>();
 
     // If no user found, return success anyway (prevent enumeration)
     if (!user) {
+      return successResponse;
+    }
+
+    // If user only has Google OAuth (no password set), skip the reset email
+    // to avoid confusion — they should sign in with Google instead
+    if (!user.hashed_password && user.google_id) {
       return successResponse;
     }
 

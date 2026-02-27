@@ -7,6 +7,7 @@ import { getDB } from '../../lib/db';
 import { calculateBuildingAverages, calculateDomainScores } from '../../lib/scoring';
 
 const { slug } = Astro.params;
+const submitted = Astro.url.searchParams.get('submitted') === 'true';
 
 let building: any = null;
 let scores: any = null;
@@ -169,6 +170,23 @@ const sortedUnits = Array.from(reviewsByUnit.values())
 
 <BaseLayout title={building.address} description={`Reviews for ${building.address} in ${building.neighborhood || building.city}`}>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {submitted && (
+      <div class="mb-6 bg-teal-50 border border-teal-200 rounded-lg p-4 flex items-start gap-3" id="submitted-banner">
+        <svg class="w-5 h-5 text-teal-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div class="flex-1">
+          <p class="text-teal-800 font-medium">Review submitted!</p>
+          <p class="text-teal-700 text-sm">Your review has been submitted and is pending moderation. It will appear on this page once approved.</p>
+        </div>
+        <button onclick="document.getElementById('submitted-banner').remove()" class="text-teal-400 hover:text-teal-600">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    )}
+
     <!-- Header -->
     <div class="mb-8">
       <nav class="text-sm text-gray-500 mb-4">

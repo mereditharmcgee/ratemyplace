@@ -1,5 +1,4 @@
--- Add admin flag to users
-ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;
+-- NOTE: is_admin column already added in 0004_survey_scores.sql
 
 -- Add verification columns to reviews
 ALTER TABLE reviews ADD COLUMN is_verified INTEGER NOT NULL DEFAULT 0;

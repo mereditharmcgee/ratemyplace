@@ -54,7 +54,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     // Update user's password
     await db
-      .prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+      .prepare('UPDATE users SET hashed_password = ? WHERE id = ?')
       .bind(passwordHash, tokenResult.userId)
       .run();
 
