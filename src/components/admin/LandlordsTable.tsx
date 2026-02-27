@@ -23,6 +23,7 @@ export default function LandlordsTable() {
   const [editingLandlord, setEditingLandlord] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Landlord>>({});
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLandlords();
@@ -85,6 +86,36 @@ export default function LandlordsTable() {
       alert('Failed to save landlord');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const deleteLandlord = async (landlord: Landlord) => {
+    if (landlord.building_count > 0) {
+      alert(`Cannot delete landlord with ${landlord.building_count} building(s). Remove buildings first.`);
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete "${landlord.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeleting(landlord.id);
+    try {
+      const response = await fetch(`/api/admin/landlords/${landlord.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setLandlords((prev) => prev.filter((l) => l.id !== landlord.id));
+        setExpandedLandlord(null);
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to delete landlord');
+      }
+    } catch (err) {
+      alert('Failed to delete landlord');
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -364,6 +395,14 @@ export default function LandlordsTable() {
                       >
                         View Buildings ({landlord.building_count})
                       </a>
+                      <button
+                        onClick={() => deleteLandlord(landlord)}
+                        disabled={deleting === landlord.id || landlord.building_count > 0}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={landlord.building_count > 0 ? 'Remove all buildings first' : 'Delete landlord'}
+                      >
+                        {deleting === landlord.id ? 'Deleting...' : 'Delete'}
+                      </button>
                     </div>
                   </>
                 )}
