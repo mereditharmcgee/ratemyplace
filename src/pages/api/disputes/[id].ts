@@ -1,6 +1,8 @@
 import type { APIRoute } from 'astro';
 import { getDB } from '../../../lib/db';
 import { sendDisputeUpheldEmail } from '../../../lib/email';
+import { createAuditLog } from '../../../lib/audit';
+import { getClientIP } from '../../../lib/rateLimit';
 
 /**
  * PATCH /api/disputes/:id
@@ -51,9 +53,9 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
     // Get database
     const db = getDB(locals.runtime);
 
-    // Get dispute details for email
+    // Get dispute details for email and audit log
     const dispute = await db
-      .prepare('SELECT landlord_email, landlord_name FROM disputes WHERE id = ?')
+      .prepare('SELECT landlord_email, landlord_name, status, resolution_outcome FROM disputes WHERE id = ?')
       .bind(disputeId)
       .first();
 
@@ -63,6 +65,10 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
         { status: 404, headers: { 'Content-Type': 'application/json' } }
       );
     }
+
+    // Capture current state for audit log
+    const oldStatus = dispute.status || 'unknown';
+    const oldOutcome = dispute.resolution_outcome || null;
 
     // Update dispute
     await db
@@ -78,6 +84,24 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
       `)
       .bind(resolutionOutcome, resolutionNotes, user.id, disputeId)
       .run();
+
+    // Audit log the resolution
+    // Map outcome to action type for clearer filtering
+    const actionType = resolutionOutcome === 'uphold' ? 'dispute_upheld'
+      : resolutionOutcome === 'dismiss' ? 'dispute_dismissed'
+      : resolutionOutcome === 'partially_valid' ? 'dispute_partially_valid'
+      : 'dispute_resolved';
+
+    await createAuditLog(db, {
+      adminUserId: user.id,
+      adminIp: getClientIP({ request }),
+      actionType,
+      entityType: 'dispute',
+      entityId: disputeId as string,
+      oldValue: { status: oldStatus, outcome: oldOutcome },
+      newValue: { status: 'resolved', outcome: resolutionOutcome },
+      notes: resolutionNotes
+    });
 
     // If outcome is 'uphold', send notification email to landlord
     if (resolutionOutcome === 'uphold') {
