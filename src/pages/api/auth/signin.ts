@@ -3,6 +3,7 @@ import { initializeLucia } from '../../../lib/auth';
 import { getDB } from '../../../lib/db';
 import { verifyPassword } from '../../../lib/password';
 import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
+import { logError } from '../../../lib/logger';
 
 export async function POST(context: APIContext): Promise<Response> {
   const formData = await context.request.formData();
@@ -38,13 +39,23 @@ export async function POST(context: APIContext): Promise<Response> {
     const rateLimit = await checkRateLimit(db, clientIP, 'signin', 5, 900);
 
     if (!rateLimit.allowed) {
-      return new Response(JSON.stringify({
-        error: `Too many sign-in attempts. Please try again in ${Math.ceil(rateLimit.retryAfterSeconds / 60)} minutes.`
-      }), {
-        status: 429,
+      const status = rateLimit.error ? 503 : 429;
+      const message = rateLimit.error
+        ? 'Service temporarily unavailable. Please try again in a few minutes.'
+        : 'Too many attempts. Please try again later.';
+
+      if (rateLimit.error) {
+        logError('rate_limit_db_failure', {
+          endpoint: 'signin',
+          ip: clientIP
+        });
+      }
+
+      return new Response(JSON.stringify({ error: message }), {
+        status,
         headers: {
           'Content-Type': 'application/json',
-          'Retry-After': rateLimit.retryAfterSeconds.toString()
+          'Retry-After': String(rateLimit.retryAfterSeconds)
         }
       });
     }
