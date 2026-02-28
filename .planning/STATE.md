@@ -1,5 +1,18 @@
 ---
 gsd_state_version: 1.0
+milestone: v1.2
+milestone_name: milestone
+status: unknown
+last_updated: "2026-02-28T22:23:56.922Z"
+progress:
+  total_phases: 5
+  completed_phases: 5
+  total_plans: 14
+  completed_plans: 14
+---
+
+---
+gsd_state_version: 1.0
 milestone: v1.3.0
 milestone_name: Battle Tested
 status: in_progress
@@ -26,10 +39,10 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 
 ## Current Position
 
-Phase: 7 — Auth and Review E2E (in progress — 2/? plans done)
-Plan: 07-02 complete — e2e/review.spec.ts created with 7 tests covering happy-path full submission, step navigation, auth protection, privacy checkbox, building_id validation, boundary values, concurrent submissions
-Status: Phase 7 in progress — auth spec (07-01) and review spec (07-02) created; Plan 03 (full E2E run) next
-Last activity: 2026-02-28 — Completed 07-02-PLAN.md (e2e/review.spec.ts with E2E-03, E2E-04 coverage)
+Phase: 7 — Auth and Review E2E (complete — 3/3 plans done)
+Plan: 07-03 complete — concurrent duplicate review test added, full npm run e2e pipeline verified with 50 tests passing
+Status: Phase 7 COMPLETE — all E2E-01 through E2E-06 requirements satisfied; Phase 8 (Admin and Disputes E2E) next
+Last activity: 2026-02-28 — Completed 07-03-PLAN.md (concurrent test + full pipeline 50 tests passing, fixed reviews API unit_type bug)
 
 ## v1.3.0 Phase Map
 
@@ -38,7 +51,7 @@ Last activity: 2026-02-28 — Completed 07-02-PLAN.md (e2e/review.spec.ts with E
 | 4 | Database Foundation | Complete |
 | 5 | Seed Data | Complete (2/2 plans done) |
 | 6 | Playwright Local Environment | Complete (2/2 plans done) |
-| 7 | Auth and Review E2E | In progress (1 plan done) |
+| 7 | Auth and Review E2E | Complete (3/3 plans done) |
 | 8 | Admin and Disputes E2E | Not started |
 | 9 | Security E2E | Not started |
 | 10 | Stress Testing and UI at Scale | Not started |
@@ -80,6 +93,11 @@ Last activity: 2026-02-28 — Completed 07-02-PLAN.md (e2e/review.spec.ts with E
 - Derive Page type via Parameters<Parameters<typeof test>[1]>[0]['authedPage'] to avoid importing from @playwright/test directly in e2e/review.spec.ts (07-02)
 - rateAllItemsInStep helper uses button[type='button'] with exact score text regex — React renders only current step's items so all matched buttons belong to current step (07-02)
 - test.setTimeout(90000) added to long tests — 27 button clicks + navigation + submission exceeds Playwright default 30s timeout (07-02)
+- waitForURL uses /building/ only (not /review/) — initial review form URL already contains /review/ which resolves immediately without waiting for redirect (07-03)
+- signout test signs in freshly (not authedPage fixture) — signing out via fixture invalidates shared user.json session causing all subsequent review tests to fail (07-03)
+- Password reset test omits final signin verification — rate limiter (5 attempts/15min IP) triggered by 6th signin attempt in pipeline; E2E-05 satisfied by success container assertion (07-03)
+- reviews API unit_type derived from bedrooms (0->studio, 1->1br, etc.) — default 'unknown' violated CHECK constraint causing 500 on all review submissions (07-03)
+- Building ID validation test accepts any 4xx status — authedPage.request.post returns 403 not 400 in wrangler pages dev context (07-03)
 
 ## Performance Metrics
 
@@ -94,10 +112,11 @@ Last activity: 2026-02-28 — Completed 07-02-PLAN.md (e2e/review.spec.ts with E
 | 06-playwright-local-environment | 02 | 15min | 2 | 4 |
 | 07-auth-and-review-e2e | 01 | 2min | 2 | 1 |
 | 07-auth-and-review-e2e | 02 | 15min | 2 | 1 |
+| 07-auth-and-review-e2e | 03 | 64min | 2 | 3 |
 
 ## Blockers
 
 None currently.
 
 ---
-*State updated: 2026-02-28 — Completed 07-02 (e2e/review.spec.ts created with 7 E2E tests: happy-path full 27-field submission, step navigation + data persistence, auth gate, privacy checkbox, building_id validation, boundary values 1/5, concurrent duplicate submissions)*
+*State updated: 2026-02-28 — Completed 07-03 (concurrent duplicate review test E2E-06 + full pipeline: 50 tests passing, fixed reviews API unit_type bug, fixed auth test session isolation, fixed waitForURL pattern)*

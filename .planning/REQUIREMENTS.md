@@ -20,7 +20,7 @@
 - [x] **E2E-03**: User can submit a complete 27-field review through the multi-step form
 - [x] **E2E-04**: Review form validates required fields and rejects invalid input
 - [x] **E2E-05**: User can request and complete password reset flow
-- [ ] **E2E-06**: Concurrent duplicate review submissions are handled gracefully
+- [x] **E2E-06**: Concurrent duplicate review submissions are handled gracefully
 
 ### E2E - Admin & Disputes
 
@@ -78,7 +78,7 @@
 | E2E-03 | Phase 7 | Complete |
 | E2E-04 | Phase 7 | Complete |
 | E2E-05 | Phase 7 | Complete |
-| E2E-06 | Phase 7 | Pending |
+| E2E-06 | Phase 7 | Complete |
 | E2E-07 | Phase 8 | Pending |
 | E2E-08 | Phase 8 | Pending |
 | E2E-09 | Phase 8 | Pending |
