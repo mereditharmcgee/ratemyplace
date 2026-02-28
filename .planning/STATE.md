@@ -3,6 +3,19 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: unknown
+last_updated: "2026-02-28T06:07:04.765Z"
+progress:
+  total_phases: 3
+  completed_phases: 3
+  total_plans: 9
+  completed_plans: 9
+---
+
+---
+gsd_state_version: 1.0
+milestone: v1.2
+milestone_name: milestone
+status: unknown
 last_updated: "2026-02-28T05:25:02.614Z"
 progress:
   total_phases: 3
@@ -35,21 +48,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** Tenants can submit honest, anonymous reviews and see aggregated scores
-**Current focus:** v1.3.0 — Phase 5 Plan 01 complete (seed data foundation with users, landlords, buildings)
+**Current focus:** v1.3.0 — Phase 5 complete (seed data: users, landlords, buildings, reviews, disputes, scores)
 
 ## Current Position
 
-Phase: 5 — Seed Data (in progress)
-Plan: 01 complete — db:seed and db:setup working
-Status: Phase 5 Plan 01 complete — 8 users, 10 landlords, 30 buildings seeded; Plan 02 next (reviews, disputes, scores)
-Last activity: 2026-02-28 — Completed 05-01-PLAN.md (db-seed.ts with users, landlords, buildings)
+Phase: 5 — Seed Data (complete — 2/2 plans done)
+Plan: 02 complete — db:setup produces full dataset with verified scores
+Status: Phase 5 complete — 8 users, 10 landlords, 30 buildings, 128 reviews, 10 disputes, scores verified; Phase 6 next
+Last activity: 2026-02-28 — Completed 05-02-PLAN.md (reviews, disputes, score computation, verification)
 
 ## v1.3.0 Phase Map
 
 | Phase | Name | Status |
 |-------|------|--------|
 | 4 | Database Foundation | Complete |
-| 5 | Seed Data | In progress (1/2 plans done) |
+| 5 | Seed Data | Complete (2/2 plans done) |
 | 6 | Playwright Local Environment | Not started |
 | 7 | Auth and Review E2E | Not started |
 | 8 | Admin and Disputes E2E | Not started |
@@ -78,6 +91,9 @@ Last activity: 2026-02-28 — Completed 05-01-PLAN.md (db-seed.ts with users, la
 - Use wrangler --file (not --command) for INSERT batches to avoid shell escaping issues with text content on Windows (05-01)
 - Hardcode TEST_PASSWORD_HASH constant (PBKDF2-SHA256, fixed salt seed-data-fixed!) — runtime hashPassword() uses random salt, breaks E2E determinism (05-01)
 - All seed IDs hardcoded strings (user-test-01, landlord-01, building-01..30) for stable E2E test assertions (05-01)
+- overall_score computed via calculateOverallScore() inside insertReviews() at insert time, not at constant definition time (05-02)
+- building_scores populates only avg_overall, review_count, pct_* columns — per-field averages left NULL; building page uses live calculation (05-02)
+- makeReview() helper auto-derives issue flags from score thresholds (unit_pests<=2 = had_pests, etc.) for correlated test data (05-02)
 
 ## Performance Metrics
 
@@ -87,10 +103,11 @@ Last activity: 2026-02-28 — Completed 05-01-PLAN.md (db-seed.ts with users, la
 | 04-database-foundation | 02 | 5min | 2 | 2 |
 | 04-database-foundation | 03 | 18min | 3 | 2 |
 | 05-seed-data | 01 | 5min | 2 | 2 |
+| 05-seed-data | 02 | 39min | 3 | 1 |
 
 ## Blockers
 
 None currently.
 
 ---
-*State updated: 2026-02-28 — Completed 05-01 (db-seed.ts with users, landlords, buildings — Phase 5 Plan 01 complete)*
+*State updated: 2026-02-28 — Completed 05-02 (reviews, disputes, score computation, verification — Phase 5 complete)*
