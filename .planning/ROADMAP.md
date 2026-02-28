@@ -31,7 +31,7 @@ See: `.planning/milestones/v1.2.2-ROADMAP.md`
 
 ### v1.3.0 "Battle Tested" — Current Milestone
 
-- [ ] **Phase 4: Database Foundation** — Reset, migrate, and seed scripts for local D1
+- [x] **Phase 4: Database Foundation** — Reset, migrate, and seed scripts for local D1 (completed 2026-02-28)
 - [ ] **Phase 5: Seed Data** — Realistic data population (30 buildings, 10 landlords, 100+ reviews)
 - [ ] **Phase 6: Playwright Local Environment** — Config, webServer, auth fixtures for local E2E
 - [ ] **Phase 7: Auth and Review E2E** — Signup, signin, signout, password reset, review submission
@@ -136,7 +136,7 @@ See: `.planning/milestones/v1.2.2-ROADMAP.md`
 | 1. Email Verification | v1.2.1 | 4/4 | Complete | 2026-02-26 |
 | 2. Landlord Disputes | v1.2.2 | 3/3 | Complete | 2026-02-27 |
 | 3. Security Hardening | v1.2.2 | 3/3 | Complete | 2026-02-27 |
-| 4. Database Foundation | 1/3 | In Progress|  | — |
+| 4. Database Foundation | 3/3 | Complete   | 2026-02-28 | — |
 | 5. Seed Data | v1.3.0 | 0/? | Not started | — |
 | 6. Playwright Local Environment | v1.3.0 | 0/? | Not started | — |
 | 7. Auth and Review E2E | v1.3.0 | 0/? | Not started | — |
