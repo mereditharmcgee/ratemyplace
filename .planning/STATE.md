@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T03:50:45.940Z"
+last_updated: "2026-02-28T05:25:02.614Z"
 progress:
-  total_phases: 2
+  total_phases: 3
   completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 9
+  completed_plans: 8
 ---
 
 ---
@@ -35,21 +35,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** Tenants can submit honest, anonymous reviews and see aggregated scores
-**Current focus:** v1.3.0 — Phase 4 complete (all 3 plans done)
+**Current focus:** v1.3.0 — Phase 5 Plan 01 complete (seed data foundation with users, landlords, buildings)
 
 ## Current Position
 
-Phase: 4 — Database Foundation (complete)
-Plan: 01, 02, and 03 all complete
-Status: Phase 4 complete — db:reset, db:migrate:local, and db:fresh all working
-Last activity: 2026-02-28 — Completed 04-03-PLAN.md (db-fresh.ts with schema verification)
+Phase: 5 — Seed Data (in progress)
+Plan: 01 complete — db:seed and db:setup working
+Status: Phase 5 Plan 01 complete — 8 users, 10 landlords, 30 buildings seeded; Plan 02 next (reviews, disputes, scores)
+Last activity: 2026-02-28 — Completed 05-01-PLAN.md (db-seed.ts with users, landlords, buildings)
 
 ## v1.3.0 Phase Map
 
 | Phase | Name | Status |
 |-------|------|--------|
 | 4 | Database Foundation | Complete |
-| 5 | Seed Data | Not started |
+| 5 | Seed Data | In progress (1/2 plans done) |
 | 6 | Playwright Local Environment | Not started |
 | 7 | Auth and Review E2E | Not started |
 | 8 | Admin and Disputes E2E | Not started |
@@ -75,6 +75,9 @@ Last activity: 2026-02-28 — Completed 04-03-PLAN.md (db-fresh.ts with schema v
 - CRLF normalization required before regex comment stripping — Windows SQL files cause $ to miss line ends (04-03)
 - Use paren-depth scanning not regex to extract CREATE TABLE bodies — CHECK constraints contain nested parens that break regex (04-03)
 - Strip SQL line comments before comma-splitting CREATE TABLE body — comment parens corrupt depth counting (04-03)
+- Use wrangler --file (not --command) for INSERT batches to avoid shell escaping issues with text content on Windows (05-01)
+- Hardcode TEST_PASSWORD_HASH constant (PBKDF2-SHA256, fixed salt seed-data-fixed!) — runtime hashPassword() uses random salt, breaks E2E determinism (05-01)
+- All seed IDs hardcoded strings (user-test-01, landlord-01, building-01..30) for stable E2E test assertions (05-01)
 
 ## Performance Metrics
 
@@ -83,10 +86,11 @@ Last activity: 2026-02-28 — Completed 04-03-PLAN.md (db-fresh.ts with schema v
 | 04-database-foundation | 01 | 35min | 2 | 2 |
 | 04-database-foundation | 02 | 5min | 2 | 2 |
 | 04-database-foundation | 03 | 18min | 3 | 2 |
+| 05-seed-data | 01 | 5min | 2 | 2 |
 
 ## Blockers
 
 None currently.
 
 ---
-*State updated: 2026-02-28 — Completed 04-03 (db:fresh script with schema verification — Phase 4 Database Foundation complete)*
+*State updated: 2026-02-28 — Completed 05-01 (db-seed.ts with users, landlords, buildings — Phase 5 Plan 01 complete)*

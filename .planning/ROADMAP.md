@@ -137,7 +137,7 @@ See: `.planning/milestones/v1.2.2-ROADMAP.md`
 | 2. Landlord Disputes | v1.2.2 | 3/3 | Complete | 2026-02-27 |
 | 3. Security Hardening | v1.2.2 | 3/3 | Complete | 2026-02-27 |
 | 4. Database Foundation | 3/3 | Complete    | 2026-02-28 | — |
-| 5. Seed Data | v1.3.0 | 0/? | Not started | — |
+| 5. Seed Data | 1/2 | In Progress|  | — |
 | 6. Playwright Local Environment | v1.3.0 | 0/? | Not started | — |
 | 7. Auth and Review E2E | v1.3.0 | 0/? | Not started | — |
 | 8. Admin and Disputes E2E | v1.3.0 | 0/? | Not started | — |

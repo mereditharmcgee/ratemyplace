@@ -8,7 +8,7 @@
 ### Test Infrastructure
 
 - [x] **INFRA-01**: Local D1 database can be reset, migrated, and seeded with a single npm command
-- [ ] **INFRA-02**: Seed script populates realistic data: 30 buildings, 10 landlords, 100+ reviews, 3 test users, 10 disputes
+- [x] **INFRA-02**: Seed script populates realistic data: 30 buildings, 10 landlords, 100+ reviews, 3 test users, 10 disputes
 - [ ] **INFRA-03**: Seeded data includes pre-computed building and landlord aggregate scores
 - [ ] **INFRA-04**: Playwright runs against local dev server (not production URL)
 - [ ] **INFRA-05**: Playwright auth fixtures create reusable sessions for regular user and admin user
@@ -69,7 +69,7 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | INFRA-01 | Phase 4 | Complete |
-| INFRA-02 | Phase 5 | Pending |
+| INFRA-02 | Phase 5 | Complete |
 | INFRA-03 | Phase 5 | Pending |
 | INFRA-04 | Phase 6 | Pending |
 | INFRA-05 | Phase 6 | Pending |
