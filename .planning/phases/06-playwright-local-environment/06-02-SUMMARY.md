@@ -124,6 +124,17 @@ None - no external service configuration required.
 - authedPage and adminPage fixtures are available for authenticated test scenarios
 - Test credentials confirmed working: user@test.ratemyplace.local / TestPassword123! and admin@test.ratemyplace.local / TestPassword123!
 
+## Self-Check: PASSED
+
+- FOUND: e2e/navigation.spec.ts (imports from './fixtures')
+- FOUND: e2e/pages.spec.ts (imports from './fixtures')
+- FOUND: e2e/fixtures.ts (ESM-compatible __dirname)
+- FOUND: e2e/global.setup.ts (ESM-compatible __dirname)
+- FOUND: .planning/phases/06-playwright-local-environment/06-02-SUMMARY.md
+- FOUND: d3f2d99 (feat: update spec files to use shared fixtures import)
+- FOUND: f1b5232 (fix: replace __dirname with import.meta.url for ESM compatibility)
+- FOUND: 5847e78 (docs: complete playwright local environment integration verification)
+
 ---
 *Phase: 06-playwright-local-environment*
 *Completed: 2026-02-28*
