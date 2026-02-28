@@ -8,6 +8,9 @@ type Page = Parameters<Parameters<typeof test>[1]>[0]['authedPage'];
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Path to the authenticated user session file (created by global.setup.ts)
+const USER_AUTH_FILE = path.join(__dirname, '../playwright/.auth/user.json');
+
 // Helper: rate all visible rating items in the current step with a given score.
 // Each step renders only its own RatingItem components (React conditional rendering),
 // so every button[type="button"] matching the score text belongs to this step.
@@ -221,4 +224,93 @@ test.describe('Review Form', () => {
     await score5Buttons.nth(1).click();
   });
 
+});
+
+// E2E-06: Concurrent duplicate review submissions handled gracefully
+test.describe('Concurrent Submissions', () => {
+  test('concurrent duplicate reviews handled gracefully', async ({ browser }) => {
+    // Increase timeout — this test fills the form twice (sequentially) then submits both concurrently
+    test.setTimeout(120000);
+
+    // Create two browser contexts from the same authenticated user session
+    const [ctx1, ctx2] = await Promise.all([
+      browser.newContext({ storageState: USER_AUTH_FILE }),
+      browser.newContext({ storageState: USER_AUTH_FILE }),
+    ]);
+    const page1 = await ctx1.newPage();
+    const page2 = await ctx2.newPage();
+
+    // Helper to navigate through all review steps up to (but not including) the Submit click
+    async function fillReviewToSubmit(page: Page) {
+      await page.goto('/review/new?building=building-30');
+      await page.waitForLoadState('networkidle');
+
+      // Unit Details — click Continue (defaults are fine)
+      await page.locator('button[type="button"]', { hasText: 'Continue' }).click();
+
+      // Unit Rating — rate all items with score 3
+      await page.waitForSelector('text=Rate Your Unit', { timeout: 15000 });
+      await rateAllItemsInStep(page, 3);
+      await page.locator('button[type="button"]', { hasText: 'Continue' }).click();
+
+      // Building Rating — rate all items with score 3
+      await page.waitForSelector('text=Rate the Building', { timeout: 10000 });
+      await rateAllItemsInStep(page, 3);
+      await page.locator('button[type="button"]', { hasText: 'Continue' }).click();
+
+      // Landlord Rating — rate all items with score 3
+      await page.waitForSelector('text=Rate Your Landlord', { timeout: 10000 });
+      await rateAllItemsInStep(page, 3);
+      await page.locator('button[type="button"]', { hasText: 'Continue' }).click();
+
+      // Additional — click Review & Submit (defaults are fine)
+      await page.waitForSelector('text=How long did you live', { timeout: 10000 });
+      await page.locator('button[type="button"]', { hasText: 'Review & Submit' }).click();
+
+      // Confirm — check privacy checkbox and wait for Submit to be enabled
+      await page.waitForSelector('text=Review Summary', { timeout: 10000 });
+      await page.locator('input[type="checkbox"]').check();
+      await page.waitForFunction(
+        () => {
+          const btn = Array.from(document.querySelectorAll('button[type="button"]')).find(
+            (b) => b.textContent?.includes('Submit Review')
+          );
+          return btn && !(btn as HTMLButtonElement).disabled;
+        },
+        { timeout: 5000 }
+      );
+    }
+
+    // Fill both forms sequentially (can't parallelize — sequential D1 writes + shared React state)
+    await fillReviewToSubmit(page1);
+    await fillReviewToSubmit(page2);
+
+    // Submit simultaneously — this is the concurrency test
+    await Promise.all([
+      page1.locator('button[type="button"]', { hasText: 'Submit Review' }).click(),
+      page2.locator('button[type="button"]', { hasText: 'Submit Review' }).click(),
+    ]);
+
+    // Wait for both pages to settle (redirect to building page or remain on review page)
+    await Promise.all([
+      page1.waitForURL(/\/building\/|\/review\//, { timeout: 30000 }).catch(() => {}),
+      page2.waitForURL(/\/building\/|\/review\//, { timeout: 30000 }).catch(() => {}),
+    ]);
+
+    // Neither page should show a 500 Internal Server Error
+    const body1 = await page1.textContent('body');
+    const body2 = await page2.textContent('body');
+    expect(body1).not.toContain('Internal Server Error');
+    expect(body2).not.toContain('Internal Server Error');
+
+    // At least one submission should have succeeded (redirected to building page)
+    const url1 = page1.url();
+    const url2 = page2.url();
+    const oneSucceeded = url1.includes('/building/') || url2.includes('/building/');
+    expect(oneSucceeded).toBe(true);
+
+    // Cleanup — do NOT sign out (would invalidate the shared session)
+    await ctx1.close();
+    await ctx2.close();
+  });
 });
