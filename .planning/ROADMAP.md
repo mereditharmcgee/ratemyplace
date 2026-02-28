@@ -139,7 +139,7 @@ See: `.planning/milestones/v1.2.2-ROADMAP.md`
 | 4. Database Foundation | 3/3 | Complete    | 2026-02-28 | — |
 | 5. Seed Data | 2/2 | Complete   | 2026-02-28 | — |
 | 6. Playwright Local Environment | v1.3.0 | 2/2 | Complete | 2026-02-28 |
-| 7. Auth and Review E2E | v1.3.0 | 0/? | Not started | — |
+| 7. Auth and Review E2E | 2/3 | In Progress|  | — |
 | 8. Admin and Disputes E2E | v1.3.0 | 0/? | Not started | — |
 | 9. Security E2E | v1.3.0 | 0/? | Not started | — |
 | 10. Stress Testing and UI at Scale | v1.3.0 | 0/? | Not started | — |
