@@ -68,36 +68,37 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | — | Pending |
-| INFRA-02 | — | Pending |
-| INFRA-03 | — | Pending |
-| INFRA-04 | — | Pending |
-| INFRA-05 | — | Pending |
-| E2E-01 | — | Pending |
-| E2E-02 | — | Pending |
-| E2E-03 | — | Pending |
-| E2E-04 | — | Pending |
-| E2E-05 | — | Pending |
-| E2E-06 | — | Pending |
-| E2E-07 | — | Pending |
-| E2E-08 | — | Pending |
-| E2E-09 | — | Pending |
-| E2E-10 | — | Pending |
-| E2E-11 | — | Pending |
-| SEC-04 | — | Pending |
-| SEC-05 | — | Pending |
-| SEC-06 | — | Pending |
-| SEC-07 | — | Pending |
-| SEC-08 | — | Pending |
-| STRESS-01 | — | Pending |
-| STRESS-02 | — | Pending |
-| STRESS-03 | — | Pending |
-| STRESS-04 | — | Pending |
+| INFRA-01 | Phase 4 | Pending |
+| INFRA-02 | Phase 5 | Pending |
+| INFRA-03 | Phase 5 | Pending |
+| INFRA-04 | Phase 6 | Pending |
+| INFRA-05 | Phase 6 | Pending |
+| E2E-01 | Phase 7 | Pending |
+| E2E-02 | Phase 7 | Pending |
+| E2E-03 | Phase 7 | Pending |
+| E2E-04 | Phase 7 | Pending |
+| E2E-05 | Phase 7 | Pending |
+| E2E-06 | Phase 7 | Pending |
+| E2E-07 | Phase 8 | Pending |
+| E2E-08 | Phase 8 | Pending |
+| E2E-09 | Phase 8 | Pending |
+| E2E-10 | Phase 8 | Pending |
+| E2E-11 | Phase 8 | Pending |
+| SEC-04 | Phase 9 | Pending |
+| SEC-05 | Phase 9 | Pending |
+| SEC-06 | Phase 9 | Pending |
+| SEC-07 | Phase 9 | Pending |
+| SEC-08 | Phase 9 | Pending |
+| STRESS-01 | Phase 10 | Pending |
+| STRESS-02 | Phase 10 | Pending |
+| STRESS-03 | Phase 10 | Pending |
+| STRESS-04 | Phase 10 | Pending |
 
 **Coverage:**
 - v1 requirements: 25 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 25
+- Mapped to phases: 25
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-27*
+*Traceability updated: 2026-02-27 — Phases 4-10 assigned*
