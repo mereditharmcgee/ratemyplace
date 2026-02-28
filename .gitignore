@@ -29,3 +29,7 @@ pnpm-debug.log*
 # test output
 test-results/
 playwright-report/
+playwright/.auth/
+
+# GSD tools (symlink to home install)
+.claude/get-shit-done
