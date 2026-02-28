@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "smoke": "npx tsx scripts/smoke-test.ts",
     "e2e": "npx playwright test",
-    "e2e:headed": "npx playwright test --headed"
+    "e2e:headed": "npx playwright test --headed",
+    "db:migrate:local": "npx tsx scripts/db-migrate.ts"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.12",
