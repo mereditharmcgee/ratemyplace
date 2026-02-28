@@ -28,8 +28,11 @@ export async function POST(context: APIContext): Promise<Response> {
     const moveOutYearNew = formData.get('move_out_year') as string || null;
     const isCurrentTenant = moveOutYearNew === 'current' ? 1 : 0;
 
-    // Unit details
-    const unitType = formData.get('unit_type') as string || 'unknown';
+    // Unit details — derive unit_type from bedrooms if not provided directly
+    // unit_type must be one of: studio, 1br, 2br, 3br, 4br+, house
+    const bedroomsForType = formData.get('bedrooms') as string || '1';
+    const unitTypeMap: Record<string, string> = { '0': 'studio', '1': '1br', '2': '2br', '3': '3br', '4': '4br+' };
+    const unitType = formData.get('unit_type') as string || unitTypeMap[bedroomsForType] || '1br';
     const unitNumber = formData.get('unit_number') as string || null;
     const bedrooms = formData.get('bedrooms') as string || null;
     const bathrooms = formData.get('bathrooms') as string || null;
