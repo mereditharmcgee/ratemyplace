@@ -1,6 +1,10 @@
 import { test as setup } from '@playwright/test';
 import { mkdir } from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const AUTH_DIR = path.join(__dirname, '../playwright/.auth');
 const USER_AUTH_FILE = path.join(AUTH_DIR, 'user.json');
