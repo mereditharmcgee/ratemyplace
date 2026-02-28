@@ -1,53 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: milestone
-status: unknown
-last_updated: "2026-02-28T06:11:19.764Z"
-progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
----
-
----
-gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: milestone
-status: unknown
-last_updated: "2026-02-28T06:07:04.765Z"
-progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
----
-
----
-gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: milestone
-status: unknown
-last_updated: "2026-02-28T05:25:02.614Z"
-progress:
-  total_phases: 3
-  completed_phases: 2
-  total_plans: 9
-  completed_plans: 8
----
-
----
-gsd_state_version: 1.0
 milestone: v1.3.0
 milestone_name: Battle Tested
 status: in_progress
-last_updated: "2026-02-28T03:45:28Z"
+last_updated: "2026-02-28T19:44:12Z"
 progress:
   total_phases: 7
-  completed_phases: 0
-  total_plans: 3
-  completed_plans: 3
+  completed_phases: 2
+  total_plans: 12
+  completed_plans: 6
 ---
 
 # Project State
@@ -61,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** Tenants can submit honest, anonymous reviews and see aggregated scores
-**Current focus:** v1.3.0 — Phase 5 complete (seed data: users, landlords, buildings, reviews, disputes, scores)
+**Current focus:** v1.3.0 — Phase 6 Plan 01 complete (Playwright local environment infrastructure)
 
 ## Current Position
 
-Phase: 5 — Seed Data (complete — 2/2 plans done)
-Plan: 02 complete — db:setup produces full dataset with verified scores
-Status: Phase 5 complete — 8 users, 10 landlords, 30 buildings, 128 reviews, 10 disputes, scores verified; Phase 6 next
-Last activity: 2026-02-28 — Completed 05-02-PLAN.md (reviews, disputes, score computation, verification)
+Phase: 6 — Playwright Local Environment (in progress — 1/2 plans done)
+Plan: 01 complete — playwright.config.ts, global.setup.ts, fixtures.ts, e2e scripts, .gitignore
+Status: Plan 01 done — Playwright infrastructure configured for local wrangler dev server; Plan 02 (integration verification) next
+Last activity: 2026-02-28 — Completed 06-01-PLAN.md (playwright.config.ts, global.setup.ts, fixtures.ts, package.json, .gitignore)
 
 ## v1.3.0 Phase Map
 
@@ -76,7 +37,7 @@ Last activity: 2026-02-28 — Completed 05-02-PLAN.md (reviews, disputes, score 
 |-------|------|--------|
 | 4 | Database Foundation | Complete |
 | 5 | Seed Data | Complete (2/2 plans done) |
-| 6 | Playwright Local Environment | Not started |
+| 6 | Playwright Local Environment | In progress (1/2 plans done) |
 | 7 | Auth and Review E2E | Not started |
 | 8 | Admin and Disputes E2E | Not started |
 | 9 | Security E2E | Not started |
@@ -91,7 +52,6 @@ Last activity: 2026-02-28 — Completed 05-02-PLAN.md (reviews, disputes, score 
 
 - Phase numbering starts at 4 (continues from v1.2.x phases 1-3)
 - autocannon chosen over artillery for stress testing (simpler, no YAML config)
-- Local dev server command (astro dev vs wrangler pages dev) must be validated in Phase 6
 - Google OAuth E2E is explicitly out of scope — bot detection blocks headless browsers
 - Seed scripts use --local flag only — production D1 must never be touched by seed commands
 - Playwright workers: 1 required — shared local D1 cannot handle parallel writers
@@ -107,6 +67,11 @@ Last activity: 2026-02-28 — Completed 05-02-PLAN.md (reviews, disputes, score 
 - overall_score computed via calculateOverallScore() inside insertReviews() at insert time, not at constant definition time (05-02)
 - building_scores populates only avg_overall, review_count, pct_* columns — per-field averages left NULL; building page uses live calculation (05-02)
 - makeReview() helper auto-derives issue flags from score thresholds (unit_pests<=2 = had_pests, etc.) for correlated test data (05-02)
+- baseURL set to http://localhost:8788 (overridable via BASE_URL env var) — no production URLs in test config (06-01)
+- retries: 0 for fail-fast local testing; reuseExistingServer: true for faster iteration (06-01)
+- waitForURL('/') used in global.setup.ts because sign-in JS does window.location.href = '/' for both user and admin roles (06-01)
+- Auth files stored in playwright/.auth/ (gitignored) — not committed to source control (06-01)
+- e2e scripts chain db:setup (fresh+seed) then build then playwright test for reproducible runs (06-01)
 
 ## Performance Metrics
 
@@ -117,10 +82,11 @@ Last activity: 2026-02-28 — Completed 05-02-PLAN.md (reviews, disputes, score 
 | 04-database-foundation | 03 | 18min | 3 | 2 |
 | 05-seed-data | 01 | 5min | 2 | 2 |
 | 05-seed-data | 02 | 39min | 3 | 1 |
+| 06-playwright-local-environment | 01 | 5min | 4 | 5 |
 
 ## Blockers
 
 None currently.
 
 ---
-*State updated: 2026-02-28 — Completed 05-02 (reviews, disputes, score computation, verification — Phase 5 complete)*
+*State updated: 2026-02-28 — Completed 06-01 (playwright.config.ts, global.setup.ts, fixtures.ts, e2e scripts, .gitignore)*
