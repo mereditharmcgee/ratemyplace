@@ -136,7 +136,7 @@ See: `.planning/milestones/v1.2.2-ROADMAP.md`
 | 1. Email Verification | v1.2.1 | 4/4 | Complete | 2026-02-26 |
 | 2. Landlord Disputes | v1.2.2 | 3/3 | Complete | 2026-02-27 |
 | 3. Security Hardening | v1.2.2 | 3/3 | Complete | 2026-02-27 |
-| 4. Database Foundation | 3/3 | Complete   | 2026-02-28 | — |
+| 4. Database Foundation | 3/3 | Complete    | 2026-02-28 | — |
 | 5. Seed Data | v1.3.0 | 0/? | Not started | — |
 | 6. Playwright Local Environment | v1.3.0 | 0/? | Not started | — |
 | 7. Auth and Review E2E | v1.3.0 | 0/? | Not started | — |
