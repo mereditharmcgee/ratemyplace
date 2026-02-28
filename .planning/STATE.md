@@ -1,40 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: milestone
-status: unknown
-last_updated: "2026-02-28T21:21:08.921Z"
-progress:
-  total_phases: 5
-  completed_phases: 4
-  total_plans: 14
-  completed_plans: 13
----
-
----
-gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: milestone
-status: unknown
-last_updated: "2026-02-28T19:55:59.256Z"
-progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
----
-
----
-gsd_state_version: 1.0
 milestone: v1.3.0
 milestone_name: Battle Tested
 status: in_progress
-last_updated: "2026-02-28T21:20:00Z"
+last_updated: "2026-02-28T21:22:00Z"
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 12
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
