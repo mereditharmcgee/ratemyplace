@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3.0
 milestone_name: Battle Tested
 status: in_progress
-last_updated: "2026-02-28T19:44:12Z"
+last_updated: "2026-02-28T20:00:00Z"
 progress:
   total_phases: 7
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 12
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** Tenants can submit honest, anonymous reviews and see aggregated scores
-**Current focus:** v1.3.0 — Phase 6 Plan 01 complete (Playwright local environment infrastructure)
+**Current focus:** v1.3.0 — Phase 6 complete (Playwright local environment fully verified — 35 E2E tests passing)
 
 ## Current Position
 
-Phase: 6 — Playwright Local Environment (in progress — 1/2 plans done)
-Plan: 01 complete — playwright.config.ts, global.setup.ts, fixtures.ts, e2e scripts, .gitignore
-Status: Plan 01 done — Playwright infrastructure configured for local wrangler dev server; Plan 02 (integration verification) next
-Last activity: 2026-02-28 — Completed 06-01-PLAN.md (playwright.config.ts, global.setup.ts, fixtures.ts, package.json, .gitignore)
+Phase: 6 — Playwright Local Environment (complete — 2/2 plans done)
+Plan: 02 complete — spec files updated to ./fixtures import, ESM __dirname fixed, all 35 tests passing
+Status: Phase 6 done — full npm run e2e pipeline verified; Phase 7 (Auth and Review E2E) next
+Last activity: 2026-02-28 — Completed 06-02-PLAN.md (navigation.spec.ts, pages.spec.ts, fixtures.ts, global.setup.ts)
 
 ## v1.3.0 Phase Map
 
@@ -37,7 +37,7 @@ Last activity: 2026-02-28 — Completed 06-01-PLAN.md (playwright.config.ts, glo
 |-------|------|--------|
 | 4 | Database Foundation | Complete |
 | 5 | Seed Data | Complete (2/2 plans done) |
-| 6 | Playwright Local Environment | In progress (1/2 plans done) |
+| 6 | Playwright Local Environment | Complete (2/2 plans done) |
 | 7 | Auth and Review E2E | Not started |
 | 8 | Admin and Disputes E2E | Not started |
 | 9 | Security E2E | Not started |
@@ -72,6 +72,8 @@ Last activity: 2026-02-28 — Completed 06-01-PLAN.md (playwright.config.ts, glo
 - waitForURL('/') used in global.setup.ts because sign-in JS does window.location.href = '/' for both user and admin roles (06-01)
 - Auth files stored in playwright/.auth/ (gitignored) — not committed to source control (06-01)
 - e2e scripts chain db:setup (fresh+seed) then build then playwright test for reproducible runs (06-01)
+- All e2e spec files import from './fixtures' not '@playwright/test' directly — unified import convention (06-02)
+- Use fileURLToPath(import.meta.url) to derive __dirname in e2e/ files — required because project "type": "module" makes __dirname undefined (06-02)
 
 ## Performance Metrics
 
@@ -83,10 +85,11 @@ Last activity: 2026-02-28 — Completed 06-01-PLAN.md (playwright.config.ts, glo
 | 05-seed-data | 01 | 5min | 2 | 2 |
 | 05-seed-data | 02 | 39min | 3 | 1 |
 | 06-playwright-local-environment | 01 | 5min | 4 | 5 |
+| 06-playwright-local-environment | 02 | 15min | 2 | 4 |
 
 ## Blockers
 
 None currently.
 
 ---
-*State updated: 2026-02-28 — Completed 06-01 (playwright.config.ts, global.setup.ts, fixtures.ts, e2e scripts, .gitignore)*
+*State updated: 2026-02-28 — Completed 06-02 (navigation.spec.ts, pages.spec.ts imports updated; ESM __dirname fixed in fixtures.ts and global.setup.ts; 35 E2E tests passing)*
