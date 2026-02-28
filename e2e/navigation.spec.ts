@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 test.describe('Header navigation', () => {
   test('logo links to homepage', async ({ page }) => {
