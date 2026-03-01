@@ -9,15 +9,15 @@ test.describe('Admin Page Navigation', () => {
     await expect(adminPage.locator('h1')).toContainText('Dashboard Overview');
 
     // Assert all 9 nav links are present
-    await expect(adminPage.locator('nav a[href="/admin"]')).toBeVisible();
-    await expect(adminPage.locator('nav a[href="/admin/users"]')).toBeVisible();
-    await expect(adminPage.locator('nav a[href="/admin/reviews"]')).toBeVisible();
-    await expect(adminPage.locator('nav a[href="/admin/buildings"]')).toBeVisible();
-    await expect(adminPage.locator('nav a[href="/admin/landlords"]')).toBeVisible();
-    await expect(adminPage.locator('nav a[href="/admin/managers"]')).toBeVisible();
-    await expect(adminPage.locator('nav a[href="/admin/verify"]')).toBeVisible();
-    await expect(adminPage.locator('nav a[href="/admin/disputes"]')).toBeVisible();
-    await expect(adminPage.locator('nav a[href="/admin/audit"]')).toBeVisible();
+    await expect(adminPage.locator('nav a[href="/admin"]').first()).toBeVisible();
+    await expect(adminPage.locator('nav a[href="/admin/users"]').first()).toBeVisible();
+    await expect(adminPage.locator('nav a[href="/admin/reviews"]').first()).toBeVisible();
+    await expect(adminPage.locator('nav a[href="/admin/buildings"]').first()).toBeVisible();
+    await expect(adminPage.locator('nav a[href="/admin/landlords"]').first()).toBeVisible();
+    await expect(adminPage.locator('nav a[href="/admin/managers"]').first()).toBeVisible();
+    await expect(adminPage.locator('nav a[href="/admin/verify"]').first()).toBeVisible();
+    await expect(adminPage.locator('nav a[href="/admin/disputes"]').first()).toBeVisible();
+    await expect(adminPage.locator('nav a[href="/admin/audit"]').first()).toBeVisible();
   });
 });
 
@@ -32,7 +32,7 @@ test.describe('Admin Dashboard', () => {
     // Stats card labels
     await expect(adminPage.locator('text=Total Users')).toBeVisible();
     await expect(adminPage.locator('text=Total Reviews')).toBeVisible();
-    await expect(adminPage.locator('text=Buildings')).toBeVisible();
+    await expect(adminPage.locator('p.text-sm.font-medium', { hasText: 'Buildings' })).toBeVisible();
     await expect(adminPage.locator('text=Verifications')).toBeVisible();
 
     // Section headings on dashboard
