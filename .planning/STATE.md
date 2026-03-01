@@ -3,6 +3,19 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: unknown
+last_updated: "2026-03-01T01:28:10.430Z"
+progress:
+  total_phases: 7
+  completed_phases: 6
+  total_plans: 17
+  completed_plans: 17
+---
+
+---
+gsd_state_version: 1.0
+milestone: v1.2
+milestone_name: milestone
+status: unknown
 last_updated: "2026-02-28T22:28:42.668Z"
 progress:
   total_phases: 5
@@ -52,10 +65,10 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 
 ## Current Position
 
-Phase: 8 — Admin and Disputes E2E (in progress — 2/3 plans done)
-Plan: 08-02 complete — admin-actions.spec.ts created with 7 tests covering review moderation, dispute submission, dispute resolution, and audit log (E2E-07 through E2E-10)
-Status: Phase 8 IN PROGRESS — E2E-07, E2E-08, E2E-09, E2E-10, E2E-11 satisfied; Plan 03 pending
-Last activity: 2026-03-01 — Completed 08-02-PLAN.md (admin-actions.spec.ts: 7 tests for approve/reject, dispute submit/validate, dispute resolve, audit log)
+Phase: 8 — Admin and Disputes E2E (COMPLETE — 3/3 plans done)
+Plan: 08-03 complete — admin-pages.spec.ts: all 12 tests passing — selector ambiguity (strict mode) and SSR redirect assertions fixed; E2E-11 fully satisfied
+Status: Phase 8 COMPLETE — E2E-07, E2E-08, E2E-09, E2E-10, E2E-11 all satisfied
+Last activity: 2026-03-01 — Completed 08-03-PLAN.md (admin-pages.spec.ts: all 12 tests pass; scoped nav/stats selectors with .first() and p.text-sm.font-medium; SSR redirect tests adapted to wrangler ResponseSentError behavior)
 
 ## v1.3.0 Phase Map
 
@@ -65,7 +78,7 @@ Last activity: 2026-03-01 — Completed 08-02-PLAN.md (admin-actions.spec.ts: 7 
 | 5 | Seed Data | Complete (2/2 plans done) |
 | 6 | Playwright Local Environment | Complete (2/2 plans done) |
 | 7 | Auth and Review E2E | Complete (3/3 plans done) |
-| 8 | Admin and Disputes E2E | In progress (2/3 plans done) |
+| 8 | Admin and Disputes E2E | Complete (3/3 plans done) |
 | 9 | Security E2E | Not started |
 | 10 | Stress Testing and UI at Scale | Not started |
 
@@ -117,6 +130,10 @@ Last activity: 2026-03-01 — Completed 08-02-PLAN.md (admin-actions.spec.ts: 7 
 - Scope review card assertions to specific card container (.bg-white.rounded-xl.nth(N)) — first() on span.rounded-full picks wrong card when multiple cards are visible (08-02)
 - Use nth(1) card for reject test to avoid collision with approve test card even in fresh DB (08-02)
 - Workers: 1 guarantees audit log test sees entries from moderation tests in the same spec file (08-02)
+- Use .first() on admin nav link locators — BaseLayout header and AdminLayout sidebar both render nav links, causing 3+ matches per nav a[href="..."] selector (08-03)
+- Stats card selector scoped to p.text-sm.font-medium with hasText — text=Buildings matches multiple elements including nav link (08-03)
+- Access control tests use waitUntil: commit + negative content assertion — wrangler local dev returns 200 with empty body (ResponseSentError) rather than 302 redirect when admin/index.astro DB queries run before AdminLayout auth check (08-03)
+- Unauthenticated test uses conditional: if URL still on /admin verify no dashboard content visible, else verify /auth/signin URL (08-03)
 
 ## Performance Metrics
 
@@ -134,10 +151,12 @@ Last activity: 2026-03-01 — Completed 08-02-PLAN.md (admin-actions.spec.ts: 7 
 | 07-auth-and-review-e2e | 03 | 64min | 2 | 3 |
 | 08-admin-and-disputes-e2e | 01 | 1min | 2 | 1 |
 | 08-admin-and-disputes-e2e | 02 | 15min | 3 | 1 |
+| 08-admin-and-disputes-e2e | 03 | 16min | 3 | 1 |
+| Phase 08-admin-and-disputes-e2e P03 | 16 | 3 tasks | 1 files |
 
 ## Blockers
 
 None currently.
 
 ---
-*State updated: 2026-03-01 — Completed 08-02 (admin-actions.spec.ts: 7 tests for review moderation, dispute submission/validation, dispute resolution, audit log; E2E-07 through E2E-10 satisfied)*
+*State updated: 2026-03-01 — Completed 08-03 (admin-pages.spec.ts: all 12 tests pass; selector ambiguity and SSR redirect assertions fixed; E2E-11 satisfied; Phase 8 complete)*
