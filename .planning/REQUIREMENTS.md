@@ -28,7 +28,7 @@
 - [ ] **E2E-08**: Landlord can submit a dispute through the public /dispute form
 - [ ] **E2E-09**: Admin can view and resolve disputes with outcome and notes
 - [ ] **E2E-10**: Admin actions create verifiable audit log entries
-- [ ] **E2E-11**: All 9 admin pages render correctly and are navigable
+- [x] **E2E-11**: All 9 admin pages render correctly and are navigable
 
 ### Security
 
@@ -83,7 +83,7 @@
 | E2E-08 | Phase 8 | Pending |
 | E2E-09 | Phase 8 | Pending |
 | E2E-10 | Phase 8 | Pending |
-| E2E-11 | Phase 8 | Pending |
+| E2E-11 | Phase 8 | Complete |
 | SEC-04 | Phase 9 | Pending |
 | SEC-05 | Phase 9 | Pending |
 | SEC-06 | Phase 9 | Pending |

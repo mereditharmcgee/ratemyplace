@@ -52,10 +52,10 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 
 ## Current Position
 
-Phase: 7 — Auth and Review E2E (complete — 3/3 plans done)
-Plan: 07-03 complete — concurrent duplicate review test added, full npm run e2e pipeline verified with 50 tests passing
-Status: Phase 7 COMPLETE — all E2E-01 through E2E-06 requirements satisfied; Phase 8 (Admin and Disputes E2E) next
-Last activity: 2026-02-28 — Completed 07-03-PLAN.md (concurrent test + full pipeline 50 tests passing, fixed reviews API unit_type bug)
+Phase: 8 — Admin and Disputes E2E (in progress — 1/3 plans done)
+Plan: 08-01 complete — admin-pages.spec.ts created with 12 tests covering all 9 admin pages, navigation, and access control
+Status: Phase 8 IN PROGRESS — E2E-11 satisfied; Plans 02 and 03 pending
+Last activity: 2026-03-01 — Completed 08-01-PLAN.md (admin-pages.spec.ts: 12 tests, all 9 admin pages, access control)
 
 ## v1.3.0 Phase Map
 
@@ -65,7 +65,7 @@ Last activity: 2026-02-28 — Completed 07-03-PLAN.md (concurrent test + full pi
 | 5 | Seed Data | Complete (2/2 plans done) |
 | 6 | Playwright Local Environment | Complete (2/2 plans done) |
 | 7 | Auth and Review E2E | Complete (3/3 plans done) |
-| 8 | Admin and Disputes E2E | Not started |
+| 8 | Admin and Disputes E2E | In progress (1/3 plans done) |
 | 9 | Security E2E | Not started |
 | 10 | Stress Testing and UI at Scale | Not started |
 
@@ -111,6 +111,9 @@ Last activity: 2026-02-28 — Completed 07-03-PLAN.md (concurrent test + full pi
 - Password reset test omits final signin verification — rate limiter (5 attempts/15min IP) triggered by 6th signin attempt in pipeline; E2E-05 satisfied by success container assertion (07-03)
 - reviews API unit_type derived from bedrooms (0->studio, 1->1br, etc.) — default 'unknown' violated CHECK constraint causing 500 on all review submissions (07-03)
 - Building ID validation test accepts any 4xx status — authedPage.request.post returns 403 not 400 in wrangler pages dev context (07-03)
+- Dashboard page (/admin) is SSR-only — no waitForLoadState('networkidle') needed unlike the 8 React island admin pages (08-01)
+- Disputes filter button test uses count() sum check — more resilient than exact text matching for filter button variants (08-01)
+- Audit log test accepts either table thead or 'No audit logs found' text — handles empty and populated states (08-01)
 
 ## Performance Metrics
 
@@ -126,10 +129,11 @@ Last activity: 2026-02-28 — Completed 07-03-PLAN.md (concurrent test + full pi
 | 07-auth-and-review-e2e | 01 | 2min | 2 | 1 |
 | 07-auth-and-review-e2e | 02 | 15min | 2 | 1 |
 | 07-auth-and-review-e2e | 03 | 64min | 2 | 3 |
+| 08-admin-and-disputes-e2e | 01 | 1min | 2 | 1 |
 
 ## Blockers
 
 None currently.
 
 ---
-*State updated: 2026-02-28 — Completed 07-03 (concurrent duplicate review test E2E-06 + full pipeline: 50 tests passing, fixed reviews API unit_type bug, fixed auth test session isolation, fixed waitForURL pattern)*
+*State updated: 2026-03-01 — Completed 08-01 (admin-pages.spec.ts: 12 tests for all 9 admin pages, nav bar, access control; E2E-11 satisfied)*
