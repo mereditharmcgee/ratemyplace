@@ -35,7 +35,7 @@ See: `.planning/milestones/v1.2.2-ROADMAP.md`
 - [x] **Phase 5: Seed Data** — Realistic data population (30 buildings, 10 landlords, 100+ reviews) (completed 2026-02-28)
 - [x] **Phase 6: Playwright Local Environment** — Config, webServer, auth fixtures for local E2E (2/2 plans done — completed 2026-02-28)
 - [x] **Phase 7: Auth and Review E2E** — Signup, signin, signout, password reset, review submission (completed 2026-02-28)
-- [ ] **Phase 8: Admin and Disputes E2E** — Moderation queue, dispute resolution, audit log, all 9 admin pages
+- [x] **Phase 8: Admin and Disputes E2E** — Moderation queue, dispute resolution, audit log, all 9 admin pages (completed 2026-03-01)
 - [ ] **Phase 9: Security E2E** — Auth bypass, admin access control, rate limiting, injection probes
 - [ ] **Phase 10: Stress Testing and UI at Scale** — Concurrent load, volume rendering, score correctness
 
@@ -140,7 +140,7 @@ See: `.planning/milestones/v1.2.2-ROADMAP.md`
 | 5. Seed Data | 2/2 | Complete   | 2026-02-28 | — |
 | 6. Playwright Local Environment | v1.3.0 | 2/2 | Complete | 2026-02-28 |
 | 7. Auth and Review E2E | 3/3 | Complete   | 2026-02-28 | — |
-| 8. Admin and Disputes E2E | 1/2 | In Progress|  | — |
+| 8. Admin and Disputes E2E | 2/2 | Complete   | 2026-03-01 | — |
 | 9. Security E2E | v1.3.0 | 0/? | Not started | — |
 | 10. Stress Testing and UI at Scale | v1.3.0 | 0/? | Not started | — |
 

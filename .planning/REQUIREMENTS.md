@@ -24,10 +24,10 @@
 
 ### E2E - Admin & Disputes
 
-- [ ] **E2E-07**: Admin can approve and reject pending reviews from the moderation queue
-- [ ] **E2E-08**: Landlord can submit a dispute through the public /dispute form
-- [ ] **E2E-09**: Admin can view and resolve disputes with outcome and notes
-- [ ] **E2E-10**: Admin actions create verifiable audit log entries
+- [x] **E2E-07**: Admin can approve and reject pending reviews from the moderation queue
+- [x] **E2E-08**: Landlord can submit a dispute through the public /dispute form
+- [x] **E2E-09**: Admin can view and resolve disputes with outcome and notes
+- [x] **E2E-10**: Admin actions create verifiable audit log entries
 - [x] **E2E-11**: All 9 admin pages render correctly and are navigable
 
 ### Security
@@ -79,10 +79,10 @@
 | E2E-04 | Phase 7 | Complete |
 | E2E-05 | Phase 7 | Complete |
 | E2E-06 | Phase 7 | Complete |
-| E2E-07 | Phase 8 | Pending |
-| E2E-08 | Phase 8 | Pending |
-| E2E-09 | Phase 8 | Pending |
-| E2E-10 | Phase 8 | Pending |
+| E2E-07 | Phase 8 | Complete |
+| E2E-08 | Phase 8 | Complete |
+| E2E-09 | Phase 8 | Complete |
+| E2E-10 | Phase 8 | Complete |
 | E2E-11 | Phase 8 | Complete |
 | SEC-04 | Phase 9 | Pending |
 | SEC-05 | Phase 9 | Pending |

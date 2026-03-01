@@ -52,10 +52,10 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 
 ## Current Position
 
-Phase: 8 — Admin and Disputes E2E (in progress — 1/3 plans done)
-Plan: 08-01 complete — admin-pages.spec.ts created with 12 tests covering all 9 admin pages, navigation, and access control
-Status: Phase 8 IN PROGRESS — E2E-11 satisfied; Plans 02 and 03 pending
-Last activity: 2026-03-01 — Completed 08-01-PLAN.md (admin-pages.spec.ts: 12 tests, all 9 admin pages, access control)
+Phase: 8 — Admin and Disputes E2E (in progress — 2/3 plans done)
+Plan: 08-02 complete — admin-actions.spec.ts created with 7 tests covering review moderation, dispute submission, dispute resolution, and audit log (E2E-07 through E2E-10)
+Status: Phase 8 IN PROGRESS — E2E-07, E2E-08, E2E-09, E2E-10, E2E-11 satisfied; Plan 03 pending
+Last activity: 2026-03-01 — Completed 08-02-PLAN.md (admin-actions.spec.ts: 7 tests for approve/reject, dispute submit/validate, dispute resolve, audit log)
 
 ## v1.3.0 Phase Map
 
@@ -65,7 +65,7 @@ Last activity: 2026-03-01 — Completed 08-01-PLAN.md (admin-pages.spec.ts: 12 t
 | 5 | Seed Data | Complete (2/2 plans done) |
 | 6 | Playwright Local Environment | Complete (2/2 plans done) |
 | 7 | Auth and Review E2E | Complete (3/3 plans done) |
-| 8 | Admin and Disputes E2E | In progress (1/3 plans done) |
+| 8 | Admin and Disputes E2E | In progress (2/3 plans done) |
 | 9 | Security E2E | Not started |
 | 10 | Stress Testing and UI at Scale | Not started |
 
@@ -114,6 +114,9 @@ Last activity: 2026-03-01 — Completed 08-01-PLAN.md (admin-pages.spec.ts: 12 t
 - Dashboard page (/admin) is SSR-only — no waitForLoadState('networkidle') needed unlike the 8 React island admin pages (08-01)
 - Disputes filter button test uses count() sum check — more resilient than exact text matching for filter button variants (08-01)
 - Audit log test accepts either table thead or 'No audit logs found' text — handles empty and populated states (08-01)
+- Scope review card assertions to specific card container (.bg-white.rounded-xl.nth(N)) — first() on span.rounded-full picks wrong card when multiple cards are visible (08-02)
+- Use nth(1) card for reject test to avoid collision with approve test card even in fresh DB (08-02)
+- Workers: 1 guarantees audit log test sees entries from moderation tests in the same spec file (08-02)
 
 ## Performance Metrics
 
@@ -130,10 +133,11 @@ Last activity: 2026-03-01 — Completed 08-01-PLAN.md (admin-pages.spec.ts: 12 t
 | 07-auth-and-review-e2e | 02 | 15min | 2 | 1 |
 | 07-auth-and-review-e2e | 03 | 64min | 2 | 3 |
 | 08-admin-and-disputes-e2e | 01 | 1min | 2 | 1 |
+| 08-admin-and-disputes-e2e | 02 | 15min | 3 | 1 |
 
 ## Blockers
 
 None currently.
 
 ---
-*State updated: 2026-03-01 — Completed 08-01 (admin-pages.spec.ts: 12 tests for all 9 admin pages, nav bar, access control; E2E-11 satisfied)*
+*State updated: 2026-03-01 — Completed 08-02 (admin-actions.spec.ts: 7 tests for review moderation, dispute submission/validation, dispute resolution, audit log; E2E-07 through E2E-10 satisfied)*
