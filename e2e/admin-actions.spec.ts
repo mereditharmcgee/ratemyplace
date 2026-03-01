@@ -36,28 +36,29 @@ test.describe('Review Moderation (E2E-07)', () => {
   test('admin can reject a pending review', async ({ adminPage }) => {
     test.setTimeout(60000);
 
-    // Navigate to the Approved filter to find a different review to reject
+    // Navigate to reviews page and wait for React island to load
     await adminPage.goto('/admin/reviews');
     await adminPage.waitForLoadState('networkidle');
 
-    // Filter to 'Approved' reviews to find a second review (first may now be 'approved' from prev test)
-    await adminPage.locator('button').filter({ hasText: /^Approved/ }).click();
-    await adminPage.waitForLoadState('networkidle');
+    // Use the second review card to avoid any collision with the approve test card.
+    // All seed reviews are 'approved' — expand the second card.
+    const reviewCards = adminPage.locator('.cursor-pointer');
+    await reviewCards.nth(1).click();
 
-    // Expand the first review card in the approved filter
-    await adminPage.locator('.cursor-pointer').first().click();
+    // Scope all subsequent actions to the expanded card (second card container)
+    const secondCard = adminPage.locator('.bg-white.rounded-xl').nth(1);
 
-    // Click "Reset to Pending" to enable the Reject button
-    await adminPage.locator('button', { hasText: 'Reset to Pending' }).first().click();
+    // Click "Reset to Pending" within the second card to expose the Reject button
+    await secondCard.locator('button', { hasText: 'Reset to Pending' }).click();
 
-    // Wait for the status badge to update to 'pending'
-    await expect(adminPage.locator('span.rounded-full').first()).toContainText('pending');
+    // Wait for the status badge within that card to update to 'pending'
+    await expect(secondCard.locator('span.rounded-full')).toContainText('pending');
 
-    // Click Reject
-    await adminPage.locator('button', { hasText: 'Reject' }).first().click();
+    // Click Reject within the same card
+    await secondCard.locator('button', { hasText: 'Reject' }).click();
 
-    // Assert status badge updated to 'rejected'
-    await expect(adminPage.locator('span.rounded-full').first()).toContainText('rejected');
+    // Assert status badge within the card updated to 'rejected'
+    await expect(secondCard.locator('span.rounded-full')).toContainText('rejected');
   });
 });
 
