@@ -222,7 +222,7 @@ export async function DELETE(context: APIContext): Promise<Response> {
       adminUserId: context.locals.user.id,
       adminIp: getClientIP(context),
       actionType: 'landlord_deleted',
-      entityType: 'landlord' as any,
+      entityType: 'landlord',
       entityId: landlordId,
       oldValue: { name: landlord.name },
       newValue: { deleted: true }

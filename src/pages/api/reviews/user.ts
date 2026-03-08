@@ -10,7 +10,7 @@ export interface UserReview {
   city: string;
   overall_score: number;
   status: 'pending' | 'approved' | 'rejected';
-  is_verified: boolean;
+  is_verified: number | boolean;
   created_at: number;
   updated_at: number | null;
   review_title: string | null;

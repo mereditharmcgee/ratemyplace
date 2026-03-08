@@ -67,7 +67,7 @@ try {
         const allReviews = allReviewsResult.results || [];
         if (allReviews.length > 0) {
           const calculatedScores = calculateLandlordAverages(allReviews);
-          scores = { ...scores, ...calculatedScores };
+          scores = { ...scores, ...calculatedScores, building_count: buildings.length };
         }
       } else if (recentReviews.length > 0 && !scores) {
         // No landlord_scores record at all, calculate everything

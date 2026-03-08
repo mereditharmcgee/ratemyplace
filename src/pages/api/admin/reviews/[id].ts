@@ -190,8 +190,10 @@ export async function DELETE(context: APIContext): Promise<Response> {
   try {
     const db = getDB((context.locals as any).runtime);
 
-    // Check if review exists
-    const review = await db.prepare('SELECT id FROM reviews WHERE id = ?').bind(reviewId).first();
+    // Check if review exists and capture data for audit log
+    const review = await db.prepare(
+      'SELECT id, status, user_id, building_id, review_title, overall_score FROM reviews WHERE id = ?'
+    ).bind(reviewId).first<{ id: string; status: string; user_id: string; building_id: string; review_title: string | null; overall_score: number | null }>();
     if (!review) {
       return new Response(JSON.stringify({ error: 'Review not found' }), {
         status: 404,
@@ -199,14 +201,14 @@ export async function DELETE(context: APIContext): Promise<Response> {
       });
     }
 
-    // Audit log the deletion
+    // Audit log the deletion with forensic data
     await createAuditLog(db, {
       adminUserId: context.locals.user.id,
       adminIp: getClientIP(context),
       actionType: 'review_deleted',
       entityType: 'review',
       entityId: reviewId,
-      oldValue: { deleted: false },
+      oldValue: { status: review.status, userId: review.user_id, buildingId: review.building_id, title: review.review_title, score: review.overall_score },
       newValue: { deleted: true }
     });
 

@@ -240,9 +240,11 @@ export function calculateAggregatedScores(reviews: any[]): {
 
   for (const review of reviews) {
     // Determine review year for recency weighting
-    const reviewYear = review.move_out_year || review.created_at
-      ? new Date((review.created_at || 0) * 1000).getFullYear()
-      : currentYear;
+    const reviewYear = review.move_out_year
+      ? review.move_out_year
+      : review.created_at
+        ? new Date((review.created_at || 0) * 1000).getFullYear()
+        : currentYear;
     const recencyWeight = getRecencyWeight(reviewYear, currentYear);
 
     // Calculate domain scores for this review

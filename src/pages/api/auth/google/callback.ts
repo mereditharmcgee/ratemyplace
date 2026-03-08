@@ -107,6 +107,10 @@ export async function GET(context: APIContext): Promise<Response> {
       ).bind(googleUser.email.toLowerCase()).first<{ id: string; email: string; google_id: string | null }>();
 
       if (user) {
+        // Check if account is already linked to a different Google account
+        if (user.google_id && user.google_id !== googleUser.sub) {
+          return context.redirect('/auth/signin?error=account_conflict');
+        }
         // Link Google account to existing user
         await db.prepare(
           'UPDATE users SET google_id = ?, name = COALESCE(name, ?), avatar_url = COALESCE(avatar_url, ?), email_verified = 1 WHERE id = ?'

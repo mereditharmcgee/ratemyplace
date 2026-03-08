@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
-import { calculateOverallScore, calculateDomainScores, ALL_SCORE_FIELDS } from '../../../lib/scoring';
+import { calculateOverallScore, ALL_SCORE_FIELDS } from '../../../lib/scoring';
 
 export interface ReviewDetail {
   id: string;
@@ -187,9 +187,54 @@ export async function PATCH(context: APIContext): Promise<Response> {
     const body = await context.request.json();
 
     // Collect all 27 survey scores from the request body
+    // Only include fields that are present in the body to avoid wiping scores on partial update
     const scores: Record<string, number | null> = {};
+    let hasAnyScore = false;
     for (const field of ALL_SCORE_FIELDS) {
-      scores[field] = body[field] !== undefined ? (body[field] as number | null) : null;
+      if (body[field] !== undefined) {
+        const val = body[field] as number | null;
+        if (val !== null && (typeof val !== 'number' || val < 1 || val > 5)) {
+          return new Response(JSON.stringify({ error: `Invalid score for ${field}. Must be between 1 and 5.` }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        scores[field] = val;
+        hasAnyScore = true;
+      }
+    }
+
+    // If no scores were provided in the body, fetch existing scores to preserve them
+    if (!hasAnyScore) {
+      const existingReview = await db.prepare(
+        `SELECT ${ALL_SCORE_FIELDS.join(', ')} FROM reviews WHERE id = ?`
+      ).bind(id).first<Record<string, number | null>>();
+      if (existingReview) {
+        for (const field of ALL_SCORE_FIELDS) {
+          scores[field] = existingReview[field] ?? null;
+        }
+      } else {
+        for (const field of ALL_SCORE_FIELDS) {
+          scores[field] = null;
+        }
+      }
+    } else {
+      // Fill in any missing score fields from the existing review
+      const missingFields = ALL_SCORE_FIELDS.filter(f => scores[f] === undefined);
+      if (missingFields.length > 0) {
+        const existingReview = await db.prepare(
+          `SELECT ${missingFields.join(', ')} FROM reviews WHERE id = ?`
+        ).bind(id).first<Record<string, number | null>>();
+        if (existingReview) {
+          for (const field of missingFields) {
+            scores[field] = existingReview[field] ?? null;
+          }
+        } else {
+          for (const field of missingFields) {
+            scores[field] = null;
+          }
+        }
+      }
     }
 
     // Calculate overall score using the proper weighted scoring

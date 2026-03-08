@@ -1,7 +1,7 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
-import { validatePasswordResetToken, deletePasswordResetToken } from '../../../lib/tokens';
 import { hashPassword } from '../../../lib/password';
+import { initializeLucia } from '../../../lib/auth';
 
 export async function POST(context: APIContext): Promise<Response> {
   const runtime = (context.locals as any).runtime;
@@ -35,15 +35,36 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
-    // Validate token
-    const tokenResult = await validatePasswordResetToken(db, token);
+    // Look up the token to get user_id
+    const now = Math.floor(Date.now() / 1000);
+    const tokenRecord = await db
+      .prepare('SELECT user_id, expires_at FROM password_reset_tokens WHERE token = ?')
+      .bind(token)
+      .first<{ user_id: string; expires_at: number }>();
 
-    if (!tokenResult.valid) {
-      const errorMessage = tokenResult.reason === 'expired'
-        ? 'This password reset link has expired. Please request a new one.'
-        : 'Invalid password reset link. Please request a new one.';
+    if (!tokenRecord) {
+      return new Response(JSON.stringify({ error: 'Invalid password reset link. Please request a new one.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
-      return new Response(JSON.stringify({ error: errorMessage }), {
+    if (tokenRecord.expires_at < now) {
+      return new Response(JSON.stringify({ error: 'This password reset link has expired. Please request a new one.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Atomically consume the token — prevents race condition where token is used twice
+    const deleteResult = await db
+      .prepare('DELETE FROM password_reset_tokens WHERE token = ? AND expires_at > ?')
+      .bind(token, now)
+      .run();
+
+    if (!deleteResult.meta.changes || deleteResult.meta.changes === 0) {
+      // Token was already consumed by a concurrent request
+      return new Response(JSON.stringify({ error: 'This reset link has already been used. Please request a new one.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
@@ -55,11 +76,12 @@ export async function POST(context: APIContext): Promise<Response> {
     // Update user's password
     await db
       .prepare('UPDATE users SET hashed_password = ? WHERE id = ?')
-      .bind(passwordHash, tokenResult.userId)
+      .bind(passwordHash, tokenRecord.user_id)
       .run();
 
-    // Delete the token (single-use)
-    await deletePasswordResetToken(db, token);
+    // Invalidate all existing sessions for this user
+    const lucia = initializeLucia(db);
+    await lucia.invalidateUserSessions(tokenRecord.user_id);
 
     return new Response(
       JSON.stringify({

@@ -7,7 +7,7 @@ export interface AuditLogEntry {
   adminUserId: string;
   adminIp: string;
   actionType: string;
-  entityType: 'review' | 'dispute';
+  entityType: 'review' | 'dispute' | 'landlord' | 'building' | 'user';
   entityId: string;
   oldValue?: Record<string, any>;
   newValue?: Record<string, any>;

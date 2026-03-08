@@ -28,8 +28,8 @@ export async function POST(context: APIContext): Promise<Response> {
     });
   }
 
-  if (password.length < 6 || password.length > 255) {
-    return new Response(JSON.stringify({ error: 'Password must be at least 6 characters' }), {
+  if (password.length < 8 || password.length > 255) {
+    return new Response(JSON.stringify({ error: 'Password must be at least 8 characters' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' }
     });

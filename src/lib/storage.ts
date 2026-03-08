@@ -1,4 +1,4 @@
-import type { R2Bucket, R2Object } from '@cloudflare/workers-types';
+import type { R2Bucket, R2ObjectBody } from '@cloudflare/workers-types';
 
 const ALLOWED_TYPES = [
   'image/jpeg',
@@ -87,7 +87,7 @@ export async function uploadVerificationImage(
 export async function getVerificationImage(
   bucket: R2Bucket,
   key: string
-): Promise<R2Object | null> {
+): Promise<R2ObjectBody | null> {
   try {
     return await bucket.get(key);
   } catch (error) {

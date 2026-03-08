@@ -8,7 +8,8 @@ import { getClientIP } from '../../../lib/rateLimit';
  * PATCH /api/disputes/:id
  * Resolve a dispute (admin only)
  */
-export const PATCH: APIRoute = async ({ params, request, locals }) => {
+export const PATCH: APIRoute = async ({ params, request, locals: rawLocals }) => {
+  const locals = rawLocals as any;
   try {
     const disputeId = params.id;
 
@@ -63,6 +64,14 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
       return new Response(
         JSON.stringify({ error: 'Dispute not found' }),
         { status: 404, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Prevent re-resolving an already-resolved dispute
+    if (dispute.status === 'resolved') {
+      return new Response(
+        JSON.stringify({ error: 'Dispute has already been resolved' }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } }
       );
     }
 

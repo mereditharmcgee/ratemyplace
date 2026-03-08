@@ -103,11 +103,23 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
+    // Truncate address to prevent excessively long values
+    const safeAddress = streetAddress.slice(0, 500);
+
     // Generate slug from address
-    const slug = streetAddress
+    let slug = safeAddress
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '') + '-' + city.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+    // Check for slug collision and append suffix if needed
+    const existingSlug = await db.prepare(
+      'SELECT id FROM buildings WHERE slug = ?'
+    ).bind(slug).first();
+
+    if (existingSlug) {
+      slug = slug + '-' + Date.now().toString(36);
+    }
 
     const buildingId = generateIdFromEntropySize(10);
 
@@ -118,11 +130,11 @@ export async function POST(context: APIContext): Promise<Response> {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       buildingId,
-      streetAddress,
+      safeAddress,
       slug,
       neighborhood || null,
       city,
-      state || 'MA',
+      state || null,
       zipCode || null,
       latitude || null,
       longitude || null,

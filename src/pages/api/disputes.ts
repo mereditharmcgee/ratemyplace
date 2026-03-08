@@ -3,9 +3,29 @@ import { getDB } from '../../lib/db';
 import { extractReviewIdFromUrl } from '../../lib/disputes';
 import { sanitizeText } from '../../lib/validation';
 import { sendDisputeConfirmationEmail } from '../../lib/email';
+import { checkRateLimit, getClientIP } from '../../lib/rateLimit';
 
-export const POST: APIRoute = async ({ request, locals }) => {
+export const POST: APIRoute = async ({ request, locals: rawLocals }) => {
+  const locals = rawLocals as any;
   try {
+    const db = getDB(locals.runtime);
+
+    // Rate limiting: 3 dispute submissions per hour per IP
+    const clientIP = getClientIP({ request });
+    const rateLimit = await checkRateLimit(db, clientIP, 'dispute', 3, 3600);
+
+    if (!rateLimit.allowed) {
+      const status = rateLimit.error ? 503 : 429;
+      const message = rateLimit.error
+        ? 'Service temporarily unavailable. Please try again in a few minutes.'
+        : 'Too many dispute submissions. Please try again later.';
+
+      return new Response(
+        JSON.stringify({ error: message }),
+        { status, headers: { 'Content-Type': 'application/json', 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+      );
+    }
+
     const body = await request.json();
     const {
       reviewUrl,
@@ -41,9 +61,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
-
-    // Get database
-    const db = getDB(locals.runtime);
 
     // Verify review exists and get building info
     const review = await db
@@ -148,7 +165,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
  * GET /api/disputes
  * Get all disputes with joined review and building data (admin only)
  */
-export const GET: APIRoute = async ({ locals }) => {
+export const GET: APIRoute = async ({ locals: rawLocals }) => {
+  const locals = rawLocals as any;
   try {
     // Check authentication
     const user = locals.user;

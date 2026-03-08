@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../lib/db';
-import { calculateOverallScore, calculateDomainScores, ALL_SCORE_FIELDS } from '../../lib/scoring';
+import { calculateDomainScores, ALL_SCORE_FIELDS } from '../../lib/scoring';
 import { generateIdFromEntropySize } from 'lucia';
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -46,11 +46,22 @@ export async function POST(context: APIContext): Promise<Response> {
     const laundryCostPerLoad = formData.get('laundry_cost_per_load') ? parseFloat(formData.get('laundry_cost_per_load') as string) : null;
     const estimatedMonthlyUtilities = formData.get('estimated_monthly_utilities') ? parseInt(formData.get('estimated_monthly_utilities') as string) : null;
 
-    // Collect all 27 survey scores
+    // Collect all 27 survey scores with validation
     const scores: Record<string, number | null> = {};
     for (const field of ALL_SCORE_FIELDS) {
       const value = formData.get(field);
-      scores[field] = value ? parseInt(value as string) : null;
+      if (value) {
+        const parsed = parseInt(value as string);
+        if (isNaN(parsed) || parsed < 1 || parsed > 5) {
+          return new Response(JSON.stringify({ error: `Invalid score for ${field}. Must be between 1 and 5.` }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        scores[field] = parsed;
+      } else {
+        scores[field] = null;
+      }
     }
 
     // Calculate domain scores and overall
