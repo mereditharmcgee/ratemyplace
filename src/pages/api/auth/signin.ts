@@ -64,10 +64,18 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const result = await db.prepare(
       'SELECT id, hashed_password FROM users WHERE email = ?'
-    ).bind(email.toLowerCase()).first<{ id: string; hashed_password: string }>();
+    ).bind(email.toLowerCase()).first<{ id: string; hashed_password: string | null }>();
 
     if (!result) {
       return new Response(JSON.stringify({ error: 'Invalid email or password' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // OAuth-only users have no password — they must sign in via Google
+    if (!result.hashed_password) {
+      return new Response(JSON.stringify({ error: 'This account uses Google sign-in. Please sign in with Google.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
