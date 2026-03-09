@@ -6,7 +6,9 @@ interface Review {
   user_email: string;
   building_id: string;
   building_address: string;
+  building_slug: string;
   building_city: string;
+  landlord_name: string | null;
   review_title: string;
   review_text: string;
   comments: string;
@@ -277,6 +279,12 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                         <dt className="text-gray-500">City:</dt>
                         <dd className="text-gray-900">{review.building_city || 'N/A'}</dd>
                       </div>
+                      {review.landlord_name && (
+                        <div className="flex justify-between">
+                          <dt className="text-gray-500">Landlord:</dt>
+                          <dd className="text-gray-900">{review.landlord_name}</dd>
+                        </div>
+                      )}
                     </dl>
                   </div>
                   <div>
@@ -351,7 +359,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                     Edit Review
                   </a>
                   <a
-                    href={`/building/${review.building_id}`}
+                    href={`/building/${review.building_slug}`}
                     className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-sm font-medium"
                     onClick={(e) => e.stopPropagation()}
                   >

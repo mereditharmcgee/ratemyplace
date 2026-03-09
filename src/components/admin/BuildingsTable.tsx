@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react';
 
+interface LandlordOption {
+  id: string;
+  name: string;
+}
+
 interface Building {
   id: string;
   address: string;
@@ -38,9 +43,13 @@ export default function BuildingsTable() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [cleaning, setCleaning] = useState(false);
+  const [landlords, setLandlords] = useState<LandlordOption[]>([]);
+  const [managers, setManagers] = useState<LandlordOption[]>([]);
 
   useEffect(() => {
     fetchBuildings();
+    fetchLandlords();
+    fetchManagers();
   }, []);
 
   const fetchBuildings = async () => {
@@ -61,6 +70,22 @@ export default function BuildingsTable() {
     }
   };
 
+  const fetchLandlords = async () => {
+    try {
+      const response = await fetch('/api/admin/landlords');
+      const data = await response.json();
+      if (response.ok) setLandlords(data.landlords);
+    } catch {}
+  };
+
+  const fetchManagers = async () => {
+    try {
+      const response = await fetch('/api/admin/managers');
+      const data = await response.json();
+      if (response.ok) setManagers(data.managers);
+    } catch {}
+  };
+
   const startEditing = (building: Building) => {
     setEditingBuilding(building.id);
     setEditForm({
@@ -72,6 +97,8 @@ export default function BuildingsTable() {
       year_built: building.year_built,
       unit_count: building.unit_count,
       building_type: building.building_type || '',
+      landlord_id: building.landlord_id || '',
+      property_manager_id: building.property_manager_id || '',
       admin_notes: building.admin_notes || '',
       owner_name: building.owner_name || '',
       owner_entity: building.owner_entity || '',
@@ -94,9 +121,17 @@ export default function BuildingsTable() {
       });
 
       if (response.ok) {
+        // Resolve landlord/PM names for the updated local state
+        const landlordMatch = landlords.find((l) => l.id === editForm.landlord_id);
+        const managerMatch = managers.find((m) => m.id === editForm.property_manager_id);
         setBuildings((prev) =>
           prev.map((b) =>
-            b.id === buildingId ? { ...b, ...editForm } : b
+            b.id === buildingId ? {
+              ...b,
+              ...editForm,
+              landlord_name: landlordMatch?.name || null,
+              property_manager_name: managerMatch?.name || null,
+            } : b
           )
         );
         setEditingBuilding(null);
@@ -426,6 +461,43 @@ export default function BuildingsTable() {
                           }
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
                         />
+                      </div>
+                    </div>
+
+                    {/* Landlord & Property Manager */}
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">Landlord & Property Manager</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Landlord
+                          </label>
+                          <select
+                            value={editForm.landlord_id || ''}
+                            onChange={(e) => setEditForm({ ...editForm, landlord_id: e.target.value || null })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          >
+                            <option value="">None</option>
+                            {landlords.map((l) => (
+                              <option key={l.id} value={l.id}>{l.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Property Manager
+                          </label>
+                          <select
+                            value={editForm.property_manager_id || ''}
+                            onChange={(e) => setEditForm({ ...editForm, property_manager_id: e.target.value || null })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          >
+                            <option value="">None</option>
+                            {managers.map((m) => (
+                              <option key={m.id} value={m.id}>{m.name}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </div>
 
