@@ -49,7 +49,7 @@ export async function GET(context: APIContext): Promise<Response> {
 
     if (data.error) {
       console.error('Places API error:', JSON.stringify(data.error));
-      return new Response(JSON.stringify({ error: 'Places API error', googleError: data.error, predictions: [] }), {
+      return new Response(JSON.stringify({ error: 'Places API error', predictions: [] }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       });
