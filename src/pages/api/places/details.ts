@@ -11,7 +11,7 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   const runtime = (context.locals as any).runtime;
-  const apiKey = runtime?.env?.GOOGLE_MAPS_API_KEY;
+  const apiKey = runtime?.env?.GOOGLE_PLACES_API_KEY || runtime?.env?.GOOGLE_MAPS_API_KEY;
 
   if (!apiKey) {
     console.error('GOOGLE_MAPS_API_KEY not configured');
@@ -29,6 +29,7 @@ export async function GET(context: APIContext): Promise<Response> {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': apiKey,
           'X-Goog-FieldMask': 'id,formattedAddress,addressComponents,location,displayName',
+          'Referer': 'https://ratemyplace.org/',
         },
       }
     );
