@@ -30,6 +30,8 @@ export async function GET(context: APIContext): Promise<Response> {
         b.address as building_address,
         b.slug as building_slug,
         b.city as building_city,
+        b.landlord_id as building_landlord_id,
+        l.name as building_landlord_name,
         r.landlord_name,
         r.review_title,
         r.review_text,
@@ -47,6 +49,7 @@ export async function GET(context: APIContext): Promise<Response> {
       FROM reviews r
       JOIN users u ON r.user_id = u.id
       JOIN buildings b ON r.building_id = b.id
+      LEFT JOIN landlords l ON b.landlord_id = l.id
       ORDER BY r.created_at DESC
     `).all();
 

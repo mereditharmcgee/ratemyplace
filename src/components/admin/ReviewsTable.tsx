@@ -8,6 +8,8 @@ interface Review {
   building_address: string;
   building_slug: string;
   building_city: string;
+  building_landlord_id: string | null;
+  building_landlord_name: string | null;
   landlord_name: string | null;
   review_title: string;
   review_text: string;
@@ -24,6 +26,11 @@ interface Review {
   would_recommend_new: string | null;
 }
 
+interface LandlordOption {
+  id: string;
+  name: string;
+}
+
 interface Props {
   initialStatus?: string;
 }
@@ -37,8 +44,17 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
   const [processing, setProcessing] = useState<string | null>(null);
   const [expandedReview, setExpandedReview] = useState<string | null>(null);
 
+  // Landlord linking state
+  const [landlords, setLandlords] = useState<LandlordOption[]>([]);
+  const [linkingReview, setLinkingReview] = useState<string | null>(null);
+  const [linkMode, setLinkMode] = useState<'select' | 'create'>('select');
+  const [selectedLandlordId, setSelectedLandlordId] = useState('');
+  const [newLandlordName, setNewLandlordName] = useState('');
+  const [linkProcessing, setLinkProcessing] = useState(false);
+
   useEffect(() => {
     fetchReviews();
+    fetchLandlords();
   }, []);
 
   const fetchReviews = async () => {
@@ -57,6 +73,14 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchLandlords = async () => {
+    try {
+      const response = await fetch('/api/admin/landlords');
+      const data = await response.json();
+      if (response.ok) setLandlords(data.landlords);
+    } catch {}
   };
 
   const updateStatus = async (reviewId: string, newStatus: string) => {
@@ -82,6 +106,97 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
       alert('Failed to update review');
     } finally {
       setProcessing(null);
+    }
+  };
+
+  const linkLandlord = async (review: Review) => {
+    setLinkProcessing(true);
+    try {
+      let landlordId = selectedLandlordId;
+
+      // Create new landlord if needed
+      if (linkMode === 'create') {
+        const name = newLandlordName.trim();
+        if (!name) {
+          alert('Landlord name is required');
+          setLinkProcessing(false);
+          return;
+        }
+        const createRes = await fetch('/api/admin/landlords', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        const createData = await createRes.json();
+        if (!createRes.ok) {
+          alert(createData.error || 'Failed to create landlord');
+          setLinkProcessing(false);
+          return;
+        }
+        landlordId = createData.landlord.id;
+        // Refresh landlord list
+        fetchLandlords();
+      }
+
+      if (!landlordId) {
+        alert('Please select a landlord');
+        setLinkProcessing(false);
+        return;
+      }
+
+      // Assign landlord to the building
+      const res = await fetch(`/api/admin/buildings/${review.building_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ landlord_id: landlordId }),
+      });
+
+      if (res.ok) {
+        const landlordName = linkMode === 'create'
+          ? newLandlordName.trim()
+          : landlords.find((l) => l.id === landlordId)?.name || '';
+
+        // Update local state for all reviews with this building
+        setReviews((prev) =>
+          prev.map((r) =>
+            r.building_id === review.building_id
+              ? { ...r, building_landlord_id: landlordId, building_landlord_name: landlordName }
+              : r
+          )
+        );
+        setLinkingReview(null);
+        resetLinkForm();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to link landlord');
+      }
+    } catch {
+      alert('Failed to link landlord');
+    } finally {
+      setLinkProcessing(false);
+    }
+  };
+
+  const resetLinkForm = () => {
+    setLinkMode('select');
+    setSelectedLandlordId('');
+    setNewLandlordName('');
+  };
+
+  const startLinking = (reviewId: string, tenantLandlordName: string | null) => {
+    setLinkingReview(reviewId);
+    resetLinkForm();
+    // Pre-fill the new landlord name from what the tenant wrote
+    if (tenantLandlordName) {
+      setNewLandlordName(tenantLandlordName);
+      // Try to find a fuzzy match in existing landlords
+      const match = landlords.find((l) =>
+        l.name.toLowerCase() === tenantLandlordName.toLowerCase()
+      );
+      if (match) {
+        setLinkMode('select');
+        setSelectedLandlordId(match.id);
+      }
     }
   };
 
@@ -118,7 +233,8 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
     const matchesSearch =
       review.building_address.toLowerCase().includes(search.toLowerCase()) ||
       review.user_email.toLowerCase().includes(search.toLowerCase()) ||
-      (review.review_title?.toLowerCase().includes(search.toLowerCase()) ?? false);
+      (review.review_title?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+      (review.landlord_name?.toLowerCase().includes(search.toLowerCase()) ?? false);
     const matchesStatus = statusFilter === 'all' || review.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -154,7 +270,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
         <div className="flex-1">
           <input
             type="text"
-            placeholder="Search by address, email, or title..."
+            placeholder="Search by address, email, title, or landlord..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
@@ -211,6 +327,12 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                     <p className="text-sm text-gray-700 mt-1 truncate">
                       "{review.review_title}"
                     </p>
+                  )}
+                  {/* Landlord status indicator on header */}
+                  {review.landlord_name && !review.building_landlord_id && (
+                    <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 rounded-full">
+                      Landlord needs linking
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
@@ -279,12 +401,6 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                         <dt className="text-gray-500">City:</dt>
                         <dd className="text-gray-900">{review.building_city || 'N/A'}</dd>
                       </div>
-                      {review.landlord_name && (
-                        <div className="flex justify-between">
-                          <dt className="text-gray-500">Landlord:</dt>
-                          <dd className="text-gray-900">{review.landlord_name}</dd>
-                        </div>
-                      )}
                     </dl>
                   </div>
                   <div>
@@ -300,6 +416,110 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                     )}
                   </div>
                 </div>
+
+                {/* Landlord Linking Section */}
+                {review.landlord_name && (
+                  <div className="mb-4 p-3 rounded-lg border border-purple-200 bg-purple-50">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-medium text-purple-800">Tenant named landlord</h4>
+                        <p className="text-sm text-purple-900 font-semibold mt-0.5">"{review.landlord_name}"</p>
+                        <p className="text-xs text-purple-600 mt-0.5">for {review.building_address}</p>
+                      </div>
+                      {review.building_landlord_id ? (
+                        <div className="text-right shrink-0">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            Linked to: {review.building_landlord_name}
+                          </span>
+                        </div>
+                      ) : linkingReview === review.id ? null : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startLinking(review.id, review.landlord_name);
+                          }}
+                          className="shrink-0 px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
+                        >
+                          Link Landlord
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Inline linking form */}
+                    {linkingReview === review.id && (
+                      <div className="mt-3 pt-3 border-t border-purple-200 space-y-3" onClick={(e) => e.stopPropagation()}>
+                        {/* Mode toggle */}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setLinkMode('select')}
+                            className={`px-3 py-1 rounded text-sm font-medium ${
+                              linkMode === 'select'
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                            }`}
+                          >
+                            Choose Existing
+                          </button>
+                          <button
+                            onClick={() => setLinkMode('create')}
+                            className={`px-3 py-1 rounded text-sm font-medium ${
+                              linkMode === 'create'
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                            }`}
+                          >
+                            Create New
+                          </button>
+                        </div>
+
+                        {linkMode === 'select' ? (
+                          <div>
+                            <select
+                              value={selectedLandlordId}
+                              onChange={(e) => setSelectedLandlordId(e.target.value)}
+                              className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+                            >
+                              <option value="">Select a landlord...</option>
+                              {landlords.map((l) => (
+                                <option key={l.id} value={l.id}>{l.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <div>
+                            <input
+                              type="text"
+                              value={newLandlordName}
+                              onChange={(e) => setNewLandlordName(e.target.value)}
+                              placeholder="New landlord name"
+                              className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+                            />
+                            <p className="text-xs text-purple-600 mt-1">This will create a new landlord and assign them to this building.</p>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => linkLandlord(review)}
+                            disabled={linkProcessing}
+                            className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm font-medium"
+                          >
+                            {linkProcessing ? 'Linking...' : linkMode === 'create' ? 'Create & Link' : 'Link to Building'}
+                          </button>
+                          <button
+                            onClick={() => { setLinkingReview(null); resetLinkForm(); }}
+                            className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-200">
