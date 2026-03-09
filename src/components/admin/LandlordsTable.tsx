@@ -24,6 +24,9 @@ export default function LandlordsTable() {
   const [editForm, setEditForm] = useState<Partial<Landlord>>({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addForm, setAddForm] = useState({ name: '', email: '', phone: '', website: '', description: '' });
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     fetchLandlords();
@@ -119,6 +122,33 @@ export default function LandlordsTable() {
     }
   };
 
+  const addLandlord = async () => {
+    if (!addForm.name.trim()) {
+      alert('Name is required');
+      return;
+    }
+    setAdding(true);
+    try {
+      const response = await fetch('/api/admin/landlords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(addForm),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setShowAddForm(false);
+        setAddForm({ name: '', email: '', phone: '', website: '', description: '' });
+        fetchLandlords();
+      } else {
+        alert(data.error || 'Failed to create landlord');
+      }
+    } catch {
+      alert('Failed to create landlord');
+    } finally {
+      setAdding(false);
+    }
+  };
+
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
       month: 'short',
@@ -176,7 +206,84 @@ export default function LandlordsTable() {
         >
           Refresh
         </button>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+        >
+          + Add Landlord
+        </button>
       </div>
+
+      {/* Add Landlord Form */}
+      {showAddForm && (
+        <div className="bg-white rounded-xl shadow-sm border border-teal-200 p-4 space-y-4">
+          <h3 className="font-semibold text-gray-900">Add New Landlord</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+              <input
+                type="text"
+                value={addForm.name}
+                onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                placeholder="e.g. Samia Management"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                value={addForm.email}
+                onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <input
+                type="tel"
+                value={addForm.phone}
+                onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+              <input
+                type="url"
+                value={addForm.website}
+                onChange={(e) => setAddForm({ ...addForm, website: e.target.value })}
+                placeholder="https://..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                value={addForm.description}
+                onChange={(e) => setAddForm({ ...addForm, description: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={addLandlord}
+              disabled={adding}
+              className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+            >
+              {adding ? 'Creating...' : 'Create Landlord'}
+            </button>
+            <button
+              onClick={() => setShowAddForm(false)}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
