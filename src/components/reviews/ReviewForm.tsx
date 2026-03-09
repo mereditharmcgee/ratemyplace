@@ -54,6 +54,8 @@ export default function ReviewForm({ building }: Props) {
 
   // Review
   const [review, setReview] = useState<ReviewData>({
+    reviewTitle: '',
+    landlordName: '',
     wouldRecommend: 'yes',
     comments: '',
     hadPestIssues: false,
@@ -174,7 +176,14 @@ export default function ReviewForm({ building }: Props) {
         }
       }
 
+      // Laundry and utilities
+      if (unitDetails.laundryType) formData.append('laundry_type', unitDetails.laundryType);
+      if (unitDetails.laundryCostPerLoad) formData.append('laundry_cost_per_load', unitDetails.laundryCostPerLoad);
+      if (unitDetails.estimatedMonthlyUtilities) formData.append('estimated_monthly_utilities', unitDetails.estimatedMonthlyUtilities);
+
       // Review
+      if (review.reviewTitle) formData.append('review_title', review.reviewTitle);
+      if (review.landlordName) formData.append('landlord_name', review.landlordName);
       formData.append('would_recommend', review.wouldRecommend);
       if (review.comments) formData.append('comments', review.comments);
 

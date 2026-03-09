@@ -43,6 +43,8 @@ export interface Tenancy {
 }
 
 export interface ReviewData {
+  reviewTitle: string;
+  landlordName: string;
   wouldRecommend: string;
   comments: string;
   hadPestIssues: boolean;

@@ -34,6 +34,7 @@ export default function ReviewEditForm({ review }: Props) {
   const [squareFootage, setSquareFootage] = useState((review as any).square_footage?.toString() || '');
   const [rentAmount, setRentAmount] = useState(review.rent_amount?.toString() || '');
   const [reviewTitle, setReviewTitle] = useState(review.review_title || '');
+  const [landlordName, setLandlordName] = useState((review as any).landlord_name || '');
   const [reviewText, setReviewText] = useState(review.review_text || review.comments || '');
 
   // Would recommend - support new text format with fallback to legacy boolean
@@ -115,6 +116,7 @@ export default function ReviewEditForm({ review }: Props) {
           tenure_months: tenureMonths,
           move_out_year_new: moveOutYear,
           review_title: reviewTitle || null,
+          landlord_name: landlordName || null,
           review_text: reviewText || null,
           comments: reviewText || null,
           would_recommend_new: wouldRecommend,
@@ -480,6 +482,22 @@ export default function ReviewEditForm({ review }: Props) {
             Think about your landlord or property management.
           </p>
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Who was your landlord or property manager? <span className="text-gray-400">(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={landlordName}
+            onChange={(e) => setLandlordName(e.target.value)}
+            placeholder="e.g. Samia Management, John Smith"
+            maxLength={200}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          />
+          <p className="text-sm text-gray-500 mt-1">This helps us link reviews to the right landlord. It won't be shown publicly on your review.</p>
+        </div>
+
         {renderRatingScale()}
         <div className="space-y-2">{landlordItems.map(renderRatingItem)}</div>
       </div>

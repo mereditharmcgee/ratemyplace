@@ -69,6 +69,8 @@ export async function POST(context: APIContext): Promise<Response> {
     const overallScore = domainScores.overall ?? 0;
 
     // Additional info
+    const reviewTitle = formData.get('review_title') as string || null;
+    const landlordName = formData.get('landlord_name') as string || null;
     const wouldRecommendNew = formData.get('would_recommend') as string || null;
     const comments = formData.get('comments') as string || null;
 
@@ -112,7 +114,7 @@ export async function POST(context: APIContext): Promise<Response> {
         landlord_lease_clarity, landlord_privacy, landlord_deposit,
         landlord_rent_practices, landlord_non_retaliation,
         overall_score,
-        would_recommend_new, comments,
+        review_title, landlord_name, would_recommend_new, comments,
         had_pest_issues, had_heat_issues, had_water_issues,
         had_security_deposit_issues, had_eviction_threat,
         status,
@@ -132,7 +134,7 @@ export async function POST(context: APIContext): Promise<Response> {
         ?, ?, ?,
         ?, ?,
         ?,
-        ?, ?,
+        ?, ?, ?, ?,
         ?, ?, ?,
         ?, ?,
         ?,
@@ -188,6 +190,8 @@ export async function POST(context: APIContext): Promise<Response> {
       scores.landlord_non_retaliation,
       // Overall
       overallScore,
+      reviewTitle,
+      landlordName,
       wouldRecommendNew,
       comments,
       hadPestIssues,

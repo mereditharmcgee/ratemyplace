@@ -56,6 +56,21 @@ export default function AdditionalStep({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
+          Who was your landlord or property manager? <span className="text-gray-400">(optional)</span>
+        </label>
+        <input
+          type="text"
+          value={review.landlordName}
+          onChange={(e) => onReviewChange({ ...review, landlordName: e.target.value })}
+          placeholder="e.g. Samia Management, John Smith"
+          maxLength={200}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        />
+        <p className="text-sm text-gray-500 mt-1">This helps us link reviews to the right landlord. It won't be shown publicly on your review.</p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
           {supplementaryItems.wouldRecommend.text}
         </label>
         <div className="flex gap-4">
@@ -96,6 +111,21 @@ export default function AdditionalStep({
             </label>
           ))}
         </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Review Title <span className="text-gray-400">(optional)</span>
+        </label>
+        <input
+          type="text"
+          value={review.reviewTitle}
+          onChange={(e) => onReviewChange({ ...review, reviewTitle: e.target.value })}
+          placeholder="Summarize your experience in a few words"
+          maxLength={100}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        />
+        <p className="text-sm text-gray-500 mt-1">{review.reviewTitle.length}/100 characters</p>
       </div>
 
       <div>
