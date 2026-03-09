@@ -14,47 +14,58 @@ export async function GET(context: APIContext): Promise<Response> {
   const apiKey = runtime?.env?.GOOGLE_MAPS_API_KEY;
 
   if (!apiKey) {
-    console.error('GOOGLE_MAPS_API_KEY not configured. runtime keys:', runtime ? Object.keys(runtime) : 'no runtime', 'env keys:', runtime?.env ? Object.keys(runtime.env) : 'no env');
-    return new Response(JSON.stringify({ error: 'Maps API not configured', debug: { hasRuntime: !!runtime, hasEnv: !!runtime?.env, envKeys: runtime?.env ? Object.keys(runtime.env) : [] } }), {
+    console.error('GOOGLE_MAPS_API_KEY not configured');
+    return new Response(JSON.stringify({ error: 'Maps API not configured', predictions: [] }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
   }
 
   try {
-    // Use Google Places Autocomplete API
-    const params = new URLSearchParams({
+    // Use Places API (New) - Autocomplete
+    const body: Record<string, any> = {
       input,
-      key: apiKey,
-      types: 'address',
-      components: 'country:us',
-    });
+      includedPrimaryTypes: ['street_address', 'subpremise', 'premise'],
+      includedRegionCodes: ['us'],
+    };
 
     if (sessionToken) {
-      params.append('sessiontoken', sessionToken);
+      body.sessionToken = sessionToken;
     }
 
     const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/autocomplete/json?${params}`
+      'https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+        },
+        body: JSON.stringify(body),
+      }
     );
 
     const data = await response.json();
 
-    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-      console.error('Places API error:', data.status, data.error_message);
-      return new Response(JSON.stringify({ error: 'Places API error', status: data.status, message: data.error_message, predictions: [] }), {
+    if (data.error) {
+      console.error('Places API error:', data.error.status, data.error.message);
+      return new Response(JSON.stringify({ error: 'Places API error', predictions: [] }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    // Return simplified predictions
-    const predictions = (data.predictions || []).map((p: any) => ({
-      placeId: p.place_id,
-      description: p.description,
-      mainText: p.structured_formatting?.main_text || '',
-      secondaryText: p.structured_formatting?.secondary_text || '',
-    }));
+    // Map new API response to our expected format
+    const predictions = (data.suggestions || [])
+      .filter((s: any) => s.placePrediction)
+      .map((s: any) => {
+        const p = s.placePrediction;
+        return {
+          placeId: p.placeId,
+          description: p.text?.text || '',
+          mainText: p.structuredFormat?.mainText?.text || '',
+          secondaryText: p.structuredFormat?.secondaryText?.text || '',
+        };
+      });
 
     return new Response(JSON.stringify({ predictions }), {
       headers: { 'Content-Type': 'application/json' }

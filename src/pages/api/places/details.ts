@@ -2,7 +2,6 @@ import type { APIContext } from 'astro';
 
 export async function GET(context: APIContext): Promise<Response> {
   const placeId = context.url.searchParams.get('placeId') || '';
-  const sessionToken = context.url.searchParams.get('sessionToken') || '';
 
   if (!placeId) {
     return new Response(JSON.stringify({ error: 'placeId required' }), {
@@ -23,42 +22,38 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
-    const params = new URLSearchParams({
-      place_id: placeId,
-      key: apiKey,
-      fields: 'place_id,formatted_address,address_components,geometry,name',
-    });
-
-    if (sessionToken) {
-      params.append('sessiontoken', sessionToken);
-    }
-
+    // Use Places API (New) - Place Details
     const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/details/json?${params}`
+      `https://places.googleapis.com/v1/places/${placeId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'id,formattedAddress,addressComponents,location,displayName',
+        },
+      }
     );
 
     const data = await response.json();
 
-    if (data.status !== 'OK') {
-      console.error('Place Details API error:', data.status, data.error_message);
+    if (data.error) {
+      console.error('Place Details API error:', data.error.status, data.error.message);
       return new Response(JSON.stringify({ error: 'Place details error' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    const result = data.result;
-    const components = result.address_components || [];
+    const components = data.addressComponents || [];
 
-    // Extract address components
+    // Extract address components from new API format
     const getComponent = (type: string): string => {
       const comp = components.find((c: any) => c.types.includes(type));
-      return comp?.long_name || '';
+      return comp?.longText || '';
     };
 
     const getComponentShort = (type: string): string => {
       const comp = components.find((c: any) => c.types.includes(type));
-      return comp?.short_name || '';
+      return comp?.shortText || '';
     };
 
     // Build street address
@@ -67,15 +62,15 @@ export async function GET(context: APIContext): Promise<Response> {
     const streetAddress = streetNumber ? `${streetNumber} ${streetName}` : streetName;
 
     const place = {
-      placeId: result.place_id,
-      formattedAddress: result.formatted_address,
+      placeId: data.id,
+      formattedAddress: data.formattedAddress,
       streetAddress,
       neighborhood: getComponent('neighborhood') || getComponent('sublocality_level_1'),
       city: getComponent('locality') || getComponent('sublocality'),
       state: getComponentShort('administrative_area_level_1'),
       zipCode: getComponent('postal_code'),
-      latitude: result.geometry?.location?.lat,
-      longitude: result.geometry?.location?.lng,
+      latitude: data.location?.latitude,
+      longitude: data.location?.longitude,
     };
 
     return new Response(JSON.stringify({ place }), {
