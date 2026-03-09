@@ -47,8 +47,8 @@ export async function GET(context: APIContext): Promise<Response> {
     const data = await response.json();
 
     if (data.error) {
-      console.error('Places API error:', data.error.status, data.error.message);
-      return new Response(JSON.stringify({ error: 'Places API error', predictions: [] }), {
+      console.error('Places API error:', JSON.stringify(data.error));
+      return new Response(JSON.stringify({ error: 'Places API error', googleError: data.error, predictions: [] }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       });
