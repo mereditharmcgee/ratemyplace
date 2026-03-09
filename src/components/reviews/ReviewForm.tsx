@@ -56,6 +56,8 @@ export default function ReviewForm({ building }: Props) {
   const [review, setReview] = useState<ReviewData>({
     reviewTitle: '',
     landlordName: '',
+    hasSeparateManager: false,
+    propertyManagerName: '',
     wouldRecommend: 'yes',
     comments: '',
     hadPestIssues: false,
@@ -184,6 +186,9 @@ export default function ReviewForm({ building }: Props) {
       // Review
       if (review.reviewTitle) formData.append('review_title', review.reviewTitle);
       if (review.landlordName) formData.append('landlord_name', review.landlordName);
+      if (review.hasSeparateManager && review.propertyManagerName) {
+        formData.append('property_manager_name', review.propertyManagerName);
+      }
       formData.append('would_recommend', review.wouldRecommend);
       if (review.comments) formData.append('comments', review.comments);
 

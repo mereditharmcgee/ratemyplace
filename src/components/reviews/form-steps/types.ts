@@ -45,6 +45,8 @@ export interface Tenancy {
 export interface ReviewData {
   reviewTitle: string;
   landlordName: string;
+  hasSeparateManager: boolean;
+  propertyManagerName: string;
   wouldRecommend: string;
   comments: string;
   hadPestIssues: boolean;
