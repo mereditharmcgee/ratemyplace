@@ -45,6 +45,8 @@ export default function BuildingsTable() {
   const [cleaning, setCleaning] = useState(false);
   const [landlords, setLandlords] = useState<LandlordOption[]>([]);
   const [managers, setManagers] = useState<LandlordOption[]>([]);
+  const [enriching, setEnriching] = useState<string | null>(null);
+  const [enrichResult, setEnrichResult] = useState<any>(null);
 
   useEffect(() => {
     fetchBuildings();
@@ -209,6 +211,37 @@ export default function BuildingsTable() {
     } finally {
       setCleaning(false);
     }
+  };
+
+  const enrichBuilding = async (buildingId: string) => {
+    setEnriching(buildingId);
+    setEnrichResult(null);
+    try {
+      const response = await fetch(`/api/admin/buildings/${buildingId}/enrich`);
+      const data = await response.json();
+      if (response.ok) {
+        setEnrichResult(data);
+      } else {
+        alert(data.error || 'Failed to look up building data');
+      }
+    } catch (err) {
+      alert('Failed to look up building data');
+    } finally {
+      setEnriching(null);
+    }
+  };
+
+  const applyEnrichment = (buildingId: string, result: any) => {
+    startEditing(buildings.find((b) => b.id === buildingId)!);
+    setEditForm((prev) => ({
+      ...prev,
+      year_built: result.yearBuilt || prev.year_built,
+      unit_count: result.unitCount || prev.unit_count,
+      building_type: result.buildingType || prev.building_type,
+      owner_name: result.owner || prev.owner_name,
+      owner_entity: result.ownerEntityInferred || prev.owner_entity,
+    }));
+    setEnrichResult(null);
   };
 
   const formatDate = (timestamp: number) => {
@@ -675,12 +708,82 @@ export default function BuildingsTable() {
                       </div>
                     )}
 
+                    {/* Enrichment Results */}
+                    {enrichResult && enrichResult.results?.length > 0 && expandedBuilding === building.id && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">
+                          Boston Assessing Results
+                          {enrichResult.fuzzyMatch && (
+                            <span className="ml-2 text-xs text-amber-600 font-normal">(fuzzy match)</span>
+                          )}
+                        </h4>
+                        <div className="space-y-2">
+                          {enrichResult.results.map((r: any, i: number) => (
+                            <div key={i} className="bg-white border border-gray-200 rounded-lg p-3 text-sm">
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="font-medium text-gray-900">{r.address}, {r.city}</div>
+                                <button
+                                  onClick={() => applyEnrichment(building.id, r)}
+                                  className="px-3 py-1 bg-teal-600 text-white rounded text-xs font-medium hover:bg-teal-700"
+                                >
+                                  Apply
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-xs">
+                                <div><span className="text-gray-500">Owner:</span> <span className="text-gray-900">{r.owner}</span></div>
+                                <div><span className="text-gray-500">Entity:</span> <span className="text-gray-900 capitalize">{r.ownerEntityInferred}</span></div>
+                                <div><span className="text-gray-500">Year Built:</span> <span className="text-gray-900">{r.yearBuilt || 'N/A'}</span></div>
+                                <div><span className="text-gray-500">Units:</span> <span className="text-gray-900">{r.unitCount || 'N/A'} ({r.residentialUnits || 0} res / {r.commercialUnits || 0} com)</span></div>
+                                <div><span className="text-gray-500">Type:</span> <span className="text-gray-900">{r.buildingType}</span></div>
+                                <div><span className="text-gray-500">Property:</span> <span className="text-gray-900">{r.propertyType}</span></div>
+                                {r.totalValue && <div><span className="text-gray-500">Value:</span> <span className="text-gray-900">${r.totalValue.toLocaleString()}</span></div>}
+                                {r.yearRemodeled && <div><span className="text-gray-500">Remodeled:</span> <span className="text-gray-900">{r.yearRemodeled}</span></div>}
+                                {r.overallCondition && <div><span className="text-gray-500">Condition:</span> <span className="text-gray-900">{r.overallCondition}</span></div>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => setEnrichResult(null)}
+                          className="mt-2 text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Dismiss results
+                        </button>
+                      </div>
+                    )}
+
+                    {enrichResult && enrichResult.results?.length === 0 && expandedBuilding === building.id && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                          No matching records found in Boston Assessing database for "{enrichResult.address}".
+                          {enrichResult.searchedFor && (
+                            <span className="text-xs block mt-1 text-amber-600">
+                              Searched: #{enrichResult.searchedFor.number} {enrichResult.searchedFor.street}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setEnrichResult(null)}
+                          className="mt-2 text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-200">
                       <button
                         onClick={() => startEditing(building)}
                         className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium"
                       >
                         Edit Building
+                      </button>
+                      <button
+                        onClick={() => enrichBuilding(building.id)}
+                        disabled={enriching === building.id}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
+                      >
+                        {enriching === building.id ? 'Researching...' : 'Auto-Research'}
                       </button>
                       <a
                         href={`/building/${building.slug}`}
