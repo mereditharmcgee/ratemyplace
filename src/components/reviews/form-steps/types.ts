@@ -45,6 +45,11 @@ export interface Tenancy {
 export interface ReviewData {
   wouldRecommend: string;
   comments: string;
+  hadPestIssues: boolean;
+  hadHeatIssues: boolean;
+  hadWaterIssues: boolean;
+  hadSecurityDepositIssues: boolean;
+  hadEvictionThreats: boolean;
 }
 
 export type Step = 'address' | 'unit-details' | 'unit-rating' | 'building-rating' | 'landlord-rating' | 'additional' | 'confirm';

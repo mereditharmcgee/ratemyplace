@@ -74,6 +74,31 @@ export default function AdditionalStep({
       </div>
 
       <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Did you experience any of these issues? <span className="text-gray-400">(check all that apply)</span>
+        </label>
+        <div className="space-y-2">
+          {[
+            { key: 'hadPestIssues' as const, label: 'Pest issues (roaches, mice, rats, bedbugs, etc.)' },
+            { key: 'hadHeatIssues' as const, label: 'Heat or hot water issues' },
+            { key: 'hadWaterIssues' as const, label: 'Plumbing or water issues' },
+            { key: 'hadSecurityDepositIssues' as const, label: 'Security deposit problems' },
+            { key: 'hadEvictionThreats' as const, label: 'Eviction threats or retaliation' },
+          ].map((issue) => (
+            <label key={issue.key} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={review[issue.key]}
+                onChange={(e) => onReviewChange({ ...review, [issue.key]: e.target.checked })}
+                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              />
+              <span className="text-sm text-gray-700">{issue.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Additional Comments <span className="text-gray-400">(optional)</span>
         </label>

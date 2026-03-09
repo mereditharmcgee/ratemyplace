@@ -56,6 +56,11 @@ export default function ReviewForm({ building }: Props) {
   const [review, setReview] = useState<ReviewData>({
     wouldRecommend: 'yes',
     comments: '',
+    hadPestIssues: false,
+    hadHeatIssues: false,
+    hadWaterIssues: false,
+    hadSecurityDepositIssues: false,
+    hadEvictionThreats: false,
   });
 
   // Privacy acknowledgment
@@ -172,6 +177,13 @@ export default function ReviewForm({ building }: Props) {
       // Review
       formData.append('would_recommend', review.wouldRecommend);
       if (review.comments) formData.append('comments', review.comments);
+
+      // Issues experienced
+      if (review.hadPestIssues) formData.append('had_pest_issues', '1');
+      if (review.hadHeatIssues) formData.append('had_heat_issues', '1');
+      if (review.hadWaterIssues) formData.append('had_water_issues', '1');
+      if (review.hadSecurityDepositIssues) formData.append('had_security_deposit_issues', '1');
+      if (review.hadEvictionThreats) formData.append('had_eviction_threats', '1');
 
       const response = await fetch('/api/reviews', {
         method: 'POST',

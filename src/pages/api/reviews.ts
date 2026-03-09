@@ -72,6 +72,13 @@ export async function POST(context: APIContext): Promise<Response> {
     const wouldRecommendNew = formData.get('would_recommend') as string || null;
     const comments = formData.get('comments') as string || null;
 
+    // Issues experienced
+    const hadPestIssues = formData.get('had_pest_issues') === '1' ? 1 : 0;
+    const hadHeatIssues = formData.get('had_heat_issues') === '1' ? 1 : 0;
+    const hadWaterIssues = formData.get('had_water_issues') === '1' ? 1 : 0;
+    const hadSecurityDepositIssues = formData.get('had_security_deposit_issues') === '1' ? 1 : 0;
+    const hadEvictionThreat = formData.get('had_eviction_threats') === '1' ? 1 : 0;
+
     const db = getDB((context.locals as any).runtime);
 
     // Verify building exists and get its slug
@@ -106,6 +113,8 @@ export async function POST(context: APIContext): Promise<Response> {
         landlord_rent_practices, landlord_non_retaliation,
         overall_score,
         would_recommend_new, comments,
+        had_pest_issues, had_heat_issues, had_water_issues,
+        had_security_deposit_issues, had_eviction_threat,
         status,
         move_in_year, move_in_season
       ) VALUES (
@@ -123,6 +132,8 @@ export async function POST(context: APIContext): Promise<Response> {
         ?, ?, ?,
         ?, ?,
         ?,
+        ?, ?,
+        ?, ?, ?,
         ?, ?,
         ?,
         ?, ?
@@ -179,6 +190,11 @@ export async function POST(context: APIContext): Promise<Response> {
       overallScore,
       wouldRecommendNew,
       comments,
+      hadPestIssues,
+      hadHeatIssues,
+      hadWaterIssues,
+      hadSecurityDepositIssues,
+      hadEvictionThreat,
       'pending',
       // Legacy fields with defaults
       new Date().getFullYear(),
