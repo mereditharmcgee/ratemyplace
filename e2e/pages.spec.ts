@@ -5,7 +5,7 @@ test.describe('Homepage', () => {
     await page.goto('/');
     await expect(page.locator('h1').first()).toBeVisible();
     // Search form should be present
-    await expect(page.locator('form input[name="q"]').first()).toBeVisible();
+    await expect(page.locator('input[placeholder*="Search by address"]').first()).toBeVisible();
   });
 
   test('has How It Works section', async ({ page }) => {
