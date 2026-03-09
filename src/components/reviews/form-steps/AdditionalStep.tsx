@@ -77,6 +77,11 @@ export default function AdditionalStep({
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Additional Comments <span className="text-gray-400">(optional)</span>
         </label>
+        <p className="text-sm text-gray-500 mb-2">
+          Things you might want to mention: move-in/move-out experience, how maintenance requests were handled,
+          neighborhood pros and cons, parking situation, noise levels at different times, tips for future tenants,
+          or anything the ratings don't capture.
+        </p>
         <textarea
           value={review.comments}
           onChange={(e) => onReviewChange({ ...review, comments: e.target.value })}

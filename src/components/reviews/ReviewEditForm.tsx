@@ -148,7 +148,7 @@ export default function ReviewEditForm({ review }: Props) {
 
   const renderRatingScale = () => (
     <div className="flex justify-between items-center text-xs text-gray-500 mb-4 px-2">
-      <span className="text-coral-600 font-medium">1 = Strongly Disagree</span>
+      <span className="text-red-600 font-medium">1 = Strongly Disagree</span>
       <span className="text-gray-400">3 = Neutral</span>
       <span className="text-emerald-600 font-medium">5 = Strongly Agree</span>
     </div>
@@ -164,7 +164,7 @@ export default function ReviewEditForm({ review }: Props) {
             <div className="flex-1">
               <span className="text-xs text-gray-400 font-mono mr-2">{item.code}</span>
               <span className="font-medium text-gray-900">{item.dimension}</span>
-              {item.required && <span className="text-coral-500 ml-1">*</span>}
+              {item.required && <span className="text-red-500 ml-1">*</span>}
               <HelpTooltip help={item.help} dimension={item.dimension} />
             </div>
           </div>
@@ -180,7 +180,7 @@ export default function ReviewEditForm({ review }: Props) {
               className={`w-10 h-10 rounded-full text-sm font-medium transition-all ${
                 value === rating
                   ? rating <= 2
-                    ? 'bg-coral-500 text-white'
+                    ? 'bg-red-500 text-white'
                     : rating === 3
                       ? 'bg-amber-400 text-slate-900'
                       : 'bg-emerald-500 text-white'

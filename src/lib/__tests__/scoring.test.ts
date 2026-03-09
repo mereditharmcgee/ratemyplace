@@ -279,8 +279,8 @@ describe('calculateAggregatedScores', () => {
       { ...allScores(2), would_recommend_new: 'maybe', move_out_year: 2026 },
     ];
     const result = calculateAggregatedScores(reviews);
-    // 2 yes out of 4 total = 50%
-    expect(result.pctWouldRecommend).toBe(50);
+    // 2 yes out of 3 definitive (maybe excluded) = 67%
+    expect(result.pctWouldRecommend).toBe(67);
   });
 
   it('handles legacy would_recommend boolean', () => {

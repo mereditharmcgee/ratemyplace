@@ -31,6 +31,7 @@ export async function GET(context: APIContext): Promise<Response> {
         b.city as building_city,
         r.review_title,
         r.review_text,
+        r.comments,
         r.overall_score,
         r.status,
         r.is_verified,
@@ -38,7 +39,9 @@ export async function GET(context: APIContext): Promise<Response> {
         r.move_in_year,
         r.move_in_season,
         r.unit_type,
-        r.rent_amount
+        r.unit_number,
+        r.rent_amount,
+        r.would_recommend_new
       FROM reviews r
       JOIN users u ON r.user_id = u.id
       JOIN buildings b ON r.building_id = b.id

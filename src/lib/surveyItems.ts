@@ -444,8 +444,8 @@ export const landlordItems: SurveyItem[] = [
     code: 'L6',
     dimension: 'Security Deposit',
     text: 'The security deposit was handled fairly, with clear accounting and timely return if applicable.',
-    required: true,
-    allowNA: false,
+    required: false,
+    allowNA: true,
     category: 'landlord',
     help: {
       description: 'Consider how the security deposit was handled at move-in and move-out. Was it returned on time with clear documentation of any deductions?',

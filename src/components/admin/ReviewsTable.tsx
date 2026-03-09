@@ -9,6 +9,7 @@ interface Review {
   building_city: string;
   review_title: string;
   review_text: string;
+  comments: string;
   overall_score: number;
   status: 'pending' | 'approved' | 'rejected' | 'flagged';
   is_verified: number;
@@ -16,7 +17,9 @@ interface Review {
   move_in_year: number;
   move_in_season: string;
   unit_type: string;
+  unit_number: string | null;
   rent_amount: number | null;
+  would_recommend_new: string | null;
 }
 
 interface Props {
@@ -252,6 +255,12 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                         <dt className="text-gray-500">Unit Type:</dt>
                         <dd className="text-gray-900">{review.unit_type}</dd>
                       </div>
+                      {review.unit_number && (
+                        <div className="flex justify-between">
+                          <dt className="text-gray-500">Unit #:</dt>
+                          <dd className="text-gray-900">{review.unit_number}</dd>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <dt className="text-gray-500">Move-in:</dt>
                         <dd className="text-gray-900">
@@ -272,9 +281,15 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                   </div>
                   <div>
                     <h4 className="text-sm font-medium text-gray-500 mb-2">Review Text</h4>
-                    <p className="text-sm text-gray-700">
-                      {review.review_text || 'No review text provided.'}
+                    <p className="text-sm text-gray-700 whitespace-pre-line">
+                      {review.review_text || review.comments || 'No review text provided.'}
                     </p>
+                    {review.review_text && review.comments && (
+                      <div className="mt-2">
+                        <h4 className="text-sm font-medium text-gray-500 mb-1">Additional Comments</h4>
+                        <p className="text-sm text-gray-700 whitespace-pre-line">{review.comments}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 

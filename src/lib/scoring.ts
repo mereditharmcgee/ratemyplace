@@ -268,8 +268,9 @@ export function calculateAggregatedScores(reviews: any[]): {
     }
 
     // Would recommend (use new field if available, fall back to old)
+    // "maybe" is excluded from the calculation — only definitive yes/no count
     const wouldRecommend = review.would_recommend_new || review.would_recommend;
-    if (wouldRecommend !== null && wouldRecommend !== undefined) {
+    if (wouldRecommend !== null && wouldRecommend !== undefined && wouldRecommend !== 'maybe') {
       recommendTotal++;
       if (wouldRecommend === 'yes' || wouldRecommend === 1 || wouldRecommend === true) {
         recommendCount++;
