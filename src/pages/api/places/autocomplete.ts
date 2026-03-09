@@ -42,7 +42,7 @@ export async function GET(context: APIContext): Promise<Response> {
 
     if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
       console.error('Places API error:', data.status, data.error_message);
-      return new Response(JSON.stringify({ error: 'Places API error', predictions: [] }), {
+      return new Response(JSON.stringify({ error: 'Places API error', status: data.status, message: data.error_message, predictions: [] }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       });
