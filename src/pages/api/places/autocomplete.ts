@@ -14,8 +14,8 @@ export async function GET(context: APIContext): Promise<Response> {
   const apiKey = runtime?.env?.GOOGLE_MAPS_API_KEY;
 
   if (!apiKey) {
-    console.error('GOOGLE_MAPS_API_KEY not configured');
-    return new Response(JSON.stringify({ error: 'Maps API not configured' }), {
+    console.error('GOOGLE_MAPS_API_KEY not configured. runtime keys:', runtime ? Object.keys(runtime) : 'no runtime', 'env keys:', runtime?.env ? Object.keys(runtime.env) : 'no env');
+    return new Response(JSON.stringify({ error: 'Maps API not configured', debug: { hasRuntime: !!runtime, hasEnv: !!runtime?.env, envKeys: runtime?.env ? Object.keys(runtime.env) : [] } }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
