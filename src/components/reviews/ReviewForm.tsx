@@ -41,6 +41,8 @@ export default function ReviewForm({ building }: Props) {
     laundryType: 'none',
     laundryCostPerLoad: '',
     estimatedMonthlyUtilities: '',
+    parkingType: '',
+    petTypes: [],
   });
 
   // Tenancy info
@@ -61,6 +63,7 @@ export default function ReviewForm({ building }: Props) {
     wouldRecommend: 'yes',
     comments: '',
     hadPestIssues: false,
+    pestTypesExperienced: [],
     hadHeatIssues: false,
     hadWaterIssues: false,
     hadSecurityDepositIssues: false,
@@ -182,6 +185,8 @@ export default function ReviewForm({ building }: Props) {
       if (unitDetails.laundryType) formData.append('laundry_type', unitDetails.laundryType);
       if (unitDetails.laundryCostPerLoad) formData.append('laundry_cost_per_load', unitDetails.laundryCostPerLoad);
       if (unitDetails.estimatedMonthlyUtilities) formData.append('estimated_monthly_utilities', unitDetails.estimatedMonthlyUtilities);
+      if (unitDetails.parkingType) formData.append('parking_type', unitDetails.parkingType);
+      if (unitDetails.petTypes.length > 0) formData.append('pet_types', JSON.stringify(unitDetails.petTypes));
 
       // Review
       if (review.reviewTitle) formData.append('review_title', review.reviewTitle);
@@ -194,6 +199,7 @@ export default function ReviewForm({ building }: Props) {
 
       // Issues experienced
       if (review.hadPestIssues) formData.append('had_pest_issues', '1');
+      if (review.pestTypesExperienced.length > 0) formData.append('pest_types_experienced', JSON.stringify(review.pestTypesExperienced));
       if (review.hadHeatIssues) formData.append('had_heat_issues', '1');
       if (review.hadWaterIssues) formData.append('had_water_issues', '1');
       if (review.hadSecurityDepositIssues) formData.append('had_security_deposit_issues', '1');

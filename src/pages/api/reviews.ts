@@ -46,6 +46,11 @@ export async function POST(context: APIContext): Promise<Response> {
     const laundryCostPerLoad = formData.get('laundry_cost_per_load') ? parseFloat(formData.get('laundry_cost_per_load') as string) : null;
     const estimatedMonthlyUtilities = formData.get('estimated_monthly_utilities') ? parseInt(formData.get('estimated_monthly_utilities') as string) : null;
 
+    // Parking, pets, pest types
+    const parkingType = formData.get('parking_type') as string || null;
+    const petTypes = formData.get('pet_types') as string || null;
+    const pestTypesExperienced = formData.get('pest_types_experienced') as string || null;
+
     // Collect all 27 survey scores with validation
     const scores: Record<string, number | null> = {};
     for (const field of ALL_SCORE_FIELDS) {
@@ -106,6 +111,7 @@ export async function POST(context: APIContext): Promise<Response> {
         unit_type, unit_number, bedrooms, bathrooms, square_footage, rent_amount,
         amenities, utilities_included,
         laundry_type, laundry_cost_per_load, estimated_monthly_utilities,
+        parking_type, pet_types, pest_types_experienced,
         unit_structural, unit_plumbing, unit_electrical, unit_climate, unit_ventilation,
         unit_pests, unit_mold, unit_appliances, unit_layout, unit_accuracy,
         building_common_areas, building_security, building_exterior,
@@ -125,6 +131,7 @@ export async function POST(context: APIContext): Promise<Response> {
         ?, ?, ?,
         ?, ?, ?, ?, ?, ?,
         ?, ?,
+        ?, ?, ?,
         ?, ?, ?,
         ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?,
@@ -159,6 +166,9 @@ export async function POST(context: APIContext): Promise<Response> {
       laundryType,
       laundryCostPerLoad,
       estimatedMonthlyUtilities,
+      parkingType,
+      petTypes,
+      pestTypesExperienced,
       // Unit scores (10)
       scores.unit_structural,
       scores.unit_plumbing,

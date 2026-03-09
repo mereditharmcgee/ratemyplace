@@ -3,6 +3,8 @@ import {
   bathroomOptions,
   amenityOptions,
   utilityOptions,
+  parkingTypeOptions,
+  petTypeOptions,
 } from '../../../lib/formOptions';
 import type { Building, UnitDetails } from './types';
 
@@ -230,6 +232,59 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
             </p>
           </div>
         )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Parking Situation <span className="text-gray-400">(optional)</span>
+        </label>
+        <select
+          value={unitDetails.parkingType}
+          onChange={(e) => onChange({ ...unitDetails, parkingType: e.target.value })}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        >
+          <option value="">Select...</option>
+          {parkingTypeOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Pets Allowed <span className="text-gray-400">(select all that apply)</span>
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {petTypeOptions.map((pet) => (
+            <label
+              key={pet.id}
+              className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                unitDetails.petTypes.includes(pet.id)
+                  ? 'border-teal-500 bg-teal-50'
+                  : 'border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={unitDetails.petTypes.includes(pet.id)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    onChange({ ...unitDetails, petTypes: [...unitDetails.petTypes, pet.id] });
+                  } else {
+                    onChange({
+                      ...unitDetails,
+                      petTypes: unitDetails.petTypes.filter((p) => p !== pet.id),
+                    });
+                  }
+                }}
+                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              />
+              <span className="text-sm text-gray-700">{pet.label}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
       <div className="flex justify-end">

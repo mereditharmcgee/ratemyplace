@@ -108,6 +108,7 @@ function parseJsonArray(value: string | null | undefined): string[] {
 const amenities = parseJsonArray(review.amenities);
 const utilitiesIncluded = parseJsonArray(review.utilities_included);
 const petTypes = parseJsonArray(review.pet_types);
+const pestTypes = parseJsonArray(review.pest_types_experienced);
 
 // Labels for amenities
 const amenityLabels: Record<string, string> = {
@@ -153,6 +154,17 @@ const parkingLabels: Record<string, string> = {
   'available': 'Available (Extra)',
   'street': 'Street Only',
   'none': 'None',
+};
+
+// Labels for pest types
+const pestLabels: Record<string, string> = {
+  'roaches': 'Cockroaches',
+  'mice': 'Mice',
+  'rats': 'Rats',
+  'bedbugs': 'Bedbugs',
+  'ants': 'Ants',
+  'flies': 'Flies/Gnats',
+  'other': 'Other',
 };
 ---
 
@@ -389,8 +401,8 @@ const parkingLabels: Record<string, string> = {
             {review.laundry_type && (
               <span class="text-gray-600">
                 <strong>Laundry:</strong> {laundryLabels[review.laundry_type] || review.laundry_type}
-                {review.laundry_wash_cost && review.laundry_dry_cost && (
-                  <span class="text-gray-500"> (${review.laundry_wash_cost} wash / ${review.laundry_dry_cost} dry)</span>
+                {review.laundry_cost_per_load && (
+                  <span class="text-gray-500"> (${review.laundry_cost_per_load}/load)</span>
                 )}
               </span>
             )}
@@ -422,7 +434,9 @@ const parkingLabels: Record<string, string> = {
     <div class="flex flex-wrap gap-2 mb-4">
       <span class="text-sm text-gray-600 font-medium">Issues reported:</span>
       {(review.had_pest_issues === 1 || review.had_pests === 1) && (
-        <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">Pest Issues</span>
+        <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
+          Pest Issues{pestTypes.length > 0 && `: ${pestTypes.map(p => pestLabels[p] || p).join(', ')}`}
+        </span>
       )}
       {review.had_heat_issues === 1 && (
         <span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">Heat/Hot Water Issues</span>

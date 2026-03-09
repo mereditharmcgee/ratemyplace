@@ -13,6 +13,9 @@ import {
   amenityOptions,
   utilityOptions,
   laundryTypeOptions,
+  parkingTypeOptions,
+  petTypeOptions,
+  pestTypeOptions,
 } from '../../lib/formOptions';
 import { HelpTooltip } from './HelpTooltip';
 import type { ReviewDetail } from '../../pages/api/reviews/[id]';
@@ -56,6 +59,21 @@ export default function ReviewEditForm({ review }: Props) {
   const [utilitiesIncluded, setUtilitiesIncluded] = useState<string[]>(() => {
     try {
       const parsed = typeof review.utilities_included === 'string' ? JSON.parse(review.utilities_included) : review.utilities_included;
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  });
+
+  // Parking & Pets
+  const [parkingType, setParkingType] = useState((review as any).parking_type || '');
+  const [petTypes, setPetTypes] = useState<string[]>(() => {
+    try {
+      const parsed = typeof (review as any).pet_types === 'string' ? JSON.parse((review as any).pet_types) : (review as any).pet_types;
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  });
+  const [pestTypesExperienced, setPestTypesExperienced] = useState<string[]>(() => {
+    try {
+      const parsed = typeof (review as any).pest_types_experienced === 'string' ? JSON.parse((review as any).pest_types_experienced) : (review as any).pest_types_experienced;
       return Array.isArray(parsed) ? parsed : [];
     } catch { return []; }
   });
@@ -115,6 +133,9 @@ export default function ReviewEditForm({ review }: Props) {
           laundry_type: laundryType,
           laundry_cost_per_load: laundryCostPerLoad || null,
           estimated_monthly_utilities: estimatedMonthlyUtilities || null,
+          parking_type: parkingType || null,
+          pet_types: petTypes.length > 0 ? JSON.stringify(petTypes) : null,
+          pest_types_experienced: pestTypesExperienced.length > 0 ? JSON.stringify(pestTypesExperienced) : null,
           tenure_months: tenureMonths,
           move_out_year_new: moveOutYear,
           review_title: reviewTitle || null,
@@ -453,6 +474,51 @@ export default function ReviewEditForm({ review }: Props) {
         </div>
       </div>
 
+      {/* Parking */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Parking Situation <span className="text-gray-400">(optional)</span>
+        </label>
+        <select
+          value={parkingType}
+          onChange={(e) => setParkingType(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        >
+          <option value="">Select...</option>
+          {parkingTypeOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Pets */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Pets Allowed <span className="text-gray-400">(select all that apply)</span>
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {petTypeOptions.map((pet) => (
+            <label
+              key={pet.id}
+              className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                petTypes.includes(pet.id) ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={petTypes.includes(pet.id)}
+                onChange={(e) => {
+                  if (e.target.checked) setPetTypes([...petTypes, pet.id]);
+                  else setPetTypes(petTypes.filter((p) => p !== pet.id));
+                }}
+                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              />
+              <span className="text-sm text-gray-700">{pet.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
       {/* Unit Ratings */}
       <div className="space-y-4">
         <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
@@ -539,8 +605,51 @@ export default function ReviewEditForm({ review }: Props) {
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Issues Experienced</h3>
         <div className="grid grid-cols-2 gap-4">
+          <label
+            className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+              hadPestIssues ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={hadPestIssues}
+              onChange={(e) => {
+                setHadPestIssues(e.target.checked);
+                if (!e.target.checked) setPestTypesExperienced([]);
+              }}
+              className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+            />
+            <span className="text-sm text-gray-700">Pest issues</span>
+          </label>
+          {hadPestIssues && (
+            <div className="col-span-2">
+              <p className="text-xs text-gray-500 mb-2">What pests did you encounter?</p>
+              <div className="flex flex-wrap gap-2">
+                {pestTypeOptions.map((pest) => (
+                  <label
+                    key={pest.id}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-full cursor-pointer text-xs transition-colors ${
+                      pestTypesExperienced.includes(pest.id)
+                        ? 'border-red-400 bg-red-50 text-red-800'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={pestTypesExperienced.includes(pest.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) setPestTypesExperienced([...pestTypesExperienced, pest.id]);
+                        else setPestTypesExperienced(pestTypesExperienced.filter((p) => p !== pest.id));
+                      }}
+                      className="sr-only"
+                    />
+                    {pest.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           {[
-            { label: 'Pest issues', value: hadPestIssues, setter: setHadPestIssues },
             { label: 'Heat issues', value: hadHeatIssues, setter: setHadHeatIssues },
             { label: 'Water issues', value: hadWaterIssues, setter: setHadWaterIssues },
             { label: 'Deposit issues', value: hadDepositIssues, setter: setHadDepositIssues },

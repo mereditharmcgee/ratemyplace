@@ -1,4 +1,5 @@
 import { supplementaryItems } from '../../../lib/surveyItems';
+import { pestTypeOptions } from '../../../lib/formOptions';
 import type { Tenancy, ReviewData } from './types';
 
 interface Props {
@@ -124,8 +125,53 @@ export default function AdditionalStep({
           Did you experience any of these issues? <span className="text-gray-400">(check all that apply)</span>
         </label>
         <div className="space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={review.hadPestIssues}
+              onChange={(e) => onReviewChange({
+                ...review,
+                hadPestIssues: e.target.checked,
+                pestTypesExperienced: e.target.checked ? review.pestTypesExperienced : [],
+              })}
+              className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+            />
+            <span className="text-sm text-gray-700">Pest issues (roaches, mice, rats, bedbugs, etc.)</span>
+          </label>
+
+          {review.hadPestIssues && (
+            <div className="ml-6 mt-1 mb-2">
+              <p className="text-xs text-gray-500 mb-2">What pests did you encounter?</p>
+              <div className="flex flex-wrap gap-2">
+                {pestTypeOptions.map((pest) => (
+                  <label
+                    key={pest.id}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-full cursor-pointer text-xs transition-colors ${
+                      review.pestTypesExperienced.includes(pest.id)
+                        ? 'border-red-400 bg-red-50 text-red-800'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={review.pestTypesExperienced.includes(pest.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          onReviewChange({ ...review, pestTypesExperienced: [...review.pestTypesExperienced, pest.id] });
+                        } else {
+                          onReviewChange({ ...review, pestTypesExperienced: review.pestTypesExperienced.filter((p) => p !== pest.id) });
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                    {pest.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           {[
-            { key: 'hadPestIssues' as const, label: 'Pest issues (roaches, mice, rats, bedbugs, etc.)' },
             { key: 'hadHeatIssues' as const, label: 'Heat or hot water issues' },
             { key: 'hadWaterIssues' as const, label: 'Plumbing or water issues' },
             { key: 'hadSecurityDepositIssues' as const, label: 'Security deposit problems' },

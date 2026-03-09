@@ -35,6 +35,8 @@ export interface UnitDetails {
   laundryType: 'in_unit' | 'in_building' | 'coin_op' | 'none';
   laundryCostPerLoad: string;
   estimatedMonthlyUtilities: string;
+  parkingType: string;
+  petTypes: string[];
 }
 
 export interface Tenancy {
@@ -50,6 +52,7 @@ export interface ReviewData {
   wouldRecommend: string;
   comments: string;
   hadPestIssues: boolean;
+  pestTypesExperienced: string[];
   hadHeatIssues: boolean;
   hadWaterIssues: boolean;
   hadSecurityDepositIssues: boolean;

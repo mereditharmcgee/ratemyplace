@@ -46,3 +46,27 @@ export const laundryTypeOptions = [
   { value: 'coin_op', label: 'Building laundry (coin-op/paid)' },
   { value: 'none', label: 'No building laundry' },
 ];
+
+export const parkingTypeOptions = [
+  { value: 'included', label: 'Included with rent' },
+  { value: 'available', label: 'Available for extra cost' },
+  { value: 'street', label: 'Street parking only' },
+  { value: 'none', label: 'No parking available' },
+];
+
+export const petTypeOptions = [
+  { id: 'dogs', label: 'Dogs' },
+  { id: 'cats', label: 'Cats' },
+  { id: 'small_animals', label: 'Small Animals (hamsters, fish, etc.)' },
+  { id: 'no_pets', label: 'No pets allowed' },
+];
+
+export const pestTypeOptions = [
+  { id: 'roaches', label: 'Cockroaches' },
+  { id: 'mice', label: 'Mice' },
+  { id: 'rats', label: 'Rats' },
+  { id: 'bedbugs', label: 'Bedbugs' },
+  { id: 'ants', label: 'Ants' },
+  { id: 'flies', label: 'Flies/Gnats' },
+  { id: 'other', label: 'Other' },
+];
