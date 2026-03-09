@@ -21,3 +21,39 @@ export function getCurrentSeason(): string {
 export function getCurrentYear(): number {
   return new Date().getFullYear();
 }
+
+/**
+ * Returns a human-readable recency label based on how long ago someone lived there.
+ * For current tenants, returns "Current tenant".
+ * Otherwise, calculates years since move-out.
+ */
+export function formatRecency(review: {
+  is_current_tenant?: number;
+  move_out_year?: number;
+  move_out_year_new?: string;
+}): string {
+  if (review.is_current_tenant === 1) {
+    return 'Current tenant';
+  }
+
+  // Determine move-out year from new or legacy field
+  let moveOutYear: number | null = null;
+  if (review.move_out_year_new && review.move_out_year_new !== 'current') {
+    const parsed = parseInt(review.move_out_year_new);
+    if (!isNaN(parsed)) moveOutYear = parsed;
+  }
+  if (!moveOutYear && review.move_out_year) {
+    moveOutYear = review.move_out_year;
+  }
+
+  if (!moveOutYear) return 'Past tenant';
+
+  const yearsAgo = getCurrentYear() - moveOutYear;
+
+  if (yearsAgo <= 0) return 'Within the last year';
+  if (yearsAgo <= 1) return 'About 1 year ago';
+  if (yearsAgo <= 3) return '1–3 years ago';
+  if (yearsAgo <= 5) return '3–5 years ago';
+  if (yearsAgo <= 10) return '5–10 years ago';
+  return '10+ years ago';
+}

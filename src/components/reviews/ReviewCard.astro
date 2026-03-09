@@ -2,7 +2,7 @@
 import StarRating from '../ratings/StarRating.astro';
 import VerifiedBadge from '../ui/VerifiedBadge.astro';
 import EmailVerifiedBadge from '../ui/EmailVerifiedBadge.astro';
-import { formatFuzzyDate } from '../../lib/privacy';
+import { formatRecency } from '../../lib/privacy';
 import { calculateDomainScores, ITEM_WEIGHTS } from '../../lib/scoring';
 
 interface Props {
@@ -29,12 +29,7 @@ const unitTypeLabels: Record<string, string> = {
 const unitTypeLabel = unitTypeLabels[review.unit_type] || review.unit_type;
 const unitDisplay = unitTypeLabel;
 
-const moveInDate = formatFuzzyDate(review.move_in_year, review.move_in_season);
-const moveOutDate = review.is_current_tenant
-  ? 'Present'
-  : review.move_out_year
-    ? formatFuzzyDate(review.move_out_year, review.move_out_season)
-    : null;
+const recencyLabel = formatRecency(review);
 
 // New score categories based on actual schema
 // Items with weight > 1.0 are health/safety critical (marked with indicator)
@@ -198,7 +193,7 @@ const parkingLabels: Record<string, string> = {
     </div>
     <div class="text-right text-sm text-gray-500">
       <p class="font-medium text-gray-700">{unitDisplay}</p>
-      <p>{moveInDate}{moveOutDate ? ` - ${moveOutDate}` : ''}</p>
+      <p>{recencyLabel}</p>
       {review.rent_amount && (
         <p class="text-teal-600 font-medium">${review.rent_amount.toLocaleString()}/mo</p>
       )}
