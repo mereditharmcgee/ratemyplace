@@ -31,11 +31,11 @@ See: `.planning/milestones/v1.2.2-ROADMAP.md`
 
 ### v1.3.0 "Battle Tested" — Current Milestone
 
-- [x] **Phase 4: Database Foundation** — Reset, migrate, and seed scripts for local D1 (completed 2026-02-28)
-- [x] **Phase 5: Seed Data** — Realistic data population (30 buildings, 10 landlords, 100+ reviews) (completed 2026-02-28)
+- [x] **Phase 4: Database Foundation** — Reset, migrate, and seed scripts for local D1 (completed 2026-02-28)
+- [x] **Phase 5: Seed Data** — Realistic data population (30 buildings, 10 landlords, 100+ reviews) (completed 2026-02-28)
 - [x] **Phase 6: Playwright Local Environment** — Config, webServer, auth fixtures for local E2E (2/2 plans done — completed 2026-02-28)
-- [x] **Phase 7: Auth and Review E2E** — Signup, signin, signout, password reset, review submission (completed 2026-02-28)
-- [x] **Phase 8: Admin and Disputes E2E** — Moderation queue, dispute resolution, audit log, all 9 admin pages (completed 2026-03-01)
+- [x] **Phase 7: Auth and Review E2E** — Signup, signin, signout, password reset, review submission (completed 2026-02-28)
+- [x] **Phase 8: Admin and Disputes E2E** — Moderation queue, dispute resolution, audit log, all 9 admin pages (completed 2026-03-01)
 - [ ] **Phase 9: Security E2E** — Auth bypass, admin access control, rate limiting, injection probes
 - [ ] **Phase 10: Stress Testing and UI at Scale** — Concurrent load, volume rendering, score correctness
 
@@ -115,7 +115,11 @@ See: `.planning/milestones/v1.2.2-ROADMAP.md`
   3. Auth endpoints return HTTP 429 after the rate limit threshold is exceeded in rapid succession
   4. Text input fields (review text, dispute explanation) that receive SQL injection probe strings store and display the literal text without error or data corruption
   5. Stored user content (review text, dispute explanation) containing HTML/script payloads renders as escaped text, not executed markup
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 09-01-PLAN.md -- Auth bypass (401) and privilege escalation (403) tests
+- [ ] 09-02-PLAN.md -- Rate limiting (429), SQL injection, and XSS tests
 
 ### Phase 10: Stress Testing and UI at Scale
 
@@ -136,13 +140,13 @@ See: `.planning/milestones/v1.2.2-ROADMAP.md`
 | 1. Email Verification | v1.2.1 | 4/4 | Complete | 2026-02-26 |
 | 2. Landlord Disputes | v1.2.2 | 3/3 | Complete | 2026-02-27 |
 | 3. Security Hardening | v1.2.2 | 3/3 | Complete | 2026-02-27 |
-| 4. Database Foundation | 3/3 | Complete    | 2026-02-28 | — |
-| 5. Seed Data | 2/2 | Complete   | 2026-02-28 | — |
+| 4. Database Foundation | 3/3 | Complete    | 2026-02-28 | -- |
+| 5. Seed Data | 2/2 | Complete   | 2026-02-28 | -- |
 | 6. Playwright Local Environment | v1.3.0 | 2/2 | Complete | 2026-02-28 |
-| 7. Auth and Review E2E | 3/3 | Complete   | 2026-02-28 | — |
-| 8. Admin and Disputes E2E | 3/3 | Complete   | 2026-03-01 | — |
-| 9. Security E2E | v1.3.0 | 0/? | Not started | — |
-| 10. Stress Testing and UI at Scale | v1.3.0 | 0/? | Not started | — |
+| 7. Auth and Review E2E | 3/3 | Complete   | 2026-02-28 | -- |
+| 8. Admin and Disputes E2E | 3/3 | Complete   | 2026-03-01 | -- |
+| 9. Security E2E | v1.3.0 | 0/2 | Not started | -- |
+| 10. Stress Testing and UI at Scale | v1.3.0 | 0/? | Not started | -- |
 
 ---
-*Roadmap updated: 2026-02-27 — v1.3.0 "Battle Tested" phases added (Phases 4-10)*
+*Roadmap updated: 2026-03-09 -- Phase 9 plans created (2 plans)*
