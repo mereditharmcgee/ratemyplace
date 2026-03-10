@@ -1,4 +1,41 @@
 # Milestones: RateMyPlace Boston
+## v1.3.0 "Battle Tested" (Shipped: 2026-03-10)
+
+**Phases:** 6 (4-9) | **Plans:** 15 | **Timeline:** 12 days (2026-02-26 → 2026-03-10)
+
+### Delivered
+
+Comprehensive E2E test suite and security validation ensuring all user flows, admin workflows, and security controls are production-ready.
+
+### Key Accomplishments
+
+1. Local D1 database tooling — single-command reset, migrate, seed with 30 buildings, 10 landlords, 100+ reviews
+2. Playwright E2E infrastructure — local dev server, reusable auth fixtures for regular user and admin
+3. Full auth flow coverage — signup, signin, signout, password reset, concurrent submission handling
+4. Admin E2E suite — moderation queue, dispute resolution, audit log, all 9 admin pages verified
+5. Security E2E — auth bypass (401), privilege escalation (403), rate limiting (429), SQL injection, XSS prevention
+6. 17 security-specific tests proving injection payloads stored safely and scripts stripped before rendering
+
+### Known Gaps
+
+- STRESS-01: Building profile rendering with 20+ reviews (Phase 10 skipped)
+- STRESS-02: Empty state UI testing (Phase 10 skipped)
+- STRESS-03: Rate limiting under concurrent load (Phase 10 skipped)
+- STRESS-04: Score aggregation math verification (Phase 10 skipped)
+
+### Stats
+
+- Total E2E tests: 170+
+- Codebase: ~25,800 LOC (TypeScript, Astro, CSS)
+- Requirements completed: 21/25 (4 stress testing deferred)
+
+### Archive
+
+- Roadmap: `.planning/milestones/v1.3-ROADMAP.md`
+- Requirements: `.planning/milestones/v1.3-REQUIREMENTS.md`
+
+---
+
 
 ## v1.2.1 — Email Verification
 

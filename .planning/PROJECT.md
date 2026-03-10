@@ -26,25 +26,17 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 - ✓ Landlord dispute form with admin review queue — v1.2.2
 - ✓ Fail-closed rate limiting with structured logging — v1.2.2
 - ✓ Admin action audit trail with viewer — v1.2.2
+- ✓ Realistic test data seeding (30 buildings, 10 landlords, 100+ reviews) — v1.3.0
+- ✓ Automated E2E tests for all user flows (auth, review, dispute, admin) — v1.3.0
+- ✓ Security E2E validation (auth bypass, privilege escalation, rate limiting, injection, XSS) — v1.3.0
 
 ### Active
 
-- [ ] Seed realistic test data (buildings, reviews, landlords, disputes) to validate UI at scale
-- [ ] Automated E2E tests for all user flows (review, auth, dispute, admin)
-- [ ] Edge case testing (long inputs, special characters, empty states, concurrent requests)
-- [ ] Security validation (auth bypass, injection, rate limiting, admin access)
-- [ ] UI stress testing (responsive layout, many items, error states)
+(None — next milestone TBD)
 
-## Current Milestone: v1.3.0 "Battle Tested"
+## Latest Milestone: v1.3.0 "Battle Tested" (Shipped 2026-03-10)
 
-**Goal:** Comprehensive QA and stress testing to ensure every user flow works, edge cases are handled, and the site is production-ready before real users arrive.
-
-**Target features:**
-- Realistic test data seeding (buildings, reviews, landlords, disputes at volume)
-- Automated E2E testing of all user journeys
-- Edge case and boundary testing across forms and flows
-- Security and auth validation
-- UI/responsive stress testing at scale
+**Delivered:** Comprehensive E2E test suite (170+ tests) covering auth flows, review submission, admin workflows, dispute handling, and security controls. 21/25 requirements met; 4 stress testing requirements deferred.
 
 ### Out of Scope
 
@@ -55,7 +47,7 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 ## Context
 
 - **Tech stack**: Astro 5 + Cloudflare Pages + D1 (SQLite) + Lucia Auth + Tailwind CSS 4 + Resend
-- **Current version**: v1.3.0 "Battle Tested" (in progress)
+- **Current version**: v1.3.0 "Battle Tested" (shipped 2026-03-10)
 - **Production URL**: ratemyplace.boston
 - **Database tables**: 10 (users, sessions, reviews, buildings, landlords, property_managers, email_verification_tokens, rate_limits, disputes, audit_logs)
 - **Admin pages**: Dashboard, Users, Reviews, Buildings, Landlords, Managers, Verification, Disputes, Audit Log
@@ -81,4 +73,4 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 | Structured JSON logging | Machine-parseable logs for Cloudflare dashboard | ✓ Good |
 
 ---
-*Last updated: 2026-02-27 after starting v1.3.0 milestone*
+*Last updated: 2026-03-10 after v1.3.0 milestone*
