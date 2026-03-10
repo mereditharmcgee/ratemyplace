@@ -73,6 +73,9 @@ export default function ReviewForm({ building }: Props) {
   // Privacy acknowledgment
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
 
+  // Turnstile token
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+
   // Handle place selection from Google autocomplete
   const handlePlaceSelect = async (place: PlaceDetails) => {
     setLoading(true);
@@ -205,6 +208,9 @@ export default function ReviewForm({ building }: Props) {
       if (review.hadSecurityDepositIssues) formData.append('had_security_deposit_issues', '1');
       if (review.hadEvictionThreats) formData.append('had_eviction_threats', '1');
 
+      // Turnstile token
+      if (turnstileToken) formData.append('cf-turnstile-response', turnstileToken);
+
       const response = await fetch('/api/reviews', {
         method: 'POST',
         body: formData,
@@ -307,6 +313,8 @@ export default function ReviewForm({ building }: Props) {
           scores={scores}
           privacyAcknowledged={privacyAcknowledged}
           onPrivacyChange={setPrivacyAcknowledged}
+          turnstileToken={turnstileToken}
+          onTurnstileToken={setTurnstileToken}
           loading={loading}
           error={error}
           onBack={() => setStep('additional')}

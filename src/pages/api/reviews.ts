@@ -2,6 +2,8 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../lib/db';
 import { calculateDomainScores, ALL_SCORE_FIELDS } from '../../lib/scoring';
 import { generateIdFromEntropySize } from 'lucia';
+import { verifyTurnstile } from '../../lib/turnstile';
+import { getClientIP } from '../../lib/rateLimit';
 
 export async function POST(context: APIContext): Promise<Response> {
   // Require authentication
@@ -14,6 +16,21 @@ export async function POST(context: APIContext): Promise<Response> {
 
   try {
     const formData = await context.request.formData();
+
+    // Verify Turnstile token
+    const turnstileToken = formData.get('cf-turnstile-response') as string;
+    const runtime = (context.locals as any).runtime;
+    const turnstileResult = await verifyTurnstile(
+      turnstileToken,
+      runtime.env.TURNSTILE_SECRET_KEY,
+      getClientIP(context)
+    );
+    if (!turnstileResult.success) {
+      return new Response(JSON.stringify({ error: turnstileResult.error }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     const buildingId = formData.get('building_id') as string;
     if (!buildingId) {

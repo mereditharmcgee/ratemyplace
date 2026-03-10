@@ -1,6 +1,22 @@
+import { useEffect, useRef } from 'react';
 import { unitItems, buildingItems, landlordItems, supplementaryItems } from '../../../lib/surveyItems';
 import { bedroomOptions, bathroomOptions } from '../../../lib/formOptions';
 import type { Building, UnitDetails, Tenancy, ReviewData } from './types';
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: HTMLElement, options: {
+        sitekey: string;
+        theme?: string;
+        callback?: (token: string) => void;
+        'expired-callback'?: () => void;
+      }) => string;
+      reset: (widgetId: string) => void;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
 
 interface Props {
   building: Building | null;
@@ -10,6 +26,8 @@ interface Props {
   scores: Record<string, number | null>;
   privacyAcknowledged: boolean;
   onPrivacyChange: (acknowledged: boolean) => void;
+  turnstileToken: string | null;
+  onTurnstileToken: (token: string | null) => void;
   loading: boolean;
   error: string | null;
   onBack: () => void;
@@ -24,11 +42,49 @@ export default function ConfirmStep({
   scores,
   privacyAcknowledged,
   onPrivacyChange,
+  turnstileToken,
+  onTurnstileToken,
   loading,
   error,
   onBack,
   onSubmit,
 }: Props) {
+  const turnstileRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const renderWidget = () => {
+      if (!turnstileRef.current || !window.turnstile || widgetIdRef.current) return;
+      widgetIdRef.current = window.turnstile.render(turnstileRef.current, {
+        sitekey: '0x4AAAAAACo4KpkxsacPhM2r',
+        theme: 'light',
+        callback: (token: string) => onTurnstileToken(token),
+        'expired-callback': () => onTurnstileToken(null),
+      });
+    };
+
+    // If turnstile script is already loaded, render immediately
+    if (window.turnstile) {
+      renderWidget();
+    } else {
+      // Wait for the script to load
+      const interval = setInterval(() => {
+        if (window.turnstile) {
+          clearInterval(interval);
+          renderWidget();
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+
+    return () => {
+      if (widgetIdRef.current && window.turnstile) {
+        window.turnstile.remove(widgetIdRef.current);
+        widgetIdRef.current = null;
+      }
+    };
+  }, []);
+
   const unitScoreCount = unitItems.filter((item) => scores[item.key] !== undefined).length;
   const buildingScoreCount = buildingItems.filter((item) => scores[item.key] !== undefined).length;
   const landlordScoreCount = landlordItems.filter((item) => scores[item.key] !== undefined).length;
@@ -123,6 +179,8 @@ export default function ConfirmStep({
         </div>
       </div>
 
+      <div ref={turnstileRef} className="flex justify-center"></div>
+
       <div className="flex justify-between">
         <button
           type="button"
@@ -134,7 +192,7 @@ export default function ConfirmStep({
         <button
           type="button"
           onClick={onSubmit}
-          disabled={loading || !privacyAcknowledged}
+          disabled={loading || !privacyAcknowledged || !turnstileToken}
           className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Submitting...' : 'Submit Review'}

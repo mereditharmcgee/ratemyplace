@@ -4,6 +4,7 @@ import { getDB } from '../../../lib/db';
 import { verifyPassword } from '../../../lib/password';
 import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
 import { logError } from '../../../lib/logger';
+import { verifyTurnstile } from '../../../lib/turnstile';
 
 export async function POST(context: APIContext): Promise<Response> {
   const formData = await context.request.formData();
@@ -26,6 +27,21 @@ export async function POST(context: APIContext): Promise<Response> {
 
   if (password.length < 6 || password.length > 255) {
     return new Response(JSON.stringify({ error: 'Invalid password' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // Verify Turnstile token
+  const turnstileToken = formData.get('cf-turnstile-response') as string;
+  const runtime = (context.locals as any).runtime;
+  const turnstileResult = await verifyTurnstile(
+    turnstileToken,
+    runtime.env.TURNSTILE_SECRET_KEY,
+    getClientIP(context)
+  );
+  if (!turnstileResult.success) {
+    return new Response(JSON.stringify({ error: turnstileResult.error }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' }
     });

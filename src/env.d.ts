@@ -9,6 +9,7 @@ declare namespace App {
     env: {
       DB: D1Database;
       VERIFICATION_BUCKET: R2Bucket;
+      TURNSTILE_SECRET_KEY: string;
     };
     cf: import('@cloudflare/workers-types').IncomingRequestCfProperties;
     ctx: import('@cloudflare/workers-types').ExecutionContext;
