@@ -67,20 +67,17 @@ test.describe('Auth Bypass (SEC-04)', () => {
   test('POST /api/reviews rejects unauthenticated request', async ({ request }) => {
     const response = await request.post('/api/reviews', {
       multipart: { building_id: 'building-01' },
+      headers: { Origin: BASE_URL },
     });
-    // Wrangler pages dev may return 403 instead of 401 for POST requests
-    // (known behavior — see 07-03 decision). Either 4xx confirms auth bypass is blocked.
-    expect(response.status()).toBeGreaterThanOrEqual(400);
-    expect(response.status()).toBeLessThan(500);
+    expect(response.status()).toBe(401);
   });
 
   test('POST /api/verification/upload rejects unauthenticated request', async ({ request }) => {
     const response = await request.post('/api/verification/upload', {
       multipart: { review_id: 'test' },
+      headers: { Origin: BASE_URL },
     });
-    // Wrangler pages dev may return 403 instead of 401 for POST requests
-    expect(response.status()).toBeGreaterThanOrEqual(400);
-    expect(response.status()).toBeLessThan(500);
+    expect(response.status()).toBe(401);
   });
 });
 
