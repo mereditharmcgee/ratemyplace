@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-01T01:31:55.189Z"
+last_updated: "2026-03-10T02:29:25.641Z"
 progress:
-  total_phases: 7
-  completed_phases: 6
-  total_plans: 17
-  completed_plans: 17
+  total_phases: 8
+  completed_phases: 7
+  total_plans: 19
+  completed_plans: 19
 ---
 
 ---
@@ -78,10 +78,10 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 
 ## Current Position
 
-Phase: 8 — Admin and Disputes E2E (COMPLETE — 3/3 plans done)
-Plan: 08-03 complete — admin-pages.spec.ts: all 12 tests passing — selector ambiguity (strict mode) and SSR redirect assertions fixed; E2E-11 fully satisfied
-Status: Phase 8 COMPLETE — E2E-07, E2E-08, E2E-09, E2E-10, E2E-11 all satisfied
-Last activity: 2026-03-01 — Completed 08-03-PLAN.md (admin-pages.spec.ts: all 12 tests pass; scoped nav/stats selectors with .first() and p.text-sm.font-medium; SSR redirect tests adapted to wrangler ResponseSentError behavior)
+Phase: 9 — Security E2E (COMPLETE — 2/2 plans done)
+Plan: 09-02 complete — rate limiting (SEC-06), SQL injection (SEC-07), XSS prevention (SEC-08) — 6 new tests, all 17 security.spec.ts tests passing
+Status: Phase 9 COMPLETE — SEC-04, SEC-05, SEC-06, SEC-07, SEC-08 all satisfied
+Last activity: 2026-03-09 — Completed 09-02-PLAN.md (rate limiting 429 tests, SQL injection probe storage, XSS sanitization — 17 total security tests passing)
 
 ## v1.3.0 Phase Map
 
@@ -92,7 +92,7 @@ Last activity: 2026-03-01 — Completed 08-03-PLAN.md (admin-pages.spec.ts: all 
 | 6 | Playwright Local Environment | Complete (2/2 plans done) |
 | 7 | Auth and Review E2E | Complete (3/3 plans done) |
 | 8 | Admin and Disputes E2E | Complete (3/3 plans done) |
-| 9 | Security E2E | Not started |
+| 9 | Security E2E | Complete (2/2 plans done) |
 | 10 | Stress Testing and UI at Scale | Not started |
 
 ## Completed Milestones
@@ -147,6 +147,11 @@ Last activity: 2026-03-01 — Completed 08-03-PLAN.md (admin-pages.spec.ts: all 
 - Stats card selector scoped to p.text-sm.font-medium with hasText — text=Buildings matches multiple elements including nav link (08-03)
 - Access control tests use waitUntil: commit + negative content assertion — wrangler local dev returns 200 with empty body (ResponseSentError) rather than 302 redirect when admin/index.astro DB queries run before AdminLayout auth check (08-03)
 - Unauthenticated test uses conditional: if URL still on /admin verify no dashboard content visible, else verify /auth/signin URL (08-03)
+- Wrangler Pages dev CSRF blocks form POSTs without matching Origin header — include Origin: baseURL in Playwright request fixture calls (09-02)
+- signin input validation rejects passwords <6 chars before rate limit handler runs — use >=6 char passwords in rate limit tests (09-02)
+- extractReviewIdFromUrl() accepts only #review-{id} hash or /review/edit/{id} path formats — plan's /building/{id}/review/{id} format unsupported (09-02)
+- clearSecurityTestDisputes() required before injection/XSS tests — UNIQUE constraint causes 409 on re-runs without explicit cleanup (09-02)
+- sanitizeText() strips HTML tags on input before storage — XSS assertions check window.__xss_* sentinels, not literal tag text in rendered HTML (09-02)
 
 ## Performance Metrics
 
@@ -166,10 +171,11 @@ Last activity: 2026-03-01 — Completed 08-03-PLAN.md (admin-pages.spec.ts: all 
 | 08-admin-and-disputes-e2e | 02 | 15min | 3 | 1 |
 | 08-admin-and-disputes-e2e | 03 | 16min | 3 | 1 |
 | Phase 08-admin-and-disputes-e2e P03 | 16 | 3 tasks | 1 files |
+| Phase 09-security-e2e P02 | 13 | 2 tasks | 1 files |
 
 ## Blockers
 
 None currently.
 
 ---
-*State updated: 2026-03-01 — Completed 08-03 (admin-pages.spec.ts: all 12 tests pass; selector ambiguity and SSR redirect assertions fixed; E2E-11 satisfied; Phase 8 complete)*
+*State updated: 2026-03-09 — Completed 09-02 (rate limiting 429, SQL injection safe storage, XSS sanitization — 6 new tests; all 17 security.spec.ts tests passing; Phase 9 complete; SEC-06/07/08 satisfied)*

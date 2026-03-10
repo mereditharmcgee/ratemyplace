@@ -34,9 +34,9 @@
 
 - [ ] **SEC-04**: Unauthenticated requests to protected API endpoints return 401
 - [ ] **SEC-05**: Non-admin requests to admin API endpoints return 403
-- [ ] **SEC-06**: Rate limiting returns 429 after threshold is exceeded
-- [ ] **SEC-07**: SQL injection probes in text input fields are safely handled
-- [ ] **SEC-08**: Stored user content (review text, dispute explanation) is XSS-safe on render
+- [x] **SEC-06**: Rate limiting returns 429 after threshold is exceeded
+- [x] **SEC-07**: SQL injection probes in text input fields are safely handled
+- [x] **SEC-08**: Stored user content (review text, dispute explanation) is XSS-safe on render
 
 ### Stress & UI Scale
 
@@ -86,9 +86,9 @@
 | E2E-11 | Phase 8 | Complete |
 | SEC-04 | Phase 9 | Pending |
 | SEC-05 | Phase 9 | Pending |
-| SEC-06 | Phase 9 | Pending |
-| SEC-07 | Phase 9 | Pending |
-| SEC-08 | Phase 9 | Pending |
+| SEC-06 | Phase 9 | Complete |
+| SEC-07 | Phase 9 | Complete |
+| SEC-08 | Phase 9 | Complete |
 | STRESS-01 | Phase 10 | Pending |
 | STRESS-02 | Phase 10 | Pending |
 | STRESS-03 | Phase 10 | Pending |
