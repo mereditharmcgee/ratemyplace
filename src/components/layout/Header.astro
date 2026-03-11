@@ -33,7 +33,7 @@ const user = Astro.locals.user;
               Profile
             </a>
             {user.isAdmin && (
-              <a href="/admin/verify" class="text-slate-600 hover:text-teal-600 transition-colors">
+              <a href="/admin" class="text-slate-600 hover:text-teal-600 transition-colors">
                 Admin
               </a>
             )}
@@ -97,7 +97,7 @@ const user = Astro.locals.user;
               Profile
             </a>
             {user.isAdmin && (
-              <a href="/admin/verify" class="block px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-md">
+              <a href="/admin" class="block px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-md">
                 Admin
               </a>
             )}
