@@ -36,6 +36,8 @@ export default function ReviewForm({ building }: Props) {
     bathrooms: '1',
     squareFootage: '',
     rentAmount: '',
+    moveInMonth: '',
+    moveInYear: '',
     amenities: [],
     utilitiesIncluded: [],
     laundryType: 'none',
@@ -170,6 +172,8 @@ export default function ReviewForm({ building }: Props) {
       formData.append('bathrooms', unitDetails.bathrooms);
       if (unitDetails.squareFootage) formData.append('square_footage', unitDetails.squareFootage);
       if (unitDetails.rentAmount) formData.append('rent_amount', unitDetails.rentAmount);
+      if (unitDetails.moveInMonth) formData.append('move_in_month', unitDetails.moveInMonth);
+      if (unitDetails.moveInYear) formData.append('move_in_year', unitDetails.moveInYear);
       formData.append('amenities', JSON.stringify(unitDetails.amenities));
       formData.append('utilities_included', JSON.stringify(unitDetails.utilitiesIncluded));
 

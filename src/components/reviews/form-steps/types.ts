@@ -30,6 +30,8 @@ export interface UnitDetails {
   bathrooms: string;
   squareFootage: string;
   rentAmount: string;
+  moveInMonth: string;  // '1' through '12'
+  moveInYear: string;   // e.g. '2025'
   amenities: string[];
   utilitiesIncluded: string[];
   laundryType: 'in_unit' | 'in_building' | 'coin_op' | 'none';

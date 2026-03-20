@@ -86,6 +86,14 @@ export default function ReviewEditForm({ review }: Props) {
     review.estimated_monthly_utilities?.toString() || ''
   );
 
+  // Move-in month/year (user-provided, to correct the hardcoded legacy defaults)
+  const [moveInMonth, setMoveInMonth] = useState(
+    (review as any).move_in_month?.toString() || ''
+  );
+  const [moveInYear, setMoveInYear] = useState(
+    (review as any).move_in_year?.toString() || ''
+  );
+
   // Tenure & move-out
   const [tenureMonths, setTenureMonths] = useState(review.tenure_months || 18);
   const [moveOutYear, setMoveOutYear] = useState(
@@ -137,6 +145,8 @@ export default function ReviewEditForm({ review }: Props) {
           parking_type: parkingType || null,
           pet_types: petTypes.length > 0 ? JSON.stringify(petTypes) : null,
           pest_types_experienced: pestTypesExperienced.length > 0 ? JSON.stringify(pestTypesExperienced) : null,
+          move_in_month: moveInMonth ? parseInt(moveInMonth) : null,
+          move_in_year: moveInYear ? parseInt(moveInYear) : null,
           tenure_months: tenureMonths,
           move_out_year_new: moveOutYear,
           review_title: reviewTitle || null,
@@ -677,6 +687,44 @@ export default function ReviewEditForm({ review }: Props) {
       {/* Tenure & Move-out */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Tenancy Details</h3>
+
+        {/* Move-in date */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            When did you move in?
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <select
+              value={moveInMonth}
+              onChange={(e) => setMoveInMonth(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            >
+              <option value="">Month</option>
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+            <select
+              value={moveInYear}
+              onChange={(e) => setMoveInYear(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            >
+              <option value="">Year</option>
+              {Array.from({ length: new Date().getFullYear() - 1999 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                <option key={year} value={year.toString()}>{year}</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>

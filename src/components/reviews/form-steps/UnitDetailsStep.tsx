@@ -28,6 +28,44 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
         </div>
       )}
 
+      {/* Move-in date */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          When did you move in?
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <select
+            value={unitDetails.moveInMonth}
+            onChange={(e) => onChange({ ...unitDetails, moveInMonth: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          >
+            <option value="">Month</option>
+            <option value="1">January</option>
+            <option value="2">February</option>
+            <option value="3">March</option>
+            <option value="4">April</option>
+            <option value="5">May</option>
+            <option value="6">June</option>
+            <option value="7">July</option>
+            <option value="8">August</option>
+            <option value="9">September</option>
+            <option value="10">October</option>
+            <option value="11">November</option>
+            <option value="12">December</option>
+          </select>
+          <select
+            value={unitDetails.moveInYear}
+            onChange={(e) => onChange({ ...unitDetails, moveInYear: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          >
+            <option value="">Year</option>
+            {Array.from({ length: new Date().getFullYear() - 1999 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+              <option key={year} value={year.toString()}>{year}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2 sm:col-span-1">
           <label className="block text-sm font-medium text-gray-700 mb-2">

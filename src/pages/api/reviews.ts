@@ -4,6 +4,7 @@ import { calculateDomainScores, ALL_SCORE_FIELDS } from '../../lib/scoring';
 import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
 import { getClientIP } from '../../lib/rateLimit';
+import { getSeasonFromMonth } from '../../lib/privacy';
 
 export async function POST(context: APIContext): Promise<Response> {
   // Require authentication
@@ -62,6 +63,13 @@ export async function POST(context: APIContext): Promise<Response> {
     const laundryType = formData.get('laundry_type') as string || null;
     const laundryCostPerLoad = formData.get('laundry_cost_per_load') ? parseFloat(formData.get('laundry_cost_per_load') as string) : null;
     const estimatedMonthlyUtilities = formData.get('estimated_monthly_utilities') ? parseInt(formData.get('estimated_monthly_utilities') as string) : null;
+
+    // Move-in date: parse user-provided month (1-12) and year, compute season
+    const moveInMonthRaw = formData.get('move_in_month');
+    const moveInYearRaw = formData.get('move_in_year');
+    const moveInMonth = moveInMonthRaw ? parseInt(moveInMonthRaw as string) : null;
+    const moveInYear = moveInYearRaw ? parseInt(moveInYearRaw as string) : new Date().getFullYear();
+    const moveInSeason = moveInMonth ? getSeasonFromMonth(moveInMonth) : 'winter';
 
     // Parking, pets, pest types
     const parkingType = formData.get('parking_type') as string || null;
@@ -229,9 +237,9 @@ export async function POST(context: APIContext): Promise<Response> {
       hadSecurityDepositIssues,
       hadEvictionThreat,
       'pending',
-      // Legacy fields with defaults
-      new Date().getFullYear(),
-      'winter'
+      // Move-in date: use user-provided month/year, compute season from month
+      moveInYear,
+      moveInSeason
     ).run();
 
     return new Response(JSON.stringify({

@@ -46,16 +46,45 @@ describe('validateReviewForm', () => {
     expect(errors.some(e => e.field === 'move_in_year')).toBe(false);
   });
 
-  it('requires valid season', () => {
+  it('requires valid season (legacy path)', () => {
     const errors = validateReviewForm({ ...validData, move_in_season: 'autumn' as any });
     expect(errors.some(e => e.field === 'move_in_season')).toBe(true);
   });
 
-  it('accepts all valid seasons', () => {
+  it('accepts all valid seasons (legacy path)', () => {
     for (const season of ['winter', 'spring', 'summer', 'fall'] as const) {
       const errors = validateReviewForm({ ...validData, move_in_season: season });
       expect(errors.some(e => e.field === 'move_in_season')).toBe(false);
     }
+  });
+
+  // New move_in_month validation (replaces season when provided)
+  it('accepts valid move_in_month (1-12)', () => {
+    for (let month = 1; month <= 12; month++) {
+      const errors = validateReviewForm({ ...validData, move_in_month: month });
+      expect(errors.some(e => e.field === 'move_in_month')).toBe(false);
+    }
+  });
+
+  it('rejects move_in_month of 0', () => {
+    const errors = validateReviewForm({ ...validData, move_in_month: 0 });
+    expect(errors.some(e => e.field === 'move_in_month')).toBe(true);
+  });
+
+  it('rejects move_in_month of 13', () => {
+    const errors = validateReviewForm({ ...validData, move_in_month: 13 });
+    expect(errors.some(e => e.field === 'move_in_month')).toBe(true);
+  });
+
+  it('rejects non-integer move_in_month', () => {
+    const errors = validateReviewForm({ ...validData, move_in_month: 5.5 });
+    expect(errors.some(e => e.field === 'move_in_month')).toBe(true);
+  });
+
+  it('skips season validation when move_in_month is provided', () => {
+    // When move_in_month is provided, move_in_season is computed server-side — no season error expected
+    const errors = validateReviewForm({ ...validData, move_in_month: 6 });
+    expect(errors.some(e => e.field === 'move_in_season')).toBe(false);
   });
 
   it('requires valid unit_type', () => {

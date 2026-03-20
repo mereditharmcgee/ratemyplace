@@ -8,7 +8,7 @@ export interface ValidationError {
   message: string;
 }
 
-export function validateReviewForm(data: Partial<ReviewFormData>): ValidationError[] {
+export function validateReviewForm(data: Partial<ReviewFormData & { move_in_month?: number }>): ValidationError[] {
   const errors: ValidationError[] = [];
 
   // Required fields
@@ -20,8 +20,17 @@ export function validateReviewForm(data: Partial<ReviewFormData>): ValidationErr
     errors.push({ field: 'move_in_year', message: 'Valid move-in year is required' });
   }
 
-  if (!data.move_in_season || !validSeasons.includes(data.move_in_season)) {
-    errors.push({ field: 'move_in_season', message: 'Valid move-in season is required' });
+  // Accept either move_in_month (new: integer 1-12) or move_in_season (legacy: season string)
+  if (data.move_in_month !== undefined) {
+    // New path: validate month integer
+    if (!Number.isInteger(data.move_in_month) || data.move_in_month < 1 || data.move_in_month > 12) {
+      errors.push({ field: 'move_in_month', message: 'Valid move-in month is required (1-12)' });
+    }
+  } else if (data.move_in_season !== undefined) {
+    // Legacy path: validate season string (backward compat)
+    if (!validSeasons.includes(data.move_in_season)) {
+      errors.push({ field: 'move_in_season', message: 'Valid move-in season is required' });
+    }
   }
 
   if (!data.unit_type || !validUnitTypes.includes(data.unit_type)) {
