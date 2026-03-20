@@ -223,7 +223,7 @@ export default function ReviewForm({ building }: Props) {
       const result = await response.json();
 
       if (response.ok) {
-        window.location.href = `/building/${result.buildingSlug}?submitted=true`;
+        window.location.href = `/building/${result.buildingSlug}?submitted=true&reviewId=${result.reviewId}`;
       } else {
         setError(result.error || 'Failed to submit review');
       }

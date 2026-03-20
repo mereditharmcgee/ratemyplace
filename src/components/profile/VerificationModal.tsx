@@ -149,9 +149,14 @@ export default function VerificationModal({ reviewId, onClose, onSuccess }: Prop
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div className="text-sm text-blue-800">
-                <p className="font-medium mb-1">What we need to see:</p>
-                <p>Your name and the property address (lease agreement, utility bill, etc.)</p>
-                <p className="mt-2 font-medium">You may redact:</p>
+                <p className="font-medium mb-1">Accepted documents:</p>
+                <ul className="list-disc list-inside space-y-0.5 mb-2">
+                  <li>Lease or rental agreement</li>
+                  <li>Utility bill (gas, electric, water)</li>
+                  <li>Rent receipt or payment confirmation</li>
+                  <li>Piece of mail showing your name and this address</li>
+                </ul>
+                <p className="font-medium">You may redact:</p>
                 <p>Account numbers, dates of birth, SSN, or other sensitive info</p>
               </div>
             </div>
