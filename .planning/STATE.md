@@ -62,6 +62,8 @@ None currently.
 - **10-01:** UGCDisclaimer placed after reviews section (not inside map loop) on all three review-displaying pages
 - **10-01:** Terms Content Moderation section expanded in-place rather than rewritten; Section 230 block preserved verbatim
 - **10-01:** About page How We Rate section prepended with explicit "tenant-submitted" framing sentence rather than replacing existing content
+- **10-02:** Consent initializes to false on edit form — users must re-consent on each edit submission
+- **10-02:** Admin review detail fetched lazily on expand and cached to avoid re-fetching on re-expand
 
 ---
-*State updated: 2026-03-20 — Completed 10-01: UGC disclaimers and legal hardening*
+*State updated: 2026-03-20 — Completed 10-02: Consent checkbox updates and admin review detail expansion*
