@@ -32,9 +32,29 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 
 ### Active
 
-(None — next milestone TBD)
+- [ ] Fix move-in date seasonal display bug
+- [ ] Multi-city auto-research with adapter pattern (Boston + New Haven)
+- [ ] Full review content in admin pending reviews view
+- [ ] UGC disclaimers across platform (review pages, submission flow, ToS, about)
+- [ ] Contact form with D1 storage and Resend notifications
+- [ ] Review verification UX improvements (audit-first, then implement)
+- [ ] Tenant dashboard (core: review status, verification, settings)
+- [ ] Tenant dashboard (extended: saved buildings, notifications)
+- [ ] New survey fields: Section 8 acceptance, safely lit
 
-## Latest Milestone: v1.3.0 "Battle Tested" (Shipped 2026-03-10)
+## Current Milestone: v1.4.0 "Open Doors"
+
+**Goal:** Make the platform ready for real users with proper trust infrastructure, self-service tools, and public health survey improvements.
+
+**Target features:**
+- Bug fixes (move-in date, auto-research)
+- UGC disclaimers and legal protections
+- Contact form infrastructure
+- Review verification UX overhaul
+- Tenant dashboard
+- New survey fields from public health feedback
+
+## Latest Shipped: v1.3.0 "Battle Tested" (2026-03-10)
 
 **Delivered:** Comprehensive E2E test suite (170+ tests) covering auth flows, review submission, admin workflows, dispute handling, and security controls. 21/25 requirements met; 4 stress testing requirements deferred.
 
@@ -47,8 +67,8 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 ## Context
 
 - **Tech stack**: Astro 5 + Cloudflare Pages + D1 (SQLite) + Lucia Auth + Tailwind CSS 4 + Resend
-- **Current version**: v1.3.0 "Battle Tested" (shipped 2026-03-10)
-- **Production URL**: ratemyplace.boston
+- **Current version**: v1.4.0 "Open Doors" (in progress)
+- **Production URL**: ratemyplace.org
 - **Database tables**: 10 (users, sessions, reviews, buildings, landlords, property_managers, email_verification_tokens, rate_limits, disputes, audit_logs)
 - **Admin pages**: Dashboard, Users, Reviews, Buildings, Landlords, Managers, Verification, Disputes, Audit Log
 
@@ -73,4 +93,4 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 | Structured JSON logging | Machine-parseable logs for Cloudflare dashboard | ✓ Good |
 
 ---
-*Last updated: 2026-03-10 after v1.3.0 milestone*
+*Last updated: 2026-03-20 after v1.4.0 milestone start*
