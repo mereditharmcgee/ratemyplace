@@ -1,265 +1,194 @@
-# Research Summary: v1.3.0 "Battle Tested" QA Milestone
+# Project Research Summary
 
-**Project:** RateMyPlace Boston
-**Synthesized:** 2026-02-27
-**Research files:** STACK.md, FEATURES.md, ARCHITECTURE.md, PITFALLS.md
-
----
+**Project:** RateMyPlace v1.4.0 "Open Doors"
+**Domain:** Tenant housing review platform — feature additions to a live production system
+**Researched:** 2026-03-20
+**Confidence:** HIGH (all research grounded in direct codebase inspection and live API verification)
 
 ## Executive Summary
 
-RateMyPlace Boston enters v1.3.0 with a solid foundation: 130 passing Vitest unit tests covering scoring, validation, auth, rate limiting, and disputes, plus 2 Playwright spec files covering unauthenticated page navigation. The critical gap is that every meaningful user flow — review submission, admin moderation, dispute filing, auth signup/verification, password reset — has zero E2E coverage. All existing Playwright tests run against a live Cloudflare Pages preview URL, meaning any new test that writes data will corrupt production data. This must be fixed before writing a single new spec.
+RateMyPlace is a structured tenant review platform built on Astro 5 SSR + Cloudflare Pages + D1 (SQLite) with React islands for interactivity. v1.4.0 is not a greenfield milestone — it extends a live, audit-clean production system. The recommended approach is entirely additive: no new npm packages are required, all new features compose the existing stack (D1, Resend, Turnstile, React islands, Astro API routes), and four new D1 tables plus one ALTER TABLE migration cover all schema needs. The single most important architectural decision for this milestone is building the city enrichment adapter pattern before adding New Haven support — if the adapter interface is skipped in favor of inline if/else logic, the enrichment endpoint becomes a permanent maintenance burden.
 
-The recommended approach is strictly additive and minimalist: two new npm packages (`@faker-js/faker` for seed data generation, `autocannon` for stress testing), a local test environment built on `wrangler pages dev` with Playwright's `webServer` config, SQL-based seed data applied via `wrangler d1 execute --local`, and Playwright `storageState` for authenticated session reuse. The architecture follows well-documented official patterns from Cloudflare and Playwright with HIGH confidence. The 7-phase build order (DB foundation → seed data → Playwright local config → auth/review E2E → admin E2E → security E2E → stress testing) respects hard dependencies: data must exist before flows can run, auth must work before protected pages can be tested.
+The feature set divides clearly into two tiers. High-urgency work addresses legal exposure (UGC disclaimers with inline consent, CAN-SPAM-compliant notification emails), operational needs (full review content in admin queue, contact form replacing static mailto), and trust gaps that cause real-user abandonment (review status visibility, verification UX). Lower-urgency features — saved buildings, in-app notification tab, New Haven enrichment — extend the platform for engaged users but can be phased after the trust and legal foundations are solid. The dependency graph from ARCHITECTURE.md is the authoritative build order: bug fixes and isolated changes first, schema additions next, the tenant dashboard last because it depends on the notification infrastructure.
 
-The dominant risk is not technical complexity — it is scope creep and infrastructure over-engineering. For a pre-launch app with one developer, 20 focused Playwright tests against seeded local data will find more real bugs than an elaborate test framework. The pitfalls that will actually bite are: tests accidentally writing to production D1, dirty local D1 state between runs, Google OAuth being impossible to automate, React island hydration timing, and rate limit table pollution blocking auth flow tests. All of these have documented mitigations.
-
----
+The top risk cluster is legal and compliance: missing UGC disclaimers on review pages (not just ToS), notification emails without unsubscribe mechanisms, and contact form submissions without rate limiting represent the three failure modes that cause the most damage per unit of engineering time lost. The good news is all three are well-understood patterns with clear prevention strategies; none require architectural rework if addressed in the right phase order. New Haven API availability was initially flagged as blocked, but STACK.md live-tested the Connecticut state CAMA dataset (`data.ct.gov`) and confirmed it works for New Haven — the blocker is resolved.
 
 ## Key Findings
 
-### From STACK.md — Technology Additions
+### Recommended Stack
 
-**Packages to add (only 2):**
+The existing stack is locked and requires no additions. All v1.4.0 features are implementable with: D1 for persistence (4 new migrations), Resend for email (new contact notification template), Turnstile for bot protection (contact form), and React `useState`/`useEffect` for dashboard interactivity (no router library, no state management library, no tab component library).
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `@faker-js/faker` | `^10.3.0` | Realistic seed data generation |
-| `autocannon` | latest | HTTP stress testing (Node.js native, no binary install) |
+**Core technologies (all existing):**
+- Astro 5 SSR + `@astrojs/cloudflare` — Pages and API routes; runs at Cloudflare edge, handles auth-gated SSR
+- React 18 islands (`client:load`) — Interactive dashboard components; Cloudflare Workers constraint locks to React 18
+- Cloudflare D1 (SQLite) — All persistence; 4 new tables via migrations 0019–0022
+- Lucia v3 — Auth; unchanged; `generateIdFromEntropySize(10)` for ID generation
+- Resend — Email; add `sendContactNotificationEmail()` template only
+- Cloudflare Turnstile — Bot protection; reuse existing `verifyTurnstile()` for contact form
 
-**No new packages needed for:**
-- Auth state in E2E — Playwright `storageState` is built in
-- Local dev server — `wrangler pages dev` already available via npx
-- Network mocking — Playwright `page.route()` is built in
-- Database seeding execution — `wrangler d1 execute --local --file` is the official pattern
+**Critical version notes:**
+- React 19 must not be adopted — Cloudflare Workers runtime does not yet support it
+- No new npm packages required for any v1.4.0 feature
 
-**Critical version note:** `wrangler pages dev` (not `astro preview`) is required for local E2E — `astro preview` does NOT wire up D1 bindings. ARCHITECTURE.md recommends `astro dev` while STACK.md recommends `wrangler pages dev ./dist`. The safe default is `npx astro dev` which uses the Cloudflare adapter in dev mode; validate which command provides D1 binding before committing to either.
+**New Haven API (resolved blocker):** STACK.md live-tested `https://data.ct.gov/resource/pqrn-qghw.json` (CT CAMA dataset, Socrata SODA API) and confirmed it works for New Haven with owner name, year built, bedroom/bath count, building type, and condition fields. FEATURES.md marked this blocked based on Vision GIS having no public API — the state CAMA dataset resolves it.
 
-**What NOT to add:** Cypress, Miniflare directly, `@cloudflare/vitest-pool-workers` (for this milestone), Drizzle ORM, k6, Locust, MSW, visual regression tools.
+### Expected Features
 
----
+**Must have — table stakes (P1, v1.4.0):**
+- Move-in date seasonal display bug fix — visible data quality issue, erodes trust immediately
+- UGC disclaimers — inline consent checkbox on submission + banner on review pages + ToS clause; highest legal risk per unit of effort
+- Contact form with D1 storage + Resend admin notification — replaces static mailto links; enables message tracking and admin-accessible log
+- Full review content visible in admin pending view — unblocks faster moderation without additional tooling
+- Review verification UX overhaul (audit-first) — current VerificationModal trigger logic is unclear; new users leave reviews unpublished by accident
+- Tenant dashboard core — review status labels (Pending / Under Review / Published / Rejected), email verification banner with resend CTA, account settings tab
+- Section 8 acceptance survey field — high-value signal for Boston's voucher-holder population; aligns with platform public health mission
+- Safely lit survey field — maps to PHQS safety domain; 1.2x weight; LOW implementation cost
 
-### From FEATURES.md — Coverage Priorities
+**Should have — differentiators (P2, v1.4.x):**
+- Tenant dashboard: saved buildings tab — simple bookmark list; builds engagement once core dashboard ships
+- Tenant dashboard: email notification on review status change — Resend template triggered from admin moderation action
+- Multi-city auto-research: Boston adapter refactor + New Haven adapter — adapter pattern is the right architecture even if only Boston ships first
 
-**Table stakes (milestone is incomplete without these):**
+**Defer (v2+):**
+- Email notification digests — requires Cloudflare Cron Triggers infrastructure not currently configured
+- Verified resident badge — requires R2 file storage or external identity service
+- Multi-language support — explicitly deferred in PROJECT.md
+- Landlord response to reviews — explicitly excluded; dispute form covers legitimate corrections
 
-1. Seed script: ~20-30 buildings, 10-15 landlords, 50-100 reviews, 5-10 disputes, 3 test users
-2. Authenticated E2E: full review submission (27-field form, the core product flow)
-3. Authenticated E2E: auth flows (signup, email verification, signin, signout, password reset)
-4. Authenticated E2E: admin moderation (approve/reject reviews, resolve disputes)
-5. Authenticated E2E: landlord dispute filing
-6. Edge case: long inputs, special characters, Unicode, form boundary values
-7. Security: auth bypass attempts, SQL injection probes, XSS probe, rate limiting enforcement
-8. UI stress: building profile with 20+ reviews, empty states, responsive layout at scale
+**Anti-features to avoid:** WebSocket/SSE real-time notifications (Workers are stateless), mandatory identity verification via file upload (eliminates reviews), user-to-user messaging (breaks anonymity), automatic property data sync on schedule (no cron infrastructure).
 
-**Differentiators (valuable but not blocking):**
-- Concurrent duplicate review submission prevention
-- Admin audit log accuracy verification
-- Score aggregation correctness against known seeded data
-- Token expiry lifecycle testing
-- Dispute uniqueness constraint error surface
+### Architecture Approach
 
-**Explicitly deferred (do not build):**
-- Visual regression / screenshot diffs
-- Chaos engineering / fault injection
-- DAST scanning (OWASP ZAP, Burp Suite)
-- Load testing with Artillery/k6 against production
-- CI/CD pipeline setup
-- Mutation testing
+All new features follow the additive composition pattern: new `src/lib/` modules, new `src/components/` directories, new API routes under `src/pages/api/dashboard/`, and modification of existing Astro pages to pass additional props to new React islands. The most significant structural addition is `src/lib/enrichment/` — a city adapter module extracted from the current monolithic enrich endpoint. The tenant dashboard is a single React island (`TenantDashboard.tsx`) served from the existing `/profile` route with hash-based tab routing (no router library). Notification creation is best-effort and inline, mirroring the existing `createAuditLog()` pattern.
 
-**Seed data distribution requirements:** At least one building with 20+ reviews, at least one with 0 reviews, scores spanning 1-5, mixed `is_current_tenant`, at least one review near 5000-char limit, `move_in_year` spanning 2019-2025 for recency weighting.
+**Major components:**
+1. `src/lib/enrichment/` (new) — `CityAdapter` interface + `boston.ts` + `new-haven.ts` adapters; `index.ts` dispatcher routes by `building.city`
+2. `src/components/dashboard/TenantDashboard.tsx` (new) — tabbed island extending existing ProfileDashboard; hash routing for My Reviews / Saved / Notifications tabs
+3. `src/components/ui/UGCDisclaimer.astro` (new) — shared static component with `variant` prop; used on 6+ surfaces
+4. `src/lib/notifications.ts` (new) — `createNotification()` best-effort helper; called inline from admin review approval/rejection routes
+5. `src/pages/api/contact.ts` (new) — POST handler; D1 insert + Resend notification + Turnstile verify + rate limit
+6. D1 migrations 0019–0022 — `contact_messages`, `saved_buildings`, `notifications` tables + `section_8_accepted`/`safely_lit` columns on reviews
 
----
+### Critical Pitfalls
 
-### From ARCHITECTURE.md — Structure and Patterns
+1. **NOT NULL columns on reviews table without DEFAULT** — D1 rejects `ALTER TABLE ... ADD COLUMN col INTEGER NOT NULL` on tables with existing rows unless a DEFAULT is supplied. Use nullable columns (`INTEGER` with no constraint) for new survey fields and skip NULL values in scoring. Prevention: write `ALTER TABLE reviews ADD COLUMN section_8_accepted INTEGER` (nullable, no constraint).
 
-**Directory layout for new test infrastructure:**
+2. **Migration number collisions** — Multiple v1.4.0 features need new migrations. Assign numbers 0019–0022 before writing any SQL; two migrations with the same number causes one to be silently skipped by wrangler. Assign the full plan in the first phase that touches the schema.
 
-```
-e2e/
-  global.setup.ts        # Auth session setup (project dependencies pattern)
-  global.teardown.ts     # Cleanup
-  fixtures.ts            # authedPage and adminPage typed fixtures
-  auth/                  # signin, signup specs
-  review/                # submit, edge-cases specs
-  admin/                 # moderation, disputes specs
-  security/              # auth-bypass, rate-limit, admin-access specs
-  stress/                # ui-scale spec
+3. **Notification emails without unsubscribe** — CAN-SPAM requires one-click unsubscribe for non-purely-transactional emails. "Your review was approved" is borderline. Add `notification_opt_in` column to users + a signed unsubscribe token endpoint before the first notification email ships. Resend account suspension is the failure mode if this is ignored.
 
-scripts/seed/
-  reset.sql              # DROP all tables including d1_migrations
-  seed.sql               # Orchestrates data files (run via separate wrangler calls)
-  gen-hashes.ts          # One-time bcrypt hash generator
-  data/
-    landlords.sql        # 10 landlords with hardcoded text IDs
-    buildings.sql        # 30 buildings
-    users.sql            # Regular, admin, unverified test users
-    reviews.sql          # 100+ reviews with full 27-field scores
-    disputes.sql         # 5-10 disputes
-    building_scores.sql  # Pre-computed aggregates (required — not auto-computed)
-    landlord_scores.sql  # Pre-computed aggregates
+4. **UGC disclaimers only in Terms of Service** — Courts require disclaimers in close proximity to the content. ToS-only disclaimers provide weak defamation protection. Disclaimers must appear on `/building/[slug]` review lists and on the review submission form itself.
 
-scripts/stress/
-  config.ts, rate-limits.ts, search-load.ts, building-page.ts, run-all.ts
+5. **Dashboard N+1 queries** — A React island calling 4 separate API endpoints on mount (reviews, saved buildings, notifications, verification status) creates N+1 D1 latency. Design a single `/api/dashboard` endpoint returning all needed data with server-side JOINs before building the component.
 
-playwright/.auth/        # user.json, admin.json (gitignored)
-```
+6. **Contact form without rate limiting** — Without `checkRateLimit()` (already in `src/lib/rateLimit.ts`), spam floods D1 and exhausts Resend free tier (100 emails/day). Apply 3 submissions/hour/IP before the first contact submission reaches real users.
 
-**Key architectural constraints:**
-- `workers: 1` in `playwright.config.ts` — shared local D1 cannot handle parallel writers
-- D1 does NOT support SQL INCLUDE — run `wrangler d1 execute` once per data file in the npm script chain
-- `building_scores` and `landlord_scores` are denormalized caches — must be seeded separately after reviews, not auto-computed
-- Test users must have `email_verified = 1` or `global.setup.ts` login will fail
-- Admin user must have `is_admin = 1`
-- Bcrypt hashes must be pre-generated offline (`gen-hashes.ts`) and hardcoded in `users.sql`
-- Session setup must go through the UI sign-in form — do not hand-construct Lucia session tokens
-
-**npm scripts to add:**
-```json
-{
-  "db:reset": "npx wrangler d1 execute ratemyplace-db --local --file=./scripts/seed/reset.sql",
-  "db:migrate:local": "npx wrangler d1 migrations apply ratemyplace-db --local",
-  "db:seed": "npx wrangler d1 execute ratemyplace-db --local --file=./scripts/seed/data/landlords.sql && ...",
-  "db:fresh": "npm run db:reset && npm run db:migrate:local && npm run db:seed",
-  "e2e:local": "BASE_URL=http://localhost:4321 npx playwright test",
-  "stress": "npx tsx scripts/stress/run-all.ts"
-}
-```
-
----
-
-### From PITFALLS.md — Top Risks and Mitigations
-
-**Critical pitfalls (will definitely cause failures or data corruption):**
-
-| Pitfall | Risk | Prevention |
-|---------|------|------------|
-| Playwright currently points at live production URL | Any new data-writing test corrupts production D1 | Fix `playwright.config.ts` webServer + baseURL FIRST, before any other work |
-| Seeding with `--remote` flag | Fake data appears publicly on ratemyplace.boston | Never use `--remote` in seed scripts; use `--local` exclusively; add script guard |
-| Dirty local D1 state between runs | Tests pass first run, fail second run (stale data, duplicate key errors) | Build `db:fresh` reset script; run it in Playwright global setup |
-| Google OAuth cannot be automated | Hours lost, flaky CI, account bans | Use email/password test accounts only; mark OAuth tests as `test.skip` |
-| D1 migrations not run in Vitest | `no such table` errors in any integration test | Use `@cloudflare/vitest-pool-workers` with `applyD1Migrations()` for DB tests |
-
-**Moderate pitfalls (significant time waste):**
-
-| Pitfall | Risk | Prevention |
-|---------|------|------------|
-| Rate limit table blocks auth tests | Auth flow tests fail after 3rd+ run with 503 | Clear `rate_limits` in global setup; isolate rate limit tests |
-| React island hydration timing | Playwright clicks buttons before event handlers attach | Use `waitFor` with hydration checks; `waitForLoadState('networkidle')` |
-| Foreign key insertion order | Seed fails with FK constraint on first run | Follow order: landlords → buildings → users → reviews → scores → disputes |
-| D1 no cross-request transactions | Concurrent duplicate submissions may 500 instead of 409 | Document as known behavior; test and note the actual error surface |
-| Over-engineering test infrastructure | Milestone ends with zero bug findings | Write tests before fixtures; stop if helper code exceeds test code after 2 days |
-
-**D1-specific gotchas (differ from standard SQLite):**
-- Foreign keys are ON by default (unlike SQLite default)
-- No cross-request transactions
-- Test database starts empty — migrations must be explicitly applied
-- Data persists between `wrangler dev` runs — always reset before test run
-- `isolatedStorage: true` isolates per test file, not per test block
-
----
+7. **Multi-city adapter as a God Function** — Adding New Haven as an `if (city === 'New Haven')` block in the existing enrich endpoint creates untestable routing logic. Define the `CityAdapter` interface before writing the second adapter, not after.
 
 ## Implications for Roadmap
 
-### Recommended Phase Structure
+Based on the dependency graph from ARCHITECTURE.md and priority tiers from FEATURES.md, the natural phase structure groups work by what it depends on, not just by feature.
 
-**Phase 1: Database Foundation** (prerequisite for everything)
-- Rationale: Nothing else can run without local D1 working correctly
-- Deliverable: `npm run db:fresh` executes without errors; schema verified locally
-- Key work: `reset.sql`, `db:migrate:local` npm script, schema verification
-- Pitfalls: Dirty state (Pitfall 6), production contamination (Pitfall 5)
-- Research flag: None — official Cloudflare docs cover this completely
+### Phase 1: Foundations and Legal Hardening
+**Rationale:** These changes are fully isolated — no new schema, no new APIs, no dependencies on any other v1.4.0 work. Legal exposure (UGC disclaimers) and operational efficiency (admin review view) ship before anything else. This eliminates the most visible trust issues before real users arrive and unblocks faster moderation at launch.
+**Delivers:** UGCDisclaimer component deployed on all review surfaces; move-in date bug fixed; admin can see full review content without navigating away from the queue.
+**Addresses:** UGC disclaimers (P1 legal), move-in date bug (P1), full review in admin pending view (P1 ops)
+**Avoids:** Pitfall 4 (disclaimers only in ToS); no migration risk in this phase
+**Research flag:** Standard patterns — no research-phase needed.
 
-**Phase 2: Seed Data**
-- Rationale: All E2E tests, stress tests, and UI scale tests depend on realistic data existing
-- Deliverable: 30 buildings, 10 landlords, 100+ reviews, 3 test users, 10 disputes in local D1
-- Key work: All `scripts/seed/data/*.sql` files, `gen-hashes.ts`, pre-computed score rows
-- Pitfalls: FK insertion order (Pitfall 7), missing score aggregates (Pitfall 11), hardcoded IDs required
-- Research flag: None — pattern is clear; main work is writing the actual SQL rows
+### Phase 2: Schema and Survey Fields
+**Rationale:** New survey fields (Section 8, safely lit) affect the review submission form and scoring. Stabilizing these before building the tenant dashboard ensures new field data displays correctly when the dashboard renders review details. Migration numbers 0019–0022 get assigned here to prevent collisions in all subsequent phases. Contact form also ships here because its migration (0019) is part of the locked plan.
+**Delivers:** Two new survey dimensions collected from new reviews; contact form operational with D1 storage, Resend notification, Turnstile, and rate limiting; migration plan locked for all remaining phases.
+**Addresses:** Section 8 P1 feature, safely lit P1 feature, contact form P1 feature
+**Avoids:** Pitfall 1 (nullable columns, not NOT NULL), Pitfall 2 (migration number plan locked), Pitfall 7 (rate limit on contact form), Pitfall 3 (unsubscribe on any contact reply emails)
+**Research flag:** Standard patterns for survey field additions (5-step checklist in CLAUDE.md). Contact form mirrors bug_reports exactly. No research-phase needed.
 
-**Phase 3: Playwright Local Environment**
-- Rationale: Must redirect tests away from production URL before writing any data-touching spec
-- Deliverable: Existing navigation/pages specs pass locally; `global.setup.ts` creates `.auth/*.json`
-- Key work: `playwright.config.ts` `webServer` config, `global.setup.ts`, `fixtures.ts`, `.gitignore` update
-- Pitfalls: Production URL contamination (Pitfall 1 — fix this first), `workers: 1` required, local dev server command choice
-- Research flag: Validate which local server command (`astro dev` vs `wrangler pages dev`) correctly exposes D1 binding in dev mode
+### Phase 3: Multi-City Enrichment Adapter Refactor
+**Rationale:** The adapter refactor is independent of the dashboard and schema changes. Doing it before the dashboard avoids modifying the enrich endpoint twice. The CT CAMA API is confirmed working — New Haven is unblocked. This phase also establishes the `CityAdapter` interface that future cities will implement.
+**Delivers:** `src/lib/enrichment/` module with `CityAdapter` interface; Boston adapter extracted (behavior unchanged, existing Boston enrich still works); New Haven adapter implemented and tested against live CT CAMA API.
+**Addresses:** Multi-city auto-research P2 feature
+**Avoids:** Pitfall 5 (God Function anti-pattern); integration gotcha of missing AbortController timeout on external calls
+**Research flag:** Boston adapter behavior is thoroughly documented — no research needed. New Haven field mapping is confirmed in STACK.md. Skip research-phase.
 
-**Phase 4: Auth and Review E2E**
-- Rationale: Review submission is the core product value; auth is the gate to all protected flows
-- Deliverable: signin, signup, review submission, and form edge case specs passing
-- Key work: `e2e/auth/*.spec.ts`, `e2e/review/submit.spec.ts`, `e2e/review/edge-cases.spec.ts`
-- Pitfalls: Rate limit table pollution (Pitfall 9), React island hydration (Pitfall 10), Google OAuth blocker (Pitfall 4), Resend email bypass required (Pitfall 13)
-- Research flag: None — patterns are clear
+### Phase 4: Tenant Dashboard Core
+**Rationale:** Dashboard depends on the notifications schema (migration 0021) and `createNotification()` being called from admin review routes. Must come after schema phases are stable. This is the highest-complexity user-facing phase.
+**Delivers:** `/profile` extended with tabbed `TenantDashboard.tsx`; review status chips with explanatory copy; email verification banner with resend CTA; account settings tab; notifications infrastructure (`createNotification()` helper + admin route integration + `/api/dashboard/notifications` endpoint).
+**Addresses:** Tenant dashboard core (P1), in-app notifications infrastructure
+**Avoids:** Pitfall 6 (N+1 queries — single `/api/dashboard` endpoint with JOINs), Pitfall 3 (unsubscribe on review status notification emails)
+**Research flag:** Verification UX subfeature requires a 30-minute audit of the current `VerificationModal.tsx` and `ProfileDashboard.tsx` trigger logic before any redesign work begins. Flag this as a mandatory audit step before implementation of the verification portion of this phase.
 
-**Phase 5: Admin E2E**
-- Rationale: Admin dashboard has 9 sub-pages and zero E2E coverage; moderation is critical pre-launch
-- Deliverable: Approve/reject reviews, resolve disputes, audit log entries verified
-- Key work: `e2e/admin/moderation.spec.ts`, `e2e/admin/disputes.spec.ts`
-- Pitfalls: Admin `storageState` setup must succeed in Phase 3 first
-- Research flag: None
+### Phase 5: Tenant Dashboard Extended (Saved Buildings + Verification UX)
+**Rationale:** Saved buildings tab requires the dashboard shell from Phase 4. Review verification UX overhaul benefits from the dashboard being stable — the redesigned verification prompt surfaces inline in the dashboard. Both features depend on Phase 4 being settled.
+**Delivers:** Saved buildings list in dashboard with bookmark buttons on building pages; verification UX redesigned with inline prompts and "verify to publish" framing replacing the current unclear modal trigger.
+**Addresses:** Saved buildings (P2), review verification UX overhaul (P1, deferred to this phase by audit dependency)
+**Avoids:** Missing UNIQUE constraint on saved_buildings (`UNIQUE(user_id, building_id)` at DB level); UX pitfall of no undo/confirmation on unsave action
+**Research flag:** Verification UX audit must gate implementation — this is not optional. The audit itself is quick but must happen before writing any verification UX spec.
 
-**Phase 6: Security E2E**
-- Rationale: Auth bypass and admin access control are the highest-severity untested paths
-- Deliverable: 401 on unauthenticated API calls, 403 on non-admin to admin endpoints, 429 on rate limit threshold
-- Key work: `e2e/security/auth-bypass.spec.ts`, `e2e/security/rate-limit.spec.ts`, `e2e/security/admin-access.spec.ts`
-- Pitfalls: Keep rate limit tests isolated — do not mix with auth flow tests
-- Research flag: None
+### Phase Ordering Rationale
 
-**Phase 7: Stress Testing**
-- Rationale: Validates rate limiting holds under load and UI renders correctly at volume
-- Deliverable: `npm run stress` runs without crashing; rate limit endpoint returns 429 consistently under load
-- Key work: `scripts/stress/*.ts`, `autocannon` install
-- Pitfalls: Never point at production (Cloudflare abuse detection); run only against local or dedicated preview
-- Research flag: None — autocannon is straightforward for this use case
+- Isolated changes first removes noise before feature work begins and ships legal protections before real users arrive.
+- Schema plan locked in Phase 2 prevents migration number collisions across all five phases — two different phases trying to claim 0019 is a real risk with four migrations needed.
+- Enrichment refactor before dashboard keeps the admin enrichment feature independent and establishes the adapter pattern cleanly without dashboard complexity in parallel.
+- Dashboard last because it is the most complex user-facing feature and depends on: notifications schema, `createNotification()` calls wired into admin routes, and (for Phase 5) the saved buildings schema — all prior phases.
+- Verification UX at the end because it requires an audit-first approach; the dashboard foundation in Phase 4 makes the redesigned UX surface cleaner and avoids redesigning something that is still in flux.
 
----
+### Research Flags
+
+Phases needing deeper research or mandatory audit during planning:
+- **Phase 4 (Tenant Dashboard Core):** Verification UX subfeature requires auditing current `VerificationModal.tsx` trigger logic before the redesign is specced. Read `src/components/profile/ProfileDashboard.tsx` and `src/components/profile/VerificationModal.tsx` before writing Phase 4 tasks for that feature.
+
+Phases with standard, well-documented patterns (skip research-phase):
+- **Phase 1:** Astro static components and UI bug fixes — fully covered by project conventions in CLAUDE.md
+- **Phase 2:** Survey field additions follow the 5-step checklist in CLAUDE.md; contact form mirrors bug_reports table pattern exactly
+- **Phase 3:** Adapter pattern fully specified in ARCHITECTURE.md and STACK.md with working code examples and confirmed live API
+- **Phase 5:** Saved buildings is a standard join table; verification UX patterns are known once the audit runs
 
 ## Confidence Assessment
 
-| Area | Confidence | Basis |
+| Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All core recommendations backed by official Cloudflare, Playwright, and Astro docs; only Artillery (STACK.md) vs autocannon (ARCHITECTURE.md) conflict exists |
-| Features | HIGH | Grounded in direct codebase inspection of existing test infrastructure; coverage gaps are directly observable |
-| Architecture | HIGH | Official Playwright auth docs, Cloudflare D1 docs; file structure and patterns are concrete and actionable |
-| Pitfalls | HIGH | Most pitfalls are based on official docs (D1 FK behavior, vitest isolation, storageState) plus confirmed GitHub issues |
+| Stack | HIGH | All technology decisions verified against live codebase and Cloudflare Workers runtime constraints; CT CAMA API live-tested against real New Haven address |
+| Features | HIGH | Based on direct codebase inspection + competitor analysis; New Haven API blocker resolved by STACK.md live API test |
+| Architecture | HIGH | Based on direct codebase inspection of all relevant files; adapter pattern and dashboard structure fully specified with working code examples |
+| Pitfalls | HIGH | Based on direct inspection of migrations 0001–0018, all API routes, scoring.ts, email.ts, rateLimit.ts; legal pitfalls sourced from FTC and Resend official docs |
 
-**Tool conflict to resolve:** STACK.md recommends `artillery` for load testing; ARCHITECTURE.md recommends `autocannon`. Both are valid. `autocannon` is simpler (no YAML config, pure Node.js API, lighter weight) and better suited to this project's scale. Recommend `autocannon` and skip Artillery unless YAML scenario scripts become necessary.
+**Overall confidence:** HIGH
 
-**One MEDIUM confidence area:** The exact local dev server command for Playwright `webServer`. STACK.md says `wrangler pages dev ./dist` (requires build step, serves compiled output), ARCHITECTURE.md says `npx astro dev` (no build step, faster startup, dev server mode). This must be validated before Phase 3 — run both and confirm which one correctly serves D1 data from `.wrangler/state/`.
+### Gaps to Address
+
+- **New Haven data freshness (MEDIUM concern):** CT CAMA dataset uses 2021 valuation year for assessed values (last statewide revaluation). Owner name data is current per assessor records. Acceptable for human-in-the-loop auto-research, but should be noted in the admin UI alongside New Haven enrichment results. No implementation blocker.
+
+- **Review verification UX current state (must audit before Phase 5):** FEATURES.md notes the current VerificationModal trigger logic is unclear. No implementation should proceed on verification UX redesign until someone reads `ProfileDashboard.tsx` and `VerificationModal.tsx` to document the current state. This gap is intentional — audit gates design.
+
+- **Resend email digest for contact form (design decision needed):** PITFALLS.md recommends batching Resend notifications when more than 5 contact messages arrive in an hour rather than sending one email per submission. The implementation pattern is clear but the batch threshold requires a product decision before Phase 2 implementation.
+
+- **`notification_opt_in` column placement:** Should this be a column on the `users` table (migration required) or a separate `user_preferences` table? PITFALLS.md recommends a users table column for simplicity. Lock this decision before Phase 4 to avoid schema rework.
+
+## Sources
+
+### Primary (HIGH confidence)
+- Direct codebase inspection: `migrations/0001–0018`, `src/pages/api/**`, `src/lib/email.ts`, `src/lib/rateLimit.ts`, `src/lib/scoring.ts`, `src/pages/terms.astro`, `src/pages/contact.astro`, `src/components/profile/ProfileDashboard.tsx`, `src/lib/audit.ts`
+- Live API test: `https://data.ct.gov/resource/pqrn-qghw.json` — CT CAMA Socrata endpoint confirmed for New Haven with full field schema
+- [Cloudflare D1 SQL API docs](https://developers.cloudflare.com/d1/sql-api/d1-sql-api/) — NOT NULL ALTER TABLE constraint behavior
+- [Cloudflare Workers platform limits](https://developers.cloudflare.com/workers/platform/limits/) — stateless runtime, AbortController necessity
+- [CAN-SPAM Act FTC compliance guide](https://www.ftc.gov/business-guidance/resources/can-spam-act-compliance-guide-business) — unsubscribe requirements
+- [Resend anti-spam policy](https://resend.com/legal/anti-spam-policy) — account suspension triggers
+- [Astro Islands Architecture docs](https://docs.astro.build/en/concepts/islands/) — cross-island context sharing constraints
+- [HUD pilot study on landlord Section 8 acceptance](https://www.huduser.gov/portal/pilot-study-landlord-acceptance-hcv.html) — voucher acceptance rates and policy context
+- [2024 CT Parcel and CAMA Data catalog](https://catalog.data.gov/dataset/2024-connecticut-parcel-and-cama-data) — dataset scope and confirmed New Haven coverage
+
+### Secondary (MEDIUM confidence)
+- [ApartmentRatings FAQ](https://www.apartmentratings.com/faq/) — competitor "My Reviews" dashboard patterns
+- [UGC legal checklist — cobrief.app](https://www.cobrief.app/resources/business-checklist-library/legal-issues-with-user-generated-content-free-checklist/) — inline disclaimer proximity guidance
+- [TermsFeed — UGC social media legal requirements](https://www.termsfeed.com/blog/user-generated-content-social-media/) — consent at submission patterns
+- [Real estate adapter pattern — batchdata.io](https://batchdata.io/blog/apis-real-estate-data-enrichment) — multi-source enrichment adapter structure
+- [Contact form storage best practices](https://www.zoho.com/forms/contact-forms/best-practices.html) — D1 as primary, email as secondary delivery
+- [WBEZ Section 8 refusal investigation 2025](https://www.wbez.org/data/2025/05/14/section-8-renters-say-landlords-routinely-reject-their-housing-choice-vouchers) — voucher refusal prevalence
+
+### Tertiary (LOW confidence)
+- [New Haven Vision GIS portal](https://gis.vgsi.com/newhavenct/) — no public API found; CT CAMA state dataset resolved the blocker; Vision GIS endpoint remains undocumented
 
 ---
-
-## Gaps to Address
-
-1. **Local dev server command validation** — Must test whether `astro dev` or `wrangler pages dev` correctly provides D1 binding in the Cloudflare Astro adapter's local mode before writing the `webServer` config.
-
-2. **`db:seed` npm script exact form** — D1 does not support SQL INCLUDE directives. The seed npm script must chain multiple `wrangler d1 execute` calls (one per data file). The exact chained command needs to be written out in full before implementation begins.
-
-3. **Email verification bypass strategy** — For auth flow E2E, the seed must insert pre-verified users (`email_verified = 1`). For testing the verification flow itself, tokens must be read directly from local D1. Confirm the Resend API key is absent from `.dev.vars` before running auth tests.
-
-4. **bcrypt hash generation** — `gen-hashes.ts` must be run once manually before `users.sql` can be written. This is a one-time step that requires access to the app's password hashing function and cannot be skipped.
-
----
-
-## Aggregated Sources
-
-| Source | Confidence | Used By |
-|--------|------------|---------|
-| [Cloudflare D1 Wrangler Commands](https://developers.cloudflare.com/d1/wrangler-commands/) | HIGH | STACK, ARCHITECTURE |
-| [Cloudflare D1 Local Development](https://developers.cloudflare.com/d1/best-practices/local-development/) | HIGH | STACK, ARCHITECTURE, PITFALLS |
-| [Cloudflare D1 Foreign Keys](https://developers.cloudflare.com/d1/sql-api/foreign-keys/) | HIGH | PITFALLS |
-| [Playwright Authentication Docs](https://playwright.dev/docs/auth) | HIGH | STACK, FEATURES, ARCHITECTURE, PITFALLS |
-| [Playwright webServer Docs](https://playwright.dev/docs/test-webserver) | HIGH | ARCHITECTURE |
-| [Playwright Global Setup/Teardown](https://playwright.dev/docs/test-global-setup-teardown) | HIGH | ARCHITECTURE |
-| [Astro Testing Guide](https://docs.astro.build/en/guides/testing/) | HIGH | STACK, ARCHITECTURE |
-| [Astro Cloudflare Integration Docs](https://docs.astro.build/en/guides/integrations-guide/cloudflare/) | HIGH | STACK |
-| [Cloudflare Workers Vitest Integration](https://developers.cloudflare.com/workers/testing/vitest-integration/) | HIGH | FEATURES, PITFALLS |
-| [Vitest Isolation and Concurrency (Cloudflare)](https://developers.cloudflare.com/workers/testing/vitest-integration/isolation-and-concurrency/) | HIGH | PITFALLS |
-| [Faker.js v10 Docs](https://fakerjs.dev/guide/) | HIGH | STACK |
-| [autocannon GitHub](https://github.com/mcollina/autocannon) | HIGH | ARCHITECTURE |
-| [OWASP Top 10:2025 A05 Injection](https://owasp.org/Top10/2025/A05_2025-Injection/) | HIGH | FEATURES |
-| [D1 SQLite Schema, Migrations and Seeds (This Dot Labs)](https://www.thisdot.co/blog/d1-sqlite-schema-migrations-and-seeds) | MEDIUM | STACK, ARCHITECTURE |
-| [Artillery HTTP Engine Docs](https://www.artillery.io/docs/reference/engines/http) | MEDIUM | STACK |
-| [workers-sdk Issue #11028: nodejs_compat breaks vitest](https://github.com/cloudflare/workers-sdk/issues/11028) | MEDIUM | PITFALLS |
-| [Lucia v3 Session Validation](https://v3.lucia-auth.com/guides/validate-session-cookies/) | HIGH | PITFALLS |
-| Direct codebase inspection (`e2e/`, `src/lib/__tests__/`, `scripts/`, `package.json`) | HIGH | FEATURES, ARCHITECTURE |
+*Research completed: 2026-03-20*
+*Ready for roadmap: yes*

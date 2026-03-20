@@ -1,197 +1,248 @@
-# Feature Landscape: QA & Stress Testing (v1.3.0 "Battle Tested")
+# Feature Research
 
-**Domain:** Comprehensive QA milestone for a production tenant housing review web app
-**Researched:** 2026-02-27
-**Stack context:** Astro 5 SSR + Cloudflare Pages/D1 (SQLite) + Lucia Auth + Playwright + Vitest
+**Domain:** Tenant housing review platform — v1.4.0 "Open Doors" milestone
+**Researched:** 2026-03-20
+**Confidence:** MEDIUM-HIGH (competitor patterns from live sites; New Haven API availability is LOW confidence — blocked)
 
----
+## Context
 
-## Existing Test Infrastructure (Baseline)
-
-Understanding what already exists is essential before scoping what to build.
-
-**Already present and working:**
-- Vitest unit tests: 10 test files covering scoring, validation, rateLimit, tokens, audit, disputes, logger, password, formOptions — this is good coverage of lib/ functions
-- Playwright E2E: 2 spec files (pages.spec.ts, navigation.spec.ts) covering unauthenticated page loads, nav links, static page rendering, and auth redirects — surface-level only, no authenticated flows
-- Smoke test script (scripts/smoke-test.ts): hits every public page, checks 200 status and expected content strings — runnable against staging/prod
-- No: authenticated E2E flows (review submission, admin actions, dispute filing), no data seed scripts, no security probing tests, no responsive stress tests
-
-**Gap:** All existing E2E tests are unauthenticated. The most critical user flows — submitting a review, moderation, disputes, admin actions — have zero E2E coverage.
+This is a subsequent milestone research doc. The platform already ships:
+- 27-item structured review survey with weighted scoring
+- Google OAuth + email/password auth with email verification
+- Admin moderation dashboard (9 pages)
+- Landlord dispute form + admin queue
+- Boston-only auto-research via City of Boston Assessing API (CKAN/Socrata)
+- Basic profile page at `/profile` with `ProfileDashboard.tsx` (review list + verification modal)
+- Contact page at `/contact` with static mailto links — no form, no storage
+- Bug report form with D1 storage + Turnstile
 
 ---
 
-## Table Stakes
+## Feature Landscape
 
-Features users (or the dev team) expect. Missing any of these means the QA milestone is incomplete.
+### Table Stakes (Users Expect These)
+
+Features users assume exist on any review platform. Missing these = product feels incomplete.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Realistic seed data (buildings, landlords, reviews, disputes) | UI breaks without data; pagination, scoring, empty states untestable | Medium | Use `wrangler d1 execute --local --file=seed.sql`; target ~20 buildings, 15 landlords, 50-100 reviews, 5-10 disputes. This is the right D1 seeding pattern. |
-| Authenticated E2E: full review submission flow | Core product value; zero coverage today | High | Requires Playwright storageState for session reuse. Must cover: login → search/find building → submit 27-item form → confirm review appears on building profile |
-| Authenticated E2E: auth flows (signup, email verification, signin, signout, password reset) | Auth is the gate to all protected features | High | Email verification requires mocking Resend or using a test email address; password reset token lifecycle must be covered |
-| Authenticated E2E: admin moderation actions | Admin dashboard has 9 sub-pages and 0 E2E coverage | High | Must cover: approve review, reject review, verify building, resolve dispute, view audit log. Requires separate admin storageState fixture. |
-| Authenticated E2E: landlord dispute filing | Full dispute workflow built in v1.2.2 but untested E2E | Medium | Cover: find review → fill dispute form → submit → appears in admin queue → admin resolves |
-| Edge case: long inputs and special characters | SQLite stores them but UI may truncate/break | Medium | Test 200-char title, 5000-char review body, emoji in text fields, Unicode in building names, apostrophes in landlord names |
-| Edge case: form boundary values | Validation logic tested in unit tests but not through the full HTTP stack | Medium | Score = 0, score = 6 (both should 400), rent = -1, rent = 50001, move_in_year in the future, move_out before move_in |
-| Security: auth bypass attempts | Most critical for public-facing site | High | Direct API calls without session cookie → must get 401; non-admin user hitting /api/admin/* → must get 403; accessing another user's data → must be blocked |
-| Security: SQL injection via form fields | Parameterized queries should protect but must be verified | Medium | Test `'; DROP TABLE reviews; --` in text fields, `OR 1=1` in search params |
-| Security: rate limiting enforcement | Fail-closed rate limiter was the focus of v1.2.2 | Medium | Verify that >5 rapid signin attempts returns 429 with correct headers; verify 503 on simulated DB error (unit test already covers this but E2E should confirm the HTTP surface) |
-| UI stress: building profile with many reviews | Aggregate scoring, pagination, layout at 20+ reviews | Medium | Seed one building with 20+ reviews across score ranges; verify score display, color coding, and layout don't break |
-| UI stress: empty state rendering | Many pages have "no results" branches that may have bugs | Low | Verify: search with no results, building with 0 reviews, landlord with 0 buildings, admin queue empty |
-| UI stress: responsive layout at scale | Admin tables with many rows; search results with many buildings | Medium | Test admin reviews table with 50+ rows; search results with 20+ buildings; mobile viewport |
+| See my submitted reviews with clear status | Every review platform has "My Reviews"; "where did my review go?" is the #1 support question | LOW | Infrastructure exists (ProfileDashboard shows review list) — UX clarity is missing |
+| Know what happens after I submit | Review moderation is invisible; creates abandonment and confusion | LOW | Pending/approved/rejected status already in DB; surface with readable labels and explanatory copy |
+| Email verification status is visible | If email verification is required to publish, users must be able to see their state | LOW | VerificationModal exists; trigger UX is unclear from current code |
+| UGC disclaimer on review submission | Legal standard: users must consent before posting; Section 230 protection depends on this | LOW | Missing from submission flow entirely — highest legal risk per unit of effort |
+| UGC disclaimer on review display pages | Readers need to know content is user-submitted and unverified | LOW | Missing from building/landlord profile pages |
+| Contact form (not just mailto links) | Modern platforms don't use raw mailto — it leaks email, abandons message tracking, breaks on mobile | MEDIUM | Current `/contact` is static mailto only; needs D1 storage + Resend notification |
+| Section 8 acceptance visible | Critical for voucher holders — 1 in 3 Boston-area landlords reportedly refuse; high-value signal | MEDIUM | New survey field; requires migration + survey form update + landlord profile display |
 
----
+### Differentiators (Competitive Advantage)
 
-## Differentiators
-
-Features beyond the minimum that meaningfully increase confidence before launch. Valuable but not blocking.
+Features that set RateMyPlace apart. These map to the platform's public-health research mission.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Concurrent submission testing | D1 has no cross-request transactions; concurrent duplicate review submissions from same user could create inconsistencies | Medium | Use `Promise.all()` with multiple API calls at the same time; verify only one review is accepted |
-| Admin audit log accuracy testing | Verify that admin actions actually write correct entries to audit_logs | Medium | Perform approve/reject/verify actions in E2E, then query audit log and assert correct action_type, entity_id, old_value, new_value |
-| Score aggregation correctness at volume | calculateAggregatedScores is unit-tested but not validated against real D1 data | Medium | Seed building with known reviews at known scores, load profile page, assert displayed aggregate matches manual calculation |
-| Token lifecycle edge cases | Email verification and password reset tokens can expire — these flows are untested E2E | High | Requires time manipulation or inserting expired tokens directly in D1; verify expired token shows correct error message, not a 500 |
-| XSS probe via text fields | sanitizeText is unit-tested but server rendering of stored text needs validation | Medium | Submit review with `<script>alert(1)</script>` in review_text; verify the text appears escaped/stripped on the building profile page, not executed |
-| Search edge cases | Search with query string injection, very long queries, queries with no results vs queries with many | Low | Tests cover behavior the smoke test does not |
-| Rate limit header validation | Client-facing rate limit responses should include Retry-After header | Low | Unit test confirms fail-closed behavior; E2E can confirm 429 response structure |
-| Dispute uniqueness constraint | UNIQUE constraint on disputes.review_id is enforced at DB level; test the error surface | Low | Attempt to file a second dispute for the same review; should return an appropriate error, not a 500 |
+| Section 8 acceptance as crowdsourced data | Competitors list apartments but don't crowdsource voucher acceptance; high value for Boston's subsidized housing population | MEDIUM | Tenant-reported (not verified) — needs inline disclosure on landlord profile |
+| Safely lit survey field | Lighting safety is a validated housing quality dimension (PHQS); no competitor captures it at the survey level | LOW | New survey field + migration; clear weight assignment (1.2x, safety-adjacent) |
+| Multi-city auto-research via adapter pattern | Boston-only enrichment limits geographic expansion; abstracted adapters unlock future cities without rewriting the feature | HIGH | Boston adapter works today; New Haven BLOCKED (no public API found — see notes) |
+| Tenant dashboard with verification status | Most apartment review sites have no real logged-in experience; surfacing "your review is pending" reduces admin load | MEDIUM | Extends existing `/profile` — add clear status states, resend email CTA, verification banner |
+| Full review content in admin pending view | Operational: admins currently can't moderate without navigating away from the queue — slows review throughput at launch | LOW | Admin-side only; no user-facing change; high value for a platform with manual moderation |
+| Review verification UX overhaul | Current flow: modal appears with no context about why verification matters. Better: inline prompts, "verify to publish" framing | MEDIUM | Audit current flow first (understand what's broken), then redesign prompt sequence |
 
----
+### Anti-Features (Commonly Requested, Often Problematic)
 
-## Anti-Features
-
-Features to explicitly NOT build for this QA milestone.
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| Chaos engineering / fault injection | Way beyond scope for a pre-launch milestone on a solo-maintained project; tools like Chaos Monkey require infrastructure-level control | Stick to targeted edge-case and concurrent request tests |
-| Visual regression testing (screenshot diffs) | High maintenance burden: needs baseline screenshots, breaks on any styling tweak, requires separate tooling (Percy, Chromatic) | Not justified before first real users; revisit post-launch if regressions become a problem |
-| Fuzzing (automated input mutation) | Tools like AFL/libFuzzer or API fuzzing with Burp Suite are enterprise-grade; overkill when you control all inputs via validation.ts | Manual boundary testing of known input ranges is sufficient |
-| Performance load testing (k6, Locust, Artillery) | Cloudflare Workers auto-scale; D1 bottleneck under real load is a post-launch concern | Instead, seed realistic data volume and observe SSR response times from smoke test ms readings |
-| DAST scanning (OWASP ZAP, Burp Suite) | Heavy tooling requiring a running staging environment with specific configuration; produces many false positives; not calibrated to this app | Manual security spot-checks covering the OWASP Top 10 vectors most relevant to this app are sufficient |
-| Mutation testing | Checks if tests detect code changes; useful for mature test suites; premature when E2E coverage gaps are this large | Fill the coverage gaps first |
-| CI/CD pipeline integration | PROJECT.md does not mention CI setup; setting up GitHub Actions is a separate workstream | Out of scope for this milestone; worth doing post-launch |
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Real-time review status notifications (WebSockets/SSE) | "Notify me when my review is approved" feels modern | Cloudflare Workers has no persistent connections; polling is unnecessary complexity at this scale | Email notification via Resend when review transitions to approved/rejected — simpler, more reliable, already has Resend wired |
+| Saved buildings with complex alert rules | "Watch this building for new reviews" | Requires background job scheduler — not available on Cloudflare Workers without Cron Triggers + significant schema work | Simple saved/bookmarked buildings list with manual re-check first; email digests deferred to v2 |
+| Landlord response to reviews | Landlords want to rebut negative reviews | Explicitly excluded in PROJECT.md; creates adversarial UX and chilling effect on tenant honesty | Dispute form already exists for legitimate factual corrections |
+| Verified resident badge via file upload | "Prove you lived there" via lease or utility bill | File storage requires R2 setup (not in current stack); high privacy risk; systems like this are gameable | Email-domain verification (e.g., `.edu` for student housing) as a lightweight proxy signal; keep existing lease-date range self-report |
+| User-to-user messaging | "Contact the reviewer" | Completely breaks anonymity — the platform's core trust mechanism | All contact routes through the RateMyPlace contact form; reviewer identity stays protected |
+| Automatic property data sync on a schedule | Keep city assessor data fresh automatically | No cron job infrastructure currently; data freshness is secondary to data existence at this stage | Human-in-the-loop auto-research (already built for Boston) is the right pattern; keep it |
+| Mandatory identity verification before review | "Require proof of residency" | Would eliminate most reviews; creates barrier that competitors don't have; enforcement is impossible without file upload | Keep email verification as the gate; add strong UGC disclaimers to manage expectations |
 
 ---
 
 ## Feature Dependencies
 
 ```
-Seed data (buildings, landlords, reviews, disputes)
-  → Required before: UI stress tests, score aggregation tests, admin table tests, pagination tests
+[Contact Form with D1 Storage]
+    └──requires──> [Resend email integration] (already exists)
+    └──requires──> [D1 contact_submissions table] (new migration needed)
+    └──enhances──> [Admin dashboard] (new "Contact" tab or section)
 
-Playwright storageState: regular user session
-  → Required before: review submission E2E, dispute filing E2E, profile page auth tests
+[Tenant Dashboard — Core]
+    └──requires──> [ProfileDashboard.tsx exists] (already exists)
+    └──extends with──> [clear status chips + verification banner + resend CTA]
+    └──enhances──> [Review Verification UX] (dashboard surface for verification prompt)
 
-Playwright storageState: admin session
-  → Required before: all admin moderation E2E tests, audit log accuracy tests
+[Tenant Dashboard — Extended: Saved Buildings]
+    └──requires──> [Tenant Dashboard Core] (build core first)
+    └──requires──> [saved_buildings table] (new migration)
+    └──enhances──> [Building Profile Pages] (save/bookmark button)
 
-Auth E2E (signup flow)
-  → Required before: email verification token lifecycle tests
+[Review Verification UX Overhaul]
+    └──requires──> [audit of current VerificationModal flow] (understand state before changing)
+    └──enhances──> [Tenant Dashboard Core] (dashboard surfaces verification prompt inline)
 
-Rate limiting E2E
-  → Required before: rate limit header validation test
+[Multi-city Auto-Research]
+    └──requires──> [Boston adapter refactor] (extract current Boston logic to CityAdapter interface)
+    └──requires──> [New Haven API feasibility spike] (BLOCKED — no public API found; Vision GIS has no documented endpoint)
+
+[Section 8 Survey Field]
+    └──requires──> [new migration] (add section_8_accepted column to reviews)
+    └──requires──> [surveyItems.ts update]
+    └──requires──> [ReviewForm.tsx update]
+    └──enhances──> [Landlord profile page] (display aggregated acceptance percentage)
+
+[Safely Lit Survey Field]
+    └──requires──> [new migration] (add safely_lit column to reviews)
+    └──requires──> [surveyItems.ts update]
+    └──enhances──> [scoring.ts] (building dimension, 1.2x weight)
+
+[UGC Disclaimers]
+    └──no hard dependencies──> standalone additions
+    └──enhances──> [Review submission form] (consent checkbox before submit button)
+    └──enhances──> [Building/landlord profile pages] (disclaimer banner)
+    └──enhances──> [Terms of Service page] (add UGC clause)
+
+[Move-in Date Seasonal Display Bug]
+    └──no dependencies──> isolated bug fix in date formatting logic
 ```
 
----
+### Dependency Notes
 
-## User Flows That Need E2E Coverage
-
-Ordered from most critical to least critical. All of these currently have zero Playwright coverage.
-
-**Critical (must cover):**
-
-1. **Review submission** — Sign in → navigate to `/review/new` → select building via address autocomplete (or enter direct building ID) → fill 27-item form with valid scores → submit → redirected to building profile → review appears with correct scores
-2. **Admin: review moderation** — Sign in as admin → go to `/admin/reviews` → approve a pending review → verify status changes → verify audit log entry created
-3. **Admin: dispute resolution** — Sign in as admin → go to `/admin/disputes` → view dispute detail → mark as resolved → verify status updates
-4. **Auth: signup + email verification** — Sign up with email → receive verification link (use test token inserted directly into D1 for local runs) → follow link → account marked verified → can submit reviews
-5. **Auth: password reset** — Request reset for existing email → receive email (or use inserted token) → follow reset link → set new password → sign in with new password
-
-**High priority:**
-
-6. **Landlord dispute filing** — Unauthenticated user (or any user) → navigate to building profile → find a review → click "Dispute this review" → fill dispute form with valid reasons → submit → 200 response → dispute appears in admin queue
-7. **Building profile rendering at scale** — Load building profile seeded with 20+ reviews → verify aggregate score displays correctly → verify all review cards render → no layout overflow on mobile
-8. **Admin: building verification** — Admin marks building as verified → building profile shows verified badge (if applicable)
-
-**Medium priority:**
-
-9. **Search and discovery** — Search by address fragment → results appear → click building → profile loads correctly
-10. **Profile page: user's own reviews** — Sign in → navigate to `/profile` → own submitted reviews are listed → edit review works (if edit is supported)
+- **Tenant dashboard extended requires core first:** Do not build the saved buildings tab before the core dashboard (status + verification + settings) is stabilized. Adding scope to a broken UX creates compounding rework.
+- **Multi-city auto-research is partially blocked:** New Haven does not appear to have a public CKAN/Socrata API. Vision Government Solutions at `gis.vgsi.com/newhavenct/` is a web UI with no documented public API endpoint. The Boston adapter refactor (extracting the interface) is unblocked and should ship in v1.4.0. New Haven implementation requires a separate feasibility spike.
+- **Review verification UX requires audit first:** The current `VerificationModal` is triggered from `ProfileDashboard.tsx` but the trigger logic and copy framing are unclear. An audit must precede redesign to avoid breaking the flow for already-verified users.
+- **UGC disclaimers are fully independent:** No runtime dependencies on any other v1.4.0 feature. Highest legal risk mitigation per unit of effort — do these early.
+- **Survey fields share a migration pattern:** Section 8 and safely lit can be added in the same migration file (`0019_new_survey_fields.sql`) to minimize migration count.
 
 ---
 
-## Data Volumes That Reveal Real Issues
+## MVP Definition (v1.4.0 scope)
 
-These numbers are calibrated for a pre-launch QA milestone — enough to surface real bugs, not so large they slow down local D1.
+### Launch With (v1.4.0)
 
-| Entity | Minimum Volume | What It Tests |
-|--------|---------------|---------------|
-| Buildings | 20-30 | Search pagination, admin buildings table with multiple rows, profile page rendering |
-| Landlords | 10-15 | Landlord profile page, aggregate multi-building scoring |
-| Reviews | 50-100 | Score aggregation accuracy, admin reviews table pagination, recency weighting with mixed years |
-| Users | 10-15 | Admin users table, one-review-per-user policy testing, rate limit testing per IP |
-| Disputes | 5-10 | Admin disputes queue, uniqueness constraint, resolution workflow |
-| Audit log entries | 20-30 | Audit log pagination, viewer rendering, search/filter (if any) |
+These unblock real-user launch or carry legal/trust risk if absent.
 
-**Distribution guidance for reviews:**
-- At least one building should have 20+ reviews (stress-tests aggregation and layout)
-- At least one building should have 0 reviews (tests empty state)
-- Reviews should span score range 1-5 with realistic distribution (not all 5s)
-- Reviews should include both current tenants and former tenants (tests `is_current_tenant` branch)
-- At least one review should have a long `review_text` (near 5000 chars) and at least one should have `NULL` text
-- Mix `move_in_year` across 2019-2025 to exercise recency weighting
-- Include reviews with `would_recommend_new` = 'yes', 'no', and 'maybe'
+- [ ] Fix move-in date seasonal display bug — visible data quality issue; erodes trust on first impression
+- [ ] UGC disclaimers (submission flow consent + review display pages + ToS update) — legal requirement; Section 230 protection; no other feature matters if this is missing
+- [ ] Contact form with D1 storage + Resend notification — replaces static mailto; creates admin-accessible message log; enables real user support
+- [ ] Full review content in admin pending view — unblocks faster moderation at launch without additional tooling
+- [ ] Review verification UX improvements (audit first, then implement) — current flow has unclear trigger; new users will be confused and leave reviews unpublished
+- [ ] Tenant dashboard core (review status labels, email verification status, resend CTA, account settings) — users need self-service; eliminates support requests on "where is my review"
+- [ ] Section 8 acceptance survey field — high-value for Boston's subsidized housing population; public health mission alignment
+- [ ] Safely lit survey field — maps to PHQS safety domain; low effort, meaningful signal
+- [ ] Multi-city auto-research: Boston adapter refactor only — New Haven deferred
 
----
+### Add After Validation (v1.x)
 
-## MVP Recommendation
+- [ ] Tenant dashboard extended: saved buildings list — add once core dashboard has real usage data
+- [ ] Tenant dashboard: email notification on review status change — Resend template + trigger in admin moderation action; low complexity but non-essential for launch
+- [ ] New Haven auto-research — blocked on API availability; requires feasibility spike first
 
-For a pre-launch milestone, prioritize in this order:
+### Future Consideration (v2+)
 
-**Phase 1: Foundation (blockers for everything else)**
-1. Seed script with realistic data at target volumes
-2. Playwright storageState setup for regular user + admin sessions
-3. Authenticated E2E: review submission (the core user flow)
-4. Authenticated E2E: admin moderation (approve, reject reviews)
-
-**Phase 2: Coverage expansion**
-5. Auth flow E2E: signup, verification, password reset
-6. Dispute flow E2E: filing and admin resolution
-7. Security spot-checks: auth bypass, admin access control, SQL injection probe, XSS probe
-8. Edge case: form boundary values through the HTTP stack
-
-**Phase 3: Stress and polish**
-9. UI stress: building profile at volume (20+ reviews)
-10. UI stress: empty states across all pages
-11. Responsive layout: admin tables with many rows at mobile viewport
-12. Concurrent submission test: duplicate prevention
-
-**Defer entirely:**
-- Visual regression snapshots
-- Chaos testing / fault injection
-- Load testing / performance benchmarking
-- CI/CD pipeline
+- [ ] Email notification digests (weekly saved-building activity) — requires Cloudflare Cron Triggers infrastructure
+- [ ] Verified resident badge — requires R2 file storage or external identity service
+- [ ] Multi-language support — in PROJECT.md as v2.0 deferred
+- [ ] Landlord response features — explicitly excluded in PROJECT.md
 
 ---
 
-## Implementation Notes
+## Feature Prioritization Matrix
 
-**Seed script approach:** Use `wrangler d1 execute ratemyplace-db --local --file=scripts/seed.sql` for local runs. Write a separate TypeScript generator (similar to existing `scripts/smoke-test.ts` pattern) that outputs SQL `INSERT` statements. This keeps the seed portable and reviewable. Passwords in seed users must use the same bcrypt/argon2 hash the app uses — generate via the app's own password hashing function, not hardcoded strings. Session tokens for storageState can bypass this by inserting directly into the `sessions` table with a known session ID.
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| Move-in date bug fix | MEDIUM | LOW | P1 |
+| UGC disclaimers | HIGH (legal) | LOW | P1 |
+| Contact form + D1 storage | MEDIUM | MEDIUM | P1 |
+| Full review content in admin pending view | HIGH (ops) | LOW | P1 |
+| Review verification UX audit + fix | HIGH | MEDIUM | P1 |
+| Tenant dashboard — core | HIGH | MEDIUM | P1 |
+| Section 8 survey field | HIGH | LOW | P1 |
+| Safely lit survey field | MEDIUM | LOW | P1 |
+| Multi-city auto-research (Boston refactor only) | MEDIUM | MEDIUM | P2 |
+| Tenant dashboard — saved buildings | MEDIUM | MEDIUM | P2 |
+| Tenant dashboard — email notifications | LOW | LOW | P2 |
+| New Haven auto-research | LOW | HIGH (blocked) | P3 |
 
-**Playwright auth setup:** Use a `playwright/global-setup.ts` that performs UI login once per role and saves `storageState` to `playwright/.auth/user.json` and `playwright/.auth/admin.json`. Add these to `.gitignore`. Individual test files declare which role they need via `test.use({ storageState: ... })`. This is the official Playwright recommendation and avoids the 5-15s login penalty per test.
+**Priority key:**
+- P1: Must have for v1.4.0 launch
+- P2: Add once P1 features are shipping and stable
+- P3: Defer until infrastructure or API is available
 
-**Cloudflare Workers Vitest integration:** The `@cloudflare/vitest-pool-workers` package runs Vitest inside the Workers runtime with real D1 bindings. This is ideal for integration tests of API route handlers. However, the existing unit tests run in Node/happy-dom via standard Vitest — mixing both pools requires separate config files. For this milestone, it is not necessary to migrate unit tests; new API-level integration tests can use a separate `vitest.workers.config.ts` if needed. This is medium-complexity and should be deferred unless a specific API behavior cannot be tested otherwise.
+---
 
-**D1 + SQLite constraint:** D1 has no cross-request transactions. The UNIQUE constraint on `disputes.review_id` is enforced at the DB level, so a concurrent duplicate dispute submission may result in a 500 rather than a clean 409 — this is worth verifying and documenting as a known behavior if not worth fixing.
+## Competitor Feature Analysis
+
+Platforms in the tenant-review or housing-review space, patterns observed from public UIs.
+
+| Feature | ApartmentRatings.com | Zillow/Apartments.com | Our Approach |
+|---------|---------------------|----------------------|--------------|
+| Tenant dashboard | "My Reviews" control panel with edit/delete | "Saved homes" list; no review management | Full dashboard: review status + verification state + settings + (later) saved buildings |
+| Review status visibility | Not visible after submission | N/A (no moderation queue) | Explicit status chips: Pending / Under Review / Published / Rejected with copy explaining each state |
+| Review verification | Account creation only; no tenancy proof | None | Email-domain verification + lease date self-report (existing); UX overhaul in v1.4.0 |
+| UGC disclaimers | Inline text on review pages ("reviews reflect individual opinions") | ToS-gated consent on submission | Both: consent checkbox on submit + banner on display pages |
+| Contact mechanism | Standard web form | Help center + web form | Web form with D1 storage + Resend admin notification + Turnstile protection |
+| Section 8 info | Not captured | Listing field (landlord-controlled, biased) | Crowdsourced tenant-reported — more honest signal than landlord-reported |
+| Property data enrichment | None | Zillow proprietary data | City open-data APIs with human-in-the-loop review |
+| Saved/bookmarked properties | Not present | Core feature | Simple save list in v1.4.x; no complex alerts |
+
+---
+
+## Implementation Notes by Feature
+
+### UGC Disclaimers
+Three additions, no new pages:
+1. Consent checkbox on review submission form: "I certify this reflects my genuine experience and I agree to the [Community Guidelines]" — must be checked to enable submit button.
+2. Disclaimer banner on building/landlord profile pages: "Reviews are submitted by community members and reflect individual experiences. RateMyPlace does not verify tenancy."
+3. UGC clause added to existing `/terms` page (not a new page).
+
+### Contact Form
+Pattern: POST to `/api/contact` → insert into `contact_submissions` D1 table → trigger Resend email to admin with subject + message preview. Fields: subject (dropdown: General / Privacy / Press / Bug / Other), message (textarea), optional name, email (pre-filled if logged in). Add Turnstile (already used on bug report form — reuse that pattern). Add submissions list to admin dashboard (new tab or existing admin section).
+
+### Tenant Dashboard — Core
+Existing `/profile` + `ProfileDashboard.tsx` already shows review list. Additions:
+1. Status chips on each review: Pending / Under Review / Published / Rejected with 1-line explanation per state.
+2. Prominent email verification banner at top when `emailVerified === false` with inline resend button.
+3. Account settings tab: change display name, delete account request.
+No new page — extend existing component with tabs.
+
+### Tenant Dashboard — Extended (Saved Buildings)
+New `saved_buildings` table: `(id, user_id, building_id, created_at)`. Save/unsave button on building profile pages. Dashboard "Saved" tab lists buildings with current score and address. No notifications in this iteration.
+
+### Review Verification UX
+Audit required first. Current state: `VerificationModal` appears when user clicks a "Verify" button on a review list item in ProfileDashboard. Questions to answer before redesigning: Is the modal triggered automatically for unverified reviews? What copy does it show? Is there any prompt for users who haven't submitted verification? After audit: add inline banner at top of review list when any review is unverified, with copy explaining verification increases credibility and prevents removal during moderation.
+
+### Multi-City Auto-Research (Adapter Pattern)
+Boston implementation lives inline in `/api/admin/buildings/[id]/enrich`. Refactor: extract a `CityAdapter` interface with `enrich(address: string): Promise<EnrichmentResult>`. Boston adapter wraps existing CKAN logic unchanged. New Haven adapter: **blocked** — Vision Government Solutions at `gis.vgsi.com/newhavenct/` has no documented public API. Options: (a) contact New Haven city plan dept for data access, (b) defer and ship Boston refactor only. Recommendation: ship adapter abstraction + Boston adapter in v1.4.0; New Haven as a post-launch spike.
+
+### New Survey Fields
+Both follow the established pattern: migration → `surveyItems.ts` → `scoring.ts` domain array + weight → `ReviewForm.tsx` → `ReviewCard.astro`.
+- **Section 8 acceptance**: Boolean on landlord dimension (does this landlord accept housing vouchers?). Display on landlord profile as "X% of reviewers reported this landlord accepts Section 8." Weight: 1.0x (policy factor, not health/safety). Inline disclosure: "Based on tenant reports — not officially verified."
+- **Safely lit**: Boolean on building dimension (are exterior and common areas adequately lit at night?). Weight: 1.2x (safety-adjacent; aligns with PHQS safety domain). Can go in same migration as Section 8.
+
+### Move-in Date Seasonal Display Bug
+Isolated fix. Bug is in date formatting/display logic — likely a timezone offset issue causing dates to show as the prior month when `move_in_month` is rendered. Fix in the component that formats month/year display; no schema change needed.
 
 ---
 
 ## Sources
 
-- [Playwright Authentication Docs](https://playwright.dev/docs/auth) — storageState, global setup, multi-role patterns (HIGH confidence, official)
-- [Cloudflare Workers Vitest Integration](https://developers.cloudflare.com/workers/testing/vitest-integration/) — @cloudflare/vitest-pool-workers, Workers runtime testing (HIGH confidence, official)
-- [Cloudflare D1 Local Development](https://developers.cloudflare.com/d1/best-practices/local-development/) — wrangler d1 execute --local --file seeding pattern (HIGH confidence, official)
-- [OWASP Top 10:2025 A05 Injection](https://owasp.org/Top10/2025/A05_2025-Injection/) — Injection testing methodology (HIGH confidence, official)
-- [D1 SQLite: Schema, Migrations and Seeds - This Dot Labs](https://www.thisdot.co/blog/d1-sqlite-schema-migrations-and-seeds) — Practical D1 seeding patterns (MEDIUM confidence, verified against official D1 docs)
-- Existing codebase inspection: `e2e/`, `src/lib/__tests__/`, `scripts/smoke-test.ts`, `package.json` — direct evidence of current test infrastructure (HIGH confidence, direct observation)
+- [ApartmentRatings FAQ — "My Reviews" control panel](https://www.apartmentratings.com/faq/) — MEDIUM confidence
+- [ApartmentRatings platform overview 2026](https://rentalrealestate.com/tools/apartmentratings/) — MEDIUM confidence
+- [UGC legal checklist — key disclaimer components](https://www.cobrief.app/resources/business-checklist-library/legal-issues-with-user-generated-content-free-checklist/) — MEDIUM confidence
+- [TermsFeed — UGC social media legal requirements](https://www.termsfeed.com/blog/user-generated-content-social-media/) — MEDIUM confidence
+- [New Haven Vision GIS portal — no public API found](https://gis.vgsi.com/newhavenct/) — LOW confidence (absence of evidence)
+- [New Haven Assessor's Office](https://www.newhavenct.gov/government/departments-divisions/assessor-s-office) — MEDIUM confidence
+- [HUD pilot study on landlord Section 8 acceptance](https://www.huduser.gov/portal/pilot-study-landlord-acceptance-hcv.html) — HIGH confidence (official HUD research)
+- [Section 8 landlord refusal patterns — WBEZ Chicago investigation 2025](https://www.wbez.org/data/2025/05/14/section-8-renters-say-landlords-routinely-reject-their-housing-choice-vouchers) — MEDIUM confidence
+- [Real estate adapter pattern for multi-source data enrichment](https://batchdata.io/blog/apis-real-estate-data-enrichment) — MEDIUM confidence
+- [Contact form storage best practices 2026](https://www.zoho.com/forms/contact-forms/best-practices.html) — MEDIUM confidence
+- [Identity verification async UX pattern](https://lumitech.co/insights/design-secure-id-systems) — MEDIUM confidence
+- Existing codebase inspection: `src/pages/contact.astro`, `src/components/profile/ProfileDashboard.tsx`, `src/pages/profile.astro`, `migrations/` — HIGH confidence (direct observation)
+
+---
+
+*Feature research for: RateMyPlace — v1.4.0 "Open Doors" milestone*
+*Researched: 2026-03-20*

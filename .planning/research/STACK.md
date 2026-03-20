@@ -1,249 +1,308 @@
-# Technology Stack: QA & Stress Testing Additions
+# Stack Research
 
-**Project:** RateMyPlace Boston — v1.3.0 "Battle Tested"
-**Researched:** 2026-02-27
-**Scope:** NEW additions only — tools needed for E2E, seeding, load testing, edge case validation
-
----
-
-## Existing Stack (DO NOT RE-RESEARCH)
-
-These are already installed and working. Do not modify or replace them:
-
-| Tool | Version | Status |
-|------|---------|--------|
-| `@playwright/test` | `^1.58.2` | Installed, 2 spec files, runs against production URL |
-| `vitest` | `^4.0.18` | Installed, 130 tests passing, happy-dom environment |
-| `tsx` | `^4.21.0` | Installed, used for `scripts/smoke-test.ts` |
-| `wrangler` | (via npx) | Used for D1 migrations |
+**Domain:** Tenant housing review platform — v1.4.0 "Open Doors" feature additions
+**Researched:** 2026-03-20
+**Confidence:** HIGH (existing stack verified; new additions verified via live API testing and codebase review)
 
 ---
 
-## What Needs to Be Added
+## Existing Stack (Do Not Re-Research)
 
-The current E2E setup has critical gaps:
+The following are validated and in production. This document covers only what is NEW for v1.4.0.
 
-1. **No authenticated test flows** — Playwright runs against production with no auth state. Admin flows, review submission, disputes are all untested.
-2. **No local test environment** — Tests run against the deployed preview URL. No way to test with controlled data or reset state.
-3. **No test data** — No seeded buildings, reviews, or landlords to test against at realistic scale.
-4. **No load testing** — No performance validation for concurrent users, rate limiting behavior, or response times at scale.
-
----
-
-## Recommended Stack Additions
-
-### 1. Data Seeding — SQL-file approach (no new packages)
-
-**What:** TypeScript script that generates SQL INSERT statements and pipes them to `wrangler d1 execute --local --file`
-
-**Why this over alternatives:**
-- `@faker-js/faker` for generation in TypeScript, but the output is SQL fed to wrangler — no ORM needed
-- `drizzle-seed` requires adding Drizzle ORM as a dep, which the project doesn't use
-- `@wataru/seed-d1` (JSR package) is niche, low adoption, adds a dependency for trivial functionality
-- Raw SQL via `wrangler d1 execute DB --local --file ./scripts/seed.sql` is the official Cloudflare-documented pattern (HIGH confidence: [Cloudflare D1 docs](https://developers.cloudflare.com/d1/wrangler-commands/))
-
-**Packages to add:**
-
-| Package | Version | Purpose | Install as |
-|---------|---------|---------|------------|
-| `@faker-js/faker` | `^10.3.0` | Realistic fake data generation (names, addresses, text) | `devDependency` |
-
-**Pattern:** `scripts/seed-local.ts` uses faker to generate TypeScript objects, serializes to SQL INSERT statements, writes a temp `.sql` file, then shells out to `wrangler d1 execute ratemyplace-db --local --file ./tmp/seed.sql`. `tsx` (already installed) runs it.
-
-**Confidence:** HIGH — faker v10 is current, TypeScript-native, no new runtime deps needed.
+| Technology | Version (current) | Status |
+|------------|-------------------|--------|
+| Astro | 5.16.11 | Locked — do not upgrade mid-milestone |
+| @astrojs/cloudflare | 12.6.12 | Locked |
+| @astrojs/react | 3.6.3 | Locked |
+| React / React DOM | 18.3.1 | Locked — Cloudflare Workers requires React 18 |
+| Lucia | 3.2.2 | Locked |
+| Tailwind CSS | 4.1.18 | Locked |
+| Resend | 6.9.2 | Locked |
+| D1 / SQLite | CF managed | Locked |
 
 ---
 
-### 2. Playwright Auth State — `storageState` pattern (no new packages)
+## New Stack Decisions for v1.4.0
 
-**What:** Playwright's built-in `storageState` API to save and reuse authenticated sessions.
+### No New NPM Dependencies Required
 
-**Why:** Current `playwright.config.ts` has no auth setup. Tests can't reach `/admin`, `/review/new`, `/profile`, or any form that requires a session cookie (Lucia uses httpOnly cookies). `storageState` captures all cookies including httpOnly and replays them, which is exactly what Lucia's session cookie requires.
-
-**No new packages needed** — this is built into `@playwright/test` (already installed).
-
-**Pattern:**
-- Add `e2e/auth.setup.ts` — logs in as regular user via form, saves to `playwright/.auth/user.json`
-- Add `e2e/admin.setup.ts` — logs in as admin user, saves to `playwright/.auth/admin.json`
-- Update `playwright.config.ts` to add setup projects and `storageState` dependency
-- Add `playwright/.auth/` to `.gitignore`
-
-**Confidence:** HIGH — official Playwright pattern ([Playwright auth docs](https://playwright.dev/docs/auth)), confirmed compatible with cookie-based auth.
+All v1.4.0 features can be implemented with the existing stack. The analysis below explains why for each feature area.
 
 ---
 
-### 3. Playwright Local Dev Server — `webServer` + `wrangler pages dev` (no new packages)
+## Feature: Tenant Dashboard (Core + Extended)
 
-**What:** Playwright `webServer` option to spin up a local server before E2E tests run, pointing to `localhost` instead of the production preview URL.
+### Recommended Pattern: Single React Island with URL Hash Routing
 
-**Why this matters:** Current config uses `baseURL: 'https://b3b57132.ratemyplace-64y.pages.dev'` — a deployed preview URL. Problems:
-- Cannot reset data between test runs
-- Test data pollutes production preview
-- Cannot test with seeded fixture data
-- Network-dependent (flaky in CI)
+**Decision:** One React component (`TenantDashboard.tsx`) rendered with `client:load` on a dedicated `/dashboard` Astro page. Tab state is driven by `window.location.hash` (`#reviews`, `#saved`, `#notifications`, `#settings`).
 
-**`wrangler pages dev` vs `astro preview`:**
-- `astro preview` does NOT wire up Cloudflare bindings (D1, R2) — confirmed by Cloudflare docs
-- `wrangler pages dev ./dist` correctly proxies D1 local database (stored in `.wrangler/state/`) and honors `wrangler.jsonc` bindings
-- This is the correct command for accurate local simulation ([Astro Cloudflare integration docs](https://docs.astro.build/en/guides/integrations-guide/cloudflare/))
+**Why this pattern over alternatives:**
 
-**Playwright config change:**
-```typescript
-webServer: {
-  command: 'npm run build && npx wrangler pages dev ./dist --port 8788',
-  port: 8788,
-  timeout: 60_000,
-  reuseExistingServer: !process.env.CI,
-},
-use: {
-  baseURL: 'http://localhost:8788',
-}
+Astro islands cannot share React context across island boundaries. Splitting dashboard tabs into separate islands would require a custom pub/sub mechanism or localStorage to share state (e.g., unread notification counts updating the tab badge). A single island avoids this entirely.
+
+Hash routing requires zero dependencies. `window.location.hash` and `hashchange` events are native browser APIs available in Cloudflare Workers context. Tab state survives page refresh and is bookmarkable with no router library needed.
+
+**SSR data pattern:** Pass initial server-fetched data from the Astro page as props to the island. The island can re-fetch on tab switch for freshness. This prevents flash-of-empty-content on initial load while keeping data current.
+
+```astro
+<!-- src/pages/dashboard.astro -->
+<TenantDashboard
+  client:load
+  userId={locals.user.id}
+  initialReviews={userReviews}
+/>
 ```
 
-**Note:** Build step is required because `wrangler pages dev` serves the compiled `dist/` output, not source files.
+**Why NOT to add a tab library (Radix Tabs, Headless UI, etc.):**
+Dashboard tabs are three `<button onClick>` elements and a conditional render. A headless UI tab library adds 5–15 KB of bundle for functionality that is trivial in React. The existing codebase uses no UI component libraries — stay consistent.
 
-**Confidence:** MEDIUM — documented pattern, but build+start adds ~30s to test startup. Alternative: separate `prebuild` step in CI, then `reuseExistingServer: true`.
-
----
-
-### 4. Load Testing — Artillery (new package, optional)
-
-**What:** Artillery for HTTP load testing against the deployed URL — simulating concurrent users hitting public endpoints and the review submission flow.
-
-**Why Artillery over alternatives:**
-
-| Tool | Verdict | Reason |
-|------|---------|--------|
-| **Artillery** | RECOMMENDED | YAML config, Node.js native, ships as npm package, supports cookie sessions, 2.0.30 current stable |
-| k6 | Avoid for this project | Go binary, not npm-installable, requires separate install, overkill for the test volume here |
-| Locust | Avoid | Python, adds a separate runtime |
-| JMeter | Avoid | Java, GUI-heavy, bad DX for a small project |
-
-Artillery v2 is npm-installable, supports:
-- Cookie-based sessions (needed to test rate limiting after auth)
-- YAML scenario scripts (simple, no complex JS required for basic flows)
-- HTTP metrics: response times, error rates, RPS
-- `--count` and ramp-up phases
-
-**Packages to add:**
-
-| Package | Version | Purpose | Install as |
-|---------|---------|---------|------------|
-| `artillery` | `^2.0.30` | HTTP load testing for rate limiting validation and concurrent user simulation | `devDependency` |
-
-**What it tests:** Public page response times under load (homepage, search, building profiles), rate limiting behavior (auth endpoints hit >5 req/min), concurrent review submissions.
-
-**Important constraint:** Cloudflare Workers free tier has burst limits. Load tests should target the deployed preview URL (not production), or limit concurrency to avoid triggering Cloudflare's abuse protection (6000 RPM from 600 virtual users is the documented safe upper limit for paid plans; free tier is much lower).
-
-**Confidence:** MEDIUM — Artillery 2.0.30 confirmed current via npm search. Cookie session support confirmed via Artillery HTTP engine docs, though httpOnly cookie handling has known quirks (GitHub issue #354).
+**Confidence:** HIGH — this is the standard Astro SSR + island pattern used in the existing admin dashboard pages.
 
 ---
 
-### 5. Edge Case & Boundary Testing — Playwright `route.fulfill` (no new packages)
+## Feature: Tenant Notifications (In-App)
 
-**What:** Playwright's built-in network interception API to simulate error states, empty databases, and slow responses without needing special server configuration.
+### Recommended Pattern: D1 Polling on Focus, NOT Web Push
 
-**Why:** The app needs testing for: empty search results, building with no reviews, admin with 0 items in queue, form submissions with 1000-char inputs, special characters (Unicode, SQL injection attempts, XSS payloads). Playwright's `page.route()` handles the network-layer cases; form boundary tests are pure Playwright `page.fill()` operations.
+**Decision:** Store notifications in a D1 `notifications` table. Poll via `fetch('/api/user/notifications')` on component mount and on `visibilitychange` (tab regains focus). No browser push, no service worker, no WebSocket.
 
-**No new packages needed** — built into `@playwright/test`.
+**Why polling, not push:**
 
-**Pattern:**
-```typescript
-// Simulate empty building profile
-await page.route('**/api/buildings/*', route => route.fulfill({
-  status: 200,
-  body: JSON.stringify({ building: null, reviews: [] }),
-}));
+Cloudflare Workers are stateless request handlers. There is no persistent connection to push from. Durable Objects could enable WebSocket-based push, but that is a significant architectural addition (new binding, new worker class) for notification types that do not warrant real-time delivery (review approved, building saved). Users checking their dashboard will see current state immediately.
+
+Web Push requires a service worker, VAPID key pair management, push subscription storage, and user opt-in UI. For "your review was approved" notifications, this is engineering overhead that exceeds the user value.
+
+Resend (already integrated) covers email notifications, which are the higher-value delivery channel. In-app notifications are the secondary channel — polling is appropriate.
+
+**Polling strategy:** Fetch on mount + on `visibilitychange` (when user returns to tab). No interval polling. Fire-and-forget on user attention signals only.
+
+**Confidence:** HIGH — verified against Cloudflare Workers runtime constraints.
+
+---
+
+## Feature: Multi-City Auto-Research (Boston + New Haven)
+
+### Boston (Existing — No Changes)
+
+CKAN `datastore_search` API on `data.boston.gov`. Resource ID `ee73430d-96c0-423e-ad21-c4cfb54c8961`. Fully implemented in `src/pages/api/admin/buildings/[id]/enrich.ts`. No modifications needed.
+
+### New Haven (New Addition)
+
+**Decision:** Use the Connecticut state CAMA dataset on `data.ct.gov` (Socrata SODA API).
+
+**Verified endpoint:** `https://data.ct.gov/resource/pqrn-qghw.json`
+
+**Live API verification confirmed:** A direct query to this endpoint for New Haven, 187 County St returned a complete record with owner name, assessed/appraised totals, year built, bedroom/bath counts, building style, and condition. The endpoint is publicly accessible with no API key required.
+
+**Working query pattern (Socrata SODA):**
+```
+GET https://data.ct.gov/resource/pqrn-qghw.json?
+  property_city=New Haven
+  &address_number=187
+  &street_name=COUNTY ST
+  &$limit=10
 ```
 
-**Confidence:** HIGH — core Playwright API, stable across versions.
+Note: `property_city` uses mixed case "New Haven" (verified). `street_name` should be UPPER case to match stored values.
+
+**Key field mappings for the adapter:**
+
+| CT CAMA Field | Maps to Existing Output Pattern | Notes |
+|---------------|--------------------------------|-------|
+| `address_number` | `address.number` | Direct |
+| `street_name` | `address.street` | Stored in UPPER — normalize input |
+| `property_city` | `address.city` | "New Haven" mixed case |
+| `owner` | `owner` | Direct |
+| `co_owner` | Available | No Boston equivalent |
+| `ayb` | `yearBuilt` | Actual Year Built |
+| `eyb` | `yearBuilt` fallback | Effective Year Built (use if `ayb` is 0) |
+| `number_of_bedroom` | Available as new field | Not in current Boston output |
+| `number_of_baths` | Available as new field | Not in current Boston output |
+| `state_use_description` | `buildingType` | "Condominium", "Two Family", etc. |
+| `assessed_total` | `totalValue` | Assessed total |
+| `appraised_total` | Available | Appraised (market) value also present |
+| `stories` | Available as new field | Not in current Boston output |
+| `condition_description` | `overallCondition` | "Good", "Average", "Fair" |
+| `grade_desc` | Available | "Average", "Above Average", etc. |
+
+**Data freshness:** Dataset is "2024 Connecticut Parcel and CAMA Data". Valuation year in tested records is 2021 (last statewide revaluation). Owner data reflects current assessor records. This is acceptable for the human-in-the-loop auto-research use case where an admin reviews results before applying.
+
+**Adapter pattern implementation:**
+
+Refactor the enrich endpoint to use a city-routing adapter pattern:
+
+```
+src/lib/enrichAdapters/
+  index.ts          — routes by building.city to correct adapter, exports EnrichResult interface
+  boston.ts         — Boston CKAN logic extracted from current enrich.ts
+  newHaven.ts       — New CT CAMA Socrata adapter
+```
+
+The `EnrichResult` interface stays identical between adapters. The API route at `src/pages/api/admin/buildings/[id]/enrich.ts` becomes a thin router.
+
+No new dependencies. Both APIs are plain `fetch()` calls. Zero npm additions.
+
+**Confidence:** HIGH — live API verified, field schema confirmed, adapter pattern maps directly to existing code structure.
+
+**Alternative considered: Regrid API**
+
+Regrid has Connecticut parcel coverage and a polished address lookup API. Rejected because: (1) paid service with pricing requiring a sales contact — opaque cost for an open-source civic tool, (2) the free CT state CAMA dataset covers New Haven at no cost and confirmed working, (3) external paid dependency adds SLA and budget risk. Regrid is the right choice only if the state dataset proves insufficient for other cities in future milestones (small CT towns may lack coverage in the state dataset).
+
+**Confidence on CT CAMA coverage:** MEDIUM — confirmed for New Haven; coverage for smaller CT towns not verified. This is a v1.4.0 concern only for New Haven.
 
 ---
 
-## Installation Summary
+## Feature: Contact Form with D1 Storage
 
-```bash
-# Add to devDependencies
-npm install -D @faker-js/faker artillery
+### No New Dependencies
+
+The contact form uses only existing patterns:
+
+- Turnstile (already integrated) for bot protection on the public form
+- D1 for submission storage (`contact_submissions` table, migration 0019)
+- Resend (already integrated) for admin notification email on new submissions
+- Standard Astro API route (`POST /api/contact`) + React island form component
+
+**D1 table design:**
+```sql
+-- migration 0019_contact_submissions.sql
+CREATE TABLE contact_submissions (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  message TEXT NOT NULL,
+  user_id TEXT,
+  status TEXT NOT NULL DEFAULT 'new',
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  resolved_at INTEGER,
+  admin_notes TEXT,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX idx_contact_submissions_status ON contact_submissions(status);
+CREATE INDEX idx_contact_submissions_created ON contact_submissions(created_at DESC);
 ```
 
-That's it. Two packages. Everything else uses existing tools.
+Pattern mirrors the `bug_reports` table (migration 0018). Consistent schema, no new patterns introduced.
+
+**Confidence:** HIGH — direct extension of existing bug_reports implementation.
+
+---
+
+## Feature: Saved Buildings
+
+### No New Dependencies
+
+Simple D1 join table. One row per (user_id, building_id) pair. Displayed in the tenant dashboard.
+
+**D1 table design:**
+```sql
+-- migration 0020_saved_buildings.sql
+CREATE TABLE saved_buildings (
+  user_id TEXT NOT NULL,
+  building_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (user_id, building_id),
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (building_id) REFERENCES buildings(id)
+);
+CREATE INDEX idx_saved_buildings_user ON saved_buildings(user_id);
+```
+
+Composite PRIMARY KEY enforces uniqueness at DB level. Mirrors the UNIQUE constraint pattern on the `disputes` table (`UNIQUE(review_id)`).
+
+**Confidence:** HIGH — standard SQLite join table pattern.
+
+---
+
+## Feature: In-App Notifications Table
+
+**D1 table design:**
+```sql
+-- migration 0021_notifications.sql
+CREATE TABLE notifications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT,
+  entity_type TEXT,
+  entity_id TEXT,
+  read INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX idx_notifications_user_unread ON notifications(user_id, read);
+CREATE INDEX idx_notifications_created ON notifications(created_at DESC);
+```
+
+`type` values: `review_approved`, `review_rejected`, `dispute_resolved`, `building_saved_new_review`
+
+The composite index on `(user_id, read)` is the critical query path — fetching unread count per user without a full table scan.
+
+**Confidence:** HIGH — standard pattern, no D1-specific concerns.
+
+---
+
+## D1 Migration Plan for v1.4.0
+
+**Next migration number:** 0019 (current latest is 0018_bug_reports.sql)
+
+| Migration # | Name | Contents |
+|-------------|------|----------|
+| 0019 | contact_submissions | Contact form storage |
+| 0020 | saved_buildings | Saved buildings join table |
+| 0021 | notifications | In-app notification queue |
+| 0022 | new_survey_fields | `section_8_accepted`, `safely_lit` columns on reviews |
+
+**D1 constraints relevant to new tables:**
+
+- No `RETURNING` clause — generate IDs before INSERT using `generateIdFromEntropySize(10)` from Lucia (existing pattern).
+- No cross-request transactions — each API endpoint is atomic on its own request.
+- Composite index `(user_id, read)` on notifications is critical for dashboard unread count query performance.
+- `INTEGER DEFAULT (unixepoch())` for all timestamps — consistent with all existing tables.
+
+**Confidence:** HIGH — verified against existing D1 patterns throughout the codebase.
+
+---
+
+## Features Requiring No Stack Research
+
+| Feature | Why No New Stack |
+|---------|-----------------|
+| Move-in date display bug | Pure logic fix in existing component |
+| Full review in admin pending view | UI additions to existing admin Astro page |
+| UGC disclaimers | Copy/markup additions to existing Astro pages |
+| Review verification UX | UI changes to existing flows, no new libraries |
+| New survey fields (Section 8, safely lit) | D1 migration + existing form/scoring patterns |
 
 ---
 
 ## What NOT to Add
 
-| Tool | Why Not |
-|------|---------|
-| Cypress | Already have Playwright installed and working — switching creates migration cost with zero benefit |
-| Miniflare (direct) | Wrangler wraps Miniflare internally. Direct Miniflare usage adds complexity without benefit for Pages apps |
-| `@cloudflare/vitest-pool-workers` | Designed for Workers unit tests in the workerd runtime. Overkill for this milestone — existing Vitest + happy-dom already covers the 130 unit tests. Adding this would require significant vitest.config.ts restructuring for marginal gain |
-| Drizzle ORM | Only needed for seeding if the project already uses Drizzle. It doesn't — raw SQL via wrangler is simpler |
-| Supertest / node-fetch for API testing | Playwright's `request` context and `page.route()` cover API testing needs without additional packages |
-| `@playwright/test-reporter-html` (separate install) | Already built into `@playwright/test` |
-| `chance`, `casual`, or other faker alternatives | `@faker-js/faker` v10 is the dominant library with TypeScript types built-in |
-| k6 | Binary install (not npm), requires separate toolchain, overkill for this project's scale |
-| `locust` | Python runtime, wrong ecosystem |
-| `msw` (Mock Service Worker) | Designed for component-level mocking in React. Playwright's route.fulfill is the correct tool at E2E level |
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| Radix UI / Headless UI | Adds bundle weight for tab/dialog primitives achievable with Tailwind + `useState` | Native React state + Tailwind |
+| Zustand / Jotai / React Context providers | State management overkill for a dashboard with 4 tabs and shallow component tree | Local `useState` + prop drilling |
+| React Router / TanStack Router | Full router for hash-based tab navigation is unnecessary complexity | `window.location.hash` + `hashchange` listener |
+| Web Push / service worker | Stateless Workers runtime cannot maintain push connections; setup complexity exceeds value for this notification scope | D1 polling on `visibilitychange` |
+| Regrid API (paid) | Paid, requires sales contact for pricing, adds external dependency and SLA risk | Free CT state CAMA dataset (`data.ct.gov`) |
+| tRPC / GraphQL | API abstraction not needed; existing `fetch` patterns in React islands are sufficient | Plain Astro API routes |
+| React 19 | Cloudflare Workers constraint — React 18 only until Workers runtime adds full React 19 support | Stay on React 18.3.1 |
+| `@faker-js/faker` (already dev dep) | Was added in v1.3.0 for seeding — already installed | Already available |
 
 ---
 
-## Integration Points with Existing Setup
+## Installation
 
-### Vitest (existing)
+No new packages required for any v1.4.0 feature.
 
-No changes needed. Unit tests (`src/lib/__tests__/`) continue using Vitest + happy-dom. The new testing additions are complementary, not replacing:
-
-```
-vitest run          → Unit tests (scoring, validation, auth logic)
-playwright test     → E2E flows (user journeys, auth, forms)
-artillery run       → Load tests (rate limiting, performance)
-tsx scripts/seed-local.ts → Data setup for local E2E
+```bash
+# No npm install needed — all features use existing dependencies
 ```
 
-### Playwright Config (update existing)
-
-Update `playwright.config.ts` to:
-1. Add `webServer` pointing to local `wrangler pages dev`
-2. Add `setup` projects for auth state generation
-3. Add `storageState` to main chromium project
-4. Keep `baseURL` override via `BASE_URL` env var (existing pattern) for running against deployed URLs
-
-### Package.json Scripts (add)
-
-```json
-{
-  "seed:local": "tsx scripts/seed-local.ts",
-  "seed:clear": "npx wrangler d1 execute ratemyplace-db --local --command 'DELETE FROM reviews; DELETE FROM buildings; DELETE FROM landlords;'",
-  "e2e:local": "BASE_URL=http://localhost:8788 npx playwright test",
-  "load:test": "artillery run scripts/load-test.yml"
-}
-```
-
----
-
-## Environment & Configuration Notes
-
-### Local D1 State Location
-
-Wrangler stores local D1 data in `.wrangler/state/v3/d1/` relative to the project root. This directory should be in `.gitignore` (it likely already is). Seeded data persists between runs until explicitly cleared.
-
-### Auth Test Users
-
-Two test accounts must exist in the local seeded database:
-- Regular user: `test-user@ratemyplace.test` — for user flow E2E tests
-- Admin user: `test-admin@ratemyplace.test` with `is_admin = 1` — for admin dashboard tests
-
-These are seeded by `seed-local.ts` with known passwords stored in `.env.test` (never committed).
-
-### Playwright `.auth/` Directory
-
-Add to `.gitignore`:
-```
-playwright/.auth/
-```
-
-Storage state files contain session cookies — treat as secrets.
+All features use: existing D1 queries, existing Resend integration, existing Turnstile integration, native `fetch()` for external APIs, and React `useState`/`useEffect` for dashboard interactivity.
 
 ---
 
@@ -251,14 +310,14 @@ Storage state files contain session cookies — treat as secrets.
 
 | Claim | Source | Confidence |
 |-------|--------|------------|
-| `wrangler d1 execute --local --file` pattern | [Cloudflare D1 wrangler commands](https://developers.cloudflare.com/d1/wrangler-commands/) | HIGH |
-| `wrangler pages dev` required for D1 bindings (not `astro preview`) | [Cloudflare D1 local dev docs](https://developers.cloudflare.com/d1/best-practices/local-development/) | HIGH |
-| Playwright `storageState` for auth | [Playwright auth docs](https://playwright.dev/docs/auth) | HIGH |
-| Astro official Playwright recommendation | [Astro testing docs](https://docs.astro.build/en/guides/testing/) | HIGH |
-| `@faker-js/faker` v10.3.0 current | [Faker.js docs](https://fakerjs.dev/guide/) | HIGH |
-| Artillery 2.0.30 current | npm search result, published 18 days ago | MEDIUM |
-| Artillery cookie session support | [Artillery HTTP engine docs](https://www.artillery.io/docs/reference/engines/http) | MEDIUM |
-| Artillery httpOnly cookie quirks | [GitHub issue #354](https://github.com/artilleryio/artillery/issues/354) | MEDIUM |
-| `@cloudflare/vitest-pool-workers` compatibility range | [Cloudflare Workers testing docs](https://developers.cloudflare.com/workers/testing/vitest-integration/) | HIGH |
-| Playwright `webServer` with Astro | [Astro testing docs](https://docs.astro.build/en/guides/testing/) | HIGH |
-| Playwright version 1.58 current | [Playwright release notes](https://playwright.dev/docs/release-notes) | HIGH |
+| CT CAMA endpoint and New Haven field schema | Live API test: `https://data.ct.gov/resource/pqrn-qghw.json?property_city=New%20Haven&address_number=187&$limit=2` | HIGH |
+| CT CAMA dataset scope and coverage | [2024 Connecticut Parcel and CAMA Data — catalog.data.gov](https://catalog.data.gov/dataset/2024-connecticut-parcel-and-cama-data) | HIGH |
+| Astro islands cannot share React context | [Astro Islands Architecture docs](https://docs.astro.build/en/concepts/islands/) | HIGH |
+| Cloudflare Workers are stateless (no push) | [Cloudflare D1 and Workers docs](https://developers.cloudflare.com/d1/) | HIGH |
+| Regrid Connecticut parcel coverage | [Regrid Parcel API](https://regrid.com/api) — coverage confirmed, pricing opaque (sales required) | MEDIUM |
+| Boston adapter — existing implementation | `src/pages/api/admin/buildings/[id]/enrich.ts` in codebase | HIGH |
+| Migration numbering | `migrations/` directory inspection — latest is 0018 | HIGH |
+
+---
+*Stack research for: RateMyPlace v1.4.0 "Open Doors" — new feature additions only*
+*Researched: 2026-03-20*

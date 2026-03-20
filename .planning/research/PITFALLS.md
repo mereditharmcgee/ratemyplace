@@ -1,645 +1,358 @@
-# Domain Pitfalls
+# Pitfalls Research
 
-**Domain:** QA / stress testing for Astro 5 + Cloudflare Pages + D1 (SQLite) + Lucia Auth
-**Researched:** 2026-02-27
-**Scope:** Adding testing infrastructure to an existing production app (v1.3.0 "Battle Tested")
+**Domain:** Adding tenant dashboards, contact forms, notification systems, multi-source data adapters, and UGC disclaimers to an existing Astro 5 + Cloudflare Pages + D1 review platform
+**Researched:** 2026-03-20
+**Confidence:** HIGH — based on direct codebase inspection (migrations 0001–0018, all API routes, scoring system, email.ts, rateLimit.ts) and verified patterns from the v1.3.0 QA milestone
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause test failures that don't represent real bugs, accidental production data
-corruption, or large blocks of wasted time.
+Mistakes that require schema rollbacks, data loss, broken production pages, or legal exposure.
 
 ---
 
-### Pitfall 1: Playwright Is Pointed at Production Right Now
+### Pitfall 1: Adding NOT NULL Columns to the Reviews Table Without DEFAULT Values
 
-**What goes wrong:** The current `playwright.config.ts` sets `baseURL` to
-`https://b3b57132.ratemyplace-64y.pages.dev` — a live Cloudflare Pages preview URL. Any
-test that writes data (sign-up flows, review submissions, dispute forms) will write to the
-real D1 production database. There is no local server configured.
+**What goes wrong:**
+Adding `section_8_accepted` or `safely_lit` as `NOT NULL INTEGER` columns without a DEFAULT on a table that already has real production reviews fails in D1. SQLite (and D1) rejects `ALTER TABLE ... ADD COLUMN col INTEGER NOT NULL` unless a DEFAULT is provided, because existing rows would violate the constraint immediately.
 
-**Why it happens:** The existing tests are smoke-tests against a deployed environment.
-Expanding them to cover auth flows, form submissions, and admin actions without first
-switching to a local dev server will corrupt real data.
+**Why it happens:**
+Developers write migration SQL that works for fresh inserts but forget existing rows. The reviews table currently has 100+ rows in the seed data and will have real rows in production. Running a migration like:
+```sql
+ALTER TABLE reviews ADD COLUMN section_8_accepted INTEGER NOT NULL;
+```
+will throw `Cannot add a NOT NULL column with no default value` in D1.
 
-**Consequences:**
-- Fake users, fake reviews, and fake disputes accumulate in production D1
-- Rate limit tables fill up with test IPs
-- Audit log fills with test admin actions
-- Cannot run tests in isolation (shared mutable state)
-- Tests that seed 200 buildings hit the production database directly
+**How to avoid:**
+Always provide a DEFAULT when adding NOT NULL columns to existing tables:
+```sql
+-- Migration 0019_add_survey_fields.sql
+ALTER TABLE reviews ADD COLUMN section_8_accepted INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE reviews ADD COLUMN safely_lit INTEGER NOT NULL DEFAULT 0;
+```
+If a DEFAULT of 0 is semantically wrong for some rows (e.g., 0 means "No" but you want "Unknown" for old reviews), use a nullable column with NULL representing "not answered":
+```sql
+ALTER TABLE reviews ADD COLUMN section_8_accepted INTEGER;  -- NULL = not answered
+ALTER TABLE reviews ADD COLUMN safely_lit INTEGER;
+```
+Then handle NULL in the scoring logic — skip fields where value IS NULL rather than treating them as 0.
 
-**Prevention:**
-Configure `playwright.config.ts` to start `wrangler pages dev` locally and point
-`baseURL` at `http://localhost:8788`. Use an environment variable to switch between
-local and preview:
+**Warning signs:**
+Migration runs locally but throws an error against the remote D1. Or migration appears to succeed locally but existing reviews have unexpected 0 values in scoring calculations.
 
+**Phase to address:** Survey fields phase (adding `section_8_accepted`, `safely_lit`). Also applies to any new nullable columns added for saved buildings, notification preferences, or contact message metadata.
+
+---
+
+### Pitfall 2: Migration 0019+ Number Collision — Assuming Sequential Is Safe
+
+**What goes wrong:**
+Two features in v1.4.0 both need new migrations (survey fields + contact form storage + notification preferences + saved buildings). If multiple migrations are written in parallel or assigned numbers without checking, two migrations get the same number (e.g., both become `0019_xxx.sql`). Wrangler applies migrations by filename order. A collision means one migration silently overwrites the other in the applied-migrations tracking, and one schema change never runs.
+
+**Why it happens:**
+The current highest migration is `0018_bug_reports.sql`. If two phases both start their migration at `0019_`, the second one will either conflict on filename or (if named differently) both be `0019` in the wrangler migration log, causing one to be skipped.
+
+**How to avoid:**
+Assign migration numbers sequentially with a strict plan before writing any migration:
+- `0019_` — survey fields (section_8_accepted, safely_lit)
+- `0020_` — contact messages table
+- `0021_` — saved buildings table
+- `0022_` — notification preferences column on users (or separate table)
+
+Write the list before writing any SQL. If phases are built in a different order, renumber before applying.
+
+**Warning signs:**
+`wrangler d1 migrations apply` reports "already applied" for a migration you just wrote. Or the `d1_migrations` table shows duplicate version numbers.
+
+**Phase to address:** Before any migration is written for v1.4.0. Establish the numbering plan in the first phase.
+
+---
+
+### Pitfall 3: Tenant Notifications Without an Unsubscribe Mechanism
+
+**What goes wrong:**
+Sending notification emails (review status changes, moderation outcomes, contact form replies) without a one-click unsubscribe link violates CAN-SPAM (US), CASL (Canada), and GDPR (EU). Resend's sending reputation degrades when recipients mark emails as spam. At scale, this can cause Resend to suspend the account or reduce deliverability to zero.
+
+**Why it happens:**
+Transactional email flows (password reset, email verification) legally don't require unsubscribe. But "your review was approved" or "you have a new notification" are borderline marketing/notification emails. Developers treat them like transactional email and skip unsubscribe infrastructure.
+
+The existing `email.ts` has no unsubscribe mechanism in any of its four email functions. This was fine for purely transactional emails (password reset, verification, dispute confirmation). It becomes a legal requirement the moment notification emails go out to tenants who didn't explicitly request them.
+
+**How to avoid:**
+Before sending any notification email that isn't a direct response to a user action (password reset, email verification), add:
+1. A `notification_opt_in` column to the users table (default 1 for new users, present a preference toggle in the dashboard)
+2. A signed, one-click unsubscribe link in every notification email body (not just a footer link to settings)
+3. An API endpoint `/api/notifications/unsubscribe?token=...` that sets `notification_opt_in = 0` without requiring sign-in
+
+For the contact form reply emails (admin replying to a contact message), include a plain-text unsubscribe line. It takes 10 minutes and eliminates legal risk.
+
+**Warning signs:**
+The notification email template in `email.ts` has no unsubscribe footer. The users table has no opt-in column.
+
+**Phase to address:** Contact form + notification system phase. Must be built before the first notification email is sent to real users.
+
+---
+
+### Pitfall 4: UGC Disclaimers on Review Pages Without Inline Proximity
+
+**What goes wrong:**
+Adding disclaimers only to the Terms of Service page (which already exists at `/terms`) or the footer provides no meaningful legal protection. Courts and regulators in defamation cases have found that disclaimers buried in ToS, reached via a footer link, provide weak protection compared to disclaimers shown in close proximity to the content itself — particularly for statements of fact (e.g., "this landlord has pests").
+
+The existing ToS has good language (Section 230 citation, "your reviews represent your personal opinions," indemnification). But review pages — where a landlord is most likely to object — currently show reviews with no inline disclaimer.
+
+**Why it happens:**
+Developers add disclaimers to legal pages and consider the job done. Inline disclaimers feel cluttered and are deferred.
+
+**How to avoid:**
+Add a concise inline disclaimer to:
+1. **Every building review page** (`/building/[slug]`) — a single sentence above or below the reviews list: *"Reviews reflect individual tenant experiences and personal opinions. RateMyPlace does not verify or endorse review content."*
+2. **The review submission confirmation** — immediately after a review is submitted: *"Your review will be visible once approved. By submitting, you confirm you lived at this property and take responsibility for the accuracy of your statements."*
+3. **The review form itself** — a checkbox or acknowledged consent before the final submit button (a submission-time consent record is stronger evidence than a ToS scroll).
+
+The disclaimer does not need to be visually prominent — even small gray text is sufficient — but it must be on the same page as the content.
+
+**Warning signs:**
+Building pages render review cards with no disclaimer text near them. The review submission form has no consent acknowledgment near the submit button.
+
+**Phase to address:** UGC disclaimers phase. Treat as a prerequisites block before any real-user launch.
+
+---
+
+### Pitfall 5: Multi-City Adapter Pattern Without City Routing in the Enrich Endpoint
+
+**What goes wrong:**
+The current `/api/admin/buildings/[id]/enrich` endpoint hardcodes the Boston Assessing API. Adding New Haven support by adding `if (building.city === 'New Haven') ...` inline in the same file creates a God Function that grows with every new city, making it impossible to test individual city adapters in isolation, and making the URL no longer reflect a single responsibility.
+
+More concretely: if the Boston API goes down, the adapter should fail gracefully for Boston buildings without impacting New Haven. If they are in the same function with shared error handling, a failure in one city's adapter can affect the other.
+
+**Why it happens:**
+The adapter pattern is easy to defer — "I'll just add an if/else for now." It works for two cities but immediately becomes a problem at three.
+
+**How to avoid:**
+Create a proper adapter interface before writing the second city:
 ```typescript
-// playwright.config.ts
-import { defineConfig, devices } from '@playwright/test';
+// src/lib/enrichment/types.ts
+export interface CityAdapter {
+  city: string;         // e.g., 'Boston'
+  canEnrich(building: { city: string }): boolean;
+  enrich(building: Building): Promise<EnrichmentResult>;
+}
 
-export default defineConfig({
-  testDir: './e2e',
-  webServer: {
-    command: 'npx wrangler pages dev --local',
-    url: 'http://localhost:8788',
-    reuseExistingServer: !process.env.CI,
-    timeout: 30000,
-  },
-  use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:8788',
-  },
-});
+// src/lib/enrichment/boston.ts
+export const bostonAdapter: CityAdapter = { ... };
+
+// src/lib/enrichment/new-haven.ts
+export const newHavenAdapter: CityAdapter = { ... };
+
+// src/lib/enrichment/index.ts
+const adapters: CityAdapter[] = [bostonAdapter, newHavenAdapter];
+export function getAdapter(building: Building): CityAdapter | null {
+  return adapters.find(a => a.canEnrich(building)) ?? null;
+}
 ```
 
-**Detection:** If tests run in under 500ms or you see no local server starting, they are
-hitting the remote URL.
-
-**Phase:** Seed data seeding and E2E setup phase. Fix before writing any test that touches
-the database.
-
----
-
-### Pitfall 2: D1 Migrations Do Not Run Automatically in Vitest
-
-**What goes wrong:** Tests throw `D1_ERROR: no such table: users` even though the schema
-is fully defined in 15 migration files. The `vitest.config.ts` currently uses
-`environment: 'happy-dom'` — it is a plain Node.js test environment with no D1 binding
-at all, and the Workers Vitest pool (which would provide a real D1 binding) is not
-configured.
-
-**Why it happens:** Cloudflare's `@cloudflare/vitest-pool-workers` runs tests inside the
-actual Workers runtime, but even then, D1 databases start empty. Migrations must be
-explicitly applied in test setup using `applyD1Migrations()`. There is no automatic
-migration execution.
-
-**Consequences:**
-- Every DB-touching unit or integration test fails immediately
-- False confidence: tests in `happy-dom` mode can call functions that use `getDB()` and
-  won't throw until the function tries to bind (which never happens, so they may silently
-  pass without actually exercising the database path)
-
-**Prevention:**
-For unit tests that do not touch the DB (scoring logic, validation), `happy-dom` is fine.
-For anything touching D1, switch to the Workers pool:
-
+The API route becomes trivially simple:
 ```typescript
-// vitest.config.ts (for DB integration tests)
-import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config';
-
-export default defineWorkersConfig({
-  test: {
-    poolOptions: {
-      workers: {
-        wrangler: { configPath: './wrangler.jsonc' },
-        miniflare: {
-          d1Databases: ['DB'],
-        },
-      },
-    },
-  },
-});
+const adapter = getAdapter(building);
+if (!adapter) return 200 with { results: [], message: 'No adapter for this city' };
+return adapter.enrich(building);
 ```
 
-Then apply migrations before each test suite:
+Each adapter is independently testable. Adding a third city is a new file, not a modified existing file.
 
+**Warning signs:**
+The enrich endpoint has any `if (city === ...)` branching logic. There is no `src/lib/enrichment/` directory.
+
+**Phase to address:** Multi-city auto-research phase. Write the adapter interface first, before implementing the New Haven adapter.
+
+---
+
+### Pitfall 6: Dashboard N+1 Queries — One DB Call Per Review
+
+**What goes wrong:**
+The tenant dashboard loads a user's reviews, then for each review also loads the building details, verification status, and dispute status in separate queries — one query per review. With 5 reviews, that is 5 × 3 = 15 queries on a single page load. D1's per-request pricing and cold start latency makes N+1 patterns more expensive than in a traditional hosted database.
+
+The existing `/api/reviews/user` endpoint already does this correctly with a JOIN. But the dashboard may call multiple endpoints — `/api/reviews/user`, then individually fetch verification status or dispute status per review — especially if the dashboard is built as a React island making multiple `useEffect` calls.
+
+**Why it happens:**
+React island dashboards fetch data independently via multiple `useEffect` hooks ("load reviews, load verification status, load saved buildings"), making parallel requests but duplicating data across calls and sometimes sequencing them when they could be joined server-side.
+
+**How to avoid:**
+Create a single `/api/dashboard` endpoint that returns all data the dashboard needs in one response:
+```json
+{
+  "reviews": [...with building + dispute + verification status],
+  "savedBuildings": [...],
+  "notificationPreferences": { ... },
+  "unreadNotifications": 0
+}
+```
+Perform all necessary JOINs server-side. The React island receives one prop object. Only one D1 round-trip occurs on page load.
+
+If the dashboard grows complex, split into logical sections (reviews vs. saved buildings) with separate endpoints, but each endpoint should still do a single query with JOINs, not multiple queries per item.
+
+**Warning signs:**
+Dashboard React component has multiple `useEffect(() => fetch('/api/...'), [])` calls at the top level. Each call hits a different endpoint and all run on mount.
+
+**Phase to address:** Tenant dashboard phase. Design the API contract before building the React component.
+
+---
+
+### Pitfall 7: Contact Form Without Rate Limiting Enables Spam and Admin Inbox Flooding
+
+**What goes wrong:**
+The new contact form stores messages in D1 and sends a Resend notification to the admin. Without rate limiting, a malicious actor can POST thousands of messages to `/api/contact`, filling the `contact_messages` D1 table and triggering thousands of Resend notification emails, which will exhaust the Resend free tier (100 emails/day) and potentially flag the account for spam behavior.
+
+The bug report form (`/api/bug-reports`) uses Turnstile but no database-level rate limiting. The contact form needs both.
+
+**How to avoid:**
+Apply the existing `checkRateLimit` pattern (already in `src/lib/rateLimit.ts`) to the contact form endpoint:
 ```typescript
-import { applyD1Migrations, env } from 'cloudflare:test';
-import { beforeAll } from 'vitest';
-
-beforeAll(async () => {
-  await applyD1Migrations(env.DB, await readMigrations('./migrations'));
-});
+const rl = await checkRateLimit(db, getClientIP(context), 'contact', 3, 3600); // 3/hour per IP
+if (!rl.allowed) return 429;
 ```
+Also: cap the Resend notification to a digest (if more than 5 contact messages arrive in an hour, send one "you have 5 new messages" email, not 5 individual emails). Store messages in D1 (which the contact form already plans to do) and let the admin read them in the admin panel rather than relying on email for every message.
 
-Keep two vitest configs: one for unit tests (happy-dom, fast) and one for integration
-tests (workers pool, slower). Do not merge them.
+**Warning signs:**
+Contact form API endpoint calls Resend on every successful POST without a rate limit guard. No call to `checkRateLimit` in the handler.
 
-**Detection:** Tests pass but nothing is actually inserted/queried, or immediate
-`no such table` errors appear.
-
-**Phase:** Any phase writing integration or unit tests for API routes or lib functions
-that touch D1.
+**Phase to address:** Contact form phase. Add rate limiting and Resend digest before deploying.
 
 ---
 
-### Pitfall 3: `nodejs_compat` Auto-Injection Creates False Positive Tests
+## Technical Debt Patterns
 
-**What goes wrong:** The Workers Vitest pool automatically injects the `nodejs_compat`
-flag even if `wrangler.jsonc` does not have it. Tests that depend on Node.js APIs (like
-`crypto`, `buffer`) pass in vitest but could fail in production if the flag is ever
-removed or the compatibility date changes.
+Shortcuts that seem reasonable but create long-term problems.
 
-**Why it happens:** This is a documented behavior of `@cloudflare/vitest-pool-workers`.
-The project's `wrangler.jsonc` already has `nodejs_compat` set, so for this project the
-risk is low — but the inverse is also true: as of compatibility date `2025-09-21`,
-`nodejs_compat` combined with newer compatibility dates breaks vitest (tracked in
-cloudflare/workers-sdk issue #11028).
-
-**Consequences:**
-- Tests pass locally but Workers reject the code in production because a Node API is used
-  without the flag being present in the actual runtime
-- Upgrading `compatibility_date` in `wrangler.jsonc` breaks the test runner unexpectedly
-
-**Prevention:**
-- Do not change `compatibility_date` in `wrangler.jsonc` without checking
-  cloudflare/workers-sdk for vitest-pool-workers compatibility first
-- Pin `wrangler` and `@cloudflare/vitest-pool-workers` versions in `package.json`; do not
-  auto-update these during the QA milestone
-- The project already uses Web Crypto API (not Node crypto), which is always available in
-  Workers — this is the correct pattern; do not introduce `node:crypto` imports
-
-**Detection:** vitest fails with cryptic errors after a `wrangler` or compatibility date
-update.
-
-**Phase:** Any integration test setup phase. Pin versions before writing tests.
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Inline city logic in enrich endpoint (`if city === 'Boston'`) | Faster to ship New Haven | Every new city requires modifying a shared file; untestable in isolation | Never — the adapter takes 1 extra hour and is worth it |
+| Sending notifications without opt-out | Simpler email.ts | CAN-SPAM liability, Resend suspension, user complaints | Never for unsolicited notification emails |
+| Dashboard calls 4 separate API endpoints | Each endpoint is simpler | N+1 latency, D1 cost, Cloudflare Workers request overhead | Never — join server-side, not client-side |
+| UGC disclaimer only in ToS | Legal team satisfied | Weak defamation protection when disclaimer is 3 clicks from the content | Never for review-display pages |
+| Adding boolean columns as `INTEGER NOT NULL` with no DEFAULT | Strict type checking | Migration fails on existing production data | Never on tables with existing rows |
+| Contact form emails sent on every POST | Simple implementation | Resend quota exhaustion, spam risk | Only if contact volume is < 5/day (unacceptable assumption pre-launch) |
+| New survey fields scored as 0 when NULL | Simple scoring math | Old reviews (NULL = "not answered") scored lower than new reviews for no reason | Never — NULL should mean "skip" in weighted average |
 
 ---
 
-### Pitfall 4: Google OAuth Cannot Be Automated in E2E Tests
+## Integration Gotchas
 
-**What goes wrong:** Attempting to drive the real Google OAuth flow in Playwright is
-unreliable. Google detects headless browsers and either blocks them, shows CAPTCHAs, or
-flags the test account for suspicious activity. There is no reliable way to automate the
-Google sign-in popup in a headless browser.
+Common mistakes when connecting to external services or extending existing integrations.
 
-**Why it happens:** The app uses Google OAuth via Lucia. The OAuth redirect goes to
-Google's servers. Google's bot detection is aggressive against headless Chromium.
-
-**Consequences:**
-- Hours spent trying to make Playwright click through Google's sign-in UI
-- Test accounts get banned or CAPTCHAs appear mid-CI run
-- Flaky tests that pass locally but fail in GitHub Actions
-
-**Prevention:**
-Do not try to automate Google OAuth. Instead, use the programmatic session injection
-approach:
-
-1. Create test users via the standard email/password sign-up flow (which is testable)
-2. For tests that need a logged-in user, call the sign-in API endpoint directly and
-   extract the session cookie, then inject it into the Playwright browser context:
-
-```typescript
-// e2e/fixtures/auth.ts
-import { test as base, request } from '@playwright/test';
-
-export const test = base.extend({
-  authenticatedPage: async ({ browser }, use) => {
-    const context = await browser.newContext();
-    // Call the app's sign-in endpoint directly
-    const apiContext = await request.newContext({ baseURL: 'http://localhost:8788' });
-    const res = await apiContext.post('/api/auth/signin', {
-      data: { email: 'test@example.com', password: 'TestPassword123!' }
-    });
-    const cookies = res.headers()['set-cookie'];
-    // Inject session cookie into browser context
-    await context.addCookies([parseCookie(cookies)]);
-    const page = await context.newPage();
-    await use(page);
-    await context.close();
-  }
-});
-```
-
-3. Mark OAuth-specific tests as manual/skipped in CI with `test.skip`
-
-**Detection:** Any test that calls `page.goto('/auth/google')` or navigates to
-`accounts.google.com` is going to fail.
-
-**Phase:** Auth flow testing phase. Establish this pattern before writing any
-authenticated test.
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Boston Assessing API (CKAN) | Hardcoding FY2026 resource ID `ee73430d-...` without documenting it | Add a comment with the data source URL and fiscal year so the next developer knows when to update it |
+| New Haven property API | Assuming same CKAN format as Boston | Investigate API format before writing adapter — New Haven may use Socrata, GIS REST, or a different schema entirely |
+| Resend (notifications) | Creating a new `Resend` instance per email call (already done in email.ts) | This is fine for Cloudflare Workers (no persistent connection cost), but be aware the constructor call counts toward Worker CPU time |
+| Resend (notifications) | Adding new email function directly to `email.ts` without an unsubscribe parameter | Pass `unsubscribeUrl` as a required parameter to any new notification email function so it cannot be omitted |
+| D1 (saved buildings) | Using the user_id + building_id combination without a UNIQUE constraint | Without `UNIQUE(user_id, building_id)`, a user can save the same building multiple times, corrupting saved count and causing duplicate display |
+| Cloudflare Turnstile | Adding Turnstile to the contact form but not validating server-side | The Turnstile token must be verified via the `verifyTurnstile()` function already in `src/lib/turnstile.ts` — client-side validation only is trivially bypassed |
 
 ---
 
-### Pitfall 5: Seeding Data Into Production D1 by Accident
+## Performance Traps
 
-**What goes wrong:** Running a seed script with `--remote` flag (or without `--local`)
-writes fake data directly into the production D1 database. All 200 fake buildings, fake
-users, and fake reviews become visible on ratemyplace.boston immediately.
+Patterns that work at small scale but fail as usage grows.
 
-**Why it happens:** Wrangler v3+ defaults to local-first, but it is easy to add
-`--remote` thinking you are targeting a staging environment that does not exist. For a
-Cloudflare Pages project, there is no built-in staging D1 — there is only one production
-database.
-
-**Consequences:**
-- Fake reviews show up publicly before launch
-- Score aggregates get corrupted by seeded data
-- Cannot easily distinguish real data from seed data without a flag column
-
-**Prevention:**
-- Never run seed scripts with `--remote` or against the production database ID
-- Add a `is_seed_data INTEGER DEFAULT 0` marker column to the seed SQL (not to the real
-  schema — do this only in the local seed SQL as a comment or in a seed-only table)
-- Better: wrap all seed scripts in a guard:
-
-```bash
-# scripts/seed-local.sh
-if [ "$1" != "--i-know-what-im-doing" ]; then
-  echo "ERROR: This seeds LOCAL D1 only. Pass --local flag explicitly."
-  exit 1
-fi
-npx wrangler d1 execute ratemyplace-db --local --file=scripts/seed.sql
-```
-
-- Keep the production database ID out of any seed script. Use the binding name, not the
-  UUID, and always pass `--local`.
-
-**Detection:** Run `wrangler d1 execute ratemyplace-db --local --command "SELECT COUNT(*) FROM reviews"` before and after seeding. If the count on the remote goes up, something is wrong.
-
-**Phase:** Data seeding phase. Establish the safety guardrails before writing any seed SQL.
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Tenant dashboard fetches all user reviews with no pagination | Dashboard slow for users with 5+ reviews (each includes full building JOINs) | Add LIMIT to the dashboard query; paginate or lazy-load older reviews | Starts degrading at 10+ reviews per user; unlikely pre-launch but design for it |
+| Saved buildings table queried with no index on user_id | Slow saved buildings load as table grows | Add `CREATE INDEX idx_saved_buildings_user ON saved_buildings(user_id)` in the creation migration | Breaks at ~10,000 saved building rows across all users |
+| Multi-city enrich making sequential API calls | Admin "Auto-Research" button takes 3–5s | Each city adapter should independently time out (2s max) and return empty results, not block | Immediate — external API latency is unpredictable |
+| Rate limit table scanned without partial index | Every contact form POST does a full `rate_limits` table scan | The existing `rateLimit.ts` pattern already cleans up expired rows, but add `CREATE INDEX idx_rate_limits_key_created ON rate_limits(rate_key, created_at)` for the contact endpoint specifically | Breaks at ~50,000 rate limit rows (easily reached with spam) |
+| `building_scores` / `landlord_scores` not updated after new survey fields | New fields collected but never aggregated | If `section_8_accepted` or `safely_lit` should appear in aggregate displays, the score update trigger/recalculation logic must explicitly include them | Immediate — new fields will show as NULL in aggregate tables |
 
 ---
 
-### Pitfall 6: Local D1 Persists Dirty State Between Test Runs
+## Security Mistakes
 
-**What goes wrong:** Wrangler v3+ persists local D1 data across runs in
-`.wrangler/state/`. If a seed script runs, tests modify data, and the next run starts
-without a reset, tests see stale, mutated data. Tests that assume a clean state fail
-intermittently.
+Domain-specific security issues specific to v1.4.0 features.
 
-**Why it happens:** The persistence-by-default behavior was introduced to improve DX for
-development. It is the wrong default for testing.
-
-**Consequences:**
-- "Works on my machine" failures where a previous test run's data bleeds into the next
-- Rate limit rows from a previous test run block new test attempts
-- Duplicate key errors when re-seeding without reset
-- Unique constraint violation on `users.email` when the same test user email is inserted twice
-
-**Prevention:**
-Create a `scripts/reset-local-db.sh` that drops all tables and re-runs migrations before
-seeding:
-
-```bash
-#!/bin/bash
-# Drop all tables and recreate from migrations
-npx wrangler d1 execute ratemyplace-db --local --command "
-  PRAGMA foreign_keys = OFF;
-  DROP TABLE IF EXISTS audit_logs;
-  DROP TABLE IF EXISTS disputes;
-  DROP TABLE IF EXISTS rate_limits;
-  DROP TABLE IF EXISTS email_verification_tokens;
-  DROP TABLE IF EXISTS password_reset_tokens;
-  DROP TABLE IF EXISTS property_managers;
-  DROP TABLE IF EXISTS review_votes;
-  DROP TABLE IF EXISTS reviews;
-  DROP TABLE IF EXISTS sessions;
-  DROP TABLE IF EXISTS building_scores;
-  DROP TABLE IF EXISTS landlord_scores;
-  DROP TABLE IF EXISTS buildings;
-  DROP TABLE IF EXISTS users;
-  DROP TABLE IF EXISTS landlords;
-  PRAGMA foreign_keys = ON;
-"
-npx wrangler d1 migrations apply ratemyplace-db --local
-npx wrangler d1 execute ratemyplace-db --local --file=scripts/seed.sql
-```
-
-Run this before E2E test runs in CI. Add it to the Playwright global setup.
-
-**Detection:** Tests pass on the first run but fail on the second run without any code
-changes.
-
-**Phase:** Data seeding setup phase. Required before any E2E test that writes data.
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Contact form stores message body without sanitization | Stored XSS in admin panel — an attacker submits `<script>` tags in a message, admin views it, script executes | Escape HTML in the admin panel display of contact messages; do not render contact message bodies as raw HTML |
+| Saved buildings endpoint returns ALL saved buildings for any authenticated user if user_id is not scoped to `context.locals.user.id` | User A can retrieve User B's saved buildings by calling the API with a different user_id | Always scope saved buildings queries to `WHERE user_id = context.locals.user.id` — never accept user_id from the request body |
+| Notification email tokens that expire but are not deleted from DB | Token table grows unboundedly; expired tokens waste storage | Add cleanup: `DELETE FROM notification_tokens WHERE expires_at < unixepoch()` on each token creation (same pattern as email_verification_tokens) |
+| Multi-source adapter makes outbound HTTP to untrusted city APIs without timeout | Cloudflare Worker can be held open for 30s by a slow external API, consuming CPU time | Set a 3-second `AbortController` timeout on all external API calls in city adapters |
+| Contact form accepts message from unauthenticated users, stores email field as-is | Spam with fake emails; admin wastes time on junk | Require authentication for contact form OR apply strict Turnstile + rate limit (3/hour/IP) for anonymous submissions |
 
 ---
 
-## Moderate Pitfalls
+## UX Pitfalls
 
-Mistakes that cause incorrect behavior or significant wasted time, but do not corrupt data
-or produce wrong results silently.
+Common user experience mistakes in the features being added.
 
----
-
-### Pitfall 7: D1 Foreign Key Insertion Order During Seeding
-
-**What goes wrong:** Seed SQL inserts data in the wrong order — for example, inserting
-`reviews` before the referenced `users` and `buildings` exist. D1 enforces foreign keys
-by default (unlike standard SQLite), so this immediately throws
-`FOREIGN KEY constraint failed`.
-
-**Why it happens:** D1 sets `PRAGMA foreign_keys = ON` for every transaction by default.
-Standard SQLite has it off by default. A seed file that works against a plain SQLite file
-(e.g., during development with a different ORM or tool) may fail against D1.
-
-**Prevention:**
-Maintain strict insertion order in seed SQL:
-1. `landlords`
-2. `buildings` (references `landlords`)
-3. `users`
-4. `sessions` (references `users`)
-5. `reviews` (references `users`, `buildings`)
-6. `building_scores` (references `buildings`)
-7. `landlord_scores` (references `landlords`)
-8. `disputes` (references `reviews`)
-9. `audit_logs` (references `users`)
-10. `rate_limits`
-
-Alternatively, wrap the entire seed in `PRAGMA defer_foreign_keys = ON` at the start of
-the transaction. This defers constraint checking to commit time, allowing any insert
-order, but still validates all constraints before committing.
-
-**Detection:** `FOREIGN KEY constraint failed` error on first seed run. Check the line
-number — it tells you which table is the offender.
-
-**Phase:** Data seeding phase.
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Dashboard shows "Review Pending" with no explanation of what "pending" means or how long it takes | Users submit a review, see "Pending," and re-submit thinking it failed — creating duplicate submission attempts | Inline explanation: "Your review is under moderation. This typically takes 1–3 business days." |
+| Move-in date bug fix changes how existing data is displayed without showing what changed | Users see different dates than before; may report as a bug | Add a note to the migration comment explaining the display fix, and verify existing data still renders correctly after the fix |
+| Notifications sent for review approved/rejected, but no way to turn them off from within the email | Users mark email as spam; Resend deliverability degrades | One-click unsubscribe link in every notification email footer (also required for CAN-SPAM compliance — see Pitfall 3) |
+| Saved buildings feature with no confirmation on "unsave" | Users accidentally unsave a building and cannot recover it | Add a simple undo toast or confirmation for destructive save actions |
+| Contact form submits successfully but admin never sees it because Resend notification goes to spam | User believes their message was received; admin misses it | Store all contact messages in D1 admin panel as primary delivery mechanism; Resend notification is secondary |
+| Inline UGC disclaimers styled with `text-gray-400` (too low contrast) | Screen reader and accessibility users may miss disclaimer; legally weakens the protection | Use `text-gray-500` minimum; ensure disclaimer passes WCAG 2.1 AA contrast ratio |
 
 ---
 
-### Pitfall 8: Vitest `isolatedStorage: false` Causes Test State Leakage
+## "Looks Done But Isn't" Checklist
 
-**What goes wrong:** When running integration tests with the Workers Vitest pool, the
-default `isolatedStorage: true` mode creates a fresh D1 database per test file. If you
-set `isolatedStorage: false` to run tests concurrently, every test file reads and writes
-to the same D1 state. A test that creates a user and a test that checks for no users will
-interfere.
+Things that appear complete but are missing critical pieces.
 
-**Why it happens:** The Workers pool supports four isolation modes. The concurrent mode
-(`isolatedStorage: false, singleWorker: false`) shares storage across all concurrent
-tests, which seems like it would be faster but creates test ordering dependencies.
-
-**Prevention:**
-- Use the default `isolatedStorage: true` for integration tests touching D1
-- Accept that integration tests run serially per file; this is correct for a small app
-- For unit tests (scoring logic, validation), keep using `happy-dom` which runs
-  concurrently with no shared state at all
-- Never use global state in test setup without a corresponding teardown
-
-**Detection:** Tests pass in isolation but fail when run together with `npm test`.
-
-**Phase:** Any integration test setup phase.
+- [ ] **Contact form:** Often missing rate limiting — verify `checkRateLimit` is called before the INSERT and before the Resend notification send
+- [ ] **Contact form:** Often missing server-side Turnstile validation — verify `verifyTurnstile()` is called (not just client-side widget rendering)
+- [ ] **Survey fields (section_8_accepted, safely_lit):** Often missing from the scoring calculation — verify `src/lib/scoring.ts` includes new fields with correct weights AND that NULL handling skips them rather than treating as 0
+- [ ] **Survey fields:** Often missing from the `ReviewCard.astro` display — verify new fields are shown in the card or at minimum are not silently dropped
+- [ ] **UGC disclaimers:** Often only added to Terms of Service — verify disclaimer text exists on `/building/[slug]` review list AND on the review submission form/confirmation
+- [ ] **Tenant dashboard notifications:** Often missing unsubscribe — verify every notification email has a working unsubscribe link that does not require sign-in to use
+- [ ] **Saved buildings:** Often missing the UNIQUE constraint — verify `UNIQUE(user_id, building_id)` is in the CREATE TABLE statement
+- [ ] **Multi-city adapter:** Often the Boston adapter behavior is changed when adding New Haven — verify Boston enrich still works after adapter refactor (run a manual enrich on a Boston building)
+- [ ] **Notification preferences:** Often stored as a user table column without a migration — verify migration 0019+ actually adds the column before the dashboard reads it
+- [ ] **Move-in date bug fix:** Often fixes the display but breaks something in the E2E tests that asserted the old (buggy) display format — verify E2E tests updated to match the fix
 
 ---
 
-### Pitfall 9: Rate Limit Table Breaks Auth Flow Tests
+## Recovery Strategies
 
-**What goes wrong:** The app implements fail-closed rate limiting that writes to the
-`rate_limits` D1 table on every auth attempt. E2E tests that attempt sign-in multiple
-times in the same test run will hit the rate limit and receive 503 responses — not
-because the auth logic is broken, but because the test user's IP has been rate-limited
-by previous test attempts.
+When pitfalls occur despite prevention, how to recover.
 
-**Why it happens:** `wrangler pages dev` runs on localhost. All test requests come from
-127.0.0.1. The rate limiter sees all E2E test traffic as the same IP. After enough
-sign-in tests, the limit is exceeded.
-
-**Consequences:**
-- Auth flow tests fail with 503 on the third or fourth run
-- Flaky tests that depend on how many other tests ran before them
-- Hard to distinguish real rate limit bugs from test infrastructure artifacts
-
-**Prevention:**
-- Clear the `rate_limits` table in Playwright global setup (part of the DB reset)
-- Use unique email addresses per test run (timestamp-based: `test_${Date.now()}@example.com`)
-- In integration tests, mock or disable rate limiting for the test environment by checking
-  an env variable: `if (env.TEST_MODE === 'true') skip rate limiting`
-- Do not test the rate limiting behavior in E2E tests that also test auth flow — keep
-  rate limit testing as a dedicated, isolated test suite
-
-**Detection:** Tests that fail with 503 after previously passing, especially after
-running the full test suite multiple times.
-
-**Phase:** Auth flow testing phase.
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| NOT NULL migration failed on production D1 | MEDIUM | Write a new migration that drops and recreates the column as nullable, or adds with a DEFAULT; apply with `wrangler d1 migrations apply --remote` |
+| Duplicate migration number applied | HIGH | Inspect `d1_migrations` table in production (`wrangler d1 execute --remote --command "SELECT * FROM d1_migrations"`); manually delete the incorrect entry; rename the file with the next available number and re-apply |
+| Notification emails sent without unsubscribe | MEDIUM | Deploy unsubscribe endpoint immediately; add unsubscribe link to email templates; monitor Resend dashboard for spam complaints |
+| N+1 dashboard queries degrading performance | LOW | Add a combined `/api/dashboard` endpoint; update the React island to use it; the old individual endpoints can remain for backward compat |
+| Contact form spammed before rate limit was added | LOW | Truncate `contact_messages` table; add rate limit; redeploy |
+| Adapter refactor broke Boston enrich | LOW | Roll back `src/lib/enrichment/boston.ts` to the inline version; Boston adapter is the only one used in production until the refactor is validated |
 
 ---
 
-### Pitfall 10: `client:load` React Islands Need Time to Hydrate
+## Pitfall-to-Phase Mapping
 
-**What goes wrong:** Playwright navigates to a page and immediately tries to interact
-with a React island (e.g., the `ReviewForm`, the Google Maps address autocomplete, or
-the admin dashboard dropdowns). The SSR HTML is present, but the React island has not yet
-hydrated. Clicks on buttons do nothing; form submissions fail silently.
+How roadmap phases should address these pitfalls.
 
-**Why it happens:** Astro's island architecture renders React components server-side as
-static HTML, then hydrates them client-side when the `client:load` directive fires.
-Between page load and hydration completion, the DOM is present but event handlers are not
-attached.
-
-**Consequences:**
-- Tests click a button, nothing happens, and the assertion times out
-- Tests that work in headed mode (where the developer can see the page) fail in headless
-  mode because timing is tighter
-
-**Prevention:**
-Wait for the `astro-island` element to finish hydrating before interacting:
-
-```typescript
-// Wait for the island to hydrate (ssr attribute is removed after hydration)
-await page.waitForSelector('astro-island[uid]:not([ssr])');
-// Or wait for a specific interactive element to be ready
-await page.waitForSelector('[data-testid="review-form-submit"]:not([disabled])');
-// Or use role-based waitFor
-await page.getByRole('button', { name: 'Submit Review' }).waitFor({ state: 'visible' });
-```
-
-For form tests, prefer `page.waitForLoadState('networkidle')` after navigation to ensure
-all islands have hydrated before interaction.
-
-**Detection:** Tests that click interactive elements and then time out waiting for a
-navigation or response.
-
-**Phase:** E2E testing of review submission, address autocomplete, and admin UI.
-
----
-
-### Pitfall 11: Scoring Aggregate Tests Against Empty Buildings Are Misleading
-
-**What goes wrong:** Tests that assert score display for a building with zero or one
-review pass because the "0 reviews" state is handled, but they do not exercise the
-weighted scoring calculation, the privacy-preserving fuzzy display thresholds, or the
-aggregation logic. The test gives false confidence.
-
-**Why it happens:** It is easier to write tests against empty states than to write tests
-that require seeded data in a specific state. Without a robust seed, tests cluster around
-zero-data states.
-
-**Consequences:**
-- The scoring system bugs (wrong weights, wrong aggregation) go undetected until real
-  users appear
-- The `building_scores` and `landlord_scores` tables are never exercised by tests
-
-**Prevention:**
-- Seed buildings with known score data (pre-calculated expected aggregate scores) and
-  write assertions against those specific values
-- Test the scoring calculation directly in unit tests with the actual weights from
-  `src/lib/scoring.ts` — do not rely on E2E tests to catch scoring bugs
-- Include at least one building in the seed with 5+ reviews to exercise the display
-  threshold for aggregate scores
-
-**Detection:** Test coverage report shows `src/lib/scoring.ts` at low coverage while
-E2E tests show green.
-
-**Phase:** Data seeding phase and unit test phase.
-
----
-
-### Pitfall 12: Over-Engineering the Test Infrastructure
-
-**What goes wrong:** Spending the milestone building a full test fixture framework,
-factory functions for every model, a custom test database reset utility, a mock Resend
-email server, parallel test workers, and a CI matrix — before writing a single meaningful
-test. The milestone ends with infrastructure but no coverage.
-
-**Why it happens:** Testing infrastructure work feels productive. It is satisfying to
-build factories and fixtures. But for a pre-launch app with one developer and a small
-schema, this is premature optimization.
-
-**Consequences:**
-- The milestone delivers zero bug findings
-- The infrastructure becomes a maintenance burden
-- Real user-facing bugs (form validation edge cases, score display at low review counts,
-  admin action audit trail correctness) go untested
-
-**Prevention:**
-For this app's scale, the right testing investment is:
-
-| What | Do | Don't |
-|------|----|-------|
-| Scoring logic | Vitest unit tests with real weights | Mock the scoring module |
-| E2E auth | Programmatic sign-in fixture, reuse across tests | Build a full auth test framework |
-| Data seeding | One seed SQL file with ~10 buildings, ~5 landlords, ~30 reviews | Factory functions per model |
-| Email testing | Assert the API endpoint was called (check logs) | Run a local SMTP server |
-| Stress testing | Seed 200 buildings, check UI render time visually | Load test with k6 against production |
-| CI | Run Playwright against local wrangler pages dev | Build a staging environment |
-
-Use the simplest tool that answers the question. A well-written seed SQL file and 20
-focused Playwright tests will find more bugs than 200 lines of fixture infrastructure.
-
-**Detection:** If you have written more test helper code than actual test code after 2
-days, stop and write tests.
-
-**Phase:** All phases. Apply the principle from day one.
-
----
-
-## Minor Pitfalls
-
----
-
-### Pitfall 13: Resend Email Cannot Be Tested in Local D1 Environment
-
-**What goes wrong:** The email verification flow (sign-up triggers verification email)
-calls the Resend API. In local development, `wrangler pages dev` does not mock Resend.
-Real emails will be sent to real addresses if the `RESEND_API_KEY` secret is present in
-the local environment, or the call will fail silently if it is not.
-
-**Prevention:**
-- Do not set `RESEND_API_KEY` in the local `.dev.vars` file for testing
-- The app already handles graceful email failure (signup succeeds even if email fails)
-  — this means E2E tests for sign-up will pass even without email delivery
-- For email verification testing specifically, test the token endpoint directly: create a
-  user, read the token from the local D1 `email_verification_tokens` table using
-  `wrangler d1 execute --local`, and call the verification endpoint with that token
-- Do not add a local email mock server (Mailhog, etc.) — it is not worth the complexity
-  for this use case
-
-**Phase:** Auth flow E2E testing phase.
-
----
-
-### Pitfall 14: `unixepoch()` Timestamps Make Date Comparisons Tricky in Tests
-
-**What goes wrong:** Tests that assert "review created today" or "token expires in 24
-hours" use JavaScript `Date` comparison against SQLite `unixepoch()` values. Off-by-one
-errors in timezone handling, or forgetting to multiply by 1000 (SQLite stores seconds,
-JavaScript uses milliseconds), cause test assertions to fail or, worse, pass incorrectly.
-
-**Why it happens:** The project correctly uses `unixepoch()` for timestamps (per
-`CLAUDE.md`). But converting these for test assertions is error-prone.
-
-**Prevention:**
-- In test assertions, always convert: `new Date(row.created_at * 1000)`
-- For "is this recent?" checks, use a range: `expect(row.created_at).toBeGreaterThan(Date.now() / 1000 - 60)`
-- Do not assert exact timestamps — assert within a reasonable window (e.g., "within the
-  last 5 seconds")
-
-**Phase:** Any integration test writing assertions against timestamp fields.
-
----
-
-### Pitfall 15: Playwright Tests Against a Cold Cloudflare Pages Preview Are Slow and Flaky
-
-**What goes wrong:** The current `playwright.config.ts` points at a preview URL. Cold
-starts on Cloudflare Workers can add 300-800ms to the first request of a test run. Tests
-with 30-second timeouts may pass but only by burning most of the timeout budget on cold
-start, making them appear flaky in CI.
-
-**Prevention:**
-- Switch to local `wrangler pages dev` for all E2E tests (solves this completely)
-- If preview URL testing is kept for smoke tests, add a "warm-up" request before the test
-  suite starts, or increase the timeout for the first navigation only
-- Set `retries: 0` for local tests (retries mask flakiness; cold start is the real cause)
-
-**Phase:** E2E setup phase. Fix the baseURL configuration first.
-
----
-
-## Phase-Specific Warnings
-
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Data seeding setup | Writing to production D1 by accident (Pitfall 5) | Use `--local` flag, add script guard |
-| Data seeding setup | Dirty state between runs (Pitfall 6) | Build reset script first |
-| Data seeding setup | Foreign key order violations (Pitfall 7) | Follow insertion order table above |
-| E2E test infrastructure | Tests running against live production URL (Pitfall 1) | Switch to `wrangler pages dev` + webServer config |
-| E2E auth testing | Trying to automate Google OAuth (Pitfall 4) | Use programmatic session injection |
-| E2E auth testing | Rate limits blocking repeated sign-in tests (Pitfall 9) | Clear `rate_limits` table in global setup |
-| E2E form testing | React islands not yet hydrated (Pitfall 10) | Use `waitFor` with hydration checks |
-| Integration tests | D1 tables not found in test environment (Pitfall 2) | Configure Workers Vitest pool |
-| Integration tests | nodejs_compat version mismatch (Pitfall 3) | Pin wrangler version |
-| Integration tests | Shared D1 state between test files (Pitfall 8) | Use default `isolatedStorage: true` |
-| Unit tests | Empty-state tests give false confidence in scoring (Pitfall 11) | Seed known data, assert exact scores |
-| Stress testing | Over-engineering infrastructure (Pitfall 12) | Simple seed SQL + focused tests only |
-| Email verification testing | Real emails sent or silently skipped (Pitfall 13) | Bypass Resend, read token from D1 directly |
-| Any DB timestamp assertion | Off-by-1000 milliseconds vs seconds (Pitfall 14) | Convert timestamps consistently |
-| CI smoke tests | Cold start flakiness on preview URL (Pitfall 15) | Switch to local dev server |
-
----
-
-## D1-Specific Gotchas Summary
-
-These are the D1 behaviors that differ from standard SQLite and will surprise anyone who
-has tested SQLite apps before:
-
-1. **Foreign keys are ON by default.** Standard SQLite has them OFF. Seed order matters
-   or you must use `PRAGMA defer_foreign_keys = ON`.
-
-2. **No cross-request transactions.** D1's "single-threaded, processes queries one at a
-   time" model means you cannot keep a transaction open across multiple HTTP requests.
-   Tests that assume transactional rollback between requests will not work.
-
-3. **The test database is empty.** Even when using `@cloudflare/vitest-pool-workers`,
-   the D1 instance starts with no tables. Migrations must be explicitly applied in
-   `beforeAll`.
-
-4. **Data persists between `wrangler dev` runs** by default. This is good for development
-   but bad for testing. Always reset before a test run.
-
-5. **No `--remote` in Pages dev.** You cannot connect to the production D1 from
-   `wrangler pages dev`. The only way to accidentally hit production is via direct
-   `wrangler d1 execute --remote` commands. Keep `--remote` out of all scripts.
-
-6. **`isolatedStorage: true`** in the Workers Vitest pool creates a separate D1 per test
-   file — not per test. State can still leak between `test()` blocks within the same
-   file.
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| NOT NULL migration without DEFAULT (Pitfall 1) | Survey fields phase | Run migration against local DB with existing seed data; verify old reviews query correctly |
+| Migration number collision (Pitfall 2) | First phase that writes a migration | Assign all migration numbers in the roadmap plan before any SQL is written |
+| Notifications without unsubscribe (Pitfall 3) | Contact form + notifications phase | Send a test notification to a real email; verify unsubscribe link works without sign-in |
+| UGC disclaimers only in ToS (Pitfall 4) | UGC disclaimers phase | Manual review of `/building/[slug]`, review submission form, and confirmation page |
+| Multi-city adapter as God Function (Pitfall 5) | Multi-city auto-research phase | Adapter interface defined before New Haven code is written; Boston adapter passes existing manual tests |
+| Dashboard N+1 queries (Pitfall 6) | Tenant dashboard phase | Check browser Network tab: exactly one (or two) API calls on dashboard load, not four or more |
+| Contact form without rate limiting (Pitfall 7) | Contact form phase | Attempt >3 POST requests in one hour from same IP; verify 429 response on the 4th |
 
 ---
 
 ## Sources
 
-- [Cloudflare Vitest Integration Docs](https://developers.cloudflare.com/workers/testing/vitest-integration/) — HIGH confidence
-- [D1 Local Development Best Practices](https://developers.cloudflare.com/d1/best-practices/local-development/) — HIGH confidence
-- [D1 Foreign Keys](https://developers.cloudflare.com/d1/sql-api/foreign-keys/) — HIGH confidence
-- [D1 Platform Limits](https://developers.cloudflare.com/d1/platform/limits/) — HIGH confidence
-- [Vitest Isolation and Concurrency](https://developers.cloudflare.com/workers/testing/vitest-integration/isolation-and-concurrency/) — HIGH confidence
-- [Astro Testing Guide](https://docs.astro.build/en/guides/testing/) — HIGH confidence
-- [Playwright Authentication](https://playwright.dev/docs/auth) — HIGH confidence
-- [Cloudflare Workers SDK Discussion: D1 in Vitest](https://github.com/cloudflare/workers-sdk/discussions/7855) — MEDIUM confidence
-- [Vitest workers-sdk Issue #11028: nodejs_compat breaks vitest with newer compat dates](https://github.com/cloudflare/workers-sdk/issues/11028) — MEDIUM confidence
-- [Lucia v3 Session Validation](https://v3.lucia-auth.com/guides/validate-session-cookies/) — HIGH confidence
-- [Astro React Hydration Issues](https://github.com/withastro/astro/issues/7709) — MEDIUM confidence
-- [Playwright Issues Against Shared Database](https://github.com/microsoft/playwright/issues/33699) — MEDIUM confidence
-- [Node.js Compatibility in Workers 2025](https://blog.cloudflare.com/nodejs-workers-2025/) — HIGH confidence
+- Codebase inspection: `migrations/0001–0018`, `src/pages/api/**`, `src/lib/email.ts`, `src/lib/rateLimit.ts`, `src/lib/scoring.ts`, `src/pages/terms.astro`, `src/pages/contact.astro` — HIGH confidence (direct inspection)
+- [D1 ALTER TABLE constraints](https://developers.cloudflare.com/d1/sql-api/d1-sql-api/) — NOT NULL column addition requires DEFAULT — HIGH confidence
+- [CAN-SPAM Act Requirements](https://www.ftc.gov/business-guidance/resources/can-spam-act-compliance-guide-business) — unsubscribe requirement for commercial email — HIGH confidence
+- [Section 230 Communications Decency Act](https://www.law.cornell.edu/uscode/text/47/230) — platform safe harbor — HIGH confidence
+- [Resend Terms of Service: Spam Policy](https://resend.com/legal/anti-spam-policy) — account suspension for spam behavior — HIGH confidence
+- [Cloudflare Workers CPU time limits](https://developers.cloudflare.com/workers/platform/limits/) — AbortController timeout necessity for external calls — HIGH confidence
+- General pattern: Astro island dashboard anti-pattern (multiple useEffect fetches) — MEDIUM confidence (common community pattern, verified against project codebase architecture)
+
+---
+*Pitfalls research for: v1.4.0 "Open Doors" — feature additions to existing tenant review platform*
+*Researched: 2026-03-20*
