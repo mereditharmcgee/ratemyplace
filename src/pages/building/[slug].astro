@@ -4,6 +4,7 @@ import StarRating from '../../components/ratings/StarRating.astro';
 import ReviewCard from '../../components/reviews/ReviewCard.astro';
 import ScoreCard from '../../components/ratings/ScoreCard.astro';
 import UGCDisclaimer from '../../components/reviews/UGCDisclaimer.astro';
+import BookmarkButton from '../../components/ui/BookmarkButton';
 import { getDB } from '../../lib/db';
 import { calculateBuildingAverages, calculateDomainScores } from '../../lib/scoring';
 
@@ -14,6 +15,7 @@ let building: any = null;
 let scores: any = null;
 let reviews: any[] = [];
 let landlord: any = null;
+let isSaved = false;
 
 // Unit type display order and labels
 const unitTypeOrder = ['studio', '1br', '2br', '3br', '4br+', 'house'];
@@ -67,6 +69,14 @@ try {
     } else if (reviews.length > 0 && !scores) {
       // No building_scores record at all, calculate everything
       scores = calculateBuildingAverages(reviews);
+    }
+
+    // Check if logged-in user has saved this building
+    if (Astro.locals.user) {
+      const savedResult = await db.prepare(
+        'SELECT 1 FROM saved_buildings WHERE user_id = ? AND building_id = ?'
+      ).bind(Astro.locals.user.id, building.id).first();
+      isSaved = Boolean(savedResult);
     }
   }
 } catch (error) {
@@ -239,12 +249,17 @@ const sortedUnits = Array.from(reviewsByUnit.values())
             <p class="text-gray-400">No reviews yet</p>
           )}
 
-          <a
-            href={`/review/new?building=${building.id}`}
-            class="mt-4 inline-block bg-teal-600 text-white px-6 py-2 rounded-lg hover:bg-teal-700 transition-colors"
-          >
-            Write a Review
-          </a>
+          <div class="mt-4 flex items-center gap-2">
+            {Astro.locals.user && (
+              <BookmarkButton client:load buildingId={building.id} initialSaved={isSaved} />
+            )}
+            <a
+              href={`/review/new?building=${building.id}`}
+              class="inline-block bg-teal-600 text-white px-6 py-2 rounded-lg hover:bg-teal-700 transition-colors"
+            >
+              Write a Review
+            </a>
+          </div>
         </div>
       </div>
     </div>
