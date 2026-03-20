@@ -43,6 +43,8 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [processing, setProcessing] = useState<string | null>(null);
   const [expandedReview, setExpandedReview] = useState<string | null>(null);
+  const [reviewDetails, setReviewDetails] = useState<Record<string, any>>({});
+  const [loadingDetail, setLoadingDetail] = useState<string | null>(null);
 
   // Landlord linking state
   const [landlords, setLandlords] = useState<LandlordOption[]>([]);
@@ -229,6 +231,21 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
     return 'text-red-600';
   };
 
+  const getScoreBadgeColor = (score: number) => {
+    if (score >= 4) return 'bg-emerald-500 text-white';
+    if (score >= 3) return 'bg-amber-500 text-white';
+    if (score >= 2) return 'bg-orange-500 text-white';
+    return 'bg-red-500 text-white';
+  };
+
+  const formatScoreLabel = (key: string) => {
+    return key
+      .replace(/^(unit_|building_|landlord_)/, '')
+      .split('_')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  };
+
   const filteredReviews = reviews.filter((review) => {
     const matchesSearch =
       review.building_address.toLowerCase().includes(search.toLowerCase()) ||
@@ -303,7 +320,21 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
             {/* Review Header */}
             <div
               className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={() => setExpandedReview(expandedReview === review.id ? null : review.id)}
+              onClick={async () => {
+                const isCollapsing = expandedReview === review.id;
+                setExpandedReview(isCollapsing ? null : review.id);
+                if (!isCollapsing && !reviewDetails[review.id]) {
+                  setLoadingDetail(review.id);
+                  try {
+                    const res = await fetch(`/api/admin/reviews/${review.id}`);
+                    const data = await res.json();
+                    if (res.ok) {
+                      setReviewDetails((prev) => ({ ...prev, [review.id]: data.review ?? data }));
+                    }
+                  } catch {}
+                  setLoadingDetail(null);
+                }
+              }}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
@@ -371,51 +402,152 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
             {/* Expanded Details */}
             {expandedReview === review.id && (
               <div className="border-t border-gray-200 p-4 bg-gray-50">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-500 mb-2">Details</h4>
-                    <dl className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <dt className="text-gray-500">Unit Type:</dt>
-                        <dd className="text-gray-900">{review.unit_type}</dd>
-                      </div>
-                      {review.unit_number && (
-                        <div className="flex justify-between">
-                          <dt className="text-gray-500">Unit #:</dt>
-                          <dd className="text-gray-900">{review.unit_number}</dd>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <dt className="text-gray-500">Move-in:</dt>
-                        <dd className="text-gray-900">
-                          {review.move_in_season} {review.move_in_year}
-                        </dd>
-                      </div>
-                      {review.rent_amount && (
-                        <div className="flex justify-between">
-                          <dt className="text-gray-500">Rent:</dt>
-                          <dd className="text-gray-900">${review.rent_amount}/mo</dd>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <dt className="text-gray-500">City:</dt>
-                        <dd className="text-gray-900">{review.building_city || 'N/A'}</dd>
-                      </div>
-                    </dl>
+
+                {/* Loading spinner */}
+                {loadingDetail === review.id && (
+                  <div className="flex justify-center py-6">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-600"></div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-500 mb-2">Review Text</h4>
-                    <p className="text-sm text-gray-700 whitespace-pre-line">
-                      {review.review_text || review.comments || 'No review text provided.'}
-                    </p>
-                    {review.review_text && review.comments && (
-                      <div className="mt-2">
-                        <h4 className="text-sm font-medium text-gray-500 mb-1">Additional Comments</h4>
-                        <p className="text-sm text-gray-700 whitespace-pre-line">{review.comments}</p>
+                )}
+
+                {/* Full detail view once loaded */}
+                {reviewDetails[review.id] && loadingDetail !== review.id && (() => {
+                  const detail = reviewDetails[review.id];
+                  const unitFields = [
+                    'unit_structural', 'unit_plumbing', 'unit_electrical', 'unit_climate',
+                    'unit_ventilation', 'unit_pests', 'unit_mold', 'unit_appliances',
+                    'unit_layout', 'unit_accuracy',
+                  ];
+                  const buildingFields = [
+                    'building_common_areas', 'building_security', 'building_exterior',
+                    'building_noise_neighbors', 'building_noise_external', 'building_mail',
+                    'building_laundry', 'building_parking', 'building_trash',
+                  ];
+                  const landlordFields = [
+                    'landlord_maintenance', 'landlord_communication', 'landlord_professionalism',
+                    'landlord_lease_clarity', 'landlord_privacy', 'landlord_deposit',
+                    'landlord_rent_practices', 'landlord_non_retaliation',
+                  ];
+
+                  const renderScoreRow = (fields: string[], label: string) => (
+                    <div className="mb-3">
+                      <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{label}</h5>
+                      <div className="flex flex-wrap gap-1.5">
+                        {fields.map((field) => {
+                          const val = detail[field];
+                          if (val == null) return null;
+                          return (
+                            <span
+                              key={field}
+                              className={`inline-flex flex-col items-center px-2 py-1 rounded text-xs font-medium ${getScoreBadgeColor(val)}`}
+                            >
+                              <span className="opacity-80">{formatScoreLabel(field)}</span>
+                              <span className="font-bold text-sm">{val}</span>
+                            </span>
+                          );
+                        })}
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  );
+
+                  return (
+                    <>
+                      {/* Score Grid */}
+                      <div className="mb-4 p-3 bg-white rounded-lg border border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-700 mb-3">Scores</h4>
+                        {renderScoreRow(unitFields, 'Unit')}
+                        {renderScoreRow(buildingFields, 'Building')}
+                        {renderScoreRow(landlordFields, 'Landlord')}
+                      </div>
+
+                      {/* Written Content */}
+                      <div className="mb-4 p-3 bg-white rounded-lg border border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Review Content</h4>
+                        {detail.review_title && (
+                          <p className="font-semibold text-gray-900 mb-1">"{detail.review_title}"</p>
+                        )}
+                        <p className="text-sm text-gray-700 whitespace-pre-line">
+                          {detail.review_text || detail.comments || 'No review text provided.'}
+                        </p>
+                        {detail.review_text && detail.comments && detail.review_text !== detail.comments && (
+                          <div className="mt-2 pt-2 border-t border-gray-100">
+                            <p className="text-xs font-medium text-gray-500 mb-1">Additional Comments</p>
+                            <p className="text-sm text-gray-700 whitespace-pre-line">{detail.comments}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Metadata */}
+                      <div className="mb-4 p-3 bg-white rounded-lg border border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Metadata</h4>
+                        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                          <div className="flex justify-between col-span-1">
+                            <dt className="text-gray-500">Reviewer:</dt>
+                            <dd className="text-gray-900 truncate ml-2">{detail.user_email || review.user_email}</dd>
+                          </div>
+                          <div className="flex justify-between col-span-1">
+                            <dt className="text-gray-500">Verified:</dt>
+                            <dd>
+                              {detail.is_verified ? (
+                                <span className="px-1.5 py-0.5 bg-teal-100 text-teal-800 rounded text-xs font-medium">Yes</span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-medium">No</span>
+                              )}
+                            </dd>
+                          </div>
+                          <div className="flex justify-between col-span-1">
+                            <dt className="text-gray-500">Move-in:</dt>
+                            <dd className="text-gray-900">{detail.move_in_season} {detail.move_in_year}</dd>
+                          </div>
+                          <div className="flex justify-between col-span-1">
+                            <dt className="text-gray-500">Unit type:</dt>
+                            <dd className="text-gray-900">{detail.unit_type || 'N/A'}</dd>
+                          </div>
+                          {detail.unit_number && (
+                            <div className="flex justify-between col-span-1">
+                              <dt className="text-gray-500">Unit #:</dt>
+                              <dd className="text-gray-900">{detail.unit_number}</dd>
+                            </div>
+                          )}
+                          {detail.rent_amount && (
+                            <div className="flex justify-between col-span-1">
+                              <dt className="text-gray-500">Rent:</dt>
+                              <dd className="text-gray-900">${detail.rent_amount}/mo</dd>
+                            </div>
+                          )}
+                          {detail.would_recommend_new && (
+                            <div className="flex justify-between col-span-1">
+                              <dt className="text-gray-500">Recommend:</dt>
+                              <dd className="text-gray-900 capitalize">{detail.would_recommend_new}</dd>
+                            </div>
+                          )}
+                        </dl>
+                      </div>
+
+                      {/* Inline approve/reject for convenience */}
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {review.status !== 'approved' && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); updateStatus(review.id, 'approved'); }}
+                            disabled={processing === review.id}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+                          >
+                            {processing === review.id ? '...' : 'Approve'}
+                          </button>
+                        )}
+                        {review.status !== 'rejected' && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); updateStatus(review.id, 'rejected'); }}
+                            disabled={processing === review.id}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 text-sm font-medium"
+                          >
+                            {processing === review.id ? '...' : 'Reject'}
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
 
                 {/* Landlord Linking Section */}
                 {review.landlord_name && (
