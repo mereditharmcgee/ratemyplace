@@ -311,6 +311,27 @@ export interface AuditLogsResponse {
 }
 
 // =============================================================================
+// Saved Buildings Types
+// =============================================================================
+
+export interface SavedBuilding {
+  id: number;
+  building_id: string;
+  building_address: string;
+  building_slug: string;
+  neighborhood: string | null;
+  city: string;
+  state: string;
+  review_count: number;
+  avg_overall: number | null;
+  saved_at: number;
+}
+
+export interface SavedBuildingsResponse {
+  buildings: SavedBuilding[];
+}
+
+// =============================================================================
 // Cleanup Types
 // =============================================================================
 
