@@ -3,6 +3,7 @@ import BaseLayout from '../../components/layout/BaseLayout.astro';
 import StarRating from '../../components/ratings/StarRating.astro';
 import ReviewCard from '../../components/reviews/ReviewCard.astro';
 import ScoreCard from '../../components/ratings/ScoreCard.astro';
+import UGCDisclaimer from '../../components/reviews/UGCDisclaimer.astro';
 import { getDB } from '../../lib/db';
 import { calculateBuildingAverages, calculateDomainScores } from '../../lib/scoring';
 
@@ -371,6 +372,8 @@ const sortedUnits = Array.from(reviewsByUnit.values())
             </a>
           </div>
         )}
+
+        <UGCDisclaimer />
       </div>
 
       <!-- Sidebar -->

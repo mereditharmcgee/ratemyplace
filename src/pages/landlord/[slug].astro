@@ -3,6 +3,7 @@ import BaseLayout from '../../components/layout/BaseLayout.astro';
 import StarRating from '../../components/ratings/StarRating.astro';
 import ScoreCard from '../../components/ratings/ScoreCard.astro';
 import ReviewCard from '../../components/reviews/ReviewCard.astro';
+import UGCDisclaimer from '../../components/reviews/UGCDisclaimer.astro';
 import { getDB } from '../../lib/db';
 import { calculateLandlordAverages } from '../../lib/scoring';
 
@@ -234,6 +235,8 @@ const totalReviews = buildings.reduce((sum, b) => sum + (b.review_count || 0), 0
             </div>
           </div>
         )}
+
+        <UGCDisclaimer />
       </div>
 
       <!-- Sidebar -->
