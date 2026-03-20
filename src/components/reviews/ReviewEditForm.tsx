@@ -28,6 +28,7 @@ export default function ReviewEditForm({ review }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [consentAcknowledged, setConsentAcknowledged] = useState(false);
 
   // Form state - initialized from existing review
   const [unitType, setUnitType] = useState(review.unit_type || 'unknown');
@@ -768,6 +769,29 @@ export default function ReviewEditForm({ review }: Props) {
         </div>
       </div>
 
+      {/* Consent Checkbox */}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={consentAcknowledged}
+            onChange={(e) => setConsentAcknowledged(e.target.checked)}
+            className="mt-0.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+          />
+          <span className="text-sm text-amber-800">
+            I confirm this review reflects my honest personal experience and agree to the{' '}
+            <a href="/terms" target="_blank" className="underline font-medium hover:text-amber-900">
+              Terms of Service
+            </a>{' '}
+            and{' '}
+            <a href="/guidelines" target="_blank" className="underline font-medium hover:text-amber-900">
+              Review Guidelines
+            </a>
+            .
+          </span>
+        </label>
+      </div>
+
       {/* Actions */}
       <div className="flex gap-4 pt-4 border-t">
         <a
@@ -778,8 +802,8 @@ export default function ReviewEditForm({ review }: Props) {
         </a>
         <button
           type="submit"
-          disabled={loading}
-          className="flex-1 px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+          disabled={loading || !consentAcknowledged}
+          className="flex-1 px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? 'Saving...' : 'Save Changes'}
         </button>

@@ -117,9 +117,7 @@ export default function ConfirmStep({
                 className="mt-0.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
               />
               <span className="text-sm text-amber-800">
-                I understand that while my review is anonymous, details may allow the landlord to identify me.
-                I confirm this review is based on my actual experience as a tenant at this property and complies
-                with the{' '}
+                I confirm this review reflects my honest personal experience and agree to the{' '}
                 <a href="/terms" target="_blank" className="underline font-medium hover:text-amber-900">
                   Terms of Service
                 </a>{' '}
