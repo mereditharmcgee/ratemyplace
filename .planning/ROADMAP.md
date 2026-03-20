@@ -45,7 +45,7 @@ See: `.planning/milestones/v1.3-ROADMAP.md`
 
 </details>
 
-### 🚧 v1.4.0 Open Doors (In Progress)
+### v1.4.0 Open Doors (In Progress)
 
 **Milestone Goal:** Make the platform ready for real users with proper trust infrastructure, self-service tools, and public health survey improvements.
 
@@ -134,11 +134,11 @@ Plans:
   3. After submitting a review, users see a clear prompt to verify if they have not already done so
   4. Verified reviews are visually distinguished from unverified reviews on building pages (badge or indicator)
   5. The verification flow completes without navigating to a confusing intermediate state (audit of current VerificationModal must gate implementation)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 14-01: Saved buildings migration (0022), API routes, bookmark button on building pages, and saved tab in dashboard
-- [ ] 14-02: Verification UX audit, redesigned inline verification prompt, and verified review visual distinction
+- [ ] 14-01-PLAN.md — Saved buildings migration (0023), API routes, bookmark button on building pages, and saved tab in dashboard
+- [ ] 14-02-PLAN.md — Verification UX audit, post-submission verification prompt, verified review visual distinction, and dashboard nudge
 
 ## Progress
 
@@ -161,4 +161,4 @@ Plans:
 | 14. Saved Buildings and Verification UX | v1.4.0 | 0/2 | Not started | - |
 
 ---
-*Roadmap updated: 2026-03-20 — Phase 10 plans finalized (3 plans, 1 wave)*
+*Roadmap updated: 2026-03-20 — Phase 14 plans finalized (2 plans, 2 waves)*
