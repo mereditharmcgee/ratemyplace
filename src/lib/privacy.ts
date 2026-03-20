@@ -1,3 +1,18 @@
+/**
+ * Converts a calendar month (1-12) to a season string.
+ * December uses the user-provided year (e.g., December 2025 = Winter 2025, not Winter 2026).
+ *   spring = March-May (3-5)
+ *   summer = June-August (6-8)
+ *   fall   = September-November (9-11)
+ *   winter = December-February (12, 1, 2)
+ */
+export function getSeasonFromMonth(month: number): string {
+  if (month >= 3 && month <= 5) return 'spring';
+  if (month >= 6 && month <= 8) return 'summer';
+  if (month >= 9 && month <= 11) return 'fall';
+  return 'winter'; // 12, 1, 2
+}
+
 const seasonLabels: Record<string, string> = {
   winter: 'Winter',
   spring: 'Spring',
