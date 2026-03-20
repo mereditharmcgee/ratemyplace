@@ -94,43 +94,43 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | TBD | Pending |
-| FIX-02 | TBD | Pending |
-| ENRICH-01 | TBD | Pending |
-| ENRICH-02 | TBD | Pending |
-| ENRICH-03 | TBD | Pending |
-| ENRICH-04 | TBD | Pending |
-| ADMIN-01 | TBD | Pending |
-| ADMIN-02 | TBD | Pending |
-| ADMIN-03 | TBD | Pending |
-| UGC-01 | TBD | Pending |
-| UGC-02 | TBD | Pending |
-| UGC-03 | TBD | Pending |
-| UGC-04 | TBD | Pending |
-| CONTACT-01 | TBD | Pending |
-| CONTACT-02 | TBD | Pending |
-| CONTACT-03 | TBD | Pending |
-| CONTACT-04 | TBD | Pending |
-| VERIFY-01 | TBD | Pending |
-| VERIFY-02 | TBD | Pending |
-| VERIFY-03 | TBD | Pending |
-| VERIFY-04 | TBD | Pending |
-| DASH-01 | TBD | Pending |
-| DASH-02 | TBD | Pending |
-| DASH-03 | TBD | Pending |
-| DASH-04 | TBD | Pending |
-| DASH-05 | TBD | Pending |
-| DASH-06 | TBD | Pending |
-| DASH-07 | TBD | Pending |
-| SURVEY-01 | TBD | Pending |
-| SURVEY-02 | TBD | Pending |
-| SURVEY-03 | TBD | Pending |
+| FIX-01 | Phase 10 | Pending |
+| FIX-02 | Phase 12 | Pending |
+| ENRICH-01 | Phase 12 | Pending |
+| ENRICH-02 | Phase 12 | Pending |
+| ENRICH-03 | Phase 12 | Pending |
+| ENRICH-04 | Phase 12 | Pending |
+| ADMIN-01 | Phase 10 | Pending |
+| ADMIN-02 | Phase 10 | Pending |
+| ADMIN-03 | Phase 10 | Pending |
+| UGC-01 | Phase 10 | Pending |
+| UGC-02 | Phase 10 | Pending |
+| UGC-03 | Phase 10 | Pending |
+| UGC-04 | Phase 10 | Pending |
+| CONTACT-01 | Phase 11 | Pending |
+| CONTACT-02 | Phase 11 | Pending |
+| CONTACT-03 | Phase 11 | Pending |
+| CONTACT-04 | Phase 11 | Pending |
+| VERIFY-01 | Phase 14 | Pending |
+| VERIFY-02 | Phase 14 | Pending |
+| VERIFY-03 | Phase 14 | Pending |
+| VERIFY-04 | Phase 14 | Pending |
+| DASH-01 | Phase 13 | Pending |
+| DASH-02 | Phase 13 | Pending |
+| DASH-03 | Phase 13 | Pending |
+| DASH-04 | Phase 13 | Pending |
+| DASH-05 | Phase 14 | Pending |
+| DASH-06 | Phase 13 | Pending |
+| DASH-07 | Phase 13 | Pending |
+| SURVEY-01 | Phase 11 | Pending |
+| SURVEY-02 | Phase 11 | Pending |
+| SURVEY-03 | Phase 11 | Pending |
 
 **Coverage:**
 - v1.4.0 requirements: 31 total
-- Mapped to phases: 0
-- Unmapped: 31
+- Mapped to phases: 31
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-20*
-*Last updated: 2026-03-20 after initial definition*
+*Last updated: 2026-03-20 — traceability complete, 31/31 requirements mapped to phases 10-14*
