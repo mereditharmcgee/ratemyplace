@@ -41,10 +41,10 @@ Requirements for milestone v1.4.0 "Open Doors". Each maps to roadmap phases.
 
 ### Verification UX
 
-- [ ] **VERIFY-01**: Verification option is clearly visible during or after review submission
-- [ ] **VERIFY-02**: Value of verification is communicated to users (why bother verifying?)
-- [ ] **VERIFY-03**: Verification flow is completable without confusion
-- [ ] **VERIFY-04**: Verified reviews are visually distinguished on public-facing pages
+- [x] **VERIFY-01**: Verification option is clearly visible during or after review submission
+- [x] **VERIFY-02**: Value of verification is communicated to users (why bother verifying?)
+- [x] **VERIFY-03**: Verification flow is completable without confusion
+- [x] **VERIFY-04**: Verified reviews are visually distinguished on public-facing pages
 
 ### Tenant Dashboard
 
@@ -111,10 +111,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONTACT-02 | Phase 11 | Pending |
 | CONTACT-03 | Phase 11 | Pending |
 | CONTACT-04 | Phase 11 | Pending |
-| VERIFY-01 | Phase 14 | Pending |
-| VERIFY-02 | Phase 14 | Pending |
-| VERIFY-03 | Phase 14 | Pending |
-| VERIFY-04 | Phase 14 | Pending |
+| VERIFY-01 | Phase 14 | Complete |
+| VERIFY-02 | Phase 14 | Complete |
+| VERIFY-03 | Phase 14 | Complete |
+| VERIFY-04 | Phase 14 | Complete |
 | DASH-01 | Phase 13 | Pending |
 | DASH-02 | Phase 13 | Pending |
 | DASH-03 | Phase 13 | Pending |

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: executing
-last_updated: "2026-03-20T20:59:35.561Z"
+last_updated: "2026-03-20T21:29:17.530Z"
 last_activity: "2026-03-20 — Completed 10-02: Consent checkbox updates and admin review detail expansion"
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 15
 ---
 
@@ -72,3 +72,6 @@ None currently.
 - [Phase 14-01]: UNIQUE constraint on (user_id, building_id) caught and returned 200 for idempotent save API
 - [Phase 14-01]: isSaved queried server-side in Astro frontmatter so BookmarkButton initial state is correct without client flash
 - [Phase 14-01]: Saved buildings tab lazy-loads on first switch and caches via savedLoaded flag
+- [Phase 14-02]: Kept VerificationModal modal pattern after audit — overlay works well, avoids confusing page navigation mid-verification
+- [Phase 14-02]: Post-submission prompt checks is_verified server-side in Astro frontmatter to avoid client flash if already verified
+- [Phase 14-02]: CSS-only tooltip (group/group-hover) on VerifiedBadge for mobile tap support without JS dependency

@@ -55,7 +55,7 @@ See: `.planning/milestones/v1.3-ROADMAP.md`
 - [ ] **Phase 11: Schema, Survey Fields, and Contact Form** - Two new survey dimensions, contact form with D1 storage and Resend notifications, migration plan locked for milestone
 - [ ] **Phase 12: Multi-City Enrichment Adapter** - CityAdapter interface extracted, Boston adapter refactored, New Haven adapter implemented
 - [ ] **Phase 13: Tenant Dashboard Core** - Review status visibility, verification banner, account settings, and in-app notifications infrastructure
-- [ ] **Phase 14: Saved Buildings and Verification UX** - Building bookmarks in dashboard, redesigned verification flow with inline prompts
+- [x] **Phase 14: Saved Buildings and Verification UX** - Building bookmarks in dashboard, redesigned verification flow with inline prompts (completed 2026-03-20)
 
 ## Phase Details
 
@@ -158,7 +158,7 @@ Plans:
 | 11. Schema, Survey Fields, and Contact Form | v1.4.0 | 0/2 | Not started | - |
 | 12. Multi-City Enrichment Adapter | v1.4.0 | 0/2 | Not started | - |
 | 13. Tenant Dashboard Core | v1.4.0 | 0/3 | Not started | - |
-| 14. Saved Buildings and Verification UX | 1/2 | In Progress|  | - |
+| 14. Saved Buildings and Verification UX | 2/2 | Complete   | 2026-03-20 | - |
 
 ---
 *Roadmap updated: 2026-03-20 — Phase 14 plans finalized (2 plans, 2 waves)*
