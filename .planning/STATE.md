@@ -1,14 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.4.0
-milestone_name: Open Doors
-status: ready_to_plan
-last_updated: "2026-03-20"
+milestone: v1.2
+milestone_name: milestone
+status: planning
+last_updated: "2026-03-20T19:11:42.697Z"
+last_activity: 2026-03-20 — Roadmap created for v1.4.0, 31 requirements mapped across phases 10-14
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 13
-  completed_plans: 0
+  total_plans: 3
+  completed_plans: 2
+  percent: 0
 ---
 
 # Project State
@@ -27,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 ## Current Position
 
 Phase: 10 of 14 (Foundations and Legal Hardening)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-03-20 — Roadmap created for v1.4.0, 31 requirements mapped across phases 10-14
+Plan: 02 complete — ready for 03
+Status: In progress
+Last activity: 2026-03-20 — Completed 10-02: Consent checkbox updates and admin review detail expansion
 
-Progress: [░░░░░░░░░░] 0% (0/13 plans)
+Progress: [██░░░░░░░░] 15% (2/13 plans)
 
 ## Completed Milestones
 
@@ -55,5 +57,11 @@ Progress: [░░░░░░░░░░] 0% (0/13 plans)
 
 None currently.
 
+## Decisions
+
+- **10-01:** UGCDisclaimer placed after reviews section (not inside map loop) on all three review-displaying pages
+- **10-01:** Terms Content Moderation section expanded in-place rather than rewritten; Section 230 block preserved verbatim
+- **10-01:** About page How We Rate section prepended with explicit "tenant-submitted" framing sentence rather than replacing existing content
+
 ---
-*State updated: 2026-03-20 — Roadmap created, phases 10-14 defined*
+*State updated: 2026-03-20 — Completed 10-01: UGC disclaimers and legal hardening*

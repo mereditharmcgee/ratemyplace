@@ -21,16 +21,16 @@ Requirements for milestone v1.4.0 "Open Doors". Each maps to roadmap phases.
 
 ### Admin Improvements
 
-- [ ] **ADMIN-01**: Admin can read complete review content inline from the pending reviews list without navigating away
-- [ ] **ADMIN-02**: All review fields visible in expanded view: ratings, text responses, photos, verification status, user info
-- [ ] **ADMIN-03**: Approve/reject actions accessible from the expanded review view
+- [x] **ADMIN-01**: Admin can read complete review content inline from the pending reviews list without navigating away
+- [x] **ADMIN-02**: All review fields visible in expanded view: ratings, text responses, photos, verification status, user info
+- [x] **ADMIN-03**: Approve/reject actions accessible from the expanded review view
 
 ### UGC Disclaimers
 
-- [ ] **UGC-01**: Visible disclaimer on all pages that display review content (building pages, review cards)
-- [ ] **UGC-02**: Review submission flow includes acknowledgment checkbox that review is personal experience
-- [ ] **UGC-03**: Terms of Service includes standard UGC platform protections (Section 230 safe harbor, content responsibility, removal policy)
-- [ ] **UGC-04**: About page clearly frames platform role (hosts tenant experiences, not a rating agency)
+- [x] **UGC-01**: Visible disclaimer on all pages that display review content (building pages, review cards)
+- [x] **UGC-02**: Review submission flow includes acknowledgment checkbox that review is personal experience
+- [x] **UGC-03**: Terms of Service includes standard UGC platform protections (Section 230 safe harbor, content responsibility, removal policy)
+- [x] **UGC-04**: About page clearly frames platform role (hosts tenant experiences, not a rating agency)
 
 ### Contact Form
 
@@ -100,13 +100,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ENRICH-02 | Phase 12 | Pending |
 | ENRICH-03 | Phase 12 | Pending |
 | ENRICH-04 | Phase 12 | Pending |
-| ADMIN-01 | Phase 10 | Pending |
-| ADMIN-02 | Phase 10 | Pending |
-| ADMIN-03 | Phase 10 | Pending |
-| UGC-01 | Phase 10 | Pending |
-| UGC-02 | Phase 10 | Pending |
-| UGC-03 | Phase 10 | Pending |
-| UGC-04 | Phase 10 | Pending |
+| ADMIN-01 | Phase 10 | Complete |
+| ADMIN-02 | Phase 10 | Complete |
+| ADMIN-03 | Phase 10 | Complete |
+| UGC-01 | Phase 10 | Complete |
+| UGC-02 | Phase 10 | Complete |
+| UGC-03 | Phase 10 | Complete |
+| UGC-04 | Phase 10 | Complete |
 | CONTACT-01 | Phase 11 | Pending |
 | CONTACT-02 | Phase 11 | Pending |
 | CONTACT-03 | Phase 11 | Pending |

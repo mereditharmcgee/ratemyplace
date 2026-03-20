@@ -153,7 +153,7 @@ Plans:
 | 7. Auth and Review E2E | v1.3.0 | 3/3 | Complete | 2026-02-28 |
 | 8. Admin and Disputes E2E | v1.3.0 | 3/3 | Complete | 2026-03-01 |
 | 9. Security E2E | v1.3.0 | 2/2 | Complete | 2026-03-10 |
-| 10. Stress Testing | v1.3.0 | -- | Skipped | -- |
+| 10. Stress Testing | 2/3 | In Progress|  | -- |
 | 10. Foundations and Legal Hardening | v1.4.0 | 0/3 | Not started | - |
 | 11. Schema, Survey Fields, and Contact Form | v1.4.0 | 0/2 | Not started | - |
 | 12. Multi-City Enrichment Adapter | v1.4.0 | 0/2 | Not started | - |
