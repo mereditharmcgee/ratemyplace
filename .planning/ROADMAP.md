@@ -158,7 +158,7 @@ Plans:
 | 11. Schema, Survey Fields, and Contact Form | v1.4.0 | 0/2 | Not started | - |
 | 12. Multi-City Enrichment Adapter | v1.4.0 | 0/2 | Not started | - |
 | 13. Tenant Dashboard Core | v1.4.0 | 0/3 | Not started | - |
-| 14. Saved Buildings and Verification UX | 2/2 | Complete   | 2026-03-20 | - |
+| 14. Saved Buildings and Verification UX | 2/2 | Complete    | 2026-03-20 | - |
 
 ---
 *Roadmap updated: 2026-03-20 — Phase 14 plans finalized (2 plans, 2 waves)*
