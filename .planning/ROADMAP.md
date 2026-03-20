@@ -69,13 +69,12 @@ See: `.planning/milestones/v1.3-ROADMAP.md`
   3. The Terms of Service page includes Section 230 safe harbor language, content responsibility clause, and removal policy
   4. Admin can expand any pending review inline and see all fields (ratings, text, photos, verification status, user info) plus approve/reject without leaving the list
   5. Move-in dates display the correct season label (December 2025 shows "Winter 2025" not "Winter 2026")
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 10-01: UGC disclaimer component and deployment across review surfaces
-- [ ] 10-02: ToS update and review submission consent checkbox
-- [ ] 10-03: Admin pending reviews expanded inline view with actions
-- [ ] 10-04: Move-in date seasonal display bug fix
+- [ ] 10-01-PLAN.md — UGC disclaimer component, ToS expansion, and About page reframing
+- [ ] 10-02-PLAN.md — Consent checkbox update and admin review inline expansion
+- [ ] 10-03-PLAN.md — Move-in date season/year bug fix
 
 ### Phase 11: Schema, Survey Fields, and Contact Form
 **Goal**: Two new public health survey dimensions are collected from new reviews, a working contact form replaces the static mailto link, and all migration numbers for the milestone are pre-assigned to prevent collisions
@@ -155,11 +154,11 @@ Plans:
 | 8. Admin and Disputes E2E | v1.3.0 | 3/3 | Complete | 2026-03-01 |
 | 9. Security E2E | v1.3.0 | 2/2 | Complete | 2026-03-10 |
 | 10. Stress Testing | v1.3.0 | -- | Skipped | -- |
-| 10. Foundations and Legal Hardening | v1.4.0 | 0/4 | Not started | - |
+| 10. Foundations and Legal Hardening | v1.4.0 | 0/3 | Not started | - |
 | 11. Schema, Survey Fields, and Contact Form | v1.4.0 | 0/2 | Not started | - |
 | 12. Multi-City Enrichment Adapter | v1.4.0 | 0/2 | Not started | - |
 | 13. Tenant Dashboard Core | v1.4.0 | 0/3 | Not started | - |
 | 14. Saved Buildings and Verification UX | v1.4.0 | 0/2 | Not started | - |
 
 ---
-*Roadmap updated: 2026-03-20 — v1.4.0 "Open Doors" phases 10-14 added*
+*Roadmap updated: 2026-03-20 — Phase 10 plans finalized (3 plans, 1 wave)*
