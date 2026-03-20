@@ -9,7 +9,7 @@ Requirements for milestone v1.4.0 "Open Doors". Each maps to roadmap phases.
 
 ### Bug Fixes
 
-- [ ] **FIX-01**: Move-in dates display correct season/year labels including winter month edge cases (Dec 2025 = Winter 2025, not Winter 2026)
+- [x] **FIX-01**: Move-in dates display correct season/year labels including winter month edge cases (Dec 2025 = Winter 2025, not Winter 2026)
 - [ ] **FIX-02**: Admin auto-research routes to correct city data source based on building location instead of always querying Boston
 
 ### Multi-City Enrichment
@@ -94,7 +94,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | Phase 10 | Pending |
+| FIX-01 | Phase 10 | Complete |
 | FIX-02 | Phase 12 | Pending |
 | ENRICH-01 | Phase 12 | Pending |
 | ENRICH-02 | Phase 12 | Pending |

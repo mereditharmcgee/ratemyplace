@@ -51,7 +51,7 @@ See: `.planning/milestones/v1.3-ROADMAP.md`
 
 #### Phase Checklist
 
-- [ ] **Phase 10: Foundations and Legal Hardening** - UGC disclaimers, move-in date bug fix, and full review content in admin queue
+- [x] **Phase 10: Foundations and Legal Hardening** - UGC disclaimers, move-in date bug fix, and full review content in admin queue (completed 2026-03-20)
 - [ ] **Phase 11: Schema, Survey Fields, and Contact Form** - Two new survey dimensions, contact form with D1 storage and Resend notifications, migration plan locked for milestone
 - [ ] **Phase 12: Multi-City Enrichment Adapter** - CityAdapter interface extracted, Boston adapter refactored, New Haven adapter implemented
 - [ ] **Phase 13: Tenant Dashboard Core** - Review status visibility, verification banner, account settings, and in-app notifications infrastructure
@@ -153,7 +153,7 @@ Plans:
 | 7. Auth and Review E2E | v1.3.0 | 3/3 | Complete | 2026-02-28 |
 | 8. Admin and Disputes E2E | v1.3.0 | 3/3 | Complete | 2026-03-01 |
 | 9. Security E2E | v1.3.0 | 2/2 | Complete | 2026-03-10 |
-| 10. Stress Testing | 2/3 | In Progress|  | -- |
+| 10. Stress Testing | 3/3 | Complete   | 2026-03-20 | -- |
 | 10. Foundations and Legal Hardening | v1.4.0 | 0/3 | Not started | - |
 | 11. Schema, Survey Fields, and Contact Form | v1.4.0 | 0/2 | Not started | - |
 | 12. Multi-City Enrichment Adapter | v1.4.0 | 0/2 | Not started | - |
