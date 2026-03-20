@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: executing
-last_updated: "2026-03-20T19:16:49.006Z"
+last_updated: "2026-03-20T20:59:35.561Z"
 last_activity: "2026-03-20 — Completed 10-02: Consent checkbox updates and admin review detail expansion"
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 5
+  completed_plans: 4
   percent: 15
 ---
 
@@ -69,3 +69,6 @@ None currently.
 *State updated: 2026-03-20 — Completed 10-02: Consent checkbox updates and admin review detail expansion*
 - [Phase 10]: Dual-path validation: move_in_month (new) OR move_in_season (legacy) for backward compat
 - [Phase 10]: December uses user-provided year: month=12, year=2025 stores as Winter 2025 (not 2026)
+- [Phase 14-01]: UNIQUE constraint on (user_id, building_id) caught and returned 200 for idempotent save API
+- [Phase 14-01]: isSaved queried server-side in Astro frontmatter so BookmarkButton initial state is correct without client flash
+- [Phase 14-01]: Saved buildings tab lazy-loads on first switch and caches via savedLoaded flag
