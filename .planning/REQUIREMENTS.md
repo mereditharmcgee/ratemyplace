@@ -16,7 +16,7 @@ Requirements for milestone v1.4.0 "Open Doors". Each maps to roadmap phases.
 
 - [x] **ENRICH-01**: Enrichment endpoint uses adapter pattern with a common `CityAdapter` interface for city-specific data sources
 - [x] **ENRICH-02**: Boston adapter extracted from existing monolithic `enrich.ts` endpoint
-- [ ] **ENRICH-03**: New Haven adapter queries CT CAMA state dataset (`data.ct.gov`, resource `pqrn-qghw`)
+- [x] **ENRICH-03**: New Haven adapter queries CT CAMA state dataset (`data.ct.gov`, resource `pqrn-qghw`)
 - [x] **ENRICH-04**: Unsupported cities display "no auto-research data available" instead of failing silently
 
 ### Admin Improvements
@@ -98,7 +98,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FIX-02 | Phase 12 | Complete |
 | ENRICH-01 | Phase 12 | Complete |
 | ENRICH-02 | Phase 12 | Complete |
-| ENRICH-03 | Phase 12 | Pending |
+| ENRICH-03 | Phase 12 | Complete |
 | ENRICH-04 | Phase 12 | Complete |
 | ADMIN-01 | Phase 10 | Complete |
 | ADMIN-02 | Phase 10 | Complete |

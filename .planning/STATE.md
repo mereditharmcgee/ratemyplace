@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: executing
-last_updated: "2026-03-21T21:10:44.013Z"
-last_activity: 2026-03-21 — Completed 11-01-PLAN.md (survey fields)
+last_updated: "2026-03-21T21:15:33.303Z"
+last_activity: 2026-03-21 — Completed 12-02-PLAN.md (New Haven adapter + multi-city UI)
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
   percent: 100
 ---
 
@@ -28,12 +28,12 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 
 ## Current Position
 
-Phase: 12 of 14 (Multi-City Enrichment Adapter)
-Plan: 12-01 complete — ready for next plan (12-02 New Haven adapter)
-Status: In progress
-Last activity: 2026-03-21 — Completed 12-01-PLAN.md (enrichment adapter foundation)
+Phase: 12 of 14 (Multi-City Enrichment Adapter) — COMPLETE
+Plan: 12-02 complete — Phase 12 fully done
+Status: Phase 12 complete
+Last activity: 2026-03-21 — Completed 12-02-PLAN.md (New Haven adapter + multi-city UI)
 
-Progress: [██████████] 96% (8/9 plans)
+Progress: [██████████] 100% (9/9 plans)
 
 ## Completed Milestones
 
@@ -51,7 +51,7 @@ Progress: [██████████] 96% (8/9 plans)
 - Survey fields: use nullable columns (INTEGER, no NOT NULL constraint) — D1 rejects NOT NULL ALTER TABLE on existing rows
 - CAN-SPAM: notification_opt_in column needed on users table before first review status email ships (Phase 13)
 - Verification UX: mandatory audit of VerificationModal.tsx and ProfileDashboard.tsx must gate Phase 14 implementation
-- 207 unit tests passing, build clean as of 2026-03-21
+- 215 unit tests passing, build clean as of 2026-03-21
 
 ## Blockers
 
@@ -81,3 +81,5 @@ None currently.
 - [Phase 12]: Dispatcher strips trailing state abbreviation from city (Boston, MA -> boston) before adapter map lookup
 - [Phase 12]: Cambridge not routed to BostonAdapter — Boston Assessing is City of Boston only; stays NullAdapter until verified
 - [Phase 12]: mapBuildingType() stays in boston.ts adapter — LU_DESC codes are Boston-specific
+- [Phase 12]: NewHavenAdapter uses Socrata SoQL with escaped apostrophes and broad $q fallback
+- [Phase 12]: Unsupported-city block renders separately from empty-results block in BuildingsTable
