@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: executing
-last_updated: "2026-03-21T18:51:43.907Z"
+last_updated: "2026-03-21T21:10:44.013Z"
 last_activity: 2026-03-21 — Completed 11-01-PLAN.md (survey fields)
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 9
+  completed_plans: 8
   percent: 100
 ---
 
@@ -28,12 +28,12 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 
 ## Current Position
 
-Phase: 11 of 14 (Schema, Survey Fields, and Contact Form)
-Plan: 11-01 complete — ready for next plan
+Phase: 12 of 14 (Multi-City Enrichment Adapter)
+Plan: 12-01 complete — ready for next plan (12-02 New Haven adapter)
 Status: In progress
-Last activity: 2026-03-21 — Completed 11-01-PLAN.md (survey fields)
+Last activity: 2026-03-21 — Completed 12-01-PLAN.md (enrichment adapter foundation)
 
-Progress: [██████████] 100% (7/7 plans)
+Progress: [██████████] 96% (8/9 plans)
 
 ## Completed Milestones
 
@@ -51,7 +51,7 @@ Progress: [██████████] 100% (7/7 plans)
 - Survey fields: use nullable columns (INTEGER, no NOT NULL constraint) — D1 rejects NOT NULL ALTER TABLE on existing rows
 - CAN-SPAM: notification_opt_in column needed on users table before first review status email ships (Phase 13)
 - Verification UX: mandatory audit of VerificationModal.tsx and ProfileDashboard.tsx must gate Phase 14 implementation
-- 171 unit tests passing, build clean as of 2026-03-09
+- 207 unit tests passing, build clean as of 2026-03-21
 
 ## Blockers
 
@@ -78,3 +78,6 @@ None currently.
 - [Phase 11-02]: SSR direct D1 query in admin/contact.astro — simpler, avoids extra client JS for read-only table
 - [Phase 11-02]: Migration 0019 added as reserved placeholder to close sequence gap between 0018 and 0023
 - [Phase 11]: Placed housingVouchers and safelyLit radio groups before wouldRecommend for clustered yes/no/unsure grouping
+- [Phase 12]: Dispatcher strips trailing state abbreviation from city (Boston, MA -> boston) before adapter map lookup
+- [Phase 12]: Cambridge not routed to BostonAdapter — Boston Assessing is City of Boston only; stays NullAdapter until verified
+- [Phase 12]: mapBuildingType() stays in boston.ts adapter — LU_DESC codes are Boston-specific

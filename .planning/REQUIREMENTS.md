@@ -10,14 +10,14 @@ Requirements for milestone v1.4.0 "Open Doors". Each maps to roadmap phases.
 ### Bug Fixes
 
 - [x] **FIX-01**: Move-in dates display correct season/year labels including winter month edge cases (Dec 2025 = Winter 2025, not Winter 2026)
-- [ ] **FIX-02**: Admin auto-research routes to correct city data source based on building location instead of always querying Boston
+- [x] **FIX-02**: Admin auto-research routes to correct city data source based on building location instead of always querying Boston
 
 ### Multi-City Enrichment
 
-- [ ] **ENRICH-01**: Enrichment endpoint uses adapter pattern with a common `CityAdapter` interface for city-specific data sources
-- [ ] **ENRICH-02**: Boston adapter extracted from existing monolithic `enrich.ts` endpoint
+- [x] **ENRICH-01**: Enrichment endpoint uses adapter pattern with a common `CityAdapter` interface for city-specific data sources
+- [x] **ENRICH-02**: Boston adapter extracted from existing monolithic `enrich.ts` endpoint
 - [ ] **ENRICH-03**: New Haven adapter queries CT CAMA state dataset (`data.ct.gov`, resource `pqrn-qghw`)
-- [ ] **ENRICH-04**: Unsupported cities display "no auto-research data available" instead of failing silently
+- [x] **ENRICH-04**: Unsupported cities display "no auto-research data available" instead of failing silently
 
 ### Admin Improvements
 
@@ -95,11 +95,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | FIX-01 | Phase 10 | Complete |
-| FIX-02 | Phase 12 | Pending |
-| ENRICH-01 | Phase 12 | Pending |
-| ENRICH-02 | Phase 12 | Pending |
+| FIX-02 | Phase 12 | Complete |
+| ENRICH-01 | Phase 12 | Complete |
+| ENRICH-02 | Phase 12 | Complete |
 | ENRICH-03 | Phase 12 | Pending |
-| ENRICH-04 | Phase 12 | Pending |
+| ENRICH-04 | Phase 12 | Complete |
 | ADMIN-01 | Phase 10 | Complete |
 | ADMIN-02 | Phase 10 | Complete |
 | ADMIN-03 | Phase 10 | Complete |
