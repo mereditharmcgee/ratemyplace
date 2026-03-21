@@ -34,10 +34,10 @@ Requirements for milestone v1.4.0 "Open Doors". Each maps to roadmap phases.
 
 ### Contact Form
 
-- [ ] **CONTACT-01**: Contact page has a working form with name, email, category dropdown (general, privacy, support, landlord), message body
-- [ ] **CONTACT-02**: Submissions stored in D1 (`contact_messages` table) with notification email via Resend to appropriate @ratemyplace.org address
-- [ ] **CONTACT-03**: Submitter receives confirmation email acknowledging receipt
-- [ ] **CONTACT-04**: Contact submissions visible in admin panel alongside bug reports
+- [x] **CONTACT-01**: Contact page has a working form with name, email, category dropdown (general, privacy, support, landlord), message body
+- [x] **CONTACT-02**: Submissions stored in D1 (`contact_messages` table) with notification email via Resend to appropriate @ratemyplace.org address
+- [x] **CONTACT-03**: Submitter receives confirmation email acknowledging receipt
+- [x] **CONTACT-04**: Contact submissions visible in admin panel alongside bug reports
 
 ### Verification UX
 
@@ -107,10 +107,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UGC-02 | Phase 10 | Complete |
 | UGC-03 | Phase 10 | Complete |
 | UGC-04 | Phase 10 | Complete |
-| CONTACT-01 | Phase 11 | Pending |
-| CONTACT-02 | Phase 11 | Pending |
-| CONTACT-03 | Phase 11 | Pending |
-| CONTACT-04 | Phase 11 | Pending |
+| CONTACT-01 | Phase 11 | Complete |
+| CONTACT-02 | Phase 11 | Complete |
+| CONTACT-03 | Phase 11 | Complete |
+| CONTACT-04 | Phase 11 | Complete |
 | VERIFY-01 | Phase 14 | Complete |
 | VERIFY-02 | Phase 14 | Complete |
 | VERIFY-03 | Phase 14 | Complete |
