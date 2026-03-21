@@ -101,11 +101,11 @@ Plans:
   2. Admin clicking "Auto-Research" on a New Haven building returns CT CAMA dataset fields (owner name, year built, building type)
   3. Admin clicking "Auto-Research" on an unsupported city sees "no auto-research data available" message instead of an error or empty result
   4. The enrichment code uses a CityAdapter interface that future cities can implement without modifying the dispatcher
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 12-01: CityAdapter interface, Boston adapter extraction, and enrichment dispatcher
-- [ ] 12-02: New Haven adapter implementation and unsupported-city fallback
+- [ ] 12-01-PLAN.md — CityAdapter interface, shared helpers extraction, Boston adapter, NullAdapter, dispatcher, and unit tests
+- [ ] 12-02-PLAN.md — New Haven CT CAMA adapter, dispatcher registration, and BuildingsTable UI update for multi-city labels
 
 ### Phase 13: Tenant Dashboard Core
 **Goal**: Logged-in tenants can see the status of all their reviews, verify their email from the dashboard, manage account settings, and receive in-app notifications when review status changes
@@ -161,4 +161,4 @@ Plans:
 | 14. Saved Buildings and Verification UX | 2/2 | Complete    | 2026-03-20 | - |
 
 ---
-*Roadmap updated: 2026-03-21 — Phase 11 plans finalized (2 plans, 1 wave)*
+*Roadmap updated: 2026-03-21 — Phase 12 plans finalized (2 plans, 2 waves)*
