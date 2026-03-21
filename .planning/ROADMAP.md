@@ -86,11 +86,11 @@ Plans:
   3. Contact page has a working form with category dropdown, submits successfully, and submitter receives a confirmation email
   4. Admin panel shows contact submissions alongside bug reports
   5. Contact form rejects submissions without a valid Turnstile token and enforces rate limiting (3 per hour per IP)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 11-01: Migration plan lock (pre-assign 0019-0022) and survey field migrations + form wiring
-- [ ] 11-02: Contact form page, API route, D1 storage, Resend notifications, and admin panel integration
+- [ ] 11-01-PLAN.md — Survey field migrations (0019), supplementaryItems definitions, form wiring, and ReviewCard display
+- [ ] 11-02-PLAN.md — Contact form page, API route, D1 storage (0020), Resend emails, admin Contact tab, and migration placeholders (0021-0022)
 
 ### Phase 12: Multi-City Enrichment Adapter
 **Goal**: The auto-research feature routes to the correct city data source based on building location, Boston behavior is unchanged, New Haven enrichment works, and the architecture supports future cities without code duplication
@@ -161,4 +161,4 @@ Plans:
 | 14. Saved Buildings and Verification UX | 2/2 | Complete    | 2026-03-20 | - |
 
 ---
-*Roadmap updated: 2026-03-20 — Phase 14 plans finalized (2 plans, 2 waves)*
+*Roadmap updated: 2026-03-21 — Phase 11 plans finalized (2 plans, 1 wave)*
