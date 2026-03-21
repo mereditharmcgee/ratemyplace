@@ -58,9 +58,9 @@ Requirements for milestone v1.4.0 "Open Doors". Each maps to roadmap phases.
 
 ### Survey Fields
 
-- [ ] **SURVEY-01**: Review form includes Section 8 / Housing Choice Voucher acceptance question (yes/no/unsure)
-- [ ] **SURVEY-02**: Review form includes "safely lit at night" question for building and surrounding area
-- [ ] **SURVEY-03**: New fields displayed on public review cards (omitted for older reviews without data)
+- [x] **SURVEY-01**: Review form includes Section 8 / Housing Choice Voucher acceptance question (yes/no/unsure)
+- [x] **SURVEY-02**: Review form includes "safely lit at night" question for building and surrounding area
+- [x] **SURVEY-03**: New fields displayed on public review cards (omitted for older reviews without data)
 
 ## v2 Requirements
 
@@ -122,9 +122,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-05 | Phase 14 | Complete |
 | DASH-06 | Phase 13 | Pending |
 | DASH-07 | Phase 13 | Pending |
-| SURVEY-01 | Phase 11 | Pending |
-| SURVEY-02 | Phase 11 | Pending |
-| SURVEY-03 | Phase 11 | Pending |
+| SURVEY-01 | Phase 11 | Complete |
+| SURVEY-02 | Phase 11 | Complete |
+| SURVEY-03 | Phase 11 | Complete |
 
 **Coverage:**
 - v1.4.0 requirements: 31 total
