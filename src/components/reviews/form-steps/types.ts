@@ -59,6 +59,8 @@ export interface ReviewData {
   hadWaterIssues: boolean;
   hadSecurityDepositIssues: boolean;
   hadEvictionThreats: boolean;
+  housingVouchers: string | null;
+  safelyLit: string | null;
 }
 
 export type Step = 'address' | 'unit-details' | 'unit-rating' | 'building-rating' | 'landlord-rating' | 'additional' | 'confirm';

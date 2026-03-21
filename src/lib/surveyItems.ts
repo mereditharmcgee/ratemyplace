@@ -558,4 +558,22 @@ export const supplementaryItems = {
       { value: '2020_or_earlier', label: '2020 or earlier' },
     ],
   },
+  housingVouchers: {
+    key: 'accepts_housing_vouchers',
+    text: 'To your knowledge, does this property accept Housing Choice Vouchers (Section 8)?',
+    options: [
+      { value: 'yes', label: 'Yes' },
+      { value: 'no', label: 'No' },
+      { value: 'unsure', label: 'Unsure' },
+    ],
+  },
+  safelyLit: {
+    key: 'safely_lit_at_night',
+    text: 'Was the building and surrounding area safely lit at night?',
+    options: [
+      { value: 'yes', label: 'Yes' },
+      { value: 'no', label: 'No' },
+      { value: 'unsure', label: 'Unsure' },
+    ],
+  },
 };
