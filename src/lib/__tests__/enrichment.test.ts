@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { selectAdapter } from '../enrichment/dispatcher';
 import { NullAdapter } from '../enrichment/adapters/null';
 import { BostonAdapter } from '../enrichment/adapters/boston';
+import { NewHavenAdapter } from '../enrichment/adapters/new-haven';
 import {
   inferOwnerEntity,
   parseStreetAddress,
@@ -35,6 +36,21 @@ describe('selectAdapter', () => {
   it('routes unknown city to NullAdapter', () => {
     const adapter = selectAdapter('springfield');
     expect(adapter).toBeInstanceOf(NullAdapter);
+  });
+
+  it('routes "new haven" to NewHavenAdapter', () => {
+    const adapter = selectAdapter('new haven');
+    expect(adapter).toBeInstanceOf(NewHavenAdapter);
+  });
+
+  it('routes "New Haven" (mixed case) to NewHavenAdapter', () => {
+    const adapter = selectAdapter('New Haven');
+    expect(adapter).toBeInstanceOf(NewHavenAdapter);
+  });
+
+  it('routes "New Haven, CT" (with state suffix) to NewHavenAdapter', () => {
+    const adapter = selectAdapter('New Haven, CT');
+    expect(adapter).toBeInstanceOf(NewHavenAdapter);
   });
 });
 
@@ -238,5 +254,131 @@ describe('BostonAdapter', () => {
     const result = await adapter.enrich(badBuilding);
     expect(result.results).toEqual([]);
     expect(result.message).toBe('Could not parse address');
+  });
+});
+
+// ── NewHavenAdapter tests ──
+
+describe('NewHavenAdapter', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  const building: BuildingRecord = {
+    id: 'bld-nh-1',
+    address: '100 Elm St',
+    city: 'New Haven',
+    state: 'CT',
+    zip_code: '06510',
+  };
+
+  // CT CAMA Socrata returns a raw JSON array (not CKAN envelope)
+  const fakeCtCamaRecord = {
+    address_number: '100',
+    street_name: 'ELM ST',
+    property_city: 'NEW HAVEN',
+    owner: 'SMITH LLC',
+    ayb: '1920',
+    state_use_description: 'RESIDENTIAL',
+    gross_area_of_primary_building: '3200',
+    living_area: '2800',
+    number_of_buildings: '3',
+    appraised_total: '450000',
+    condition_description: 'Average',
+  };
+
+  it('returns EnrichResponse with correct field mapping from exact match', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => [fakeCtCamaRecord],
+    }));
+
+    const adapter = new NewHavenAdapter();
+    const result = await adapter.enrich(building);
+
+    expect(result.address).toBe('100 Elm St');
+    expect(result.source).toBe('CT CAMA');
+    expect(result.results).toHaveLength(1);
+    const r = result.results[0];
+    expect(r.owner).toBe('SMITH LLC');
+    expect(r.ownerEntityInferred).toBe('llc');
+    expect(r.yearBuilt).toBe(1920);
+    expect(r.propertyType).toBe('RESIDENTIAL');
+    expect(r.buildingType).toBe('Residential');
+    expect(r.grossArea).toBe(3200);
+    expect(r.livingArea).toBe(2800);
+    expect(r.totalValue).toBe(450000);
+    expect(r.overallCondition).toBe('Average');
+    expect(r.address).toBe('100 ELM ST');
+    expect(r.city).toBe('NEW HAVEN');
+  });
+
+  it('triggers broad fallback when exact match returns empty array', async () => {
+    const fallbackRecord = { ...fakeCtCamaRecord, owner: 'JONES TRUST' };
+
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
+      .mockResolvedValueOnce({ ok: true, json: async () => [fallbackRecord] })
+    );
+
+    const adapter = new NewHavenAdapter();
+    const result = await adapter.enrich(building);
+
+    expect(result.fuzzyMatch).toBe(true);
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].owner).toBe('JONES TRUST');
+  });
+
+  it('returns empty results with message when no records found at all', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
+    );
+
+    const adapter = new NewHavenAdapter();
+    const result = await adapter.enrich(building);
+
+    expect(result.results).toEqual([]);
+    expect(result.message).toBeTruthy();
+    expect(result.source).toBe('CT CAMA');
+  });
+
+  it('escapes apostrophes in address for SoQL query', async () => {
+    const apostropheBuilding: BuildingRecord = {
+      id: 'bld-nh-2',
+      address: "12 O'Brien St",
+      city: 'New Haven',
+      state: 'CT',
+      zip_code: '06510',
+    };
+
+    let capturedUrl = '';
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      capturedUrl = url;
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }));
+
+    const adapter = new NewHavenAdapter();
+    await adapter.enrich(apostropheBuilding);
+
+    // The first fetch (exact match) URL should escape the apostrophe
+    // O'BRIEN should become O''BRIEN in the SoQL $where clause
+    expect(capturedUrl).toContain("O''BRIEN");
+  });
+
+  it('returns empty results with message when address cannot be parsed', async () => {
+    const badBuilding: BuildingRecord = {
+      id: 'bld-nh-3',
+      address: 'BadAddress',
+      city: 'New Haven',
+      state: 'CT',
+      zip_code: '06510',
+    };
+
+    const adapter = new NewHavenAdapter();
+    const result = await adapter.enrich(badBuilding);
+
+    expect(result.results).toEqual([]);
+    expect(result.message).toBeTruthy();
   });
 });
