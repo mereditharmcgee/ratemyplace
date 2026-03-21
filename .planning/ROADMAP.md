@@ -155,7 +155,7 @@ Plans:
 | 9. Security E2E | v1.3.0 | 2/2 | Complete | 2026-03-10 |
 | 10. Stress Testing | 3/3 | Complete    | 2026-03-20 | -- |
 | 10. Foundations and Legal Hardening | v1.4.0 | 0/3 | Not started | - |
-| 11. Schema, Survey Fields, and Contact Form | 2/2 | Complete   | 2026-03-21 | - |
+| 11. Schema, Survey Fields, and Contact Form | 2/2 | Complete    | 2026-03-21 | - |
 | 12. Multi-City Enrichment Adapter | v1.4.0 | 0/2 | Not started | - |
 | 13. Tenant Dashboard Core | v1.4.0 | 0/3 | Not started | - |
 | 14. Saved Buildings and Verification UX | 2/2 | Complete    | 2026-03-20 | - |
