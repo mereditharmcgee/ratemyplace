@@ -243,6 +243,150 @@ export async function sendDisputeConfirmationEmail(
 }
 
 /**
+ * Send contact form confirmation email to submitter
+ *
+ * @param apiKey - Resend API key from environment
+ * @param toEmail - Submitter's email address
+ * @param toName - Submitter's name
+ * @param category - Contact category (general, privacy, support, landlord)
+ */
+export async function sendContactConfirmationEmail(
+  apiKey: string,
+  toEmail: string,
+  toName: string,
+  category: string
+): Promise<EmailResult> {
+  if (!apiKey) {
+    console.error('RESEND_API_KEY not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  const resend = new Resend(apiKey);
+
+  const categoryLabels: Record<string, string> = {
+    general: 'general inquiry',
+    privacy: 'privacy concern',
+    support: 'support request',
+    landlord: 'landlord/property manager inquiry',
+  };
+  const categoryLabel = categoryLabels[category] || 'inquiry';
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+      to: toEmail,
+      subject: 'We received your message - RateMyPlace Boston',
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">We received your message</h2>
+
+  <p>Hi ${toName},</p>
+
+  <p>Thank you for reaching out. We've received your ${categoryLabel} and will get back to you as soon as possible.</p>
+
+  <p>Our team typically responds within 2-3 business days. If your matter is urgent, please reply to this email and include "URGENT" in the subject line.</p>
+
+  <p style="color: #666; font-size: 14px;">Thank you for helping us make RateMyPlace Boston better for everyone.</p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    This is a confirmation that we received your message. Please do not reply to this automated email — use the contact form at ratemyplace.org/contact to send additional messages.
+  </p>
+</body>
+</html>
+      `,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err) {
+    console.error('Email send exception:', err);
+    return { success: false, error: 'Failed to send email' };
+  }
+}
+
+/**
+ * Send contact form notification email to admin
+ *
+ * @param apiKey - Resend API key from environment
+ * @param submitterName - Name of the person who submitted
+ * @param submitterEmail - Email of the person who submitted
+ * @param category - Contact category
+ * @param messagePreview - First 200 chars of the message
+ */
+export async function sendContactNotificationEmail(
+  apiKey: string,
+  submitterName: string,
+  submitterEmail: string,
+  category: string,
+  messagePreview: string
+): Promise<EmailResult> {
+  if (!apiKey) {
+    console.error('RESEND_API_KEY not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  const resend = new Resend(apiKey);
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+      to: 'contact@ratemyplace.org',
+      subject: `New contact: ${category} from ${submitterName}`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">New Contact Form Submission</h2>
+
+  <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 8px 0;"><strong>Name:</strong> ${submitterName}</p>
+    <p style="margin: 0 0 8px 0;"><strong>Email:</strong> <a href="mailto:${submitterEmail}" style="color: #0d9488;">${submitterEmail}</a></p>
+    <p style="margin: 0 0 8px 0;"><strong>Category:</strong> ${category}</p>
+    <p style="margin: 16px 0 4px 0;"><strong>Message preview:</strong></p>
+    <p style="margin: 0; color: #666;">${messagePreview}</p>
+  </div>
+
+  <p style="color: #666; font-size: 14px;">
+    View all submissions at <a href="https://ratemyplace.org/admin/contact" style="color: #0d9488;">ratemyplace.org/admin/contact</a>
+  </p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">This is an automated admin notification from RateMyPlace Boston.</p>
+</body>
+</html>
+      `,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err) {
+    console.error('Email send exception:', err);
+    return { success: false, error: 'Failed to send email' };
+  }
+}
+
+/**
  * Send dispute upheld notification to landlord
  *
  * @param apiKey - Resend API key from environment
