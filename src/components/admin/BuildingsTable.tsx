@@ -712,7 +712,7 @@ export default function BuildingsTable() {
                     {enrichResult && enrichResult.results?.length > 0 && expandedBuilding === building.id && (
                       <div className="mt-4 pt-4 border-t border-gray-200">
                         <h4 className="text-sm font-medium text-gray-700 mb-2">
-                          Boston Assessing Results
+                          {enrichResult.source ? `${enrichResult.source} Results` : 'Auto-Research Results'}
                           {enrichResult.fuzzyMatch && (
                             <span className="ml-2 text-xs text-amber-600 font-normal">(fuzzy match)</span>
                           )}
@@ -752,10 +752,26 @@ export default function BuildingsTable() {
                       </div>
                     )}
 
-                    {enrichResult && enrichResult.results?.length === 0 && expandedBuilding === building.id && (
+                    {enrichResult && enrichResult.unsupported === true && expandedBuilding === building.id && (
                       <div className="mt-4 pt-4 border-t border-gray-200">
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-                          No matching records found in Boston Assessing database for "{enrichResult.address}".
+                          {enrichResult.message}
+                        </div>
+                        <button
+                          onClick={() => setEnrichResult(null)}
+                          className="mt-2 text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
+
+                    {enrichResult && enrichResult.results?.length === 0 && !enrichResult.unsupported && expandedBuilding === building.id && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                          {enrichResult.source
+                            ? `No matching records found in ${enrichResult.source} for "${enrichResult.address}".`
+                            : `No matching records found for "${enrichResult.address}".`}
                           {enrichResult.searchedFor && (
                             <span className="text-xs block mt-1 text-amber-600">
                               Searched: #{enrichResult.searchedFor.number} {enrichResult.searchedFor.street}
