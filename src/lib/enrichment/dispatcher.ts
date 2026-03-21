@@ -1,13 +1,14 @@
 import { BostonAdapter } from './adapters/boston';
+import { NewHavenAdapter } from './adapters/new-haven';
 import { NullAdapter } from './adapters/null';
 import type { CityAdapter } from './types';
 
 // Map of normalized city names to adapter constructors.
 // Cambridge is NOT included — Boston Assessing API is City of Boston only;
 // Cambridge has its own assessing database. Route Cambridge to NullAdapter until verified.
-// 'new haven' will be added in Plan 02 when NewHavenAdapter is implemented.
 const CITY_ADAPTERS: Record<string, new () => CityAdapter> = {
   'boston': BostonAdapter,
+  'new haven': NewHavenAdapter,
 };
 
 export function selectAdapter(city: string | null): CityAdapter {

@@ -352,9 +352,9 @@ describe('NewHavenAdapter', () => {
       zip_code: '06510',
     };
 
-    let capturedUrl = '';
+    const capturedUrls: string[] = [];
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
-      capturedUrl = url;
+      capturedUrls.push(url);
       return Promise.resolve({ ok: true, json: async () => [] });
     }));
 
@@ -363,7 +363,7 @@ describe('NewHavenAdapter', () => {
 
     // The first fetch (exact match) URL should escape the apostrophe
     // O'BRIEN should become O''BRIEN in the SoQL $where clause
-    expect(capturedUrl).toContain("O''BRIEN");
+    expect(capturedUrls[0]).toContain("O''BRIEN");
   });
 
   it('returns empty results with message when address cannot be parsed', async () => {
