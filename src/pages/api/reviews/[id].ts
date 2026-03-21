@@ -78,6 +78,8 @@ export interface ReviewDetail {
   had_water_issues: boolean;
   had_security_deposit_issues: boolean;
   had_eviction_threat: boolean;
+  accepts_housing_vouchers: string | null;
+  safely_lit_at_night: string | null;
   would_recommend: boolean;
   would_recommend_new: string | null;
   status: string;
@@ -304,6 +306,8 @@ export async function PATCH(context: APIContext): Promise<Response> {
         had_water_issues = ?,
         had_security_deposit_issues = ?,
         had_eviction_threat = ?,
+        accepts_housing_vouchers = ?,
+        safely_lit_at_night = ?,
         updated_at = unixepoch()
       WHERE id = ?
     `).bind(
@@ -368,6 +372,8 @@ export async function PATCH(context: APIContext): Promise<Response> {
       body.had_water_issues ? 1 : 0,
       body.had_security_deposit_issues ? 1 : 0,
       body.had_eviction_threat ? 1 : 0,
+      body.accepts_housing_vouchers || null,
+      body.safely_lit_at_night || null,
       id
     ).run();
 

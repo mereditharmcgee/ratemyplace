@@ -453,6 +453,30 @@ const pestLabels: Record<string, string> = {
     </div>
   )}
 
+  <!-- Housing Vouchers & Lighting -->
+  {(review.accepts_housing_vouchers != null || review.safely_lit_at_night != null) && (
+    <div class="flex flex-wrap gap-2 mb-4">
+      {review.accepts_housing_vouchers === 'yes' && (
+        <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Section 8: Accepted</span>
+      )}
+      {review.accepts_housing_vouchers === 'no' && (
+        <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">Section 8: Not accepted</span>
+      )}
+      {review.accepts_housing_vouchers === 'unsure' && (
+        <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">Section 8: Unsure</span>
+      )}
+      {review.safely_lit_at_night === 'yes' && (
+        <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Well lit at night</span>
+      )}
+      {review.safely_lit_at_night === 'no' && (
+        <span class="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full">Poorly lit at night</span>
+      )}
+      {review.safely_lit_at_night === 'unsure' && (
+        <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">Lighting: Unsure</span>
+      )}
+    </div>
+  )}
+
   <!-- Footer -->
   <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm">
     <div class="flex items-center gap-3">

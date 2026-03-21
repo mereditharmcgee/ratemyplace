@@ -112,6 +112,10 @@ export async function POST(context: APIContext): Promise<Response> {
     const hadSecurityDepositIssues = formData.get('had_security_deposit_issues') === '1' ? 1 : 0;
     const hadEvictionThreat = formData.get('had_eviction_threats') === '1' ? 1 : 0;
 
+    // New survey fields (nullable — empty string stored as NULL)
+    const acceptsHousingVouchers = (formData.get('accepts_housing_vouchers') as string) || null;
+    const safelyLitAtNight = (formData.get('safely_lit_at_night') as string) || null;
+
     const db = getDB((context.locals as any).runtime);
 
     // Verify building exists and get its slug
@@ -150,7 +154,8 @@ export async function POST(context: APIContext): Promise<Response> {
         had_pest_issues, had_heat_issues, had_water_issues,
         had_security_deposit_issues, had_eviction_threat,
         status,
-        move_in_year, move_in_season
+        move_in_year, move_in_season,
+        accepts_housing_vouchers, safely_lit_at_night
       ) VALUES (
         ?, ?, ?,
         ?, ?, ?,
@@ -171,6 +176,7 @@ export async function POST(context: APIContext): Promise<Response> {
         ?, ?, ?,
         ?, ?,
         ?,
+        ?, ?,
         ?, ?
       )
     `).bind(
@@ -239,7 +245,10 @@ export async function POST(context: APIContext): Promise<Response> {
       'pending',
       // Move-in date: use user-provided month/year, compute season from month
       moveInYear,
-      moveInSeason
+      moveInSeason,
+      // New survey fields
+      acceptsHousingVouchers,
+      safelyLitAtNight
     ).run();
 
     return new Response(JSON.stringify({

@@ -70,6 +70,8 @@ export default function ReviewForm({ building }: Props) {
     hadWaterIssues: false,
     hadSecurityDepositIssues: false,
     hadEvictionThreats: false,
+    housingVouchers: null,
+    safelyLit: null,
   });
 
   // Privacy acknowledgment
@@ -211,6 +213,10 @@ export default function ReviewForm({ building }: Props) {
       if (review.hadWaterIssues) formData.append('had_water_issues', '1');
       if (review.hadSecurityDepositIssues) formData.append('had_security_deposit_issues', '1');
       if (review.hadEvictionThreats) formData.append('had_eviction_threats', '1');
+
+      // New survey fields
+      formData.append('accepts_housing_vouchers', review.housingVouchers ?? '');
+      formData.append('safely_lit_at_night', review.safelyLit ?? '');
 
       // Turnstile token
       if (turnstileToken) formData.append('cf-turnstile-response', turnstileToken);

@@ -100,6 +100,10 @@ export default function ReviewEditForm({ review }: Props) {
     review.is_current_tenant ? 'current' : (review.move_out_year_new || review.move_out_year?.toString() || 'current')
   );
 
+  // New survey fields
+  const [housingVouchers, setHousingVouchers] = useState<string | null>((review as any).accepts_housing_vouchers || null);
+  const [safelyLit, setSafelyLit] = useState<string | null>((review as any).safely_lit_at_night || null);
+
   // Issue flags
   const [hadPestIssues, setHadPestIssues] = useState(review.had_pest_issues);
   const [hadHeatIssues, setHadHeatIssues] = useState(review.had_heat_issues);
@@ -160,6 +164,8 @@ export default function ReviewEditForm({ review }: Props) {
           had_water_issues: hadWaterIssues,
           had_security_deposit_issues: hadDepositIssues,
           had_eviction_threat: hadEvictionThreat,
+          accepts_housing_vouchers: housingVouchers || null,
+          safely_lit_at_night: safelyLit || null,
           // Send all 27 score fields directly
           ...scores,
         }),
@@ -760,6 +766,46 @@ export default function ReviewEditForm({ review }: Props) {
               ))}
             </select>
           </div>
+        </div>
+      </div>
+
+      {/* Housing Vouchers */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          {supplementaryItems.housingVouchers.text} <span className="text-gray-400">(optional)</span>
+        </label>
+        <div className="flex gap-4">
+          {supplementaryItems.housingVouchers.options.map((opt) => (
+            <label key={opt.value} className="flex items-center gap-2">
+              <input
+                type="radio"
+                checked={housingVouchers === opt.value}
+                onChange={() => setHousingVouchers(opt.value)}
+                className="text-teal-600 focus:ring-teal-500"
+              />
+              <span>{opt.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Safely Lit at Night */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          {supplementaryItems.safelyLit.text} <span className="text-gray-400">(optional)</span>
+        </label>
+        <div className="flex gap-4">
+          {supplementaryItems.safelyLit.options.map((opt) => (
+            <label key={opt.value} className="flex items-center gap-2">
+              <input
+                type="radio"
+                checked={safelyLit === opt.value}
+                onChange={() => setSafelyLit(opt.value)}
+                className="text-teal-600 focus:ring-teal-500"
+              />
+              <span>{opt.label}</span>
+            </label>
+          ))}
         </div>
       </div>
 
