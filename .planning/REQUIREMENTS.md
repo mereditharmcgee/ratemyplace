@@ -48,9 +48,9 @@ Requirements for milestone v1.4.0 "Open Doors". Each maps to roadmap phases.
 
 ### Tenant Dashboard
 
-- [ ] **DASH-01**: Logged-in user can view all their submitted reviews with status (pending/approved/rejected/disputed)
-- [ ] **DASH-02**: Approved reviews link to live review; rejected reviews show reason and option to edit/resubmit
-- [ ] **DASH-03**: Dashboard shows verification status with clear path to verify if not yet verified
+- [x] **DASH-01**: Logged-in user can view all their submitted reviews with status (pending/approved/rejected/disputed)
+- [x] **DASH-02**: Approved reviews link to live review; rejected reviews show reason and option to edit/resubmit
+- [x] **DASH-03**: Dashboard shows verification status with clear path to verify if not yet verified
 - [ ] **DASH-04**: Basic account settings accessible from dashboard (display name, email, notification preferences)
 - [x] **DASH-05**: User can save/bookmark buildings and view saved buildings in dashboard
 - [ ] **DASH-06**: User receives in-app notifications for review status changes (approved, rejected, disputed)
@@ -115,9 +115,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VERIFY-02 | Phase 14 | Complete |
 | VERIFY-03 | Phase 14 | Complete |
 | VERIFY-04 | Phase 14 | Complete |
-| DASH-01 | Phase 13 | Pending |
-| DASH-02 | Phase 13 | Pending |
-| DASH-03 | Phase 13 | Pending |
+| DASH-01 | Phase 13 | Complete |
+| DASH-02 | Phase 13 | Complete |
+| DASH-03 | Phase 13 | Complete |
 | DASH-04 | Phase 13 | Pending |
 | DASH-05 | Phase 14 | Complete |
 | DASH-06 | Phase 13 | Pending |
