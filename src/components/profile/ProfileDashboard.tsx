@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import ReviewListItem from './ReviewListItem';
 import VerificationModal from './VerificationModal';
+import NotificationsTab from './NotificationsTab';
+import SettingsTab from './SettingsTab';
+import type { Notification } from './NotificationsTab';
 import type { UserReview, UserReviewsResponse, SavedBuilding, SavedBuildingsResponse } from '../../lib/api-types';
 
 interface Props {
@@ -9,11 +12,15 @@ interface Props {
   avatarUrl: string | null;
   memberSince: string;
   emailVerified: boolean;
+  unreadNotificationCount: number;
+  hasPassword: boolean;
+  isGoogleUser: boolean;
+  notificationOptIn: boolean;
 }
 
-type ActiveTab = 'reviews' | 'saved';
+type ActiveTab = 'reviews' | 'saved' | 'notifications' | 'settings';
 
-export default function ProfileDashboard({ userEmail, userName, avatarUrl, memberSince, emailVerified }: Props) {
+export default function ProfileDashboard({ userEmail, userName, avatarUrl, memberSince, emailVerified, unreadNotificationCount, hasPassword, isGoogleUser, notificationOptIn }: Props) {
   // Tab state
   const [activeTab, setActiveTab] = useState<ActiveTab>('reviews');
 
@@ -32,6 +39,13 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
   const [savedLoading, setSavedLoading] = useState(false);
   const [savedError, setSavedError] = useState<string | null>(null);
   const [savedLoaded, setSavedLoaded] = useState(false);
+
+  // Notifications state
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationsLoaded, setNotificationsLoaded] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const [localUnreadCount, setLocalUnreadCount] = useState(unreadNotificationCount);
 
   useEffect(() => {
     fetchReviews();
@@ -75,10 +89,37 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
     }
   };
 
+  const fetchNotifications = async () => {
+    if (notificationsLoaded) return; // Cache — only fetch once
+    try {
+      setNotificationsLoading(true);
+      const response = await fetch('/api/notifications');
+      const data = await response.json();
+
+      if (response.ok) {
+        setNotifications(data.notifications);
+        setNotificationsLoaded(true);
+        // Mark all as read (best-effort, don't block or await)
+        fetch('/api/notifications', { method: 'PATCH' }).catch(() => {});
+        // Clear the local unread badge count immediately
+        setLocalUnreadCount(0);
+      } else {
+        setNotificationsError((data as any).error || 'Failed to load notifications');
+      }
+    } catch (err) {
+      setNotificationsError('Failed to load notifications');
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
   const handleTabSwitch = (tab: ActiveTab) => {
     setActiveTab(tab);
     if (tab === 'saved' && !savedLoaded) {
       fetchSavedBuildings();
+    }
+    if (tab === 'notifications' && !notificationsLoaded) {
+      fetchNotifications();
     }
   };
 
@@ -227,6 +268,26 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
           >
             Saved Buildings {savedLoaded ? `(${savedBuildings.length})` : ''}
           </button>
+          <button
+            onClick={() => handleTabSwitch('notifications')}
+            className={`py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'notifications'
+                ? 'border-teal-600 text-teal-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Notifications {localUnreadCount > 0 ? `(${localUnreadCount})` : ''}
+          </button>
+          <button
+            onClick={() => handleTabSwitch('settings')}
+            className={`py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'settings'
+                ? 'border-teal-600 text-teal-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Settings
+          </button>
         </nav>
       </div>
 
@@ -349,6 +410,31 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             </div>
           )}
         </div>
+      )}
+
+      {/* Notifications Tab */}
+      {activeTab === 'notifications' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Notifications</h2>
+          </div>
+          <NotificationsTab
+            notifications={notifications}
+            loading={notificationsLoading}
+            error={notificationsError}
+          />
+        </div>
+      )}
+
+      {/* Settings Tab */}
+      {activeTab === 'settings' && (
+        <SettingsTab
+          userName={userName}
+          userEmail={userEmail}
+          hasPassword={hasPassword}
+          isGoogleUser={isGoogleUser}
+          notificationOptIn={notificationOptIn}
+        />
       )}
 
       {/* Verification Modal */}

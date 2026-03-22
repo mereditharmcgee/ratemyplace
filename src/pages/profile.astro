@@ -10,11 +10,19 @@ if (!user) {
   return Astro.redirect('/auth/signin?redirect=/profile');
 }
 
-// Get user created_at and email_verified from database
+// Get user profile data from database
 const db = getDB((Astro.locals as any).runtime);
-const dbUser = await db.prepare('SELECT created_at, email_verified FROM users WHERE id = ?')
+const dbUser = await db.prepare(
+  'SELECT created_at, email_verified, hashed_password, google_id, notification_opt_in FROM users WHERE id = ?'
+)
   .bind(user.id)
-  .first<{ created_at: number; email_verified: number }>();
+  .first<{
+    created_at: number;
+    email_verified: number;
+    hashed_password: string | null;
+    google_id: string | null;
+    notification_opt_in: number;
+  }>();
 
 // Format member since date
 const memberSince = dbUser
@@ -26,6 +34,17 @@ const memberSince = dbUser
 
 // Get email verification status
 const emailVerified = dbUser ? Boolean(dbUser.email_verified) : false;
+
+// Compute settings-related props
+const hasPassword = !!dbUser?.hashed_password;
+const isGoogleUser = !!dbUser?.google_id;
+const notificationOptIn = dbUser?.notification_opt_in !== 0;
+
+// Get unread notification count
+const unreadResult = await db.prepare(
+  'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read_at IS NULL'
+).bind(user.id).first<{ count: number }>();
+const unreadNotificationCount = unreadResult?.count ?? 0;
 
 const updated = Astro.url.searchParams.get('updated') === 'true';
 ---
@@ -53,5 +72,9 @@ const updated = Astro.url.searchParams.get('updated') === 'true';
     avatarUrl={user.avatarUrl}
     memberSince={memberSince}
     emailVerified={emailVerified}
+    unreadNotificationCount={unreadNotificationCount}
+    hasPassword={hasPassword}
+    isGoogleUser={isGoogleUser}
+    notificationOptIn={notificationOptIn}
   />
 </BaseLayout>
