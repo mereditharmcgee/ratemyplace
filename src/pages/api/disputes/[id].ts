@@ -3,6 +3,7 @@ import { getDB } from '../../../lib/db';
 import { sendDisputeUpheldEmail } from '../../../lib/email';
 import { createAuditLog } from '../../../lib/audit';
 import { getClientIP } from '../../../lib/rateLimit';
+import { createNotification } from '../../../lib/notifications';
 
 /**
  * PATCH /api/disputes/:id
@@ -111,6 +112,20 @@ export const PATCH: APIRoute = async ({ params, request, locals: rawLocals }) =>
       newValue: { status: 'resolved', outcome: resolutionOutcome },
       notes: resolutionNotes
     });
+
+    // Notify review author that their dispute was resolved
+    const reviewInfo = await db.prepare(
+      'SELECT d.review_id, r.user_id, b.address FROM disputes d JOIN reviews r ON d.review_id = r.id JOIN buildings b ON r.building_id = b.id WHERE d.id = ?'
+    ).bind(disputeId).first<{ review_id: string; user_id: string; address: string }>();
+
+    if (reviewInfo) {
+      await createNotification(db, {
+        userId: reviewInfo.user_id,
+        eventType: 'dispute_resolved',
+        reviewId: reviewInfo.review_id,
+        buildingAddress: reviewInfo.address,
+      });
+    }
 
     // If outcome is 'uphold', send notification email to landlord
     if (resolutionOutcome === 'uphold') {

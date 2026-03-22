@@ -2,6 +2,7 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
 import { createAuditLog } from '../../../../lib/audit';
 import { getClientIP } from '../../../../lib/rateLimit';
+import { createNotification } from '../../../../lib/notifications';
 
 export async function PATCH(context: APIContext): Promise<Response> {
   // Require authentication
@@ -88,6 +89,22 @@ export async function PATCH(context: APIContext): Promise<Response> {
         newValue: { status },
         notes: moderation_notes || undefined
       });
+
+      // Notify the review author when their review is approved or rejected
+      if (status === 'approved' || status === 'rejected') {
+        const reviewWithBuilding = await db.prepare(
+          'SELECT r.user_id, b.address FROM reviews r JOIN buildings b ON r.building_id = b.id WHERE r.id = ?'
+        ).bind(reviewId).first<{ user_id: string; address: string }>();
+
+        if (reviewWithBuilding) {
+          await createNotification(db, {
+            userId: reviewWithBuilding.user_id,
+            eventType: status === 'approved' ? 'review_approved' : 'review_rejected',
+            reviewId,
+            buildingAddress: reviewWithBuilding.address,
+          });
+        }
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), {
