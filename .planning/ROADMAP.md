@@ -54,7 +54,7 @@ See: `.planning/milestones/v1.3-ROADMAP.md`
 - [x] **Phase 10: Foundations and Legal Hardening** - UGC disclaimers, move-in date bug fix, and full review content in admin queue (completed 2026-03-20)
 - [x] **Phase 11: Schema, Survey Fields, and Contact Form** - Two new survey dimensions, contact form with D1 storage and Resend notifications, migration plan locked for milestone (completed 2026-03-21)
 - [x] **Phase 12: Multi-City Enrichment Adapter** - CityAdapter interface extracted, Boston adapter refactored, New Haven adapter implemented (completed 2026-03-21)
-- [ ] **Phase 13: Tenant Dashboard Core** - Review status visibility, verification banner, account settings, and in-app notifications infrastructure
+- [x] **Phase 13: Tenant Dashboard Core** - Review status visibility, verification banner, account settings, and in-app notifications infrastructure (completed 2026-03-22)
 - [x] **Phase 14: Saved Buildings and Verification UX** - Building bookmarks in dashboard, redesigned verification flow with inline prompts (completed 2026-03-20)
 
 ## Phase Details
@@ -157,7 +157,7 @@ Plans:
 | 10. Foundations and Legal Hardening | v1.4.0 | 0/3 | Not started | - |
 | 11. Schema, Survey Fields, and Contact Form | 2/2 | Complete    | 2026-03-21 | - |
 | 12. Multi-City Enrichment Adapter | 2/2 | Complete    | 2026-03-21 | - |
-| 13. Tenant Dashboard Core | 1/3 | In Progress|  | - |
+| 13. Tenant Dashboard Core | 3/3 | Complete   | 2026-03-22 | - |
 | 14. Saved Buildings and Verification UX | 2/2 | Complete    | 2026-03-20 | - |
 
 ---

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
-status: in_progress
-last_updated: "2026-03-22T05:00:30Z"
-last_activity: 2026-03-22 — Completed 13-01-PLAN.md (notifications DB foundation and review status dashboard)
+status: executing
+last_updated: "2026-03-22T15:49:22.333Z"
+last_activity: 2026-03-22 — Completed 13-02-PLAN.md (account settings tab with API endpoints)
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 31
-  completed_plans: 29
-  percent: 94
+  completed_plans: 30
+  percent: 97
 ---
 
 # Project State
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 ## Current Position
 
 Phase: 13 of 14 (Tenant Dashboard Core) — In Progress
-Plan: 13-01 complete — 1 of 3 plans done
+Plan: 13-02 complete — 2 of 3 plans done
 Status: Phase 13 in progress
-Last activity: 2026-03-22 — Completed 13-01-PLAN.md (notifications DB foundation and review status dashboard)
+Last activity: 2026-03-22 — Completed 13-02-PLAN.md (account settings tab with API endpoints)
 
-Progress: [█████████░] 94% (29/31 plans)
+Progress: [██████████] 97% (30/31 plans)
 
 ## Completed Milestones
 
@@ -51,7 +51,7 @@ Progress: [█████████░] 94% (29/31 plans)
 - Survey fields: use nullable columns (INTEGER, no NOT NULL constraint) — D1 rejects NOT NULL ALTER TABLE on existing rows
 - CAN-SPAM: notification_opt_in column needed on users table before first review status email ships (Phase 13)
 - Verification UX: mandatory audit of VerificationModal.tsx and ProfileDashboard.tsx must gate Phase 14 implementation
-- 219 unit tests passing, build clean as of 2026-03-22
+- 234 unit tests passing, build clean as of 2026-03-22
 
 ## Blockers
 
@@ -86,3 +86,9 @@ None currently.
 - [Phase 13]: Migration 0021 already marked applied (stub SELECT 1) — DDL executed directly via wrangler d1 execute --file
 - [Phase 13]: has_open_dispute derived via LEFT JOIN disputes rather than stored as reviews column — disputes table is source of truth
 - [Phase 13]: Disputed badge takes UI priority over rejected status in ReviewListItem — has_open_dispute checked before status switch
+- [Phase 13]: Validation helpers extracted to src/lib/userSettings.ts as pure functions so they are unit-testable without mocking HTTP context
+- [Phase 13]: OAuth set-password flow skips currentPassword requirement — google_id non-null + hashed_password null is the gate
+- [Phase 13]: Email change resets email_verified=0 — user must re-verify after changing email
+- [Phase 13]: Password change calls lucia.invalidateUserSessions; frontend redirects to /auth/signin after success
+- [Phase 13]: createNotification called after createAuditLog in admin routes — best-effort, success response unaffected if notification insert fails
+- [Phase 13]: Bell icon in Header.astro SSR-queried — no client flash; localUnreadCount cleared client-side after fetchNotifications

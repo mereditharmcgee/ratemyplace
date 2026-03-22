@@ -51,10 +51,10 @@ Requirements for milestone v1.4.0 "Open Doors". Each maps to roadmap phases.
 - [x] **DASH-01**: Logged-in user can view all their submitted reviews with status (pending/approved/rejected/disputed)
 - [x] **DASH-02**: Approved reviews link to live review; rejected reviews show reason and option to edit/resubmit
 - [x] **DASH-03**: Dashboard shows verification status with clear path to verify if not yet verified
-- [ ] **DASH-04**: Basic account settings accessible from dashboard (display name, email, notification preferences)
+- [x] **DASH-04**: Basic account settings accessible from dashboard (display name, email, notification preferences)
 - [x] **DASH-05**: User can save/bookmark buildings and view saved buildings in dashboard
-- [ ] **DASH-06**: User receives in-app notifications for review status changes (approved, rejected, disputed)
-- [ ] **DASH-07**: Notification indicator visible in nav/header
+- [x] **DASH-06**: User receives in-app notifications for review status changes (approved, rejected, disputed)
+- [x] **DASH-07**: Notification indicator visible in nav/header
 
 ### Survey Fields
 
@@ -118,10 +118,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-01 | Phase 13 | Complete |
 | DASH-02 | Phase 13 | Complete |
 | DASH-03 | Phase 13 | Complete |
-| DASH-04 | Phase 13 | Pending |
+| DASH-04 | Phase 13 | Complete |
 | DASH-05 | Phase 14 | Complete |
-| DASH-06 | Phase 13 | Pending |
-| DASH-07 | Phase 13 | Pending |
+| DASH-06 | Phase 13 | Complete |
+| DASH-07 | Phase 13 | Complete |
 | SURVEY-01 | Phase 11 | Complete |
 | SURVEY-02 | Phase 11 | Complete |
 | SURVEY-03 | Phase 11 | Complete |
