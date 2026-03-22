@@ -56,7 +56,7 @@ See: `.planning/milestones/v1.3-ROADMAP.md`
 - [x] **Phase 12: Multi-City Enrichment Adapter** - CityAdapter interface extracted, Boston adapter refactored, New Haven adapter implemented (completed 2026-03-21)
 - [x] **Phase 13: Tenant Dashboard Core** - Review status visibility, verification banner, account settings, and in-app notifications infrastructure (completed 2026-03-22)
 - [x] **Phase 14: Saved Buildings and Verification UX** - Building bookmarks in dashboard, redesigned verification flow with inline prompts (completed 2026-03-20)
-- [ ] **Phase 15: Notification Gap Closure** - Wire review_disputed notification into dispute submission endpoint (gap closure from audit)
+- [x] **Phase 15: Notification Gap Closure** - Wire review_disputed notification into dispute submission endpoint (gap closure from audit) (completed 2026-03-22)
 
 ## Phase Details
 
@@ -171,7 +171,7 @@ Plans:
 | 12. Multi-City Enrichment Adapter | 2/2 | Complete    | 2026-03-21 | - |
 | 13. Tenant Dashboard Core | 3/3 | Complete    | 2026-03-22 | - |
 | 14. Saved Buildings and Verification UX | 2/2 | Complete    | 2026-03-20 | - |
-| 15. Notification Gap Closure | 0/0 | Not started | - | - |
+| 15. Notification Gap Closure | 1/1 | Complete    | 2026-03-22 | - |
 
 ---
 *Roadmap updated: 2026-03-22 — Phase 13 plans finalized (3 plans, 2 waves)*
