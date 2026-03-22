@@ -157,7 +157,7 @@ Plans:
 | 10. Foundations and Legal Hardening | v1.4.0 | 0/3 | Not started | - |
 | 11. Schema, Survey Fields, and Contact Form | 2/2 | Complete    | 2026-03-21 | - |
 | 12. Multi-City Enrichment Adapter | 2/2 | Complete    | 2026-03-21 | - |
-| 13. Tenant Dashboard Core | 3/3 | Complete   | 2026-03-22 | - |
+| 13. Tenant Dashboard Core | 3/3 | Complete    | 2026-03-22 | - |
 | 14. Saved Buildings and Verification UX | 2/2 | Complete    | 2026-03-20 | - |
 
 ---
