@@ -14,6 +14,8 @@ export interface UserReview {
   created_at: number;
   updated_at: number | null;
   review_title: string | null;
+  moderation_notes: string | null;
+  has_open_dispute: number | boolean;
 }
 
 export async function GET(context: APIContext): Promise<Response> {
@@ -41,9 +43,12 @@ export async function GET(context: APIContext): Promise<Response> {
         r.is_verified,
         r.created_at,
         r.updated_at,
-        r.review_title
+        r.review_title,
+        r.moderation_notes,
+        CASE WHEN d.id IS NOT NULL THEN 1 ELSE 0 END as has_open_dispute
       FROM reviews r
       JOIN buildings b ON r.building_id = b.id
+      LEFT JOIN disputes d ON d.review_id = r.id AND d.status = 'pending'
       WHERE r.user_id = ?
       ORDER BY r.created_at DESC
     `).bind(context.locals.user.id).all<UserReview>();
@@ -51,7 +56,8 @@ export async function GET(context: APIContext): Promise<Response> {
     return new Response(JSON.stringify({
       reviews: reviews.results.map(r => ({
         ...r,
-        is_verified: r.is_verified === 1 || r.is_verified === true
+        is_verified: r.is_verified === 1 || r.is_verified === true,
+        has_open_dispute: r.has_open_dispute === 1 || r.has_open_dispute === true
       }))
     }), {
       headers: { 'Content-Type': 'application/json' }

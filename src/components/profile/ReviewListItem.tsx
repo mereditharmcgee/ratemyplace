@@ -1,4 +1,4 @@
-import type { UserReview } from '../../pages/api/reviews/user';
+import type { UserReview } from '../../lib/api-types';
 
 interface Props {
   review: UserReview;
@@ -13,8 +13,21 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (review: UserReview) => {
+    // Disputed takes priority over underlying status
+    if (review.has_open_dispute) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-violet-100 text-violet-700">
+          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          <span>Disputed</span>
+          <span className="text-violet-500">· Under landlord review</span>
+        </span>
+      );
+    }
+
+    switch (review.status) {
       case 'approved':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
@@ -71,7 +84,7 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {getStatusBadge(review.status)}
+        {getStatusBadge(review)}
 
         {review.is_verified ? (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
@@ -102,6 +115,21 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
         </div>
       )}
 
+      {review.status === 'rejected' && !review.has_open_dispute && (
+        <div className="mt-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <p className="text-sm text-red-700">
+            <span className="font-medium">Rejected:</span>{' '}
+            {review.moderation_notes || 'No reason provided'}
+          </p>
+          <a
+            href={`/review/edit/${review.id}`}
+            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-red-700 underline hover:text-red-900 transition-colors"
+          >
+            Edit &amp; Resubmit
+          </a>
+        </div>
+      )}
+
       <div className="mt-4 flex gap-2">
         <a
           href={`/review/edit/${review.id}`}
@@ -112,16 +140,18 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
           </svg>
           Edit
         </a>
-        <a
-          href={`/building/${review.building_slug}`}
-          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-teal-700 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-          </svg>
-          View
-        </a>
+        {review.status === 'approved' && (
+          <a
+            href={`/building/${review.building_slug}`}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-teal-700 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            View
+          </a>
+        )}
       </div>
     </div>
   );

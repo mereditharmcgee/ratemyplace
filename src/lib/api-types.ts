@@ -55,6 +55,8 @@ export interface UserReview {
   created_at: number;
   updated_at: number | null;
   review_title: string | null;
+  moderation_notes: string | null;
+  has_open_dispute: boolean;
 }
 
 export interface UserReviewsResponse {
