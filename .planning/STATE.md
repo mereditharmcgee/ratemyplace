@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: completed
-last_updated: "2026-03-22T15:54:19.738Z"
-last_activity: 2026-03-22 — Completed 13-03-PLAN.md (notifications wiring, bell badge, notifications tab)
+last_updated: "2026-03-22T16:36:40.193Z"
+last_activity: 2026-03-22 — Completed 15-01-PLAN.md (review_disputed notification wired into dispute POST handler)
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 12
-  completed_plans: 12
+  total_phases: 6
+  completed_phases: 6
+  total_plans: 13
+  completed_plans: 13
   percent: 100
 ---
 
@@ -28,12 +28,12 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 
 ## Current Position
 
-Phase: 13 of 14 (Tenant Dashboard Core) — Complete
-Plan: 13-03 complete — 3 of 3 plans done
-Status: Phase 13 complete; Phase 14 (agent docs + form UX) is next
-Last activity: 2026-03-22 — Completed 13-03-PLAN.md (notifications wiring, bell badge, notifications tab)
+Phase: 15 of 15 (Notification Gap Closure) — Complete
+Plan: 15-01 complete — 1 of 1 plans done
+Status: Phase 15 complete; DASH-06 fully satisfied — all four notification event types now have callers
+Last activity: 2026-03-22 — Completed 15-01-PLAN.md (review_disputed notification wired into dispute POST handler)
 
-Progress: [██████████] 100% (31/31 plans)
+Progress: [██████████] 100% (32/32 plans)
 
 ## Completed Milestones
 
@@ -51,7 +51,7 @@ Progress: [██████████] 100% (31/31 plans)
 - Survey fields: use nullable columns (INTEGER, no NOT NULL constraint) — D1 rejects NOT NULL ALTER TABLE on existing rows
 - CAN-SPAM: notification_opt_in column needed on users table before first review status email ships (Phase 13)
 - Verification UX: mandatory audit of VerificationModal.tsx and ProfileDashboard.tsx must gate Phase 14 implementation
-- 234 unit tests passing, build clean as of 2026-03-22
+- 235 unit tests passing, build clean as of 2026-03-22
 
 ## Blockers
 
@@ -92,3 +92,4 @@ None currently.
 - [Phase 13]: Password change calls lucia.invalidateUserSessions; frontend redirects to /auth/signin after success
 - [Phase 13]: createNotification called after createAuditLog in admin routes — best-effort, success response unaffected if notification insert fails
 - [Phase 13]: Bell icon in Header.astro SSR-queried — no client flash; localUnreadCount cleared client-side after fetchNotifications
+- [Phase 15-01]: review_disputed notification fires after dispute INSERT, before confirmation email — reused buildingAddress already fetched for landlord email, added user_id to review SELECT to avoid second query
