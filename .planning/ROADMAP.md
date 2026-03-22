@@ -7,7 +7,7 @@
 - ✅ **v1.2.1 Email Verification** — Phase 1 (shipped 2026-02-26)
 - ✅ **v1.2.2 Launch Ready** — Phases 2-3 (shipped 2026-02-27)
 - ✅ **v1.3.0 Battle Tested** — Phases 4-9 (shipped 2026-03-10)
-- 🚧 **v1.4.0 Open Doors** — Phases 10-14 (in progress)
+- 🚧 **v1.4.0 Open Doors** — Phases 10-15 (in progress)
 
 ## Phases
 
@@ -56,6 +56,7 @@ See: `.planning/milestones/v1.3-ROADMAP.md`
 - [x] **Phase 12: Multi-City Enrichment Adapter** - CityAdapter interface extracted, Boston adapter refactored, New Haven adapter implemented (completed 2026-03-21)
 - [x] **Phase 13: Tenant Dashboard Core** - Review status visibility, verification banner, account settings, and in-app notifications infrastructure (completed 2026-03-22)
 - [x] **Phase 14: Saved Buildings and Verification UX** - Building bookmarks in dashboard, redesigned verification flow with inline prompts (completed 2026-03-20)
+- [ ] **Phase 15: Notification Gap Closure** - Wire review_disputed notification into dispute submission endpoint (gap closure from audit)
 
 ## Phase Details
 
@@ -140,6 +141,17 @@ Plans:
 - [ ] 14-01-PLAN.md — Saved buildings migration (0023), API routes, bookmark button on building pages, and saved tab in dashboard
 - [ ] 14-02-PLAN.md — Verification UX audit, post-submission verification prompt, verified review visual distinction, and dashboard nudge
 
+### Phase 15: Notification Gap Closure
+**Goal**: Tenants are notified when their review is disputed by a landlord, completing the notification loop for all review status changes
+**Depends on**: Phase 13
+**Requirements**: DASH-06
+**Gap Closure**: Closes DASH-06 partial gap from v1.4.0 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. When a landlord submits a dispute against a tenant's review, the tenant receives an in-app notification with event type 'review_disputed'
+  2. The notification message includes the building address
+  3. All existing notification tests still pass
+**Plans**: 0 plans
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -159,6 +171,7 @@ Plans:
 | 12. Multi-City Enrichment Adapter | 2/2 | Complete    | 2026-03-21 | - |
 | 13. Tenant Dashboard Core | 3/3 | Complete    | 2026-03-22 | - |
 | 14. Saved Buildings and Verification UX | 2/2 | Complete    | 2026-03-20 | - |
+| 15. Notification Gap Closure | 0/0 | Not started | - | - |
 
 ---
 *Roadmap updated: 2026-03-22 — Phase 13 plans finalized (3 plans, 2 waves)*

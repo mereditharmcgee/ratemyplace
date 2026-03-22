@@ -53,7 +53,7 @@ Requirements for milestone v1.4.0 "Open Doors". Each maps to roadmap phases.
 - [x] **DASH-03**: Dashboard shows verification status with clear path to verify if not yet verified
 - [x] **DASH-04**: Basic account settings accessible from dashboard (display name, email, notification preferences)
 - [x] **DASH-05**: User can save/bookmark buildings and view saved buildings in dashboard
-- [x] **DASH-06**: User receives in-app notifications for review status changes (approved, rejected, disputed)
+- [ ] **DASH-06**: User receives in-app notifications for review status changes (approved, rejected, disputed)
 - [x] **DASH-07**: Notification indicator visible in nav/header
 
 ### Survey Fields
@@ -120,7 +120,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-03 | Phase 13 | Complete |
 | DASH-04 | Phase 13 | Complete |
 | DASH-05 | Phase 14 | Complete |
-| DASH-06 | Phase 13 | Complete |
+| DASH-06 | Phase 15 | Pending |
 | DASH-07 | Phase 13 | Complete |
 | SURVEY-01 | Phase 11 | Complete |
 | SURVEY-02 | Phase 11 | Complete |
@@ -129,7 +129,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 **Coverage:**
 - v1.4.0 requirements: 31 total
 - Mapped to phases: 31
-- Unmapped: 0
+- Complete: 30
+- Pending: 1 (DASH-06 — gap closure Phase 15)
 
 ---
 *Requirements defined: 2026-03-20*
