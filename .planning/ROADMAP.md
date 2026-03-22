@@ -117,12 +117,12 @@ Plans:
   3. Dashboard shows email verification status with a banner and resend CTA if not yet verified
   4. User can update their display name and notification preferences from the dashboard settings tab
   5. Notification indicator appears in the site header when unread notifications exist; notification tab shows review status change events
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 13-01: Dashboard API endpoint (single JOIN query), TenantDashboard React island scaffold, review status tab
-- [ ] 13-02: Verification banner, account settings tab, notification schema (migration 0021), createNotification() helper wired into admin review routes
-- [ ] 13-03: Notifications tab, header indicator, and CAN-SPAM-compliant notification email template
+- [ ] 13-01-PLAN.md — Migration 0021 (notifications table + notification_opt_in), createNotification helper, review status API enhancement, and ReviewListItem UI update
+- [ ] 13-02-PLAN.md — Account settings tab (display name, password, email, notification prefs) with three new API endpoints
+- [ ] 13-03-PLAN.md — Notification wiring into admin routes, notifications tab in dashboard, and header bell badge indicator
 
 ### Phase 14: Saved Buildings and Verification UX
 **Goal**: Users can bookmark buildings and see them in a saved list, and the verification flow is clear enough that users complete it without confusion
@@ -161,4 +161,4 @@ Plans:
 | 14. Saved Buildings and Verification UX | 2/2 | Complete    | 2026-03-20 | - |
 
 ---
-*Roadmap updated: 2026-03-21 — Phase 12 plans finalized (2 plans, 2 waves)*
+*Roadmap updated: 2026-03-22 — Phase 13 plans finalized (3 plans, 2 waves)*
