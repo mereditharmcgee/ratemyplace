@@ -91,4 +91,23 @@ describe('createNotification', () => {
       expect(message).toContain(address);
     }
   });
+
+  it('createNotification builds correct message for review_disputed event', async () => {
+    const db = mockDB();
+    const address = '42 Landlord Lane, Boston MA';
+
+    await createNotification(db, {
+      userId: 'tenant-001',
+      eventType: 'review_disputed',
+      reviewId: 'review-999',
+      buildingAddress: address,
+    });
+
+    const bindArgs = db.prepare.mock.results[0].value.bind.mock.calls[0];
+    // bind args: userId, eventType, reviewId, message
+    expect(bindArgs[0]).toBe('tenant-001');
+    expect(bindArgs[1]).toBe('review_disputed');
+    expect(bindArgs[2]).toBe('review-999');
+    expect(bindArgs[3]).toBe(`Your review of ${address} has been disputed by the landlord.`);
+  });
 });

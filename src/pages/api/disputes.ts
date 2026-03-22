@@ -4,6 +4,7 @@ import { extractReviewIdFromUrl } from '../../lib/disputes';
 import { sanitizeText } from '../../lib/validation';
 import { sendDisputeConfirmationEmail } from '../../lib/email';
 import { checkRateLimit, getClientIP } from '../../lib/rateLimit';
+import { createNotification } from '../../lib/notifications';
 
 export const POST: APIRoute = async ({ request, locals: rawLocals }) => {
   const locals = rawLocals as any;
@@ -64,9 +65,9 @@ export const POST: APIRoute = async ({ request, locals: rawLocals }) => {
 
     // Verify review exists and get building info
     const review = await db
-      .prepare('SELECT id, building_id FROM reviews WHERE id = ?')
+      .prepare('SELECT id, building_id, user_id FROM reviews WHERE id = ?')
       .bind(reviewId)
-      .first();
+      .first<{ id: string; building_id: string; user_id: string }>();
 
     if (!review) {
       return new Response(
@@ -122,6 +123,16 @@ export const POST: APIRoute = async ({ request, locals: rawLocals }) => {
         );
       }
       throw dbError;
+    }
+
+    // Notify the review author that their review has been disputed (best-effort)
+    if (review?.user_id) {
+      await createNotification(db, {
+        userId: review.user_id,
+        eventType: 'review_disputed',
+        reviewId,
+        buildingAddress,
+      });
     }
 
     // Send confirmation email (best-effort)
