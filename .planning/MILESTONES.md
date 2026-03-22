@@ -1,4 +1,13 @@
 # Milestones: RateMyPlace Boston
+## v1.4.0 Open Doors (Shipped: 2026-03-22)
+
+**Phases completed:** 6 phases, 13 plans, 4 tasks
+
+**Key accomplishments:**
+- (none recorded)
+
+---
+
 ## v1.3.0 "Battle Tested" (Shipped: 2026-03-10)
 
 **Phases:** 6 (4-9) | **Plans:** 15 | **Timeline:** 12 days (2026-02-26 → 2026-03-10)

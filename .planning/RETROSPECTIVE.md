@@ -73,6 +73,56 @@
 
 ---
 
+## Milestone: v1.4.0 — Open Doors
+
+**Shipped:** 2026-03-22
+**Phases:** 6 | **Plans:** 13
+
+### What Was Built
+- UGC disclaimers across all review-displaying pages, ToS safe harbor language, consent checkbox on submission
+- Admin inline review expansion with full field visibility and approve/reject without leaving queue
+- Move-in date season/year bug fix (Winter 2025 edge case)
+- Section 8 / Housing Choice Voucher acceptance and "safely lit at night" survey fields with color-coded pills
+- Contact form with D1 storage, Resend confirmation emails, admin contact management tab
+- Multi-city enrichment adapter pattern (Boston Assessing API + New Haven CT CAMA) with NullAdapter fallback
+- Tenant dashboard: review status with disputed badge, rejection reasons with edit/resubmit CTA
+- Account settings tab: display name, notification preferences, password (OAuth-aware), email change
+- In-app notifications with createNotification helper wired into all 4 review event types
+- Header bell icon with SSR unread count badge
+- Saved buildings with bookmark button, toast feedback, and dashboard tab
+- Verification UX: post-submission prompt, verified badge with tooltip, dashboard nudge
+
+### What Worked
+- Wave-based parallel execution consistently delivered — Phase 13 ran 2 agents in parallel for Wave 2 without conflicts
+- Milestone audit caught the review_disputed notification gap that phase-level verification missed — cross-phase integration checking is valuable
+- Gap closure cycle (audit → plan-milestone-gaps → execute → re-audit) worked smoothly for a single-task fix
+- Best-effort patterns (notifications, audit logging) continued to prevent cascading failures
+- CityAdapter pattern made New Haven a clean addition without touching Boston logic
+
+### What Was Inefficient
+- SUMMARY.md frontmatter still inconsistent — `requirements-completed` field missing from most summaries, reducing 3-source cross-reference automation
+- Phase 14 was already completed before Phase 13 ran in this session — ordering was fine but caused confusion during plan-phase invocation
+- Nyquist validation files exist for phases 10-13 but all show `compliant: false` — validation strategy was created but never fully executed
+
+### Patterns Established
+- CityAdapter interface for multi-city enrichment with dispatcher pattern
+- SSR notification badge in Header.astro (query D1, no client flash)
+- Best-effort createNotification helper (same pattern as createAuditLog)
+- OAuth-aware password flows (set vs change depending on hashed_password/google_id)
+- Fire-and-forget mark-as-read on notification tab switch
+
+### Key Lessons
+1. Phase-level verification catches per-phase gaps, but milestone audit catches cross-phase integration gaps — both are needed
+2. Gap closure phases are lightweight and effective for surgical fixes found by the audit
+3. 19 human-verification items accumulated across 3 phases — need a UAT pass before calling production-ready
+
+### Cost Observations
+- Model mix: sonnet for execution/verification, opus for orchestration
+- 6 phases executed across multiple sessions (phases 10-12 in prior sessions, 13-15 in this session)
+- Phase 15 (gap closure): 1 plan, ~4 min execution — minimal overhead for a critical fix
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -81,8 +131,11 @@
 |-----------|--------|-------|------------|
 | v1.2.1 | 1 | 4 | First GSD milestone, established verification workflow |
 | v1.2.2 | 2 | 6 | Added milestone audit, caught integration gaps |
+| v1.4.0 | 6 | 13 | Gap closure cycle validated, cross-phase integration checking proven essential |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Always verify admin navigation when adding admin pages — missed in both milestones
+1. Always verify admin navigation when adding admin pages — missed in both early milestones
 2. Run milestone completion workflow before archiving artifacts
+3. Phase-level verification + milestone audit = comprehensive coverage (v1.4.0 confirmed)
+4. SUMMARY.md `requirements-completed` frontmatter still not consistently populated — 3 milestones running
