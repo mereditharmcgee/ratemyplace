@@ -1,11 +1,25 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-interface Prediction {
+interface DbResult {
+  id: string;
+  type: 'building' | 'landlord';
+  title: string;
+  subtitle: string;
+  slug: string;
+  reviewCount: number;
+  avgScore: number | null;
+}
+
+interface GooglePrediction {
   placeId: string;
   description: string;
   mainText: string;
   secondaryText: string;
 }
+
+type DropdownItem =
+  | { source: 'local'; data: DbResult }
+  | { source: 'google'; data: GooglePrediction };
 
 function generateSessionToken(): string {
   return crypto.randomUUID();
@@ -13,94 +27,146 @@ function generateSessionToken(): string {
 
 export default function HomeSearch() {
   const [inputValue, setInputValue] = useState('');
-  const [predictions, setPredictions] = useState<Prediction[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [dbResults, setDbResults] = useState<DbResult[]>([]);
+  const [googleResults, setGoogleResults] = useState<GooglePrediction[]>([]);
+  const [isLoadingDb, setIsLoadingDb] = useState(false);
+  const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [sessionToken] = useState(() => generateSessionToken());
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<NodeJS.Timeout>();
+  const dbDebounceRef = useRef<NodeJS.Timeout>();
 
-  const fetchPredictions = useCallback(async (input: string) => {
+  // Build the merged dropdown items list
+  const items: DropdownItem[] = [
+    ...dbResults.map((r): DropdownItem => ({ source: 'local', data: r })),
+    ...googleResults
+      // Filter out Google results that match a DB result by address
+      .filter(g => !dbResults.some(d =>
+        d.type === 'building' && d.title.toLowerCase() === g.mainText.toLowerCase()
+      ))
+      .map((g): DropdownItem => ({ source: 'google', data: g })),
+  ];
+
+  // Google Places fetch (only called as fallback)
+  const fetchGoogleResults = useCallback(async (input: string) => {
     if (input.length < 3) {
-      setPredictions([]);
+      setGoogleResults([]);
       return;
     }
 
-    setIsLoading(true);
+    setIsLoadingGoogle(true);
     try {
       const params = new URLSearchParams({ input, sessionToken });
       const response = await fetch(`/api/places/autocomplete?${params}`);
       const data = await response.json();
-      setPredictions(data.predictions || []);
+      setGoogleResults(data.predictions || []);
       setShowDropdown(true);
     } catch {
-      setPredictions([]);
+      setGoogleResults([]);
     } finally {
-      setIsLoading(false);
+      setIsLoadingGoogle(false);
     }
   }, [sessionToken]);
+
+  // DB search — fires first. If < 3 results, triggers Google fallback.
+  // No race condition: Google is called from the DB response callback, not a separate timer.
+  const fetchDbResults = useCallback(async (input: string) => {
+    if (input.length < 2) {
+      setDbResults([]);
+      return;
+    }
+
+    setIsLoadingDb(true);
+    try {
+      const params = new URLSearchParams({ q: input });
+      const response = await fetch(`/api/search/autocomplete?${params}`);
+      const data = await response.json();
+      const results = data.results || [];
+      setDbResults(results);
+      setShowDropdown(true);
+
+      // If DB returned fewer than 3 results, fire Google fallback
+      if (results.length < 3 && input.length >= 3) {
+        fetchGoogleResults(input);
+      }
+    } catch {
+      setDbResults([]);
+      // DB failed — try Google as fallback
+      if (input.length >= 3) {
+        fetchGoogleResults(input);
+      }
+    } finally {
+      setIsLoadingDb(false);
+    }
+  }, [fetchGoogleResults]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setInputValue(value);
     setHighlightedIndex(-1);
 
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchPredictions(value), 300);
-  };
+    if (dbDebounceRef.current) clearTimeout(dbDebounceRef.current);
 
-  const handleSelectPrediction = async (prediction: Prediction) => {
-    setInputValue(prediction.description);
-    setShowDropdown(false);
-    setPredictions([]);
-    setIsLoading(true);
-
-    try {
-      // Check if this building already exists in our DB
-      const params = new URLSearchParams({ placeId: prediction.placeId });
-      const response = await fetch(`/api/buildings?${params}`);
-      const data = await response.json();
-
-      if (data.building?.slug) {
-        // Building exists — go directly to its page
-        window.location.href = `/building/${data.building.slug}`;
-        return;
-      }
-    } catch {
-      // Fall through to search
+    if (!value.trim()) {
+      setDbResults([]);
+      setGoogleResults([]);
+      setShowDropdown(false);
+      return;
     }
 
-    // Building not in DB — go to search results
-    window.location.href = `/search?q=${encodeURIComponent(prediction.mainText)}`;
+    // Single debounce: DB fires at 150ms, triggers Google fallback if needed
+    dbDebounceRef.current = setTimeout(() => fetchDbResults(value), 150);
+  };
+
+  const handleSelectItem = async (item: DropdownItem) => {
+    setShowDropdown(false);
+    setDbResults([]);
+    setGoogleResults([]);
+
+    if (item.source === 'local') {
+      const { type, slug } = item.data;
+      window.location.href = `/${type === 'building' ? 'building' : 'landlord'}/${slug}`;
+    } else {
+      // Google result — check if building exists in DB, otherwise go to search
+      setInputValue(item.data.description);
+      try {
+        const params = new URLSearchParams({ placeId: item.data.placeId });
+        const response = await fetch(`/api/buildings?${params}`);
+        const data = await response.json();
+        if (data.building?.slug) {
+          window.location.href = `/building/${data.building.slug}`;
+          return;
+        }
+      } catch {
+        // Fall through to search
+      }
+      window.location.href = `/search?q=${encodeURIComponent(item.data.mainText)}`;
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (highlightedIndex >= 0 && highlightedIndex < predictions.length) {
-      handleSelectPrediction(predictions[highlightedIndex]);
+    if (highlightedIndex >= 0 && highlightedIndex < items.length) {
+      handleSelectItem(items[highlightedIndex]);
     } else if (inputValue.trim()) {
       window.location.href = `/search?q=${encodeURIComponent(inputValue.trim())}`;
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!showDropdown || predictions.length === 0) return;
+    if (!showDropdown || items.length === 0) return;
 
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setHighlightedIndex(prev =>
-          prev < predictions.length - 1 ? prev + 1 : 0
-        );
+        setHighlightedIndex(prev => prev < items.length - 1 ? prev + 1 : 0);
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setHighlightedIndex(prev =>
-          prev > 0 ? prev - 1 : predictions.length - 1
-        );
+        setHighlightedIndex(prev => prev > 0 ? prev - 1 : items.length - 1);
         break;
       case 'Escape':
         setShowDropdown(false);
@@ -123,8 +189,10 @@ export default function HomeSearch() {
   }, []);
 
   useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    return () => { if (dbDebounceRef.current) clearTimeout(dbDebounceRef.current); };
   }, []);
+
+  const isLoading = isLoadingDb || isLoadingGoogle;
 
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
@@ -136,7 +204,7 @@ export default function HomeSearch() {
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            onFocus={() => predictions.length > 0 && setShowDropdown(true)}
+            onFocus={() => items.length > 0 && setShowDropdown(true)}
             placeholder="Search by address, neighborhood, or landlord..."
             className="w-full px-6 py-4 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-teal-300"
             autoComplete="off"
@@ -150,31 +218,68 @@ export default function HomeSearch() {
             </div>
           )}
 
-          {showDropdown && predictions.length > 0 && (
+          {showDropdown && items.length > 0 && (
             <div
               ref={dropdownRef}
-              className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+              className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto"
             >
-              {predictions.map((prediction, index) => (
+              {items.map((item, index) => (
                 <button
-                  key={prediction.placeId}
+                  key={item.source === 'local' ? `db-${item.data.id}` : `g-${item.data.placeId}`}
                   type="button"
-                  onClick={() => handleSelectPrediction(prediction)}
+                  onClick={() => handleSelectItem(item)}
                   onMouseEnter={() => setHighlightedIndex(index)}
                   className={`w-full text-left px-4 py-3 border-b border-gray-100 last:border-0 transition-colors ${
                     highlightedIndex === index ? 'bg-teal-50' : 'hover:bg-gray-50'
                   }`}
                 >
-                  <div className="font-medium text-gray-900">{prediction.mainText}</div>
-                  <div className="text-sm text-gray-500">{prediction.secondaryText}</div>
+                  {item.source === 'local' ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-gray-900 truncate">{item.data.title}</div>
+                        <div className="text-sm text-gray-500 truncate">{item.data.subtitle}</div>
+                      </div>
+                      <div className="flex-shrink-0 flex items-center gap-2">
+                        {item.data.avgScore !== null && (
+                          <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                            item.data.avgScore >= 4 ? 'bg-emerald-100 text-emerald-700' :
+                            item.data.avgScore >= 3 ? 'bg-amber-100 text-amber-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {item.data.avgScore.toFixed(1)}
+                          </span>
+                        )}
+                        {item.data.reviewCount > 0 && (
+                          <span className="text-xs text-gray-400">
+                            {item.data.reviewCount} review{item.data.reviewCount !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {item.data.type === 'landlord' && (
+                          <span className="text-xs text-purple-500 font-medium">Landlord</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-gray-900 truncate">{item.data.mainText}</div>
+                        <div className="text-sm text-gray-500 truncate">{item.data.secondaryText}</div>
+                      </div>
+                      <span className="flex-shrink-0 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                        New address
+                      </span>
+                    </div>
+                  )}
                 </button>
               ))}
-              <div className="px-4 py-2 text-xs text-gray-400 bg-gray-50 flex items-center gap-1">
-                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                </svg>
-                Powered by Google
-              </div>
+              {googleResults.length > 0 && (
+                <div className="px-4 py-2 text-xs text-gray-400 bg-gray-50 flex items-center gap-1">
+                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                  </svg>
+                  Powered by Google
+                </div>
+              )}
             </div>
           )}
         </div>
