@@ -73,7 +73,7 @@ const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.k
     <div class="space-y-6">
       <!-- Domain Scores Overview -->
       {availableDomains.length > 0 && (
-        <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
           {availableDomains.map((domain) => {
             const score = scores[domain.key];
             return (

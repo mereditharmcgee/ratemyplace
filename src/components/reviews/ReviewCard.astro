@@ -110,6 +110,8 @@ const utilitiesIncluded = parseJsonArray(review.utilities_included);
 const petTypes = parseJsonArray(review.pet_types);
 const pestTypes = parseJsonArray(review.pest_types_experienced);
 
+import { humanize } from '../../lib/format';
+
 // Labels for amenities
 const amenityLabels: Record<string, string> = {
   'pet_friendly': 'Pet Friendly',
@@ -170,11 +172,11 @@ const pestLabels: Record<string, string> = {
 
 <article class={`bg-white border border-gray-200 rounded-lg p-6${review.is_verified === 1 ? ' border-l-4 border-l-blue-400' : ''}`}>
   <!-- Header -->
-  <div class="flex justify-between items-start mb-4">
-    <div>
+  <div class="flex justify-between items-start mb-4 gap-4">
+    <div class="min-w-0 flex-1">
       <div class="flex items-center gap-2 mb-1">
         {review.review_title && (
-          <h3 class="text-lg font-semibold text-gray-900">{review.review_title}</h3>
+          <h3 class="text-lg font-semibold text-gray-900 break-words">{review.review_title}</h3>
         )}
         {review.is_verified === 1 && <VerifiedBadge size="sm" />}
       </div>
@@ -206,7 +208,7 @@ const pestLabels: Record<string, string> = {
         </div>
       )}
     </div>
-    <div class="text-right text-sm text-gray-500">
+    <div class="text-right text-sm text-gray-500 flex-shrink-0">
       <p class="font-medium text-gray-700">{unitDisplay}</p>
       <p>{recencyLabel}</p>
       {review.rent_amount && (
@@ -217,7 +219,7 @@ const pestLabels: Record<string, string> = {
 
   <!-- Review Text / Comments -->
   {(review.review_text || review.comments) && (
-    <p class="text-gray-700 mb-4 whitespace-pre-line">{review.review_text || review.comments}</p>
+    <p class="text-gray-700 mb-4 whitespace-pre-line break-words">{review.review_text || review.comments}</p>
   )}
 
   <!-- Unit Details -->
@@ -377,7 +379,7 @@ const pestLabels: Record<string, string> = {
             <div class="flex flex-wrap gap-1">
               {utilitiesIncluded.map(util => (
                 <span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
-                  {utilityLabels[util] || util}
+                  {utilityLabels[util] || humanize(util)}
                 </span>
               ))}
             </div>
@@ -391,7 +393,7 @@ const pestLabels: Record<string, string> = {
             <div class="flex flex-wrap gap-1">
               {amenities.map(amenity => (
                 <span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
-                  {amenityLabels[amenity] || amenity}
+                  {amenityLabels[amenity] || humanize(amenity)}
                 </span>
               ))}
             </div>
@@ -403,7 +405,7 @@ const pestLabels: Record<string, string> = {
           <div class="sm:col-span-2 flex flex-wrap gap-4 text-sm">
             {review.laundry_type && (
               <span class="text-gray-600">
-                <strong>Laundry:</strong> {laundryLabels[review.laundry_type] || review.laundry_type}
+                <strong>Laundry:</strong> {laundryLabels[review.laundry_type] || humanize(review.laundry_type)}
                 {review.laundry_cost_per_load && (
                   <span class="text-gray-500"> (${review.laundry_cost_per_load}/load)</span>
                 )}
@@ -411,7 +413,7 @@ const pestLabels: Record<string, string> = {
             )}
             {review.parking_type && (
               <span class="text-gray-600">
-                <strong>Parking:</strong> {parkingLabels[review.parking_type] || review.parking_type}
+                <strong>Parking:</strong> {parkingLabels[review.parking_type] || humanize(review.parking_type)}
               </span>
             )}
           </div>
@@ -425,8 +427,8 @@ const pestLabels: Record<string, string> = {
     <div class="flex flex-wrap gap-2 mb-4">
       <span class="text-sm text-gray-600 font-medium">Pets allowed:</span>
       {petTypes.map(pet => (
-        <span class="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full capitalize">
-          {pet}
+        <span class="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">
+          {humanize(pet)}
         </span>
       ))}
     </div>
@@ -437,8 +439,8 @@ const pestLabels: Record<string, string> = {
     <div class="flex flex-wrap gap-2 mb-4">
       <span class="text-sm text-gray-600 font-medium">Issues reported:</span>
       {(review.had_pest_issues === 1 || review.had_pests === 1) && (
-        <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
-          Pest Issues{pestTypes.length > 0 && `: ${pestTypes.map(p => pestLabels[p] || p).join(', ')}`}
+        <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full break-words">
+          Pest Issues{pestTypes.length > 0 && `: ${pestTypes.map(p => pestLabels[p] || humanize(p)).join(', ')}`}
         </span>
       )}
       {review.had_heat_issues === 1 && (

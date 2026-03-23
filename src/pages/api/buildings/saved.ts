@@ -24,10 +24,9 @@ export async function GET(context: APIContext): Promise<Response> {
         b.city,
         b.state,
         (SELECT COUNT(*) FROM reviews r WHERE r.building_id = b.id AND r.status = 'approved') as review_count,
-        bs.avg_overall
+        (SELECT ROUND(AVG(r.overall_score), 1) FROM reviews r WHERE r.building_id = b.id AND r.status = 'approved') as avg_overall
       FROM saved_buildings sb
       JOIN buildings b ON sb.building_id = b.id
-      LEFT JOIN building_scores bs ON b.id = bs.building_id
       WHERE sb.user_id = ?
       ORDER BY sb.created_at DESC
     `).bind(context.locals.user.id).all();

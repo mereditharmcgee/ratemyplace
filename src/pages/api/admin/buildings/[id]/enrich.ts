@@ -43,7 +43,6 @@ export async function GET(context: APIContext): Promise<Response> {
     console.error('Enrichment error:', err);
     return new Response(JSON.stringify({
       error: 'Failed to query enrichment database',
-      details: err instanceof Error ? err.message : 'Unknown error',
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
