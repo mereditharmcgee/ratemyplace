@@ -46,6 +46,7 @@ export default function BuildingMap({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [tilesLoaded, setTilesLoaded] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationRequested, setLocationRequested] = useState(false);
@@ -160,7 +161,13 @@ export default function BuildingMap({
 
   // Initialize map and markers
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current || buildings.length === 0) return;
+    if (!mapLoaded || !mapRef.current) return;
+    if (!loading && buildings.length === 0) {
+      // No buildings to show — skip map init, clear loading overlay
+      setTilesLoaded(true);
+      return;
+    }
+    if (buildings.length === 0) return;
 
     // Initialize map
     if (!mapInstanceRef.current) {
@@ -185,6 +192,10 @@ export default function BuildingMap({
       });
 
       infoWindowRef.current = new google.maps.InfoWindow();
+
+      mapInstanceRef.current.addListener('tilesloaded', () => {
+        setTilesLoaded(true);
+      });
     }
 
     // Clear existing markers
@@ -268,9 +279,9 @@ export default function BuildingMap({
         className="w-full h-[500px] md:h-[600px] rounded-lg overflow-hidden"
       />
 
-      {/* Loading overlay */}
-      {(loading || !mapLoaded) && (
-        <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center">
+      {/* Loading overlay — z-20 to stay above Google Maps canvas */}
+      {(loading || !mapLoaded || !tilesLoaded) && (
+        <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center z-20">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-2"></div>
             <p className="text-gray-600">Loading map...</p>

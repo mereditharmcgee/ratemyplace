@@ -20,6 +20,39 @@ interface Props {
 
 type ActiveTab = 'reviews' | 'saved' | 'notifications' | 'settings';
 
+function AvatarWithFallback({ avatarUrl, alt, initials }: { avatarUrl: string | null; alt: string; initials: string }) {
+  const [imgFailed, setImgFailed] = useState(!avatarUrl);
+
+  useEffect(() => {
+    if (!avatarUrl) {
+      setImgFailed(true);
+      return;
+    }
+    // Verify image loads in a fresh Image object (avoids SSR hydration race)
+    const img = new Image();
+    img.onload = () => setImgFailed(false);
+    img.onerror = () => setImgFailed(true);
+    img.src = avatarUrl;
+  }, [avatarUrl]);
+
+  if (imgFailed || !avatarUrl) {
+    return (
+      <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+        <span className="text-xl font-semibold text-teal-700">{initials}</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={avatarUrl}
+      alt={alt}
+      className="w-16 h-16 rounded-full object-cover shrink-0"
+      onError={() => setImgFailed(true)}
+    />
+  );
+}
+
 export default function ProfileDashboard({ userEmail, userName, avatarUrl, memberSince, emailVerified, unreadNotificationCount, hasPassword, isGoogleUser, notificationOptIn }: Props) {
   // Tab state
   const [activeTab, setActiveTab] = useState<ActiveTab>('reviews');
@@ -185,17 +218,11 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
       {/* Profile Header */}
       <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
         <div className="flex items-center gap-4">
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt={userName || userEmail}
-              className="w-16 h-16 rounded-full"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center">
-              <span className="text-xl font-semibold text-teal-700">{getInitials()}</span>
-            </div>
-          )}
+          <AvatarWithFallback
+            avatarUrl={avatarUrl}
+            alt={userName || userEmail}
+            initials={getInitials()}
+          />
           <div>
             {userName && <h2 className="text-xl font-semibold text-gray-900">{userName}</h2>}
             <p className="text-gray-600">{userEmail}</p>

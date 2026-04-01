@@ -12,6 +12,11 @@ export default defineConfig({
   output: 'server',
   adapter: cloudflare(),
 
+  redirects: {
+    '/scoring': '/methodology',
+    '/review': '/review/new',
+  },
+
   vite: {
     plugins: [tailwindcss()]
   },
