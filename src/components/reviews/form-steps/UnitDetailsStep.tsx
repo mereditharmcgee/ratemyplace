@@ -19,7 +19,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
   return (
     <div className="space-y-6">
       {building && (
-        <div className="bg-slate-50 p-4 rounded-lg mb-6">
+        <div className="bg-paper p-4 rounded-lg mb-6">
           <div className="font-medium">{building.address}</div>
           <div className="text-sm text-gray-500">
             {building.neighborhood && `${building.neighborhood}, `}

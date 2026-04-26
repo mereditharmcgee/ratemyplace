@@ -264,7 +264,7 @@ export default function ReviewEditForm({ review }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {/* Building Info (read-only) */}
-      <div className="bg-slate-50 p-4 rounded-lg">
+      <div className="bg-paper p-4 rounded-lg">
         <div className="font-medium text-gray-900">{review.building_address}</div>
         <div className="text-sm text-gray-500">
           {review.neighborhood && `${review.neighborhood}, `}{review.city}
