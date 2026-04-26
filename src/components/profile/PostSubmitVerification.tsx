@@ -36,7 +36,7 @@ export default function PostSubmitVerification({ reviewId }: Props) {
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="bg-teal-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors"
+          className="bg-teal-700 text-white px-6 py-2 rounded-[4px] text-sm font-semibold hover:bg-teal-800 transition-colors"
         >
           Verify Now
         </button>

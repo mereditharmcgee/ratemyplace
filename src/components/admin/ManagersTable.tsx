@@ -179,7 +179,7 @@ export default function ManagersTable() {
         </button>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+          className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800"
         >
           + Add Manager
         </button>
@@ -252,7 +252,7 @@ export default function ManagersTable() {
             <button
               onClick={addManager}
               disabled={adding}
-              className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
             >
               {adding ? 'Creating...' : 'Create Manager'}
             </button>
@@ -424,7 +424,7 @@ export default function ManagersTable() {
                       <button
                         onClick={() => saveManager(manager.id)}
                         disabled={saving}
-                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                        className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
                       >
                         {saving ? 'Saving...' : 'Save Changes'}
                       </button>
@@ -480,7 +480,7 @@ export default function ManagersTable() {
                     <div className="flex gap-2 pt-4 border-t border-gray-200">
                       <button
                         onClick={() => startEditing(manager)}
-                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium"
+                        className="px-4 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 text-sm font-semibold"
                       >
                         Edit Manager
                       </button>

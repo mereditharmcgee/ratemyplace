@@ -897,7 +897,7 @@ export default function ReviewEditForm({ review }: Props) {
         <button
           type="submit"
           disabled={loading || !consentAcknowledged}
-          className="flex-1 px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 px-6 py-3 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? 'Saving...' : 'Save Changes'}
         </button>

@@ -329,7 +329,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
         <button
           type="button"
           onClick={onNext}
-          className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+          className="px-6 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800"
         >
           Continue
         </button>

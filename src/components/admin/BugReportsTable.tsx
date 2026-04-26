@@ -305,7 +305,7 @@ export default function BugReportsTable() {
                       <button
                         onClick={() => updateBug(bug.id, bug.status, adminNotes)}
                         disabled={processing === bug.id}
-                        className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+                        className="px-4 py-2 bg-teal-700 text-white rounded-[4px] text-sm font-semibold hover:bg-teal-800 disabled:opacity-50"
                       >
                         Save Notes
                       </button>

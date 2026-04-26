@@ -700,7 +700,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                   )}
                   <a
                     href={`/review/edit/${review.id}`}
-                    className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium"
+                    className="px-4 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 text-sm font-semibold"
                     onClick={(e) => e.stopPropagation()}
                   >
                     Edit Review

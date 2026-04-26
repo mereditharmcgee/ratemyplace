@@ -178,7 +178,7 @@ export default function SettingsTab({
           <button
             type="submit"
             disabled={nameLoading}
-            className="mt-3 px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mt-3 px-4 py-2 bg-teal-700 text-white font-semibold text-sm rounded-[4px] hover:bg-teal-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {nameLoading ? 'Saving...' : 'Save Name'}
           </button>
@@ -211,7 +211,7 @@ export default function SettingsTab({
           <button
             type="submit"
             disabled={notifLoading}
-            className="mt-4 px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mt-4 px-4 py-2 bg-teal-700 text-white font-semibold text-sm rounded-[4px] hover:bg-teal-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {notifLoading ? 'Saving...' : 'Save Preferences'}
           </button>
@@ -265,7 +265,7 @@ export default function SettingsTab({
           <button
             type="submit"
             disabled={passwordLoading}
-            className="px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-teal-700 text-white font-semibold text-sm rounded-[4px] hover:bg-teal-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {passwordLoading ? 'Saving...' : hasPassword ? 'Change Password' : 'Set Password'}
           </button>
@@ -318,7 +318,7 @@ export default function SettingsTab({
             <button
               type="submit"
               disabled={emailLoading}
-              className="px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-teal-700 text-white font-semibold text-sm rounded-[4px] hover:bg-teal-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {emailLoading ? 'Saving...' : 'Change Email'}
             </button>

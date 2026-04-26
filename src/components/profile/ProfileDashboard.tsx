@@ -257,7 +257,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             <button
               onClick={handleResendVerification}
               disabled={resendLoading}
-              className="bg-teal-600 text-white py-2 px-4 rounded-lg hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-teal-700 text-white font-semibold py-2 px-4 rounded-[4px] hover:bg-teal-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {resendLoading ? 'Sending...' : 'Send Verification Email'}
             </button>
@@ -326,7 +326,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             </h2>
             <a
               href="/review/new"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -354,7 +354,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
               </p>
               <a
                 href="/review/new"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 transition-colors"
               >
                 Write Your First Review
               </a>
@@ -395,7 +395,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
               </p>
               <a
                 href="/search"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 transition-colors"
               >
                 Browse Buildings
               </a>

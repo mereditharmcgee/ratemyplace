@@ -65,7 +65,7 @@ export default function AddressStep({ selectedPlace, loading, error, onPlaceSele
               type="button"
               onClick={onConfirm}
               disabled={loading}
-              className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              className="px-6 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
             >
               {loading ? 'Verifying...' : 'Continue'}
             </button>
