@@ -5,6 +5,7 @@ import NotificationsTab from './NotificationsTab';
 import SettingsTab from './SettingsTab';
 import type { Notification } from './NotificationsTab';
 import type { UserReview, UserReviewsResponse, SavedBuilding, SavedBuildingsResponse } from '../../lib/api-types';
+import { getScoreColor } from '../../lib/scoring-colors';
 
 interface Props {
   userEmail: string;
@@ -206,11 +207,9 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 4) return 'bg-emerald-500 text-white';
-    if (score >= 3) return 'bg-amber-500 text-white';
-    if (score >= 2) return 'bg-orange-500 text-white';
-    return 'bg-red-500 text-white';
+  const getScoreBadgeClass = (score: number) => {
+    const c = getScoreColor(score);
+    return `${c.bg} ${c.text}`;
   };
 
   return (
@@ -428,7 +427,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
                   </div>
 
                   {building.avg_overall !== null && (
-                    <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg ${getScoreColor(building.avg_overall)}`}>
+                    <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg ${getScoreBadgeClass(building.avg_overall)}`}>
                       {building.avg_overall.toFixed(1)}
                     </div>
                   )}

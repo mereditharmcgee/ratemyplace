@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getScoreColor as getScoreColorPair, getScoreTextColor } from '../../lib/scoring-colors';
 
 interface Review {
   id: string;
@@ -225,17 +226,11 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
     }
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 4) return 'text-emerald-600';
-    if (score >= 3) return 'text-amber-600';
-    return 'text-red-600';
-  };
+  const getScoreColor = (score: number) => getScoreTextColor(score);
 
   const getScoreBadgeColor = (score: number) => {
-    if (score >= 4) return 'bg-emerald-500 text-white';
-    if (score >= 3) return 'bg-amber-500 text-white';
-    if (score >= 2) return 'bg-orange-500 text-white';
-    return 'bg-red-500 text-white';
+    const c = getScoreColorPair(score);
+    return `${c.bg} ${c.text}`;
   };
 
   const formatScoreLabel = (key: string) => {

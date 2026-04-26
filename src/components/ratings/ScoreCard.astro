@@ -1,4 +1,6 @@
 ---
+import { getScoreColor, getScoreTextColor } from '../../lib/scoring-colors';
+
 interface Props {
   scores: any;
   type: 'building' | 'landlord';
@@ -31,20 +33,6 @@ const landlordCategories = [
   { key: 'avg_lease_clarity', label: 'Lease Clarity' },
   { key: 'avg_deposit_handling', label: 'Deposit Handling' },
 ];
-
-function getScoreColor(score: number): string {
-  if (score >= 4) return 'bg-emerald-500';
-  if (score >= 3) return 'bg-amber-500';
-  if (score >= 2) return 'bg-orange-500';
-  return 'bg-red-500';
-}
-
-function getScoreTextColor(score: number): string {
-  if (score >= 4) return 'text-emerald-600';
-  if (score >= 3) return 'text-amber-600';
-  if (score >= 2) return 'text-orange-600';
-  return 'text-red-600';
-}
 
 // Check if we have new domain scores
 const hasNewDomainScores = scores?.avg_unit != null || scores?.avg_building != null || scores?.avg_landlord != null;
@@ -152,7 +140,7 @@ const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.k
                   </div>
                   <div class="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      class={`h-2 rounded-full ${getScoreColor(score)}`}
+                      class={`h-2 rounded-full ${getScoreColor(score).bg}`}
                       style={`width: ${(score / 5) * 100}%`}
                     ></div>
                   </div>
@@ -182,7 +170,7 @@ const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.k
                   </div>
                   <div class="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      class={`h-2 rounded-full ${getScoreColor(score)}`}
+                      class={`h-2 rounded-full ${getScoreColor(score).bg}`}
                       style={`width: ${(score / 5) * 100}%`}
                     ></div>
                   </div>
@@ -206,7 +194,7 @@ const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.k
             </div>
             <div class="w-full bg-gray-200 rounded-full h-2">
               <div
-                class={`h-2 rounded-full ${getScoreColor(score)}`}
+                class={`h-2 rounded-full ${getScoreColor(score).bg}`}
                 style={`width: ${(score / 5) * 100}%`}
               ></div>
             </div>

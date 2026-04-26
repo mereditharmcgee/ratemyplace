@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getScoreTextColor } from '../../lib/scoring-colors';
 
 interface LandlordOption {
   id: string;
@@ -254,9 +255,7 @@ export default function BuildingsTable() {
 
   const getScoreColor = (score: number | null) => {
     if (score === null) return 'text-gray-400';
-    if (score >= 4) return 'text-emerald-600';
-    if (score >= 3) return 'text-amber-600';
-    return 'text-red-600';
+    return getScoreTextColor(score);
   };
 
   const filteredBuildings = buildings.filter((building) => {
