@@ -73,7 +73,7 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
 
   if (submitted) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+      <div className="bg-green-50 border border-green-200 rounded-[6px] p-6">
         <div className="flex gap-3">
           <svg className="w-6 h-6 text-green-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -114,7 +114,7 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
           className={fieldErrors.name ? errorInputClass : inputClass}
         />
         {fieldErrors.name && (
-          <p className="mt-1 text-sm text-red-600">{fieldErrors.name}</p>
+          <p className="mt-1 text-sm text-red-700">{fieldErrors.name}</p>
         )}
       </div>
 
@@ -131,7 +131,7 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
           className={fieldErrors.email ? errorInputClass : inputClass}
         />
         {fieldErrors.email && (
-          <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
+          <p className="mt-1 text-sm text-red-700">{fieldErrors.email}</p>
         )}
       </div>
 
@@ -166,7 +166,7 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
           className={fieldErrors.message ? errorInputClass : inputClass}
         />
         {fieldErrors.message && (
-          <p className="mt-1 text-sm text-red-600">{fieldErrors.message}</p>
+          <p className="mt-1 text-sm text-red-700">{fieldErrors.message}</p>
         )}
         <p className="mt-1 text-xs text-gray-500">At least 10 characters, max 3000.</p>
       </div>
@@ -177,7 +177,7 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
       <button
         type="submit"
         disabled={loading}
-        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-[4px] shadow-sm text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? 'Sending...' : 'Send Message'}
       </button>

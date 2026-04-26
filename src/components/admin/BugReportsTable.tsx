@@ -144,7 +144,7 @@ export default function BugReportsTable() {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>
+      <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">{error}</div>
     );
   }
 
@@ -156,7 +156,7 @@ export default function BugReportsTable() {
           <button
             key={status}
             onClick={() => setStatusFilter(status)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               statusFilter === status
                 ? 'bg-teal-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -227,7 +227,7 @@ export default function BugReportsTable() {
                       href={bug.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-teal-600 hover:text-teal-700 break-all"
+                      className="text-sm text-teal-700 hover:text-teal-700 break-all"
                     >
                       {bug.url}
                     </a>
@@ -278,7 +278,7 @@ export default function BugReportsTable() {
                       <button
                         onClick={() => updateBug(bug.id, 'in_progress', adminNotes)}
                         disabled={processing === bug.id}
-                        className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 disabled:opacity-50"
+                        className="px-4 py-2 bg-amber-500 text-white rounded-[6px] text-sm font-medium hover:bg-amber-600 disabled:opacity-50"
                       >
                         {processing === bug.id ? 'Updating...' : 'Mark In Progress'}
                       </button>
@@ -288,14 +288,14 @@ export default function BugReportsTable() {
                         <button
                           onClick={() => updateBug(bug.id, 'resolved', adminNotes)}
                           disabled={processing === bug.id}
-                          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                          className="px-4 py-2 bg-green-600 text-white rounded-[6px] text-sm font-medium hover:bg-green-700 disabled:opacity-50"
                         >
                           {processing === bug.id ? 'Updating...' : 'Resolve'}
                         </button>
                         <button
                           onClick={() => updateBug(bug.id, 'wont_fix', adminNotes)}
                           disabled={processing === bug.id}
-                          className="px-4 py-2 bg-gray-500 text-white rounded-lg text-sm font-medium hover:bg-gray-600 disabled:opacity-50"
+                          className="px-4 py-2 bg-gray-500 text-white rounded-[6px] text-sm font-medium hover:bg-gray-600 disabled:opacity-50"
                         >
                           {processing === bug.id ? 'Updating...' : "Won't Fix"}
                         </button>
@@ -305,7 +305,7 @@ export default function BugReportsTable() {
                       <button
                         onClick={() => updateBug(bug.id, bug.status, adminNotes)}
                         disabled={processing === bug.id}
-                        className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+                        className="px-4 py-2 bg-teal-700 text-white rounded-[4px] text-sm font-semibold hover:bg-teal-800 disabled:opacity-50"
                       >
                         Save Notes
                       </button>

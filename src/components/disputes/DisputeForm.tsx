@@ -185,7 +185,7 @@ export default function DisputeForm({ siteUrl }: Props) {
           }`}
         />
         {fieldErrors.reviewUrl && (
-          <p className="mt-1 text-sm text-red-600">{fieldErrors.reviewUrl}</p>
+          <p className="mt-1 text-sm text-red-700">{fieldErrors.reviewUrl}</p>
         )}
         <p className="mt-1 text-sm text-gray-500">
           Paste the URL of the review you want to dispute
@@ -213,7 +213,7 @@ export default function DisputeForm({ siteUrl }: Props) {
               }`}
             />
             {fieldErrors.landlordName && (
-              <p className="mt-1 text-sm text-red-600">{fieldErrors.landlordName}</p>
+              <p className="mt-1 text-sm text-red-700">{fieldErrors.landlordName}</p>
             )}
           </div>
 
@@ -233,7 +233,7 @@ export default function DisputeForm({ siteUrl }: Props) {
               }`}
             />
             {fieldErrors.landlordEmail && (
-              <p className="mt-1 text-sm text-red-600">{fieldErrors.landlordEmail}</p>
+              <p className="mt-1 text-sm text-red-700">{fieldErrors.landlordEmail}</p>
             )}
           </div>
 
@@ -253,7 +253,7 @@ export default function DisputeForm({ siteUrl }: Props) {
               }`}
             />
             {fieldErrors.landlordPhone && (
-              <p className="mt-1 text-sm text-red-600">{fieldErrors.landlordPhone}</p>
+              <p className="mt-1 text-sm text-red-700">{fieldErrors.landlordPhone}</p>
             )}
           </div>
         </div>
@@ -275,7 +275,7 @@ export default function DisputeForm({ siteUrl }: Props) {
                   id={`reason-${reason}`}
                   checked={disputeReasons.includes(reason)}
                   onChange={() => handleReasonToggle(reason)}
-                  className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                  className="h-4 w-4 text-teal-700 border-gray-300 rounded focus:ring-teal-500"
                 />
               </div>
               <div className="ml-3">
@@ -287,7 +287,7 @@ export default function DisputeForm({ siteUrl }: Props) {
           ))}
         </div>
         {fieldErrors.disputeReasons && (
-          <p className="mt-2 text-sm text-red-600">{fieldErrors.disputeReasons}</p>
+          <p className="mt-2 text-sm text-red-700">{fieldErrors.disputeReasons}</p>
         )}
       </div>
 
@@ -308,7 +308,7 @@ export default function DisputeForm({ siteUrl }: Props) {
           }`}
         />
         {fieldErrors.disputeExplanation && (
-          <p className="mt-1 text-sm text-red-600">{fieldErrors.disputeExplanation}</p>
+          <p className="mt-1 text-sm text-red-700">{fieldErrors.disputeExplanation}</p>
         )}
         <p className="mt-1 text-sm text-gray-500">
           {disputeExplanation.length}/2000 characters
@@ -320,7 +320,7 @@ export default function DisputeForm({ siteUrl }: Props) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-teal-600 text-white px-6 py-3 rounded-md font-semibold hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          className="w-full bg-teal-700 text-white px-6 py-3 rounded-[4px] font-semibold hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? 'Submitting...' : 'Submit Dispute'}
         </button>

@@ -22,7 +22,7 @@ export default function RatingStep({
 }: Props) {
   return (
     <div className="space-y-4">
-      <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-6">
+      <div className="bg-teal-50 border border-teal-200 rounded-[6px] p-4 mb-6">
         <h3 className="font-semibold text-teal-800 mb-1">{title}</h3>
         <p className="text-sm text-teal-700">{description}</p>
       </div>
@@ -44,14 +44,14 @@ export default function RatingStep({
         <button
           type="button"
           onClick={onBack}
-          className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          className="px-6 py-2 border border-gray-300 rounded-[6px] hover:bg-gray-50"
         >
           Back
         </button>
         <button
           type="button"
           onClick={onNext}
-          className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+          className="px-6 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800"
         >
           Continue
         </button>

@@ -22,7 +22,7 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
           </svg>
           <span>Disputed</span>
-          <span className="text-violet-500">· Under landlord review</span>
+          <span className="text-violet-500">Â· Under landlord review</span>
         </span>
       );
     }
@@ -59,7 +59,7 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+    <div className="bg-white border border-gray-200 rounded-[6px] p-4 hover:shadow-md transition-shadow">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-gray-900 truncate">
@@ -75,7 +75,7 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
 
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-teal-50 px-2 py-1 rounded">
-            <svg className="w-4 h-4 text-teal-600" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-4 h-4 text-teal-700" fill="currentColor" viewBox="0 0 20 20">
               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
             </svg>
             <span className="font-medium text-teal-700">{review.overall_score.toFixed(1)}</span>
@@ -101,7 +101,7 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
       </div>
 
       {!review.is_verified && (
-        <div className="mt-2 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
+        <div className="mt-2 flex items-center gap-2 bg-blue-50 rounded-[6px] px-3 py-2">
           <svg className="w-4 h-4 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
@@ -116,7 +116,7 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
       )}
 
       {review.status === 'rejected' && !review.has_open_dispute && (
-        <div className="mt-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+        <div className="mt-2 bg-red-50 border border-red-200 rounded-[6px] px-3 py-2">
           <p className="text-sm text-red-700">
             <span className="font-medium">Rejected:</span>{' '}
             {review.moderation_notes || 'No reason provided'}
@@ -133,7 +133,7 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
       <div className="mt-4 flex gap-2">
         <a
           href={`/review/edit/${review.id}`}
-          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-[6px] hover:bg-gray-200 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -143,7 +143,7 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
         {review.status === 'approved' && (
           <a
             href={`/building/${review.building_slug}`}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-teal-700 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-teal-700 bg-teal-50 rounded-[6px] hover:bg-teal-100 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />

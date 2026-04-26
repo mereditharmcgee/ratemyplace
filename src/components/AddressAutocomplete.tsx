@@ -59,7 +59,7 @@ export default function AddressAutocomplete({
 
   const totalItems = dbMatches.length + predictions.length;
 
-  // Fast DB search for existing buildings — 150ms
+  // Fast DB search for existing buildings â€” 150ms
   const fetchDbMatches = useCallback(async (input: string) => {
     if (input.length < 2) {
       setDbMatches([]);
@@ -87,7 +87,7 @@ export default function AddressAutocomplete({
     }
   }, []);
 
-  // Google Places for structured address data — 300ms
+  // Google Places for structured address data â€” 300ms
   const fetchPredictions = useCallback(async (input: string) => {
     if (input.length < 3) {
       setPredictions([]);
@@ -123,13 +123,13 @@ export default function AddressAutocomplete({
       return;
     }
 
-    // DB first — fast, 150ms
+    // DB first â€” fast, 150ms
     dbDebounceRef.current = setTimeout(() => {
       fetchDbMatches(value);
       setShowDropdown(true);
     }, 150);
 
-    // Google Places — 300ms (needs structured data, always fires)
+    // Google Places â€” 300ms (needs structured data, always fires)
     googleDebounceRef.current = setTimeout(() => fetchPredictions(value), 300);
   };
 
@@ -233,7 +233,7 @@ export default function AddressAutocomplete({
         />
         {isLoading && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <svg className="animate-spin h-5 w-5 text-teal-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin h-5 w-5 text-teal-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
@@ -285,7 +285,7 @@ export default function AddressAutocomplete({
                       <div className="text-sm text-gray-500 truncate">{match.subtitle}</div>
                     </div>
                     {match.reviewCount > 0 && (
-                      <span className="flex-shrink-0 text-xs text-teal-600 font-medium">
+                      <span className="flex-shrink-0 text-xs text-teal-700 font-medium">
                         {match.reviewCount} review{match.reviewCount !== 1 ? 's' : ''}
                       </span>
                     )}

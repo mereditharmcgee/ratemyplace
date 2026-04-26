@@ -3,7 +3,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
 ---
 
 <BaseLayout title="About" description="Learn about RateMyPlace's mission to help tenants find quality housing through honest reviews.">
-  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
     <h1 class="text-4xl font-bold text-gray-900 mb-8">About RateMyPlace</h1>
 
     <div class="prose prose-lg max-w-none">
@@ -12,7 +12,8 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
         about their next home by providing honest, verified reviews from real tenants.
       </p>
 
-      <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">Our Mission</h2>
+      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mt-12 mb-3">Why we exist</p>
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Our mission</h2>
       <p class="text-gray-600 mb-6">
         Finding a good apartment is challenging. Beyond high rents and competitive markets,
         tenants often don't know what they're getting into until they've signed a lease. We believe
@@ -20,17 +21,18 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
         one of their biggest financial decisions.
       </p>
 
-      <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">How We Rate</h2>
+      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mt-12 mb-3">Methodology</p>
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">How we rate</h2>
       <p class="text-gray-600 mb-3">
         These scores are calculated from tenant-submitted ratings. RateMyPlace does not independently evaluate properties.
       </p>
       <p class="text-gray-600 mb-6">
         Our scoring framework is based on housing quality research and covers 27 aspects
-        of the rental experience — organized into three categories based on what tenants reported:
+        of the rental experience â€” organized into three categories based on what tenants reported:
       </p>
 
       <div class="grid md:grid-cols-3 gap-6 my-8">
-        <div class="bg-teal-50 p-6 rounded-lg">
+        <div class="bg-teal-50 p-6 rounded-[6px]">
           <h3 class="font-semibold text-teal-900 mb-3">Unit Quality (10 items)</h3>
           <ul class="text-sm text-teal-800 space-y-1">
             <li>Structural integrity</li>
@@ -46,7 +48,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
           </ul>
         </div>
 
-        <div class="bg-blue-50 p-6 rounded-lg">
+        <div class="bg-blue-50 p-6 rounded-[6px]">
           <h3 class="font-semibold text-blue-900 mb-3">Building Quality (9 items)</h3>
           <ul class="text-sm text-blue-800 space-y-1">
             <li>Common areas</li>
@@ -61,7 +63,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
           </ul>
         </div>
 
-        <div class="bg-green-50 p-6 rounded-lg">
+        <div class="bg-green-50 p-6 rounded-[6px]">
           <h3 class="font-semibold text-green-900 mb-3">Landlord Experience (8 items)</h3>
           <ul class="text-sm text-green-800 space-y-1">
             <li>Maintenance response</li>
@@ -76,7 +78,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
         </div>
       </div>
 
-      <div class="bg-slate-50 border border-slate-200 rounded-lg p-6 my-8">
+      <div class="bg-paper border border-slate-200 rounded-[6px] p-6 my-8">
         <h3 class="text-lg font-semibold text-gray-900 mb-3">Scoring Transparency</h3>
         <p class="text-gray-600 mb-4">
           Scores aren't simple averages of what tenants reported. Health and safety factors like pest control, mold,
@@ -91,7 +93,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
         </p>
         <a
           href="/methodology"
-          class="inline-flex items-center gap-2 text-teal-600 hover:text-teal-800 font-medium transition-colors"
+          class="inline-flex items-center gap-2 text-teal-700 hover:text-teal-800 font-medium transition-colors"
         >
           Learn more about our evidence-based scoring methodology
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -100,7 +102,8 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
         </a>
       </div>
 
-      <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">Privacy Protection</h2>
+      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mt-12 mb-3">Privacy as identity</p>
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Privacy protection</h2>
       <p class="text-gray-600 mb-6">
         We take reviewer privacy seriously. To protect tenants from potential retaliation:
       </p>
@@ -111,7 +114,8 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
         <li>Users can delete their reviews at any time</li>
       </ul>
 
-      <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">Review Guidelines</h2>
+      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mt-12 mb-3">Standards</p>
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Review guidelines</h2>
       <p class="text-gray-600 mb-6">
         To maintain the quality and trustworthiness of reviews, we require that all reviews:
       </p>
@@ -122,17 +126,19 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
         <li>Don't include personally identifiable information about landlords or staff</li>
       </ul>
 
-      <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">Fairness for Landlords</h2>
+      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mt-12 mb-3">Disputes &amp; corrections</p>
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Fairness for landlords</h2>
       <p class="text-gray-600 mb-6">
         We believe in fairness for all parties. If a landlord or property manager believes a review
-        is inaccurate or violates our guidelines, they can <a href="/dispute" class="text-teal-600 hover:underline">submit a dispute</a>
+        is inaccurate or violates our guidelines, they can <a href="/dispute" class="text-teal-700 hover:underline">submit a dispute</a>
         for our team to investigate. They can also reach us at
-        <a href="mailto:landlords@ratemyplace.org" class="text-teal-600 hover:underline">landlords@ratemyplace.org</a>.
+        <a href="mailto:landlords@ratemyplace.org" class="text-teal-700 hover:underline">landlords@ratemyplace.org</a>.
       </p>
 
-      <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">Who's Behind This</h2>
+      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mt-12 mb-3">Behind the work</p>
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Who's behind this</h2>
       <p class="text-gray-600 mb-6">
-        RateMyPlace was created by <a href="https://meredithmcgee.org" target="_blank" rel="noopener noreferrer" class="text-teal-600 hover:text-teal-800">Meredith McGee</a>,
+        RateMyPlace was created by <a href="https://meredithmcgee.org" target="_blank" rel="noopener noreferrer" class="text-teal-700 hover:text-teal-800">Meredith McGee</a>,
         a Boston-based public health professional, researcher, and developer who saw firsthand how difficult
         it can be for tenants to find reliable information about apartments and landlords before signing a lease.
         Drawing on her background in public health research, Meredith designed RateMyPlace's evidence-based
@@ -141,12 +147,13 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
       </p>
       <p class="text-gray-600 mb-6">
         You can learn more about Meredith and her other work at{' '}
-        <a href="https://meredithmcgee.org" target="_blank" rel="noopener noreferrer" class="text-teal-600 hover:text-teal-800">
+        <a href="https://meredithmcgee.org" target="_blank" rel="noopener noreferrer" class="text-teal-700 hover:text-teal-800">
           meredithmcgee.org
         </a>.
       </p>
 
-      <h2 class="text-2xl font-bold text-gray-900 mt-12 mb-4">Contact Us</h2>
+      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mt-12 mb-3">Get in touch</p>
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Contact us</h2>
       <p class="text-gray-600 mb-6">
         Have questions, feedback, or need to report a problem? Email us at{' '}
         <a href="mailto:contact@ratemyplace.org" class="text-blue-600 hover:text-blue-800">

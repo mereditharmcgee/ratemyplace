@@ -149,7 +149,7 @@ export default function DisputesQueue() {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
         {error}
       </div>
     );
@@ -165,7 +165,7 @@ export default function DisputesQueue() {
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
                 statusFilter === status
                   ? 'bg-teal-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -180,7 +180,7 @@ export default function DisputesQueue() {
         <div className="flex gap-2 ml-auto">
           <button
             onClick={() => setSortOrder('oldest')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               sortOrder === 'oldest'
                 ? 'bg-teal-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -190,7 +190,7 @@ export default function DisputesQueue() {
           </button>
           <button
             onClick={() => setSortOrder('newest')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               sortOrder === 'newest'
                 ? 'bg-teal-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -225,7 +225,7 @@ export default function DisputesQueue() {
                       </h3>
                     </div>
                     <p className="text-sm text-gray-500">
-                      {dispute.landlord_name} • {formatDate(dispute.created_at)}
+                      {dispute.landlord_name} â€¢ {formatDate(dispute.created_at)}
                     </p>
                     <p className="text-sm text-gray-700 mt-1 truncate">
                       {reasonSnippet}
@@ -363,7 +363,7 @@ export default function DisputesQueue() {
                             href={`/review/edit/${dispute.review_id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700 font-medium"
+                            className="inline-flex items-center gap-1 text-sm text-teal-700 hover:text-teal-700 font-medium"
                           >
                             View full review
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -415,7 +415,7 @@ export default function DisputesQueue() {
                       <button
                         onClick={handleResolveClick}
                         disabled={!resolutionForm.notes.trim() || processing === dispute.id}
-                        className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                        className="px-6 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold"
                       >
                         {processing === dispute.id ? 'Resolving...' : 'Resolve Dispute'}
                       </button>

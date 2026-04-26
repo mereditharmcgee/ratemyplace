@@ -5,6 +5,7 @@ import NotificationsTab from './NotificationsTab';
 import SettingsTab from './SettingsTab';
 import type { Notification } from './NotificationsTab';
 import type { UserReview, UserReviewsResponse, SavedBuilding, SavedBuildingsResponse } from '../../lib/api-types';
+import { getScoreColor } from '../../lib/scoring-colors';
 
 interface Props {
   userEmail: string;
@@ -103,7 +104,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
   };
 
   const fetchSavedBuildings = async () => {
-    if (savedLoaded) return; // Cache — only fetch once
+    if (savedLoaded) return; // Cache â€” only fetch once
     try {
       setSavedLoading(true);
       const response = await fetch('/api/buildings/saved');
@@ -123,7 +124,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
   };
 
   const fetchNotifications = async () => {
-    if (notificationsLoaded) return; // Cache — only fetch once
+    if (notificationsLoaded) return; // Cache â€” only fetch once
     try {
       setNotificationsLoading(true);
       const response = await fetch('/api/notifications');
@@ -206,17 +207,15 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 4) return 'bg-emerald-500 text-white';
-    if (score >= 3) return 'bg-amber-500 text-white';
-    if (score >= 2) return 'bg-orange-500 text-white';
-    return 'bg-red-500 text-white';
+  const getScoreBadgeClass = (score: number) => {
+    const c = getScoreColor(score);
+    return `${c.bg} ${c.text}`;
   };
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Profile Header */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
+      <div className="bg-white rounded-[6px] border border-gray-200 p-6 mb-8">
         <div className="flex items-center gap-4">
           <AvatarWithFallback
             avatarUrl={avatarUrl}
@@ -232,7 +231,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
       </div>
 
       {/* Email Verification Status */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+      <div className="bg-white rounded-[6px] border border-gray-200 p-6 mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Email Verification</h3>
 
         {emailVerified ? (
@@ -244,7 +243,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
           </div>
         ) : (
           <div>
-            <div className="flex items-center gap-3 text-amber-600 mb-4">
+            <div className="flex items-center gap-3 text-amber-700 mb-4">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
@@ -258,13 +257,13 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             <button
               onClick={handleResendVerification}
               disabled={resendLoading}
-              className="bg-teal-600 text-white py-2 px-4 rounded-lg hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-teal-700 text-white font-semibold py-2 px-4 rounded-[4px] hover:bg-teal-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {resendLoading ? 'Sending...' : 'Send Verification Email'}
             </button>
 
             {resendMessage && (
-              <p className={`mt-3 text-sm ${resendMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`mt-3 text-sm ${resendMessage.type === 'success' ? 'text-green-600' : 'text-red-700'}`}>
                 {resendMessage.text}
               </p>
             )}
@@ -279,7 +278,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             onClick={() => handleTabSwitch('reviews')}
             className={`py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'reviews'
-                ? 'border-teal-600 text-teal-600'
+                ? 'border-teal-600 text-teal-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -289,7 +288,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             onClick={() => handleTabSwitch('saved')}
             className={`py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'saved'
-                ? 'border-teal-600 text-teal-600'
+                ? 'border-teal-600 text-teal-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -299,7 +298,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             onClick={() => handleTabSwitch('notifications')}
             className={`py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'notifications'
-                ? 'border-teal-600 text-teal-600'
+                ? 'border-teal-600 text-teal-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -309,7 +308,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             onClick={() => handleTabSwitch('settings')}
             className={`py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'settings'
-                ? 'border-teal-600 text-teal-600'
+                ? 'border-teal-600 text-teal-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -327,7 +326,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             </h2>
             <a
               href="/review/new"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -341,11 +340,11 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
             </div>
           ) : error ? (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+            <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
               {error}
             </div>
           ) : reviews.length === 0 ? (
-            <div className="bg-gray-50 rounded-lg p-8 text-center">
+            <div className="bg-gray-50 rounded-[6px] p-8 text-center">
               <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
@@ -355,7 +354,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
               </p>
               <a
                 href="/review/new"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 transition-colors"
               >
                 Write Your First Review
               </a>
@@ -382,11 +381,11 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
             </div>
           ) : savedError ? (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+            <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
               {savedError}
             </div>
           ) : savedBuildings.length === 0 ? (
-            <div className="bg-gray-50 rounded-lg p-8 text-center">
+            <div className="bg-gray-50 rounded-[6px] p-8 text-center">
               <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
               </svg>
@@ -396,7 +395,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
               </p>
               <a
                 href="/search"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 transition-colors"
               >
                 Browse Buildings
               </a>
@@ -406,12 +405,12 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
               {savedBuildings.map((building) => (
                 <div
                   key={building.building_id}
-                  className="bg-white rounded-lg border border-gray-200 p-4 flex items-start justify-between gap-4"
+                  className="bg-white rounded-[6px] border border-gray-200 p-4 flex items-start justify-between gap-4"
                 >
                   <div className="flex-1 min-w-0">
                     <a
                       href={`/building/${building.building_slug}`}
-                      className="text-base font-semibold text-gray-900 hover:text-teal-600 transition-colors line-clamp-2"
+                      className="text-base font-semibold text-gray-900 hover:text-teal-700 transition-colors line-clamp-2"
                     >
                       {building.building_address}
                     </a>
@@ -428,7 +427,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
                   </div>
 
                   {building.avg_overall !== null && (
-                    <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg ${getScoreColor(building.avg_overall)}`}>
+                    <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg ${getScoreBadgeClass(building.avg_overall)}`}>
                       {building.avg_overall.toFixed(1)}
                     </div>
                   )}

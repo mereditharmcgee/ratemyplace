@@ -145,12 +145,12 @@ export default function SettingsTab({
     }
   };
 
-  const sectionClass = 'bg-white rounded-lg border border-gray-200 p-6';
+  const sectionClass = 'bg-white rounded-[6px] border border-gray-200 p-6';
 
   const renderMessage = (msg: MessageState) => {
     if (!msg) return null;
     return (
-      <p className={`mt-3 text-sm ${msg.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+      <p className={`mt-3 text-sm ${msg.type === 'success' ? 'text-green-600' : 'text-red-700'}`}>
         {msg.text}
       </p>
     );
@@ -178,7 +178,7 @@ export default function SettingsTab({
           <button
             type="submit"
             disabled={nameLoading}
-            className="mt-3 px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mt-3 px-4 py-2 bg-teal-700 text-white font-semibold text-sm rounded-[4px] hover:bg-teal-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {nameLoading ? 'Saving...' : 'Save Name'}
           </button>
@@ -197,21 +197,21 @@ export default function SettingsTab({
               type="checkbox"
               checked={notifEnabled}
               onChange={(e) => setNotifEnabled(e.target.checked)}
-              className="mt-0.5 h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+              className="mt-0.5 h-4 w-4 text-teal-700 border-gray-300 rounded focus:ring-teal-500"
             />
             <div>
               <span className="text-sm font-medium text-gray-700">
                 Email me when my review status changes
               </span>
               <p className="text-xs text-gray-500 mt-0.5">
-                Email notifications coming soon — your preference will be applied when enabled.
+                Email notifications coming soon â€” your preference will be applied when enabled.
               </p>
             </div>
           </label>
           <button
             type="submit"
             disabled={notifLoading}
-            className="mt-4 px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mt-4 px-4 py-2 bg-teal-700 text-white font-semibold text-sm rounded-[4px] hover:bg-teal-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {notifLoading ? 'Saving...' : 'Save Preferences'}
           </button>
@@ -265,7 +265,7 @@ export default function SettingsTab({
           <button
             type="submit"
             disabled={passwordLoading}
-            className="px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-teal-700 text-white font-semibold text-sm rounded-[4px] hover:bg-teal-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {passwordLoading ? 'Saving...' : hasPassword ? 'Change Password' : 'Set Password'}
           </button>
@@ -318,7 +318,7 @@ export default function SettingsTab({
             <button
               type="submit"
               disabled={emailLoading}
-              className="px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-teal-700 text-white font-semibold text-sm rounded-[4px] hover:bg-teal-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {emailLoading ? 'Saving...' : 'Change Email'}
             </button>

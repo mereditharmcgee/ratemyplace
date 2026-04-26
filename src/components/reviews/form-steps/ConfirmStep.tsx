@@ -91,10 +91,10 @@ export default function ConfirmStep({
 
   return (
     <div className="space-y-6">
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+      <div className="bg-amber-50 border border-amber-200 rounded-[6px] p-4">
         <div className="flex gap-3">
           <div className="shrink-0">
-            <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -114,7 +114,7 @@ export default function ConfirmStep({
                 type="checkbox"
                 checked={privacyAcknowledged}
                 onChange={(e) => onPrivacyChange(e.target.checked)}
-                className="mt-0.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+                className="mt-0.5 rounded border-amber-400 text-amber-700 focus:ring-amber-500"
               />
               <span className="text-sm text-amber-800">
                 I confirm this review reflects my honest personal experience and agree to the{' '}
@@ -132,9 +132,9 @@ export default function ConfirmStep({
         </div>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>}
+      {error && <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">{error}</div>}
 
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-white border border-gray-200 rounded-[6px] p-6">
         <h3 className="font-semibold text-gray-900 mb-4">Review Summary</h3>
 
         {building && (
@@ -183,7 +183,7 @@ export default function ConfirmStep({
         <button
           type="button"
           onClick={onBack}
-          className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          className="px-6 py-2 border border-gray-300 rounded-[6px] hover:bg-gray-50"
         >
           Back
         </button>
@@ -191,7 +191,7 @@ export default function ConfirmStep({
           type="button"
           onClick={onSubmit}
           disabled={loading || !privacyAcknowledged || !turnstileToken}
-          className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Submitting...' : 'Submit Review'}
         </button>

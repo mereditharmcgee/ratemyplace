@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getScoreTextColor } from '../../lib/scoring-colors';
 
 interface PropertyManager {
   id: string;
@@ -130,9 +131,7 @@ export default function ManagersTable() {
 
   const getScoreColor = (score: number | null) => {
     if (score === null) return 'text-gray-400';
-    if (score >= 4) return 'text-emerald-600';
-    if (score >= 3) return 'text-amber-600';
-    return 'text-red-600';
+    return getScoreTextColor(score);
   };
 
   const filteredManagers = managers.filter((manager) => {
@@ -153,7 +152,7 @@ export default function ManagersTable() {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
         {error}
       </div>
     );
@@ -174,13 +173,13 @@ export default function ManagersTable() {
         </div>
         <button
           onClick={fetchManagers}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-[6px] hover:bg-gray-200"
         >
           Refresh
         </button>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+          className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800"
         >
           + Add Manager
         </button>
@@ -253,13 +252,13 @@ export default function ManagersTable() {
             <button
               onClick={addManager}
               disabled={adding}
-              className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
             >
               {adding ? 'Creating...' : 'Create Manager'}
             </button>
             <button
               onClick={() => setShowAddForm(false)}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300"
             >
               Cancel
             </button>
@@ -269,23 +268,23 @@ export default function ManagersTable() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">{managers.length}</div>
           <div className="text-sm text-gray-500">Total Managers</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {managers.reduce((sum, m) => sum + m.building_count, 0)}
           </div>
           <div className="text-sm text-gray-500">Total Buildings</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {managers.reduce((sum, m) => sum + m.review_count, 0)}
           </div>
           <div className="text-sm text-gray-500">Total Reviews</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {managers.filter((m) => m.avg_score && m.avg_score >= 4).length}
           </div>
@@ -314,7 +313,7 @@ export default function ManagersTable() {
                     <p className="text-sm text-gray-600">{manager.company_name}</p>
                   )}
                   <p className="text-sm text-gray-500">
-                    {manager.building_count} buildings • {manager.review_count} reviews
+                    {manager.building_count} buildings â€¢ {manager.review_count} reviews
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
@@ -425,13 +424,13 @@ export default function ManagersTable() {
                       <button
                         onClick={() => saveManager(manager.id)}
                         disabled={saving}
-                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                        className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
                       >
                         {saving ? 'Saving...' : 'Save Changes'}
                       </button>
                       <button
                         onClick={cancelEditing}
-                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300"
                       >
                         Cancel
                       </button>
@@ -460,7 +459,7 @@ export default function ManagersTable() {
                                   href={manager.website}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-teal-600 hover:underline"
+                                  className="text-teal-700 hover:underline"
                                 >
                                   {manager.website}
                                 </a>
@@ -481,19 +480,19 @@ export default function ManagersTable() {
                     <div className="flex gap-2 pt-4 border-t border-gray-200">
                       <button
                         onClick={() => startEditing(manager)}
-                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium"
+                        className="px-4 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 text-sm font-semibold"
                       >
                         Edit Manager
                       </button>
                       <a
                         href={`/property-manager/${manager.slug}`}
-                        className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-sm font-medium"
+                        className="px-4 py-2 bg-slate-600 text-white rounded-[6px] hover:bg-slate-700 text-sm font-medium"
                       >
                         View Page
                       </a>
                       <a
                         href={`/admin/buildings?manager=${manager.id}`}
-                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300 text-sm font-medium"
                       >
                         View Buildings ({manager.building_count})
                       </a>

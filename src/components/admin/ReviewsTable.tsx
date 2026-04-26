@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getScoreColor as getScoreColorPair, getScoreTextColor } from '../../lib/scoring-colors';
 
 interface Review {
   id: string;
@@ -225,17 +226,11 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
     }
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 4) return 'text-emerald-600';
-    if (score >= 3) return 'text-amber-600';
-    return 'text-red-600';
-  };
+  const getScoreColor = (score: number) => getScoreTextColor(score);
 
   const getScoreBadgeColor = (score: number) => {
-    if (score >= 4) return 'bg-emerald-500 text-white';
-    if (score >= 3) return 'bg-amber-500 text-white';
-    if (score >= 2) return 'bg-orange-500 text-white';
-    return 'bg-red-500 text-white';
+    const c = getScoreColorPair(score);
+    return `${c.bg} ${c.text}`;
   };
 
   const formatScoreLabel = (key: string) => {
@@ -274,7 +269,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
         {error}
       </div>
     );
@@ -298,7 +293,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
                 statusFilter === status
                   ? 'bg-teal-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -343,7 +338,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                       {review.building_address}
                     </h3>
                     {review.is_verified ? (
-                      <span className="flex items-center gap-1 text-xs text-teal-600">
+                      <span className="flex items-center gap-1 text-xs text-teal-700">
                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
@@ -352,7 +347,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                     ) : null}
                   </div>
                   <p className="text-sm text-gray-500">
-                    {review.user_email} • {formatDate(review.created_at)}
+                    {review.user_email} â€¢ {formatDate(review.created_at)}
                   </p>
                   {review.review_title && (
                     <p className="text-sm text-gray-700 mt-1 truncate">
@@ -453,7 +448,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                   return (
                     <>
                       {/* Score Grid */}
-                      <div className="mb-4 p-3 bg-white rounded-lg border border-gray-200">
+                      <div className="mb-4 p-3 bg-white rounded-[6px] border border-gray-200">
                         <h4 className="text-sm font-medium text-gray-700 mb-3">Scores</h4>
                         {renderScoreRow(unitFields, 'Unit')}
                         {renderScoreRow(buildingFields, 'Building')}
@@ -461,7 +456,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                       </div>
 
                       {/* Written Content */}
-                      <div className="mb-4 p-3 bg-white rounded-lg border border-gray-200">
+                      <div className="mb-4 p-3 bg-white rounded-[6px] border border-gray-200">
                         <h4 className="text-sm font-medium text-gray-700 mb-2">Review Content</h4>
                         {detail.review_title && (
                           <p className="font-semibold text-gray-900 mb-1">"{detail.review_title}"</p>
@@ -478,7 +473,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                       </div>
 
                       {/* Metadata */}
-                      <div className="mb-4 p-3 bg-white rounded-lg border border-gray-200">
+                      <div className="mb-4 p-3 bg-white rounded-[6px] border border-gray-200">
                         <h4 className="text-sm font-medium text-gray-700 mb-2">Metadata</h4>
                         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                           <div className="flex justify-between col-span-1">
@@ -530,7 +525,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                           <button
                             onClick={(e) => { e.stopPropagation(); updateStatus(review.id, 'approved'); }}
                             disabled={processing === review.id}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+                            className="px-4 py-2 bg-green-600 text-white rounded-[6px] hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
                           >
                             {processing === review.id ? '...' : 'Approve'}
                           </button>
@@ -539,7 +534,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                           <button
                             onClick={(e) => { e.stopPropagation(); updateStatus(review.id, 'rejected'); }}
                             disabled={processing === review.id}
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 text-sm font-medium"
+                            className="px-4 py-2 bg-red-600 text-white rounded-[6px] hover:bg-red-700 disabled:opacity-50 text-sm font-medium"
                           >
                             {processing === review.id ? '...' : 'Reject'}
                           </button>
@@ -551,7 +546,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
 
                 {/* Landlord Linking Section */}
                 {review.landlord_name && (
-                  <div className="mb-4 p-3 rounded-lg border border-purple-200 bg-purple-50">
+                  <div className="mb-4 p-3 rounded-[6px] border border-purple-200 bg-purple-50">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <h4 className="text-sm font-medium text-purple-800">Tenant named landlord</h4>
@@ -573,7 +568,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                             e.stopPropagation();
                             startLinking(review.id, review.landlord_name);
                           }}
-                          className="shrink-0 px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
+                          className="shrink-0 px-3 py-1.5 bg-purple-600 text-white rounded-[6px] hover:bg-purple-700 text-sm font-medium"
                         >
                           Link Landlord
                         </button>
@@ -637,13 +632,13 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                           <button
                             onClick={() => linkLandlord(review)}
                             disabled={linkProcessing}
-                            className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm font-medium"
+                            className="px-3 py-1.5 bg-purple-600 text-white rounded-[6px] hover:bg-purple-700 disabled:opacity-50 text-sm font-medium"
                           >
                             {linkProcessing ? 'Linking...' : linkMode === 'create' ? 'Create & Link' : 'Link to Building'}
                           </button>
                           <button
                             onClick={() => { setLinkingReview(null); resetLinkForm(); }}
-                            className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
+                            className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300 text-sm"
                           >
                             Cancel
                           </button>
@@ -662,7 +657,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                         updateStatus(review.id, 'approved');
                       }}
                       disabled={processing === review.id}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+                      className="px-4 py-2 bg-green-600 text-white rounded-[6px] hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
                     >
                       {processing === review.id ? '...' : 'Approve'}
                     </button>
@@ -674,7 +669,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                         updateStatus(review.id, 'rejected');
                       }}
                       disabled={processing === review.id}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 text-sm font-medium"
+                      className="px-4 py-2 bg-red-600 text-white rounded-[6px] hover:bg-red-700 disabled:opacity-50 text-sm font-medium"
                     >
                       {processing === review.id ? '...' : 'Reject'}
                     </button>
@@ -686,7 +681,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                         updateStatus(review.id, 'flagged');
                       }}
                       disabled={processing === review.id}
-                      className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 text-sm font-medium"
+                      className="px-4 py-2 bg-orange-600 text-white rounded-[6px] hover:bg-orange-700 disabled:opacity-50 text-sm font-medium"
                     >
                       {processing === review.id ? '...' : 'Flag'}
                     </button>
@@ -698,21 +693,21 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                         updateStatus(review.id, 'pending');
                       }}
                       disabled={processing === review.id}
-                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 text-sm font-medium"
+                      className="px-4 py-2 bg-gray-600 text-white rounded-[6px] hover:bg-gray-700 disabled:opacity-50 text-sm font-medium"
                     >
                       {processing === review.id ? '...' : 'Reset to Pending'}
                     </button>
                   )}
                   <a
                     href={`/review/edit/${review.id}`}
-                    className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium"
+                    className="px-4 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 text-sm font-semibold"
                     onClick={(e) => e.stopPropagation()}
                   >
                     Edit Review
                   </a>
                   <a
                     href={`/building/${review.building_slug}`}
-                    className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-sm font-medium"
+                    className="px-4 py-2 bg-slate-600 text-white rounded-[6px] hover:bg-slate-700 text-sm font-medium"
                     onClick={(e) => e.stopPropagation()}
                   >
                     View Building

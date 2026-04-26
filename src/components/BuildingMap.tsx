@@ -262,7 +262,7 @@ export default function BuildingMap({
 
   if (error) {
     return (
-      <div className="w-full h-[500px] bg-gray-100 rounded-lg flex items-center justify-center">
+      <div className="w-full h-[500px] bg-gray-100 rounded-[6px] flex items-center justify-center">
         <div className="text-center text-gray-600">
           <p className="font-medium">Failed to load map</p>
           <p className="text-sm">{error}</p>
@@ -276,7 +276,7 @@ export default function BuildingMap({
       {/* Map container */}
       <div
         ref={mapRef}
-        className="w-full h-[500px] md:h-[600px] rounded-lg overflow-hidden"
+        className="w-full h-[500px] md:h-[600px] rounded-[6px] overflow-hidden"
       />
 
       {/* Loading overlay — z-20 to stay above Google Maps canvas */}

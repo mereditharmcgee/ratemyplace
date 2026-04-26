@@ -34,7 +34,7 @@ function BuildingCard({ building }: { building: Building }) {
   return (
     <a
       href={`/building/${building.slug}`}
-      className="block bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+      className="block bg-white border border-gray-200 rounded-[6px] p-6 hover:shadow-md transition-shadow"
     >
       <div className="flex justify-between items-start gap-4">
         <div className="min-w-0 flex-1">
@@ -65,7 +65,7 @@ function LandlordCard({ landlord }: { landlord: Landlord }) {
   return (
     <a
       href={`/landlord/${landlord.slug}`}
-      className="block bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+      className="block bg-white border border-gray-200 rounded-[6px] p-6 hover:shadow-md transition-shadow"
     >
       <div className="flex justify-between items-start gap-4">
         <div className="min-w-0 flex-1">
@@ -95,7 +95,7 @@ function LoadMoreButton({ onClick, loading }: { onClick: () => void; loading: bo
       <button
         onClick={onClick}
         disabled={loading}
-        className="px-6 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-6 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-[6px] hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? (
           <span className="flex items-center gap-2 justify-center">
@@ -171,13 +171,13 @@ export default function SearchResults({
   };
 
   const buildingIcon = (
-    <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-5 h-5 text-teal-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
     </svg>
   );
 
   const landlordIcon = (
-    <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-5 h-5 text-teal-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
     </svg>
   );
@@ -185,7 +185,7 @@ export default function SearchResults({
   return (
     <div>
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-[6px] text-sm text-red-700">
           {error}
         </div>
       )}

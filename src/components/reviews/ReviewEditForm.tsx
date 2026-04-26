@@ -191,9 +191,9 @@ export default function ReviewEditForm({ review }: Props) {
 
   const renderRatingScale = () => (
     <div className="flex justify-between items-center text-xs text-gray-500 mb-4 px-2">
-      <span className="text-red-600 font-medium">1 = Strongly Disagree</span>
+      <span className="text-red-700 font-medium">1 = Strongly Disagree</span>
       <span className="text-gray-400">3 = Neutral</span>
-      <span className="text-emerald-600 font-medium">5 = Strongly Agree</span>
+      <span className="text-emerald-700 font-medium">5 = Strongly Agree</span>
     </div>
   );
 
@@ -251,7 +251,7 @@ export default function ReviewEditForm({ review }: Props) {
 
   if (success) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+      <div className="bg-green-50 border border-green-200 rounded-[6px] p-6 text-center">
         <svg className="w-12 h-12 text-green-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
@@ -264,7 +264,7 @@ export default function ReviewEditForm({ review }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {/* Building Info (read-only) */}
-      <div className="bg-slate-50 p-4 rounded-lg">
+      <div className="bg-paper p-4 rounded-[6px]">
         <div className="font-medium text-gray-900">{review.building_address}</div>
         <div className="text-sm text-gray-500">
           {review.neighborhood && `${review.neighborhood}, `}{review.city}
@@ -276,7 +276,7 @@ export default function ReviewEditForm({ review }: Props) {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+        <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
           {error}
         </div>
       )}
@@ -372,7 +372,7 @@ export default function ReviewEditForm({ review }: Props) {
             {amenityOptions.map((amenity) => (
               <label
                 key={amenity.id}
-                className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
                   amenities.includes(amenity.id)
                     ? 'border-teal-500 bg-teal-50'
                     : 'border-gray-200 hover:bg-gray-50'
@@ -388,7 +388,7 @@ export default function ReviewEditForm({ review }: Props) {
                       setAmenities(amenities.filter((a) => a !== amenity.id));
                     }
                   }}
-                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                  className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
                 />
                 <span className="text-sm text-gray-700">{amenity.label}</span>
               </label>
@@ -404,7 +404,7 @@ export default function ReviewEditForm({ review }: Props) {
             {utilityOptions.map((utility) => (
               <label
                 key={utility.id}
-                className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
                   utilitiesIncluded.includes(utility.id)
                     ? 'border-teal-500 bg-teal-50'
                     : 'border-gray-200 hover:bg-gray-50'
@@ -420,7 +420,7 @@ export default function ReviewEditForm({ review }: Props) {
                       setUtilitiesIncluded(utilitiesIncluded.filter((u) => u !== utility.id));
                     }
                   }}
-                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                  className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
                 />
                 <span className="text-sm text-gray-700">{utility.label}</span>
               </label>
@@ -517,7 +517,7 @@ export default function ReviewEditForm({ review }: Props) {
           {petTypeOptions.map((pet) => (
             <label
               key={pet.id}
-              className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+              className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
                 petTypes.includes(pet.id) ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'
               }`}
             >
@@ -528,7 +528,7 @@ export default function ReviewEditForm({ review }: Props) {
                   if (e.target.checked) setPetTypes([...petTypes, pet.id]);
                   else setPetTypes(petTypes.filter((p) => p !== pet.id));
                 }}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
               />
               <span className="text-sm text-gray-700">{pet.label}</span>
             </label>
@@ -538,7 +538,7 @@ export default function ReviewEditForm({ review }: Props) {
 
       {/* Unit Ratings */}
       <div className="space-y-4">
-        <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+        <div className="bg-teal-50 border border-teal-200 rounded-[6px] p-4">
           <h3 className="font-semibold text-teal-800 mb-1">Rate Your Unit</h3>
           <p className="text-sm text-teal-700">
             Think about the unit you lived in. Rate how much you agree with each statement.
@@ -550,7 +550,7 @@ export default function ReviewEditForm({ review }: Props) {
 
       {/* Building Ratings */}
       <div className="space-y-4">
-        <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+        <div className="bg-teal-50 border border-teal-200 rounded-[6px] p-4">
           <h3 className="font-semibold text-teal-800 mb-1">Rate the Building</h3>
           <p className="text-sm text-teal-700">
             Think about the building as a whole. If something doesn't apply, select "N/A".
@@ -562,7 +562,7 @@ export default function ReviewEditForm({ review }: Props) {
 
       {/* Landlord Ratings */}
       <div className="space-y-4">
-        <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+        <div className="bg-teal-50 border border-teal-200 rounded-[6px] p-4">
           <h3 className="font-semibold text-teal-800 mb-1">Rate Your Landlord</h3>
           <p className="text-sm text-teal-700">
             Think about your landlord or property management.
@@ -591,7 +591,7 @@ export default function ReviewEditForm({ review }: Props) {
                 setHasSeparateManager(e.target.checked);
                 if (!e.target.checked) setPropertyManagerName('');
               }}
-              className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
             />
             <span className="text-sm text-gray-700">Someone else manages the property</span>
           </label>
@@ -623,7 +623,7 @@ export default function ReviewEditForm({ review }: Props) {
         <h3 className="text-lg font-semibold text-gray-900">Issues Experienced</h3>
         <div className="grid grid-cols-2 gap-4">
           <label
-            className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+            className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
               hadPestIssues ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:bg-gray-50'
             }`}
           >
@@ -634,7 +634,7 @@ export default function ReviewEditForm({ review }: Props) {
                 setHadPestIssues(e.target.checked);
                 if (!e.target.checked) setPestTypesExperienced([]);
               }}
-              className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+              className="rounded border-gray-300 text-red-700 focus:ring-red-500"
             />
             <span className="text-sm text-gray-700">Pest issues</span>
           </label>
@@ -674,7 +674,7 @@ export default function ReviewEditForm({ review }: Props) {
           ].map((issue) => (
             <label
               key={issue.label}
-              className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+              className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
                 issue.value ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:bg-gray-50'
               }`}
             >
@@ -682,7 +682,7 @@ export default function ReviewEditForm({ review }: Props) {
                 type="checkbox"
                 checked={issue.value}
                 onChange={(e) => issue.setter(e.target.checked)}
-                className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                className="rounded border-gray-300 text-red-700 focus:ring-red-500"
               />
               <span className="text-sm text-gray-700">{issue.label}</span>
             </label>
@@ -781,7 +781,7 @@ export default function ReviewEditForm({ review }: Props) {
                 type="radio"
                 checked={housingVouchers === opt.value}
                 onChange={() => setHousingVouchers(opt.value)}
-                className="text-teal-600 focus:ring-teal-500"
+                className="text-teal-700 focus:ring-teal-500"
               />
               <span>{opt.label}</span>
             </label>
@@ -801,7 +801,7 @@ export default function ReviewEditForm({ review }: Props) {
                 type="radio"
                 checked={safelyLit === opt.value}
                 onChange={() => setSafelyLit(opt.value)}
-                className="text-teal-600 focus:ring-teal-500"
+                className="text-teal-700 focus:ring-teal-500"
               />
               <span>{opt.label}</span>
             </label>
@@ -821,7 +821,7 @@ export default function ReviewEditForm({ review }: Props) {
                 type="radio"
                 checked={wouldRecommend === opt.value}
                 onChange={() => setWouldRecommend(opt.value)}
-                className="text-teal-600 focus:ring-teal-500"
+                className="text-teal-700 focus:ring-teal-500"
               />
               <span>{opt.label}</span>
             </label>
@@ -864,13 +864,13 @@ export default function ReviewEditForm({ review }: Props) {
       </div>
 
       {/* Consent Checkbox */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+      <div className="bg-amber-50 border border-amber-200 rounded-[6px] p-4">
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
             checked={consentAcknowledged}
             onChange={(e) => setConsentAcknowledged(e.target.checked)}
-            className="mt-0.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+            className="mt-0.5 rounded border-amber-400 text-amber-700 focus:ring-amber-500"
           />
           <span className="text-sm text-amber-800">
             I confirm this review reflects my honest personal experience and agree to the{' '}
@@ -890,14 +890,14 @@ export default function ReviewEditForm({ review }: Props) {
       <div className="flex gap-4 pt-4 border-t">
         <a
           href="/profile"
-          className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-center transition-colors"
+          className="flex-1 px-6 py-3 border border-gray-300 rounded-[6px] text-gray-700 hover:bg-gray-50 text-center transition-colors"
         >
           Cancel
         </a>
         <button
           type="submit"
           disabled={loading || !consentAcknowledged}
-          className="flex-1 px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 px-6 py-3 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? 'Saving...' : 'Save Changes'}
         </button>

@@ -60,9 +60,9 @@ export default function RatingItem({ item, value, onChange }: Props) {
 export function RatingScale() {
   return (
     <div className="flex justify-between items-center text-xs text-gray-500 mb-4 px-2">
-      <span className="text-red-600 font-medium">1 = Strongly Disagree</span>
+      <span className="text-red-700 font-medium">1 = Strongly Disagree</span>
       <span className="text-gray-400">3 = Neutral</span>
-      <span className="text-emerald-600 font-medium">5 = Strongly Agree</span>
+      <span className="text-emerald-700 font-medium">5 = Strongly Agree</span>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getScoreTextColor } from '../../lib/scoring-colors';
 
 interface Landlord {
   id: string;
@@ -159,9 +160,7 @@ export default function LandlordsTable() {
 
   const getScoreColor = (score: number | null) => {
     if (score === null) return 'text-gray-400';
-    if (score >= 4) return 'text-emerald-600';
-    if (score >= 3) return 'text-amber-600';
-    return 'text-red-600';
+    return getScoreTextColor(score);
   };
 
   const filteredLandlords = landlords.filter((landlord) => {
@@ -181,7 +180,7 @@ export default function LandlordsTable() {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
         {error}
       </div>
     );
@@ -202,13 +201,13 @@ export default function LandlordsTable() {
         </div>
         <button
           onClick={fetchLandlords}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-[6px] hover:bg-gray-200"
         >
           Refresh
         </button>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+          className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800"
         >
           + Add Landlord
         </button>
@@ -271,13 +270,13 @@ export default function LandlordsTable() {
             <button
               onClick={addLandlord}
               disabled={adding}
-              className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
             >
               {adding ? 'Creating...' : 'Create Landlord'}
             </button>
             <button
               onClick={() => setShowAddForm(false)}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300"
             >
               Cancel
             </button>
@@ -287,23 +286,23 @@ export default function LandlordsTable() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">{landlords.length}</div>
           <div className="text-sm text-gray-500">Total Landlords</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {landlords.reduce((sum, l) => sum + l.building_count, 0)}
           </div>
           <div className="text-sm text-gray-500">Total Buildings</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {landlords.reduce((sum, l) => sum + l.review_count, 0)}
           </div>
           <div className="text-sm text-gray-500">Total Reviews</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {landlords.filter((l) => l.avg_score && l.avg_score >= 4).length}
           </div>
@@ -329,10 +328,10 @@ export default function LandlordsTable() {
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-gray-900">{landlord.name}</h3>
                   <p className="text-sm text-gray-500">
-                    {landlord.building_count} buildings • {landlord.review_count} reviews
+                    {landlord.building_count} buildings â€¢ {landlord.review_count} reviews
                   </p>
                   {landlord.email && (
-                    <p className="text-sm text-teal-600 mt-1">{landlord.email}</p>
+                    <p className="text-sm text-teal-700 mt-1">{landlord.email}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-4">
@@ -430,13 +429,13 @@ export default function LandlordsTable() {
                       <button
                         onClick={() => saveLandlord(landlord.id)}
                         disabled={saving}
-                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                        className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
                       >
                         {saving ? 'Saving...' : 'Save Changes'}
                       </button>
                       <button
                         onClick={cancelEditing}
-                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300"
                       >
                         Cancel
                       </button>
@@ -465,7 +464,7 @@ export default function LandlordsTable() {
                                   href={landlord.website}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-teal-600 hover:underline"
+                                  className="text-teal-700 hover:underline"
                                 >
                                   {landlord.website}
                                 </a>
@@ -486,26 +485,26 @@ export default function LandlordsTable() {
                     <div className="flex gap-2 pt-4 border-t border-gray-200">
                       <button
                         onClick={() => startEditing(landlord)}
-                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium"
+                        className="px-4 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 text-sm font-semibold"
                       >
                         Edit Landlord
                       </button>
                       <a
                         href={`/landlord/${landlord.slug}`}
-                        className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-sm font-medium"
+                        className="px-4 py-2 bg-slate-600 text-white rounded-[6px] hover:bg-slate-700 text-sm font-medium"
                       >
                         View Page
                       </a>
                       <a
                         href={`/admin/buildings?landlord=${landlord.id}`}
-                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300 text-sm font-medium"
                       >
                         View Buildings ({landlord.building_count})
                       </a>
                       <button
                         onClick={() => deleteLandlord(landlord)}
                         disabled={deleting === landlord.id || landlord.building_count > 0}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-4 py-2 bg-red-600 text-white rounded-[6px] hover:bg-red-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                         title={landlord.building_count > 0 ? 'Remove all buildings first' : 'Delete landlord'}
                       >
                         {deleting === landlord.id ? 'Deleting...' : 'Delete'}
