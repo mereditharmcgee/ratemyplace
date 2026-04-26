@@ -180,7 +180,7 @@ export default function LandlordsTable() {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
         {error}
       </div>
     );
@@ -201,7 +201,7 @@ export default function LandlordsTable() {
         </div>
         <button
           onClick={fetchLandlords}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-[6px] hover:bg-gray-200"
         >
           Refresh
         </button>
@@ -276,7 +276,7 @@ export default function LandlordsTable() {
             </button>
             <button
               onClick={() => setShowAddForm(false)}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300"
             >
               Cancel
             </button>
@@ -286,23 +286,23 @@ export default function LandlordsTable() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">{landlords.length}</div>
           <div className="text-sm text-gray-500">Total Landlords</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {landlords.reduce((sum, l) => sum + l.building_count, 0)}
           </div>
           <div className="text-sm text-gray-500">Total Buildings</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {landlords.reduce((sum, l) => sum + l.review_count, 0)}
           </div>
           <div className="text-sm text-gray-500">Total Reviews</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {landlords.filter((l) => l.avg_score && l.avg_score >= 4).length}
           </div>
@@ -435,7 +435,7 @@ export default function LandlordsTable() {
                       </button>
                       <button
                         onClick={cancelEditing}
-                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300"
                       >
                         Cancel
                       </button>
@@ -491,20 +491,20 @@ export default function LandlordsTable() {
                       </button>
                       <a
                         href={`/landlord/${landlord.slug}`}
-                        className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-sm font-medium"
+                        className="px-4 py-2 bg-slate-600 text-white rounded-[6px] hover:bg-slate-700 text-sm font-medium"
                       >
                         View Page
                       </a>
                       <a
                         href={`/admin/buildings?landlord=${landlord.id}`}
-                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300 text-sm font-medium"
                       >
                         View Buildings ({landlord.building_count})
                       </a>
                       <button
                         onClick={() => deleteLandlord(landlord)}
                         disabled={deleting === landlord.id || landlord.building_count > 0}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-4 py-2 bg-red-600 text-white rounded-[6px] hover:bg-red-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                         title={landlord.building_count > 0 ? 'Remove all buildings first' : 'Delete landlord'}
                       >
                         {deleting === landlord.id ? 'Deleting...' : 'Delete'}

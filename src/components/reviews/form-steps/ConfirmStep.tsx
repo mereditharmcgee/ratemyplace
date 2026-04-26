@@ -91,7 +91,7 @@ export default function ConfirmStep({
 
   return (
     <div className="space-y-6">
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+      <div className="bg-amber-50 border border-amber-200 rounded-[6px] p-4">
         <div className="flex gap-3">
           <div className="shrink-0">
             <svg className="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -132,9 +132,9 @@ export default function ConfirmStep({
         </div>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>}
+      {error && <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">{error}</div>}
 
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-white border border-gray-200 rounded-[6px] p-6">
         <h3 className="font-semibold text-gray-900 mb-4">Review Summary</h3>
 
         {building && (
@@ -183,7 +183,7 @@ export default function ConfirmStep({
         <button
           type="button"
           onClick={onBack}
-          className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          className="px-6 py-2 border border-gray-300 rounded-[6px] hover:bg-gray-50"
         >
           Back
         </button>

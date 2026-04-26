@@ -29,7 +29,7 @@ export default function PostSubmitVerification({ reviewId }: Props) {
         <p className="text-teal-700 text-sm mb-3">
           Verified reviews display a trust badge and carry more weight in building scores. Upload proof of tenancy to get verified.
         </p>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-3">
+        <div className="bg-blue-50 border border-blue-200 rounded-[6px] px-3 py-2 mb-3">
           <p className="text-xs text-blue-800">
             <span className="font-medium">Accepted documents:</span> lease agreement, utility bill, rent receipt, or a piece of mail showing your name and this address.
           </p>

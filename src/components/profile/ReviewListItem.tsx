@@ -59,7 +59,7 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+    <div className="bg-white border border-gray-200 rounded-[6px] p-4 hover:shadow-md transition-shadow">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-gray-900 truncate">
@@ -101,7 +101,7 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
       </div>
 
       {!review.is_verified && (
-        <div className="mt-2 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
+        <div className="mt-2 flex items-center gap-2 bg-blue-50 rounded-[6px] px-3 py-2">
           <svg className="w-4 h-4 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
@@ -116,7 +116,7 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
       )}
 
       {review.status === 'rejected' && !review.has_open_dispute && (
-        <div className="mt-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+        <div className="mt-2 bg-red-50 border border-red-200 rounded-[6px] px-3 py-2">
           <p className="text-sm text-red-700">
             <span className="font-medium">Rejected:</span>{' '}
             {review.moderation_notes || 'No reason provided'}
@@ -133,7 +133,7 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
       <div className="mt-4 flex gap-2">
         <a
           href={`/review/edit/${review.id}`}
-          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-[6px] hover:bg-gray-200 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -143,7 +143,7 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
         {review.status === 'approved' && (
           <a
             href={`/building/${review.building_slug}`}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-teal-700 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-teal-700 bg-teal-50 rounded-[6px] hover:bg-teal-100 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />

@@ -102,7 +102,7 @@ export default function VerificationQueue() {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
         {error}
       </div>
     );
@@ -110,7 +110,7 @@ export default function VerificationQueue() {
 
   if (verifications.length === 0) {
     return (
-      <div className="bg-gray-50 rounded-lg p-8 text-center">
+      <div className="bg-gray-50 rounded-[6px] p-8 text-center">
         <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
@@ -138,7 +138,7 @@ export default function VerificationQueue() {
         {verifications.map((verification) => (
           <div
             key={verification.id}
-            className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm"
+            className="bg-white border border-gray-200 rounded-[6px] p-6 shadow-sm"
           >
             {/* Header */}
             <div className="flex justify-between items-start mb-4">
@@ -166,7 +166,7 @@ export default function VerificationQueue() {
                   <img
                     src={`/api/admin/verification/${verification.id}`}
                     alt="Verification document"
-                    className={`rounded-lg border border-gray-200 transition-all ${
+                    className={`rounded-[6px] border border-gray-200 transition-all ${
                       expandedImage === verification.id
                         ? 'max-h-[600px] w-auto'
                         : 'max-h-48 w-auto'
@@ -181,7 +181,7 @@ export default function VerificationQueue() {
                   href={`/api/admin/verification/${verification.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-[6px] hover:bg-gray-200 transition-colors"
                 >
                   <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
@@ -213,7 +213,7 @@ export default function VerificationQueue() {
               <button
                 onClick={() => handleApprove(verification.id)}
                 disabled={processing === verification.id}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-[6px] hover:bg-green-700 disabled:opacity-50 transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -223,7 +223,7 @@ export default function VerificationQueue() {
               <button
                 onClick={() => handleReject(verification.id)}
                 disabled={processing === verification.id}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-[6px] hover:bg-red-700 disabled:opacity-50 transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

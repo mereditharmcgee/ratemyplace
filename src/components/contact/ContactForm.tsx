@@ -73,7 +73,7 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
 
   if (submitted) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+      <div className="bg-green-50 border border-green-200 rounded-[6px] p-6">
         <div className="flex gap-3">
           <svg className="w-6 h-6 text-green-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

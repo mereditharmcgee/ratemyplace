@@ -286,7 +286,7 @@ export default function HomeSearch() {
 
         <button
           type="submit"
-          className="px-8 py-4 bg-amber-500 text-slate-900 font-semibold rounded-lg hover:bg-amber-400 transition-colors"
+          className="px-8 py-4 bg-amber-500 text-slate-900 font-semibold rounded-[6px] hover:bg-amber-400 transition-colors"
         >
           Search
         </button>

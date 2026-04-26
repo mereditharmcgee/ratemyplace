@@ -47,7 +47,7 @@ export default function BookmarkButton({ buildingId, initialSaved }: Props) {
         disabled={loading}
         aria-label={saved ? 'Remove from saved buildings' : 'Save building'}
         title={saved ? 'Remove from saved' : 'Save building'}
-        className={`p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+        className={`p-2 rounded-[6px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
           saved
             ? 'text-teal-700 hover:text-teal-700 hover:bg-teal-50'
             : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'

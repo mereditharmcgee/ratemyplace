@@ -62,14 +62,14 @@ function formatDate(unixTs: number): string {
     </div>
 
     {messages.length === 0 ? (
-      <div class="bg-white rounded-lg border border-gray-200 p-12 text-center">
+      <div class="bg-white rounded-[6px] border border-gray-200 p-12 text-center">
         <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
         </svg>
         <p class="text-gray-500">No contact messages yet.</p>
       </div>
     ) : (
-      <div class="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+      <div class="bg-white rounded-[6px] border border-gray-200 overflow-hidden shadow-sm">
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">

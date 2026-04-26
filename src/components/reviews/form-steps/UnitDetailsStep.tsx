@@ -19,7 +19,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
   return (
     <div className="space-y-6">
       {building && (
-        <div className="bg-paper p-4 rounded-lg mb-6">
+        <div className="bg-paper p-4 rounded-[6px] mb-6">
           <div className="font-medium">{building.address}</div>
           <div className="text-sm text-gray-500">
             {building.neighborhood && `${building.neighborhood}, `}
@@ -148,7 +148,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
           {amenityOptions.map((amenity) => (
             <label
               key={amenity.id}
-              className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+              className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
                 unitDetails.amenities.includes(amenity.id)
                   ? 'border-teal-500 bg-teal-50'
                   : 'border-gray-200 hover:bg-gray-50'
@@ -183,7 +183,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
           {utilityOptions.map((utility) => (
             <label
               key={utility.id}
-              className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+              className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
                 unitDetails.utilitiesIncluded.includes(utility.id)
                   ? 'border-teal-500 bg-teal-50'
                   : 'border-gray-200 hover:bg-gray-50'
@@ -298,7 +298,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
           {petTypeOptions.map((pet) => (
             <label
               key={pet.id}
-              className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+              className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
                 unitDetails.petTypes.includes(pet.id)
                   ? 'border-teal-500 bg-teal-50'
                   : 'border-gray-200 hover:bg-gray-50'

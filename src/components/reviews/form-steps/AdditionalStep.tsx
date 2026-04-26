@@ -267,7 +267,7 @@ export default function AdditionalStep({
         <button
           type="button"
           onClick={onBack}
-          className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          className="px-6 py-2 border border-gray-300 rounded-[6px] hover:bg-gray-50"
         >
           Back
         </button>

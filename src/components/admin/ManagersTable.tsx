@@ -152,7 +152,7 @@ export default function ManagersTable() {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
         {error}
       </div>
     );
@@ -173,7 +173,7 @@ export default function ManagersTable() {
         </div>
         <button
           onClick={fetchManagers}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-[6px] hover:bg-gray-200"
         >
           Refresh
         </button>
@@ -258,7 +258,7 @@ export default function ManagersTable() {
             </button>
             <button
               onClick={() => setShowAddForm(false)}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300"
             >
               Cancel
             </button>
@@ -268,23 +268,23 @@ export default function ManagersTable() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">{managers.length}</div>
           <div className="text-sm text-gray-500">Total Managers</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {managers.reduce((sum, m) => sum + m.building_count, 0)}
           </div>
           <div className="text-sm text-gray-500">Total Buildings</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {managers.reduce((sum, m) => sum + m.review_count, 0)}
           </div>
           <div className="text-sm text-gray-500">Total Reviews</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {managers.filter((m) => m.avg_score && m.avg_score >= 4).length}
           </div>
@@ -430,7 +430,7 @@ export default function ManagersTable() {
                       </button>
                       <button
                         onClick={cancelEditing}
-                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300"
                       >
                         Cancel
                       </button>
@@ -486,13 +486,13 @@ export default function ManagersTable() {
                       </button>
                       <a
                         href={`/property-manager/${manager.slug}`}
-                        className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-sm font-medium"
+                        className="px-4 py-2 bg-slate-600 text-white rounded-[6px] hover:bg-slate-700 text-sm font-medium"
                       >
                         View Page
                       </a>
                       <a
                         href={`/admin/buildings?manager=${manager.id}`}
-                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300 text-sm font-medium"
                       >
                         View Buildings ({manager.building_count})
                       </a>

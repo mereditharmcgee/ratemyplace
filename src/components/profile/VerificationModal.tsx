@@ -143,7 +143,7 @@ export default function VerificationModal({ reviewId, onClose, onSuccess }: Prop
           </p>
 
           {/* Privacy guidance */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-[6px] p-4 mb-6">
             <div className="flex gap-3">
               <svg className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -163,7 +163,7 @@ export default function VerificationModal({ reviewId, onClose, onSuccess }: Prop
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 text-red-700">
+            <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 mb-4 text-red-700">
               {error}
             </div>
           )}
@@ -175,7 +175,7 @@ export default function VerificationModal({ reviewId, onClose, onSuccess }: Prop
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+              className={`border-2 border-dashed rounded-[6px] p-8 text-center cursor-pointer transition-colors ${
                 dragOver
                   ? 'border-teal-500 bg-teal-50'
                   : 'border-gray-300 hover:border-teal-400 hover:bg-gray-50'
@@ -200,7 +200,7 @@ export default function VerificationModal({ reviewId, onClose, onSuccess }: Prop
             </div>
           ) : (
             /* Preview */
-            <div className="border border-gray-200 rounded-lg p-4">
+            <div className="border border-gray-200 rounded-[6px] p-4">
               <div className="flex items-start gap-4">
                 {preview ? (
                   <img
@@ -235,7 +235,7 @@ export default function VerificationModal({ reviewId, onClose, onSuccess }: Prop
           <div className="mt-6 flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-[6px] text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Cancel
             </button>

@@ -164,7 +164,7 @@ const pestLabels: Record<string, string> = {
 };
 ---
 
-<article class={`bg-white border border-gray-200 rounded-lg p-6${review.is_verified === 1 ? ' border-l-4 border-l-blue-400' : ''}`}>
+<article class={`bg-white border border-gray-200 rounded-[6px] p-6${review.is_verified === 1 ? ' border-l-4 border-l-blue-400' : ''}`}>
   <!-- Header -->
   <div class="flex justify-between items-start mb-4 gap-4">
     <div class="min-w-0 flex-1">
@@ -239,7 +239,7 @@ const pestLabels: Record<string, string> = {
 
   <!-- Score Breakdown Grid -->
   {(availableUnitScores.length > 0 || availableBuildingScores.length > 0 || availableLandlordScores.length > 0) && (
-    <div class="bg-gray-50 rounded-lg p-4 mb-4">
+    <div class="bg-gray-50 rounded-[6px] p-4 mb-4">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <!-- Unit Scores -->
         {availableUnitScores.length > 0 && (
@@ -322,7 +322,7 @@ const pestLabels: Record<string, string> = {
 
   <!-- Security Deposit Highlight -->
   {showDepositSection && (
-    <div class={`rounded-lg p-4 mb-4 border ${hasDepositIssues ? 'bg-amber-50 border-amber-300' : depositStatus?.bgColor || 'bg-gray-50 border-gray-200'}`}>
+    <div class={`rounded-[6px] p-4 mb-4 border ${hasDepositIssues ? 'bg-amber-50 border-amber-300' : depositStatus?.bgColor || 'bg-gray-50 border-gray-200'}`}>
       <div class="flex items-center gap-3">
         <div class="shrink-0">
           <svg class={`w-6 h-6 ${hasDepositIssues ? 'text-amber-700' : depositStatus?.color || 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -365,7 +365,7 @@ const pestLabels: Record<string, string> = {
 
   <!-- Amenities & Utilities -->
   {(amenities.length > 0 || utilitiesIncluded.length > 0 || review.laundry_type || review.parking_type) && (
-    <div class="bg-blue-50 rounded-lg p-4 mb-4">
+    <div class="bg-blue-50 rounded-[6px] p-4 mb-4">
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <!-- Utilities Included -->
         {utilitiesIncluded.length > 0 && (

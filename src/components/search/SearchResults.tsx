@@ -34,7 +34,7 @@ function BuildingCard({ building }: { building: Building }) {
   return (
     <a
       href={`/building/${building.slug}`}
-      className="block bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+      className="block bg-white border border-gray-200 rounded-[6px] p-6 hover:shadow-md transition-shadow"
     >
       <div className="flex justify-between items-start gap-4">
         <div className="min-w-0 flex-1">
@@ -65,7 +65,7 @@ function LandlordCard({ landlord }: { landlord: Landlord }) {
   return (
     <a
       href={`/landlord/${landlord.slug}`}
-      className="block bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+      className="block bg-white border border-gray-200 rounded-[6px] p-6 hover:shadow-md transition-shadow"
     >
       <div className="flex justify-between items-start gap-4">
         <div className="min-w-0 flex-1">
@@ -95,7 +95,7 @@ function LoadMoreButton({ onClick, loading }: { onClick: () => void; loading: bo
       <button
         onClick={onClick}
         disabled={loading}
-        className="px-6 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-6 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-[6px] hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? (
           <span className="flex items-center gap-2 justify-center">
@@ -185,7 +185,7 @@ export default function SearchResults({
   return (
     <div>
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-[6px] text-sm text-red-700">
           {error}
         </div>
       )}

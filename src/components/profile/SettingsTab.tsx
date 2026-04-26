@@ -145,7 +145,7 @@ export default function SettingsTab({
     }
   };
 
-  const sectionClass = 'bg-white rounded-lg border border-gray-200 p-6';
+  const sectionClass = 'bg-white rounded-[6px] border border-gray-200 p-6';
 
   const renderMessage = (msg: MessageState) => {
     if (!msg) return null;

@@ -277,7 +277,7 @@ export default function BuildingsTable() {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
         {error}
       </div>
     );
@@ -298,14 +298,14 @@ export default function BuildingsTable() {
         </div>
         <button
           onClick={fetchBuildings}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-[6px] hover:bg-gray-200"
         >
           Refresh
         </button>
         <button
           onClick={cleanupEmptyBuildings}
           disabled={cleaning}
-          className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 disabled:opacity-50"
+          className="px-4 py-2 bg-orange-100 text-orange-700 rounded-[6px] hover:bg-orange-200 disabled:opacity-50"
         >
           {cleaning ? 'Cleaning...' : 'Cleanup Empty Buildings'}
         </button>
@@ -313,23 +313,23 @@ export default function BuildingsTable() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">{buildings.length}</div>
           <div className="text-sm text-gray-500">Total Buildings</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {buildings.filter((b) => b.review_count > 0).length}
           </div>
           <div className="text-sm text-gray-500">With Reviews</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {buildings.filter((b) => b.landlord_id).length}
           </div>
           <div className="text-sm text-gray-500">With Landlords</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {buildings.reduce((sum, b) => sum + b.review_count, 0)}
           </div>
@@ -605,7 +605,7 @@ export default function BuildingsTable() {
                       </button>
                       <button
                         onClick={cancelEditing}
-                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300"
                       >
                         Cancel
                       </button>
@@ -718,7 +718,7 @@ export default function BuildingsTable() {
                         </h4>
                         <div className="space-y-2">
                           {enrichResult.results.map((r: any, i: number) => (
-                            <div key={i} className="bg-white border border-gray-200 rounded-lg p-3 text-sm">
+                            <div key={i} className="bg-white border border-gray-200 rounded-[6px] p-3 text-sm">
                               <div className="flex justify-between items-start mb-2">
                                 <div className="font-medium text-gray-900">{r.address}, {r.city}</div>
                                 <button
@@ -753,7 +753,7 @@ export default function BuildingsTable() {
 
                     {enrichResult && enrichResult.unsupported === true && expandedBuilding === building.id && (
                       <div className="mt-4 pt-4 border-t border-gray-200">
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                        <div className="bg-amber-50 border border-amber-200 rounded-[6px] p-3 text-sm text-amber-800">
                           {enrichResult.message}
                         </div>
                         <button
@@ -767,7 +767,7 @@ export default function BuildingsTable() {
 
                     {enrichResult && enrichResult.results?.length === 0 && !enrichResult.unsupported && expandedBuilding === building.id && (
                       <div className="mt-4 pt-4 border-t border-gray-200">
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                        <div className="bg-amber-50 border border-amber-200 rounded-[6px] p-3 text-sm text-amber-800">
                           {enrichResult.source
                             ? `No matching records found in ${enrichResult.source} for "${enrichResult.address}".`
                             : `No matching records found for "${enrichResult.address}".`}
@@ -796,20 +796,20 @@ export default function BuildingsTable() {
                       <button
                         onClick={() => enrichBuilding(building.id)}
                         disabled={enriching === building.id}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-[6px] hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
                       >
                         {enriching === building.id ? 'Researching...' : 'Auto-Research'}
                       </button>
                       <a
                         href={`/building/${building.slug}`}
-                        className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-sm font-medium"
+                        className="px-4 py-2 bg-slate-600 text-white rounded-[6px] hover:bg-slate-700 text-sm font-medium"
                       >
                         View Page
                       </a>
                       {building.landlord_id && (
                         <a
                           href={`/admin/landlords?id=${building.landlord_id}`}
-                          className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+                          className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300 text-sm font-medium"
                         >
                           View Landlord
                         </a>
@@ -817,7 +817,7 @@ export default function BuildingsTable() {
                       <button
                         onClick={() => deleteBuilding(building.id, building.address)}
                         disabled={deleting === building.id}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 text-sm font-medium ml-auto"
+                        className="px-4 py-2 bg-red-600 text-white rounded-[6px] hover:bg-red-700 disabled:opacity-50 text-sm font-medium ml-auto"
                       >
                         {deleting === building.id ? 'Deleting...' : 'Delete Building'}
                       </button>

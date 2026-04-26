@@ -251,7 +251,7 @@ export default function ReviewEditForm({ review }: Props) {
 
   if (success) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+      <div className="bg-green-50 border border-green-200 rounded-[6px] p-6 text-center">
         <svg className="w-12 h-12 text-green-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
@@ -264,7 +264,7 @@ export default function ReviewEditForm({ review }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {/* Building Info (read-only) */}
-      <div className="bg-paper p-4 rounded-lg">
+      <div className="bg-paper p-4 rounded-[6px]">
         <div className="font-medium text-gray-900">{review.building_address}</div>
         <div className="text-sm text-gray-500">
           {review.neighborhood && `${review.neighborhood}, `}{review.city}
@@ -276,7 +276,7 @@ export default function ReviewEditForm({ review }: Props) {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+        <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
           {error}
         </div>
       )}
@@ -372,7 +372,7 @@ export default function ReviewEditForm({ review }: Props) {
             {amenityOptions.map((amenity) => (
               <label
                 key={amenity.id}
-                className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
                   amenities.includes(amenity.id)
                     ? 'border-teal-500 bg-teal-50'
                     : 'border-gray-200 hover:bg-gray-50'
@@ -404,7 +404,7 @@ export default function ReviewEditForm({ review }: Props) {
             {utilityOptions.map((utility) => (
               <label
                 key={utility.id}
-                className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
                   utilitiesIncluded.includes(utility.id)
                     ? 'border-teal-500 bg-teal-50'
                     : 'border-gray-200 hover:bg-gray-50'
@@ -517,7 +517,7 @@ export default function ReviewEditForm({ review }: Props) {
           {petTypeOptions.map((pet) => (
             <label
               key={pet.id}
-              className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+              className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
                 petTypes.includes(pet.id) ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'
               }`}
             >
@@ -538,7 +538,7 @@ export default function ReviewEditForm({ review }: Props) {
 
       {/* Unit Ratings */}
       <div className="space-y-4">
-        <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+        <div className="bg-teal-50 border border-teal-200 rounded-[6px] p-4">
           <h3 className="font-semibold text-teal-800 mb-1">Rate Your Unit</h3>
           <p className="text-sm text-teal-700">
             Think about the unit you lived in. Rate how much you agree with each statement.
@@ -550,7 +550,7 @@ export default function ReviewEditForm({ review }: Props) {
 
       {/* Building Ratings */}
       <div className="space-y-4">
-        <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+        <div className="bg-teal-50 border border-teal-200 rounded-[6px] p-4">
           <h3 className="font-semibold text-teal-800 mb-1">Rate the Building</h3>
           <p className="text-sm text-teal-700">
             Think about the building as a whole. If something doesn't apply, select "N/A".
@@ -562,7 +562,7 @@ export default function ReviewEditForm({ review }: Props) {
 
       {/* Landlord Ratings */}
       <div className="space-y-4">
-        <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+        <div className="bg-teal-50 border border-teal-200 rounded-[6px] p-4">
           <h3 className="font-semibold text-teal-800 mb-1">Rate Your Landlord</h3>
           <p className="text-sm text-teal-700">
             Think about your landlord or property management.
@@ -623,7 +623,7 @@ export default function ReviewEditForm({ review }: Props) {
         <h3 className="text-lg font-semibold text-gray-900">Issues Experienced</h3>
         <div className="grid grid-cols-2 gap-4">
           <label
-            className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+            className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
               hadPestIssues ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:bg-gray-50'
             }`}
           >
@@ -674,7 +674,7 @@ export default function ReviewEditForm({ review }: Props) {
           ].map((issue) => (
             <label
               key={issue.label}
-              className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+              className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
                 issue.value ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:bg-gray-50'
               }`}
             >
@@ -864,7 +864,7 @@ export default function ReviewEditForm({ review }: Props) {
       </div>
 
       {/* Consent Checkbox */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+      <div className="bg-amber-50 border border-amber-200 rounded-[6px] p-4">
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
@@ -890,7 +890,7 @@ export default function ReviewEditForm({ review }: Props) {
       <div className="flex gap-4 pt-4 border-t">
         <a
           href="/profile"
-          className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-center transition-colors"
+          className="flex-1 px-6 py-3 border border-gray-300 rounded-[6px] text-gray-700 hover:bg-gray-50 text-center transition-colors"
         >
           Cancel
         </a>

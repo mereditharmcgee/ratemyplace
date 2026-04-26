@@ -215,7 +215,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Profile Header */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
+      <div className="bg-white rounded-[6px] border border-gray-200 p-6 mb-8">
         <div className="flex items-center gap-4">
           <AvatarWithFallback
             avatarUrl={avatarUrl}
@@ -231,7 +231,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
       </div>
 
       {/* Email Verification Status */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+      <div className="bg-white rounded-[6px] border border-gray-200 p-6 mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Email Verification</h3>
 
         {emailVerified ? (
@@ -340,11 +340,11 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
             </div>
           ) : error ? (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+            <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
               {error}
             </div>
           ) : reviews.length === 0 ? (
-            <div className="bg-gray-50 rounded-lg p-8 text-center">
+            <div className="bg-gray-50 rounded-[6px] p-8 text-center">
               <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
@@ -381,11 +381,11 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
             </div>
           ) : savedError ? (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+            <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
               {savedError}
             </div>
           ) : savedBuildings.length === 0 ? (
-            <div className="bg-gray-50 rounded-lg p-8 text-center">
+            <div className="bg-gray-50 rounded-[6px] p-8 text-center">
               <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
               </svg>
@@ -405,7 +405,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
               {savedBuildings.map((building) => (
                 <div
                   key={building.building_id}
-                  className="bg-white rounded-lg border border-gray-200 p-4 flex items-start justify-between gap-4"
+                  className="bg-white rounded-[6px] border border-gray-200 p-4 flex items-start justify-between gap-4"
                 >
                   <div className="flex-1 min-w-0">
                     <a

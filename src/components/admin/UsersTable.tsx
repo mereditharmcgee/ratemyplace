@@ -101,7 +101,7 @@ export default function UsersTable({ currentUserId }: Props) {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
         {error}
       </div>
     );
@@ -123,7 +123,7 @@ export default function UsersTable({ currentUserId }: Props) {
         <div className="flex gap-2">
           <button
             onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               filter === 'all'
                 ? 'bg-teal-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -133,7 +133,7 @@ export default function UsersTable({ currentUserId }: Props) {
           </button>
           <button
             onClick={() => setFilter('admin')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               filter === 'admin'
                 ? 'bg-teal-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -143,7 +143,7 @@ export default function UsersTable({ currentUserId }: Props) {
           </button>
           <button
             onClick={() => setFilter('verified')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               filter === 'verified'
                 ? 'bg-teal-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'

@@ -26,14 +26,14 @@ export default function AddressStep({ selectedPlace, loading, error, onPlaceSele
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+        <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
           {error}
         </div>
       )}
 
       {selectedPlace && (
         <div className="space-y-4">
-          <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+          <div className="bg-teal-50 border border-teal-200 rounded-[6px] p-4">
             <div className="flex items-start gap-3">
               <div className="shrink-0 mt-0.5">
                 <svg className="w-5 h-5 text-teal-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
