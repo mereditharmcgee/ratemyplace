@@ -1,0 +1,51 @@
+---
+interface Props {
+  moveInSeason?: string | null;
+  moveInYear?: number | string | null;
+  moveOutSeason?: string | null;
+  moveOutYear?: number | string | null;
+  isCurrentTenant?: boolean;
+  class?: string;
+}
+
+const {
+  moveInSeason,
+  moveInYear,
+  moveOutSeason,
+  moveOutYear,
+  isCurrentTenant = false,
+  class: className = '',
+} = Astro.props;
+
+const seasonLabels: Record<string, string> = {
+  winter: 'Winter',
+  spring: 'Spring',
+  summer: 'Summer',
+  fall: 'Fall',
+};
+
+function formatDate(season?: string | null, year?: number | string | null): string | null {
+  if (!season || !year) return null;
+  const label = seasonLabels[season.toLowerCase()] || season;
+  return `${label} ${year}`;
+}
+
+const moveIn = formatDate(moveInSeason, moveInYear);
+const moveOutFormatted = formatDate(moveOutSeason, moveOutYear);
+const moveOut = isCurrentTenant
+  ? 'Current'
+  : moveOutFormatted ?? (moveOutYear ? String(moveOutYear) : null);
+
+const display =
+  moveIn && moveOut ? `${moveIn} · ${moveOut}` :
+  moveIn ?? moveOut ?? null;
+---
+
+{display && (
+  <span class:list={[
+    'inline-block border border-slate-900 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-900 rounded-[2px]',
+    className,
+  ]}>
+    {display}
+  </span>
+)}

@@ -2,6 +2,7 @@
 import StarRating from '../ratings/StarRating.astro';
 import VerifiedBadge from '../ui/VerifiedBadge.astro';
 import EmailVerifiedBadge from '../ui/EmailVerifiedBadge.astro';
+import SeasonChip from '../ui/SeasonChip.astro';
 import { formatRecency } from '../../lib/privacy';
 import { calculateDomainScores, ITEM_WEIGHTS } from '../../lib/scoring';
 import { getScoreTextColor } from '../../lib/scoring-colors';
@@ -204,6 +205,13 @@ const pestLabels: Record<string, string> = {
     </div>
     <div class="text-right text-sm text-gray-500 flex-shrink-0">
       <p class="font-medium text-gray-700">{unitDisplay}</p>
+      <SeasonChip
+        moveInSeason={review.move_in_season}
+        moveInYear={review.move_in_year}
+        moveOutYear={review.move_out_year_new || review.move_out_year}
+        isCurrentTenant={review.is_current_tenant === 1 || review.move_out_year_new === 'current'}
+        class="my-1"
+      />
       <p>{recencyLabel}</p>
       {review.rent_amount && (
         <p class="text-teal-700 font-medium">${review.rent_amount.toLocaleString()}/mo</p>
