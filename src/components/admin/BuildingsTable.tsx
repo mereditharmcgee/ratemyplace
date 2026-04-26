@@ -360,7 +360,7 @@ export default function BuildingsTable() {
                       .join(', ') || 'No location'}
                   </p>
                   {building.landlord_name && (
-                    <p className="text-sm text-teal-600 mt-1">
+                    <p className="text-sm text-teal-700 mt-1">
                       Landlord: {building.landlord_name}
                     </p>
                   )}
@@ -691,7 +691,7 @@ export default function BuildingsTable() {
                             <div className="flex justify-between">
                               <dt className="text-gray-500">Website:</dt>
                               <dd className="text-gray-900">
-                                <a href={building.owner_website} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">
+                                <a href={building.owner_website} target="_blank" rel="noopener noreferrer" className="text-teal-700 hover:underline">
                                   {building.owner_website.replace(/^https?:\/\//, '')}
                                 </a>
                               </dd>
@@ -713,7 +713,7 @@ export default function BuildingsTable() {
                         <h4 className="text-sm font-medium text-gray-700 mb-2">
                           {enrichResult.source ? `${enrichResult.source} Results` : 'Auto-Research Results'}
                           {enrichResult.fuzzyMatch && (
-                            <span className="ml-2 text-xs text-amber-600 font-normal">(fuzzy match)</span>
+                            <span className="ml-2 text-xs text-amber-700 font-normal">(fuzzy match)</span>
                           )}
                         </h4>
                         <div className="space-y-2">
@@ -772,7 +772,7 @@ export default function BuildingsTable() {
                             ? `No matching records found in ${enrichResult.source} for "${enrichResult.address}".`
                             : `No matching records found for "${enrichResult.address}".`}
                           {enrichResult.searchedFor && (
-                            <span className="text-xs block mt-1 text-amber-600">
+                            <span className="text-xs block mt-1 text-amber-700">
                               Searched: #{enrichResult.searchedFor.number} {enrichResult.searchedFor.street}
                             </span>
                           )}

@@ -191,9 +191,9 @@ export default function ReviewEditForm({ review }: Props) {
 
   const renderRatingScale = () => (
     <div className="flex justify-between items-center text-xs text-gray-500 mb-4 px-2">
-      <span className="text-red-600 font-medium">1 = Strongly Disagree</span>
+      <span className="text-red-700 font-medium">1 = Strongly Disagree</span>
       <span className="text-gray-400">3 = Neutral</span>
-      <span className="text-emerald-600 font-medium">5 = Strongly Agree</span>
+      <span className="text-emerald-700 font-medium">5 = Strongly Agree</span>
     </div>
   );
 
@@ -388,7 +388,7 @@ export default function ReviewEditForm({ review }: Props) {
                       setAmenities(amenities.filter((a) => a !== amenity.id));
                     }
                   }}
-                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                  className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
                 />
                 <span className="text-sm text-gray-700">{amenity.label}</span>
               </label>
@@ -420,7 +420,7 @@ export default function ReviewEditForm({ review }: Props) {
                       setUtilitiesIncluded(utilitiesIncluded.filter((u) => u !== utility.id));
                     }
                   }}
-                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                  className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
                 />
                 <span className="text-sm text-gray-700">{utility.label}</span>
               </label>
@@ -528,7 +528,7 @@ export default function ReviewEditForm({ review }: Props) {
                   if (e.target.checked) setPetTypes([...petTypes, pet.id]);
                   else setPetTypes(petTypes.filter((p) => p !== pet.id));
                 }}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
               />
               <span className="text-sm text-gray-700">{pet.label}</span>
             </label>
@@ -591,7 +591,7 @@ export default function ReviewEditForm({ review }: Props) {
                 setHasSeparateManager(e.target.checked);
                 if (!e.target.checked) setPropertyManagerName('');
               }}
-              className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
             />
             <span className="text-sm text-gray-700">Someone else manages the property</span>
           </label>
@@ -634,7 +634,7 @@ export default function ReviewEditForm({ review }: Props) {
                 setHadPestIssues(e.target.checked);
                 if (!e.target.checked) setPestTypesExperienced([]);
               }}
-              className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+              className="rounded border-gray-300 text-red-700 focus:ring-red-500"
             />
             <span className="text-sm text-gray-700">Pest issues</span>
           </label>
@@ -682,7 +682,7 @@ export default function ReviewEditForm({ review }: Props) {
                 type="checkbox"
                 checked={issue.value}
                 onChange={(e) => issue.setter(e.target.checked)}
-                className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                className="rounded border-gray-300 text-red-700 focus:ring-red-500"
               />
               <span className="text-sm text-gray-700">{issue.label}</span>
             </label>
@@ -781,7 +781,7 @@ export default function ReviewEditForm({ review }: Props) {
                 type="radio"
                 checked={housingVouchers === opt.value}
                 onChange={() => setHousingVouchers(opt.value)}
-                className="text-teal-600 focus:ring-teal-500"
+                className="text-teal-700 focus:ring-teal-500"
               />
               <span>{opt.label}</span>
             </label>
@@ -801,7 +801,7 @@ export default function ReviewEditForm({ review }: Props) {
                 type="radio"
                 checked={safelyLit === opt.value}
                 onChange={() => setSafelyLit(opt.value)}
-                className="text-teal-600 focus:ring-teal-500"
+                className="text-teal-700 focus:ring-teal-500"
               />
               <span>{opt.label}</span>
             </label>
@@ -821,7 +821,7 @@ export default function ReviewEditForm({ review }: Props) {
                 type="radio"
                 checked={wouldRecommend === opt.value}
                 onChange={() => setWouldRecommend(opt.value)}
-                className="text-teal-600 focus:ring-teal-500"
+                className="text-teal-700 focus:ring-teal-500"
               />
               <span>{opt.label}</span>
             </label>
@@ -870,7 +870,7 @@ export default function ReviewEditForm({ review }: Props) {
             type="checkbox"
             checked={consentAcknowledged}
             onChange={(e) => setConsentAcknowledged(e.target.checked)}
-            className="mt-0.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+            className="mt-0.5 rounded border-amber-400 text-amber-700 focus:ring-amber-500"
           />
           <span className="text-sm text-amber-800">
             I confirm this review reflects my honest personal experience and agree to the{' '}

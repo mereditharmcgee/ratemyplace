@@ -71,7 +71,7 @@ export default function HomeSearch() {
     }
   }, [sessionToken]);
 
-  // DB search — fires first. If < 3 results, triggers Google fallback.
+  // DB search â€” fires first. If < 3 results, triggers Google fallback.
   // No race condition: Google is called from the DB response callback, not a separate timer.
   const fetchDbResults = useCallback(async (input: string) => {
     if (input.length < 2) {
@@ -94,7 +94,7 @@ export default function HomeSearch() {
       }
     } catch {
       setDbResults([]);
-      // DB failed — try Google as fallback
+      // DB failed â€” try Google as fallback
       if (input.length >= 3) {
         fetchGoogleResults(input);
       }
@@ -130,7 +130,7 @@ export default function HomeSearch() {
       const { type, slug } = item.data;
       window.location.href = `/${type === 'building' ? 'building' : 'landlord'}/${slug}`;
     } else {
-      // Google result — check if building exists in DB, otherwise go to search
+      // Google result â€” check if building exists in DB, otherwise go to search
       setInputValue(item.data.description);
       try {
         const params = new URLSearchParams({ placeId: item.data.placeId });
@@ -211,7 +211,7 @@ export default function HomeSearch() {
           />
           {isLoading && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <svg className="animate-spin h-5 w-5 text-teal-600" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin h-5 w-5 text-teal-700" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>

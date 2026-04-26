@@ -114,7 +114,7 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
           className={fieldErrors.name ? errorInputClass : inputClass}
         />
         {fieldErrors.name && (
-          <p className="mt-1 text-sm text-red-600">{fieldErrors.name}</p>
+          <p className="mt-1 text-sm text-red-700">{fieldErrors.name}</p>
         )}
       </div>
 
@@ -131,7 +131,7 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
           className={fieldErrors.email ? errorInputClass : inputClass}
         />
         {fieldErrors.email && (
-          <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
+          <p className="mt-1 text-sm text-red-700">{fieldErrors.email}</p>
         )}
       </div>
 
@@ -166,7 +166,7 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
           className={fieldErrors.message ? errorInputClass : inputClass}
         />
         {fieldErrors.message && (
-          <p className="mt-1 text-sm text-red-600">{fieldErrors.message}</p>
+          <p className="mt-1 text-sm text-red-700">{fieldErrors.message}</p>
         )}
         <p className="mt-1 text-xs text-gray-500">At least 10 characters, max 3000.</p>
       </div>

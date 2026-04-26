@@ -328,10 +328,10 @@ export default function LandlordsTable() {
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-gray-900">{landlord.name}</h3>
                   <p className="text-sm text-gray-500">
-                    {landlord.building_count} buildings • {landlord.review_count} reviews
+                    {landlord.building_count} buildings â€¢ {landlord.review_count} reviews
                   </p>
                   {landlord.email && (
-                    <p className="text-sm text-teal-600 mt-1">{landlord.email}</p>
+                    <p className="text-sm text-teal-700 mt-1">{landlord.email}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-4">
@@ -464,7 +464,7 @@ export default function LandlordsTable() {
                                   href={landlord.website}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-teal-600 hover:underline"
+                                  className="text-teal-700 hover:underline"
                                 >
                                   {landlord.website}
                                 </a>

@@ -49,7 +49,7 @@ export default function BookmarkButton({ buildingId, initialSaved }: Props) {
         title={saved ? 'Remove from saved' : 'Save building'}
         className={`p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
           saved
-            ? 'text-teal-600 hover:text-teal-700 hover:bg-teal-50'
+            ? 'text-teal-700 hover:text-teal-700 hover:bg-teal-50'
             : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
         }`}
       >

@@ -225,7 +225,7 @@ export default function DisputesQueue() {
                       </h3>
                     </div>
                     <p className="text-sm text-gray-500">
-                      {dispute.landlord_name} • {formatDate(dispute.created_at)}
+                      {dispute.landlord_name} â€¢ {formatDate(dispute.created_at)}
                     </p>
                     <p className="text-sm text-gray-700 mt-1 truncate">
                       {reasonSnippet}
@@ -363,7 +363,7 @@ export default function DisputesQueue() {
                             href={`/review/edit/${dispute.review_id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700 font-medium"
+                            className="inline-flex items-center gap-1 text-sm text-teal-700 hover:text-teal-700 font-medium"
                           >
                             View full review
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

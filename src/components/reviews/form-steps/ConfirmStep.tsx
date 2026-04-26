@@ -94,7 +94,7 @@ export default function ConfirmStep({
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
         <div className="flex gap-3">
           <div className="shrink-0">
-            <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -114,7 +114,7 @@ export default function ConfirmStep({
                 type="checkbox"
                 checked={privacyAcknowledged}
                 onChange={(e) => onPrivacyChange(e.target.checked)}
-                className="mt-0.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+                className="mt-0.5 rounded border-amber-400 text-amber-700 focus:ring-amber-500"
               />
               <span className="text-sm text-amber-800">
                 I confirm this review reflects my honest personal experience and agree to the{' '}

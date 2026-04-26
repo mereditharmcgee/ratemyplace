@@ -222,7 +222,7 @@ export default function UsersTable({ currentUserId }: Props) {
                         user.id === currentUserId
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           : user.is_admin
-                          ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                          ? 'bg-red-50 text-red-700 hover:bg-red-100'
                           : 'bg-purple-50 text-purple-600 hover:bg-purple-100'
                       }`}
                     >

@@ -50,7 +50,7 @@ export function HelpTooltip({ help, dimension }: HelpTooltipProps) {
         ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="ml-1.5 text-gray-400 hover:text-teal-600 focus:outline-none focus:text-teal-600 transition-colors"
+        className="ml-1.5 text-gray-400 hover:text-teal-700 focus:outline-none focus:text-teal-700 transition-colors"
         aria-label={`Help for ${dimension}`}
         aria-expanded={isOpen}
       >

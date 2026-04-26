@@ -150,7 +150,7 @@ export default function SettingsTab({
   const renderMessage = (msg: MessageState) => {
     if (!msg) return null;
     return (
-      <p className={`mt-3 text-sm ${msg.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+      <p className={`mt-3 text-sm ${msg.type === 'success' ? 'text-green-600' : 'text-red-700'}`}>
         {msg.text}
       </p>
     );
@@ -197,14 +197,14 @@ export default function SettingsTab({
               type="checkbox"
               checked={notifEnabled}
               onChange={(e) => setNotifEnabled(e.target.checked)}
-              className="mt-0.5 h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+              className="mt-0.5 h-4 w-4 text-teal-700 border-gray-300 rounded focus:ring-teal-500"
             />
             <div>
               <span className="text-sm font-medium text-gray-700">
                 Email me when my review status changes
               </span>
               <p className="text-xs text-gray-500 mt-0.5">
-                Email notifications coming soon — your preference will be applied when enabled.
+                Email notifications coming soon â€” your preference will be applied when enabled.
               </p>
             </div>
           </label>

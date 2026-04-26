@@ -128,7 +128,7 @@ export default function VerificationQueue() {
         </h2>
         <button
           onClick={fetchVerifications}
-          className="text-sm text-teal-600 hover:text-teal-700"
+          className="text-sm text-teal-700 hover:text-teal-700"
         >
           Refresh
         </button>

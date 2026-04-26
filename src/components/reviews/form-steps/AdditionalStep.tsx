@@ -78,7 +78,7 @@ export default function AdditionalStep({
               hasSeparateManager: e.target.checked,
               propertyManagerName: e.target.checked ? review.propertyManagerName : '',
             })}
-            className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+            className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
           />
           <span className="text-sm text-gray-700">Someone else manages the property</span>
         </label>
@@ -112,7 +112,7 @@ export default function AdditionalStep({
                 type="radio"
                 checked={review.housingVouchers === opt.value}
                 onChange={() => onReviewChange({ ...review, housingVouchers: opt.value })}
-                className="text-teal-600 focus:ring-teal-500"
+                className="text-teal-700 focus:ring-teal-500"
               />
               <span>{opt.label}</span>
             </label>
@@ -131,7 +131,7 @@ export default function AdditionalStep({
                 type="radio"
                 checked={review.safelyLit === opt.value}
                 onChange={() => onReviewChange({ ...review, safelyLit: opt.value })}
-                className="text-teal-600 focus:ring-teal-500"
+                className="text-teal-700 focus:ring-teal-500"
               />
               <span>{opt.label}</span>
             </label>
@@ -150,7 +150,7 @@ export default function AdditionalStep({
                 type="radio"
                 checked={review.wouldRecommend === opt.value}
                 onChange={() => onReviewChange({ ...review, wouldRecommend: opt.value })}
-                className="text-teal-600 focus:ring-teal-500"
+                className="text-teal-700 focus:ring-teal-500"
               />
               <span>{opt.label}</span>
             </label>
@@ -172,7 +172,7 @@ export default function AdditionalStep({
                 hadPestIssues: e.target.checked,
                 pestTypesExperienced: e.target.checked ? review.pestTypesExperienced : [],
               })}
-              className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
             />
             <span className="text-sm text-gray-700">Pest issues (roaches, mice, rats, bedbugs, etc.)</span>
           </label>
@@ -220,7 +220,7 @@ export default function AdditionalStep({
                 type="checkbox"
                 checked={review[issue.key]}
                 onChange={(e) => onReviewChange({ ...review, [issue.key]: e.target.checked })}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
               />
               <span className="text-sm text-gray-700">{issue.label}</span>
             </label>

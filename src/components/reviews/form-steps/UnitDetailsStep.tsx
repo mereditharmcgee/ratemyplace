@@ -167,7 +167,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
                     });
                   }
                 }}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
               />
               <span className="text-sm text-gray-700">{amenity.label}</span>
             </label>
@@ -205,7 +205,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
                     });
                   }
                 }}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
               />
               <span className="text-sm text-gray-700">{utility.label}</span>
             </label>
@@ -317,7 +317,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
                     });
                   }
                 }}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
               />
               <span className="text-sm text-gray-700">{pet.label}</span>
             </label>

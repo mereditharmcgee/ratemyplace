@@ -104,7 +104,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
   };
 
   const fetchSavedBuildings = async () => {
-    if (savedLoaded) return; // Cache — only fetch once
+    if (savedLoaded) return; // Cache â€” only fetch once
     try {
       setSavedLoading(true);
       const response = await fetch('/api/buildings/saved');
@@ -124,7 +124,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
   };
 
   const fetchNotifications = async () => {
-    if (notificationsLoaded) return; // Cache — only fetch once
+    if (notificationsLoaded) return; // Cache â€” only fetch once
     try {
       setNotificationsLoading(true);
       const response = await fetch('/api/notifications');
@@ -243,7 +243,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
           </div>
         ) : (
           <div>
-            <div className="flex items-center gap-3 text-amber-600 mb-4">
+            <div className="flex items-center gap-3 text-amber-700 mb-4">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
@@ -263,7 +263,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             </button>
 
             {resendMessage && (
-              <p className={`mt-3 text-sm ${resendMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`mt-3 text-sm ${resendMessage.type === 'success' ? 'text-green-600' : 'text-red-700'}`}>
                 {resendMessage.text}
               </p>
             )}
@@ -278,7 +278,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             onClick={() => handleTabSwitch('reviews')}
             className={`py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'reviews'
-                ? 'border-teal-600 text-teal-600'
+                ? 'border-teal-600 text-teal-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -288,7 +288,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             onClick={() => handleTabSwitch('saved')}
             className={`py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'saved'
-                ? 'border-teal-600 text-teal-600'
+                ? 'border-teal-600 text-teal-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -298,7 +298,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             onClick={() => handleTabSwitch('notifications')}
             className={`py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'notifications'
-                ? 'border-teal-600 text-teal-600'
+                ? 'border-teal-600 text-teal-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -308,7 +308,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             onClick={() => handleTabSwitch('settings')}
             className={`py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'settings'
-                ? 'border-teal-600 text-teal-600'
+                ? 'border-teal-600 text-teal-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -410,7 +410,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
                   <div className="flex-1 min-w-0">
                     <a
                       href={`/building/${building.building_slug}`}
-                      className="text-base font-semibold text-gray-900 hover:text-teal-600 transition-colors line-clamp-2"
+                      className="text-base font-semibold text-gray-900 hover:text-teal-700 transition-colors line-clamp-2"
                     >
                       {building.building_address}
                     </a>
