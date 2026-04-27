@@ -1,106 +1,96 @@
 # Technology Stack
 
-**Analysis Date:** 2026-02-26
+**Analysis Date:** 2026-04-26
 
 ## Languages
 
 **Primary:**
-- TypeScript 5+ - All application code, API endpoints, components
-- JavaScript/JSX - React component development via TypeScript
+- TypeScript 5.9.3 - All source code, strict mode enabled via `astro/tsconfigs/strict`
 
 **Secondary:**
-- SQL - Database queries via D1/SQLite
-- TOML - Wrangler configuration
+- JavaScript - Configuration files (`astro.config.mjs`, `wrangler.jsonc`)
+- SQL - Database migrations and queries
 
 ## Runtime
 
 **Environment:**
-- Node.js - Development environment
-- Cloudflare Workers - Production runtime (serverless)
+- Node.js (implied by SSR and build scripts)
+- Cloudflare Workers (server runtime via `@astrojs/cloudflare` adapter)
 
 **Package Manager:**
-- npm - JavaScript package management
-- Lockfile: Present (`package-lock.json`)
+- npm (detected via `package-lock.json`)
+- Lockfile: Present
 
 ## Frameworks
 
 **Core:**
-- Astro 5.16.11 - Full-stack web framework, SSR with server-side rendering
-- React 18.3.1 - UI components and interactive elements
-- @astrojs/react 3.6.3 - React integration for Astro
-
-**Authentication:**
-- Lucia 3.2.2 - Authentication framework
-- @lucia-auth/adapter-sqlite 3.0.2 - SQLite adapter for Lucia
+- Astro 5.16.11 - SSR framework with server-side rendering enabled (`output: 'server'`)
+- React 18.3.1 - Client-side interactive components (islands architecture)
+- Lucia v3.2.2 - Authentication with SQLite D1 adapter
 
 **Styling:**
-- Tailwind CSS 4.1.18 - Utility-first CSS framework
+- Tailwind CSS 4.1.18 - Utility-first CSS
 - @tailwindcss/vite 4.1.18 - Vite plugin for Tailwind
 
 **Testing:**
-- Vitest 4.0.18 - Unit/integration test runner
-- @playwright/test 1.58.2 - E2E browser testing
+- Vitest 4.0.18 - Unit and component testing (`vitest.config.ts`)
+- Happy DOM 20.5.1 - DOM environment for tests
+- @playwright/test 1.58.2 - E2E testing
 - @testing-library/react 16.3.2 - React component testing utilities
-- @testing-library/user-event 14.6.1 - User interaction simulation
 
 **Build/Dev:**
-- @astrojs/cloudflare 12.6.12 - Cloudflare adapter for Astro
-- tsx 4.21.0 - TypeScript execution for scripts
+- Vite (via Astro)
+- @astrojs/react 3.6.3 - React integration for Astro
+- @astrojs/cloudflare 12.6.12 - Cloudflare Pages adapter
 
 ## Key Dependencies
 
 **Critical:**
-- @cloudflare/workers-types 4.20260117.0 - TypeScript types for Cloudflare Workers runtime
-- @oslojs/crypto 1.0.1 - Cryptographic utilities (PBKDF2-SHA256, SHA256)
-- @oslojs/encoding 1.1.0 - Encoding utilities (base64, hex)
+- lucia 3.2.2 - Session management and authentication
+- @lucia-auth/adapter-sqlite 3.0.2 - D1 database adapter for Lucia
+- resend 6.9.2 - Email service for transactional emails (verification, password reset, notifications)
+- @oslojs/crypto 1.0.1 - Cryptographic utilities for token generation
+- @oslojs/encoding 1.1.0 - Encoding utilities
+- docx 9.6.1 - Document generation for reports/exports
 
 **Infrastructure:**
-- happy-dom 20.5.1 - Lightweight DOM implementation for testing
+- @cloudflare/workers-types 4.20260117.0 - TypeScript types for Cloudflare Workers
+- tsx 4.21.0 - TypeScript execution for scripts
 
 ## Configuration
 
 **Environment:**
-- Handled via Cloudflare Workers environment bindings (wrangler.jsonc)
-- Runtime environment accessed through `context.locals.runtime.env`
-- Key variables: `GOOGLE_MAPS_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `DB`, `VERIFICATION_BUCKET`
+- `GOOGLE_CLIENT_ID` - OAuth provider ID
+- `GOOGLE_CLIENT_SECRET` - OAuth provider secret
+- `GOOGLE_MAPS_API_KEY` - Google Maps API key for map display
+- `GOOGLE_PLACES_API_KEY` - Google Places API key for address autocomplete
+- `RESEND_API_KEY` - Email service API key
+- `SITE_URL` - Canonical site URL (fallback to `context.url.origin`)
+- `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile bot verification secret
 
 **Build:**
-- `astro.config.mjs` - Astro configuration
-- `tsconfig.json` - TypeScript compiler options, extends Astro strict config
-- `vitest.config.ts` - Unit test configuration with happy-dom environment
-- `playwright.config.ts` - E2E test configuration
-- `wrangler.jsonc` - Cloudflare deployment configuration
+- `astro.config.mjs` - Astro configuration with Cloudflare adapter and Tailwind plugin
+- `tsconfig.json` - TypeScript strict mode configuration
+- `wrangler.jsonc` - Cloudflare Workers configuration with D1 and R2 bindings
+- `vitest.config.ts` - Test runner configuration with Happy DOM environment
 
-**TypeScript:**
-- Strict mode enabled (extends `astro/tsconfigs/strict`)
-- JSX: `react-jsx` with `jsxImportSource` set to React
-- Path resolution includes `.astro/types.d.ts`
+**Runtime Files:**
+- `src/env.d.ts` - Environment type definitions for Astro locals, Cloudflare runtime bindings
 
 ## Platform Requirements
 
 **Development:**
-- Node.js (version specified via npm)
-- npm package manager
-- Cloudflare Wrangler CLI (for local D1/R2 emulation during dev)
+- Node.js (version not specified, infer from package ecosystem)
+- npm for dependency management
+- Wrangler CLI (for local D1/R2 development)
 
 **Production:**
-- Cloudflare Pages for hosting
-- Cloudflare Workers for serverless compute
-- Cloudflare D1 for SQLite database
-- Cloudflare R2 for object storage
-
-## Runtime Configuration Details
-
-**Cloudflare Bindings (wrangler.jsonc):**
-- DB: D1Database (SQLite) - binding name "DB"
-- VERIFICATION_BUCKET: R2Bucket - binding name "VERIFICATION_BUCKET"
-- Database: "ratemyplace-db" (ID: 7dd2a722-fdd3-4986-b2f7-6d61d069438e)
-- R2 Bucket: "ratemyplace-verification"
-
-**Compatibility:**
-- Date: 2024-12-01
-- Flags: nodejs_compat (Node.js compatibility mode enabled)
+- Cloudflare Pages (server runtime)
+- Cloudflare Workers (server functions)
+- Cloudflare D1 (SQLite database)
+- Cloudflare R2 (file storage for verification images)
+- Cloudflare Email Routing (email forwarding for @ratemyplace.org domain)
 
 ---
 
-*Stack analysis: 2026-02-26*
+*Stack analysis: 2026-04-26*
