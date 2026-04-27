@@ -1,7 +1,9 @@
+import type { APIContext } from 'astro';
 import type { D1Database } from '@cloudflare/workers-types';
+import { getEnv } from './runtime';
 
-export function getDB(runtime: any): D1Database {
-  const db = runtime?.env?.DB;
+export function getDB(context: APIContext): D1Database {
+  const db = getEnv(context).DB;
   if (!db) {
     throw new Error('D1 Database not found. Make sure you have configured the DB binding.');
   }
