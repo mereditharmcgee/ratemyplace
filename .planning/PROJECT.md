@@ -41,7 +41,15 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 
 ### Active
 
-(None — next milestone requirements TBD)
+- [ ] Rate limiting and input validation on all public POST endpoints
+- [ ] CSRF protection audit and remediation
+- [ ] Admin moderation flow E2E test coverage
+- [ ] Cross-view data consistency E2E coverage
+- [ ] Async email send pattern (fire-and-forget)
+- [ ] D1 search-filter index audit
+- [ ] Component refactors (3 files >700 LOC)
+- [ ] Typed Cloudflare runtime wrapper to retire `(context.locals as any).runtime` casts
+- [ ] Shared EmptyState component for consistent messaging
 
 ### Out of Scope
 
@@ -51,6 +59,23 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 - Real-time push notifications — Cloudflare Workers stateless; polling sufficient
 - Email unsubscribe management — track in v1.5.0 before scaling notification emails
 - Stress testing — deferred from v1.3.0, lower priority than user-facing features
+
+## Current Milestone: v1.5.0 "Closed Loops"
+
+**Goal:** Close the security, validation, and quality-debt gaps surfaced by the post-brand codebase audit. Harden public endpoints, fill critical-flow test coverage, and reduce maintenance debt accumulated through v1.4.0.
+
+**Target features:**
+- Rate limiting + input validation across all public POST endpoints (`/api/contacts`, `/api/bug-reports`, `/api/disputes`, `/api/search`)
+- CSRF protection audit (Lucia/Astro defaults) with token + SameSite remediation if gaps found
+- E2E coverage for admin moderation flow with audit-log assertion
+- E2E coverage for cross-view data consistency (review created → search/profile/detail all updated)
+- Email sends switched to fire-and-forget so Resend latency no longer blocks API responses
+- D1 search-filter column index audit and additions
+- Component refactor pass on 3 files >700 LOC (ReviewEditForm, BuildingsTable, ReviewsTable)
+- Typed Cloudflare runtime wrapper replacing 71 `(context.locals as any).runtime` casts
+- Shared `<EmptyState>` component for consistent empty-state messaging
+
+**Source:** `.planning/codebase/CONCERNS.md` audit (2026-04-26)
 
 ## Latest Shipped: v1.4.0 "Open Doors" (2026-03-22)
 
@@ -90,4 +115,4 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 | SSR bell badge for notifications | Server-rendered unread count avoids client flash | ✓ Good (v1.4.0) |
 
 ---
-*Last updated: 2026-03-22 after v1.4.0 "Open Doors" milestone*
+*Last updated: 2026-04-27 after starting v1.5.0 "Closed Loops" milestone*
