@@ -1,257 +1,251 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-02-26
+**Analysis Date:** 2026-04-26
 
 ## Tech Debt
 
-**Widespread `as any` Type Assertions:**
-- Issue: 53 instances of `as any` casting throughout codebase. This bypasses TypeScript's type safety system and hides potential runtime errors.
-- Files: `src/lib/db.ts`, `src/lib/rateLimit.ts`, `src/lib/auth.ts`, `src/pages/api/admin/reviews/[id].ts`, `src/pages/api/reviews.ts`, `src/pages/api/verification/upload.ts`, and 40+ other files
-- Impact: Type safety is compromised. Runtime errors in Cloudflare runtime context may not be caught during development. Future refactoring becomes risky.
-- Fix approach: Create proper TypeScript interfaces for Cloudflare context types. Define `Context extends APIContext` with typed `locals` property. This requires updating middleware (`src/middleware.ts`) and creating a context type file.
+### Dual Legacy Pest Columns
+- **Issue:** Two overlapping columns exist for pest reporting: `had_pests` (migration 0004) and `had_pest_issues` (migration 0001).
+- **Files:** `migrations/0001_initial.sql`, `migrations/0004_survey_scores.sql`, `src/lib/types.ts` (line 75), `src/pages/api/reviews/[id].ts` (line 76)
+- **Impact:** Code uses fallback logic to normalize the mismatch; no data loss but creates type/semantic confusion. Adds maintenance burden when displaying pest data across UI.
+- **Fix approach:** 
+  1. Migrate all `had_pests=1` rows to `had_pest_issues=1` 
+  2. Drop `had_pests` column in new migration
+  3. Update all code references to use `had_pest_issues` consistently
+  4. Cost: Low (fallback pattern works, migration is straightforward)
 
-**Rate Limiting Degradation on Database Failure:**
-- Issue: `src/lib/rateLimit.ts` line 67-74 silently allows all requests if rate limit check fails (e.g., table doesn't exist). This is a security vulnerability masquerading as failover.
-- Files: `src/lib/rateLimit.ts` (lines 67-74)
-- Impact: If database migrations fail or `rate_limits` table is missing, all rate limiting is silently bypassed. Attackers can brute force auth endpoints (signin/signup) without limits.
-- Fix approach: Distinguish between temporary database errors and permanent configuration issues. Log explicitly when rate limiting is unavailable. For auth endpoints, either: (1) fail requests hard instead of silently passing, or (2) implement in-memory fallback rate limiting.
+### Legacy v1 Score Columns (12 columns)
+- **Issue:** Redundant old scoring columns kept for backward compatibility: `score_building_quality`, `score_maintenance`, `score_pest_control`, `score_safety`, `score_noise`, `score_landlord_responsiveness`, `score_landlord_communication`, `score_landlord_fairness`, `score_lease_clarity`, `score_deposit_handling`, `score_rent_value`, `score_amenities`.
+- **Files:** `migrations/0001_initial.sql` (lines 82-94), `src/lib/types.ts` (lines 57-68), `src/pages/api/reviews/[id].ts` (lines 59-71)
+- **Impact:** New reviews use 27-item survey (v2); legacy columns are never written. No runtime impact but clutters schema and API responses. Database footprint cost is minimal.
+- **Fix approach:** 
+  1. Keep columns for backward-compatible data reads (safe for historical data)
+  2. If ever removing: requires audit of any external consumers, then safe migration
+  3. Current strategy (keep) is appropriate; migration to remove is deferred until dataset reaches significant scale
+- **Priority:** Low (non-blocking, actively managed via code comments)
 
-**Large Form Component (ReviewForm.tsx - 916 lines):**
-- Issue: `src/components/reviews/ReviewForm.tsx` is 916 lines in a single file. Contains state management, form rendering, API calls, validation, and multi-step wizard logic.
-- Files: `src/components/reviews/ReviewForm.tsx`
-- Impact: Difficult to test individual pieces. High cognitive load. Changes to one feature (e.g., unit details) require scrolling through entire file. Reusability of steps is limited.
-- Fix approach: Extract step components (`AddressStep.tsx`, `UnitDetailsStep.tsx`, `RatingStep.tsx`), move state management to a custom hook (`useReviewForm.ts`), move API calls to helper module (`reviewService.ts`).
+### Type Coercion Pattern: `(context.locals as any).runtime`
+- **Issue:** 71 instances across API routes and library files cast `context.locals` to `any` to access Cloudflare runtime object due to incomplete Astro type definitions.
+- **Files:** `src/pages/api/**/*.ts`, `src/lib/db.ts` (line 3), `src/lib/audit.ts` (line 22), `src/lib/rateLimit.ts` (line 23), `src/lib/notifications.ts` (line 37), and 67 more API routes
+- **Impact:** Bypasses TypeScript type safety for Cloudflare-specific properties. Not a security risk (Cloudflare runtime is legitimate); but reduces IDE assistance and makes refactoring harder.
+- **Fix approach:**
+  1. Create a typed wrapper for Cloudflare runtime:
+     ```typescript
+     // src/lib/types.ts - add
+     export interface CloudflareContext {
+       runtime?: {
+         env?: Record<string, string | D1Database>;
+         context?: ExecutionContext;
+       };
+     }
+     ```
+  2. Replace `(context.locals as any).runtime` with typed access throughout
+  3. Cost: Medium (repetitive but straightforward refactoring, can be done incrementally)
+  4. Timeline: Acceptable as future tech debt cleanup
 
-**Legacy Review Score Field Mapping:**
-- Issue: `src/lib/scoring.ts` contains multiple legacy functions (`calculateBuildingAverages`, `calculateLandlordAverages`) that map old field names to new 27-item survey. Schema has moved from 12 legacy fields to 27 weighted fields, but backward compatibility code remains intertwined with current logic.
-- Files: `src/lib/scoring.ts` (lines 292-342)
-- Impact: Code is confusing - unclear which functions are "current" vs "legacy". Maintenance burden when updating scoring logic. Risk of accidentally using wrong field in new code.
-- Fix approach: Create separate `legacyScoring.ts` file for backward compatibility only. Mark legacy functions clearly. Update all new code to use `calculateDomainScores` and `calculateAggregatedScores` exclusively.
-
-**Inconsistent Error Response Patterns in API Endpoints:**
-- Issue: Across 25+ API files, error responses are inconsistent. Some use `{ error: 'message' }`, some use `{ error: message, field: 'fieldName' }`, some use `{ success: false, error: 'message' }`. No single error schema.
-- Files: `src/pages/api/reviews.ts`, `src/pages/api/reviews/[id].ts`, `src/pages/api/auth/signin.ts`, `src/pages/api/verification/upload.ts`, `src/pages/api/admin/reviews/[id].ts`, and all other API endpoints
-- Impact: Client-side error handling must anticipate multiple response shapes. Documentation of error contracts is missing. Breaking changes if response format changes.
-- Fix approach: Create standardized error response interface in `src/lib/api.ts`. All endpoints must use `errorResponse()` helper with consistent structure. Update all 25+ endpoints to conform.
-
-## Known Bugs
-
-**SQL Query Vulnerability in Dynamic UPDATE Statement:**
-- Issue: `src/pages/api/admin/reviews/[id].ts` lines 52-73 build UPDATE query by concatenating field names into SQL string, then binding values separately. While parameter binding is correct, field names are not validated.
-- Files: `src/pages/api/admin/reviews/[id].ts` (lines 52-73)
-- Trigger: Admin submits PATCH request with unexpected field names in JSON body. Example: `{ "status": "approved", "DROP TABLE users": true }`
-- Workaround: Currently only `status` and `moderation_notes` fields are allowed (whitelist check at line 33), but code is fragile.
-- Fix approach: Move from dynamic query building to hardcoded UPDATE statement with explicit field handling. Use prepared statement placeholders for all field names, not just values.
-
-**IP Detection Fallback Order May Fail Behind Proxies:**
-- Issue: `src/lib/rateLimit.ts` lines 81-95 check headers in order: CF-Connecting-IP → X-Forwarded-For → X-Real-IP → 'unknown'. On Cloudflare Workers, CF-Connecting-IP is injected automatically, but if request bypasses Cloudflare or headers are spoofed, fallback logic may use wrong IP.
-- Files: `src/lib/rateLimit.ts` (lines 81-95)
-- Trigger: Attacker spoofs X-Forwarded-For header when CF-Connecting-IP is not present (e.g., direct access to Cloudflare IP, or misconfigured proxy).
-- Workaround: Cloudflare proxy is enforced in production, so CF-Connecting-IP should always be present.
-- Fix approach: Validate that CF-Connecting-IP is always present (throw error if not in production). Remove fallbacks or log warnings when used. Consider restricting rate limiting to Cloudflare-verified headers only.
-
-**Review Status Field Inconsistency:**
-- Issue: Codebase uses both `status` (DB column) and `review_status` (in some type references). Function `calculateAggregatedScores` at line 249 expects a `scores` object but receives full review records, leading to type coercion.
-- Files: `src/pages/api/reviews.ts` (line 249), `src/lib/scoring.ts` (line 249)
-- Trigger: When calculating aggregated scores across reviews, function attempts to read `scores` property directly from review record, which doesn't exist at top level.
-- Workaround: Works due to optional chaining and null checks, but fragile.
-- Fix approach: Refactor `calculateAggregatedScores` to take array of structured review objects with explicit score fields. Update callers to extract scores before passing.
-
-## Security Considerations
-
-**Password Migration Path for Legacy Hashes:**
-- Risk: `src/lib/password.ts` lines 52-56 accept both PBKDF2 and legacy SHA-256 hashes for backward compatibility. Legacy hashes are weaker and should be migrated immediately on first sign-in.
-- Files: `src/lib/password.ts`, `src/pages/api/auth/signin.ts`
-- Current mitigation: Legacy hashes are only used for comparison; no new hashes are created with legacy algorithm. Database still contains legacy hashes until password reset.
-- Recommendations: (1) Force password reset for legacy hash users on first sign-in. (2) Add admin command to identify and tag accounts with legacy hashes. (3) Set 90-day deadline for migration before disabling login.
-
-**Rate Limiting Without User Context:**
-- Risk: Rate limiting is based solely on IP address in `src/lib/rateLimit.ts` lines 36-38. In shared networks (offices, dorms), legitimate users may hit rate limits due to others' brute force attempts.
-- Files: `src/lib/rateLimit.ts`, `src/pages/api/auth/signin.ts` (line 38)
-- Current mitigation: Rate limits are generous (5 attempts per 15 minutes for signin). Error message clearly states time remaining.
-- Recommendations: (1) Consider session-based rate limiting for authenticated users (separate from IP limits). (2) Add admin whitelist for known IPs (e.g., development, support team). (3) Monitor false positive rate and adjust limits if needed.
-
-**R2 Storage Access Control:**
-- Risk: Verification images uploaded to R2 at `src/lib/storage.ts` line 58 use predictable path `users/{userId}/verifications/{reviewId}/{timestamp}.{ext}`. If bucket is misconfigured, images may be publicly readable.
-- Files: `src/lib/storage.ts` (line 55), `src/pages/api/verification/upload.ts`
-- Current mitigation: Images require review before access is granted. No public endpoint exposes images.
-- Recommendations: (1) Verify R2 bucket ACL is private in production. (2) Add explicit access control check when serving images to admin. (3) Consider encrypting sensitive image metadata with KMS.
-
-**Validation Regex Gaps:**
-- Risk: `src/lib/validation.ts` line 98 uses regex `/(<[^>]*>)/g` to strip HTML tags, but this is insufficient protection against DOM-based XSS. Sanitization-only approach is fragile.
-- Files: `src/lib/validation.ts` (line 98)
-- Current mitigation: Astro uses auto-escaping; React components also escape by default. However, sanitized text is stored in database and re-rendered, creating multiple escape opportunities.
-- Recommendations: (1) Use a robust HTML sanitization library (e.g., `DOMPurify`) instead of regex. (2) Validate that review text contains only safe markup. (3) Store sanitized HTML only in database.
-
-**Admin Action Audit Trail Missing:**
-- Risk: Admin endpoints like `PATCH /api/admin/reviews/[id]` at `src/pages/api/admin/reviews/[id].ts` lines 69-73 modify review status and moderation notes, but do not log who made the change or when.
-- Files: `src/pages/api/admin/reviews/[id].ts`, `src/pages/api/admin/buildings/[id].ts`, `src/pages/api/admin/users/[id].ts`
-- Current mitigation: Database has `updated_at` timestamp, but no `updated_by` field.
-- Recommendations: (1) Add `updated_by` and `updated_at` fields to all modifiable tables. (2) Create audit log table tracking admin actions. (3) Display audit history in admin dashboard.
-
-## Performance Bottlenecks
-
-**Unindexed Building and Review Searches:**
-- Problem: `src/pages/api/buildings.ts` line 40-46 uses LIKE queries on `address` and `neighborhood` fields without database indexes.
-- Files: `src/pages/api/buildings.ts` (lines 40-46)
-- Cause: SELECT query with two LIKE wildcards; database must scan entire buildings table on each search.
-- Improvement path: (1) Add database indexes on `buildings.address` and `buildings.neighborhood`. (2) Consider full-text search if data grows beyond 10k buildings. (3) Add query limit (already set to 10) and pagination.
-
-**Review Aggregation Queries on Large Datasets:**
-- Problem: Building and landlord profile pages load all reviews to calculate aggregated scores. `calculateAggregatedScores` at `src/lib/scoring.ts` line 209 is O(n) in review count.
-- Files: `src/lib/scoring.ts` (lines 209-286), review fetch queries in page components
-- Cause: No materialized view or cached aggregates; every page load recalculates for all reviews.
-- Improvement path: (1) Create materialized `building_aggregates` and `landlord_aggregates` tables. (2) Update aggregates incrementally when new review is approved. (3) Cache building/landlord pages for 1 hour. (4) Consider pagination for buildings with 100+ reviews.
-
-**Form State Management Causes Re-renders:**
-- Problem: `src/components/reviews/ReviewForm.tsx` manages 70+ state variables (scores, unit details, tenancy, etc.). Each state change triggers full component re-render.
-- Files: `src/components/reviews/ReviewForm.tsx`
-- Cause: No memoization; complex form with many input fields will re-render entire form on each keystroke.
-- Improvement path: (1) Use `useCallback` for input handlers to prevent child re-renders. (2) Split form into smaller components with `React.memo`. (3) Use form library (React Hook Form) to manage state more efficiently.
-
-## Fragile Areas
-
-**Database Schema Assumptions in API Endpoints:**
-- Files: All API endpoints in `src/pages/api/` (26 files)
-- Why fragile: Each endpoint assumes specific column names in database (e.g., `move_out_year_new`, `unit_structural`). If schema changes, many endpoints break simultaneously.
-- Safe modification: (1) Create data access layer (`src/lib/queries/`) with helper functions for common database operations. (2) Update schema → update helpers → endpoints automatically benefit. (3) Add TypeScript interfaces matching database schema and validate at import time.
-- Test coverage: No integration tests verify API contracts match schema.
-
-**Survey Item Configuration Scattered:**
-- Files: `src/lib/surveyItems.ts` (561 lines), `src/lib/scoring.ts` (361 lines), `src/lib/formOptions.ts`
-- Why fragile: Survey item definitions, response options, and scoring weights are split across three files with no central source of truth. Adding a new survey item requires updates to all three files.
-- Safe modification: Create single `src/lib/surveyConfig.ts` with centralized item definitions. Export item lists, weights, and response options from this single source.
-- Test coverage: `src/lib/__tests__/scoring.test.ts` has 422 lines but does not test that all items in `surveyItems` are weighted in `scoring`.
-
-**Authentication Context Access Pattern:**
-- Files: 53+ instances of `(context.locals as any).runtime` across API endpoints
-- Why fragile: Every endpoint must remember the exact pattern to access database context. Typo in one endpoint silently fails.
-- Safe modification: Create `src/lib/context.ts` with typed helper:
-  ```typescript
-  export function getRuntime(context: APIContext): Runtime {
-    const runtime = (context.locals as any).runtime;
-    if (!runtime?.env?.DB) throw new Error('DB not configured');
-    return runtime;
-  }
-  ```
-  All endpoints call `getRuntime(context)` once.
-- Test coverage: No unit tests for context access patterns.
-
-**Validation Logic Duplication:**
-- Files: `src/lib/validation.ts`, `src/components/reviews/ReviewForm.tsx` (client-side validation), API endpoints (server-side validation)
-- Why fragile: Move-in year validation, unit type validation, score range checks appear in multiple places. Changes to business rules must be propagated to all locations.
-- Safe modification: Consolidate all validation to single source. Export validation functions from `src/lib/validation.ts`. Client imports same functions for instant feedback. Servers always validate before insert.
-- Test coverage: `src/lib/__tests__/validation.test.ts` tests only `validateReviewForm`, not client-side validation or API endpoint validation.
+### Over-Permissive `any` Types in Scoring Functions
+- **Issue:** Core scoring functions accept `any[]` for review data instead of typed `Review` objects.
+- **Files:** `src/lib/scoring.ts` (lines 209, 295, 330) - `calculateAggregatedScores()`, `calculateBuildingAverages()`, `calculateLandlordAverages()`
+- **Impact:** Type safety lost for critical business logic. Makes it harder to verify correctness of calculations. Not a bug (functions work correctly) but increases maintenance risk.
+- **Fix approach:**
+  1. Define `ReviewScoreData` interface with required score fields
+  2. Update function signatures to accept `ReviewScoreData[]`
+  3. Update call sites to pass properly typed data
+  4. Cost: Low (functions are well-tested, isolated from other code)
 
 ## Scaling Limits
 
-**D1 Database Scalability Ceiling:**
-- Current capacity: Cloudflare D1 is SQLite-based, suitable for <50GB databases.
-- Limit: At ~2KB per review record, D1 can hold approximately 25 million reviews before approaching size limits. With 100 buildings each averaging 10,000 reviews, platform reaches this limit at ~125 buildings in Boston alone.
-- Scaling path: (1) Implement data archival: move reviews older than 2 years to long-term storage. (2) Consider migration to PostgreSQL via Cloudflare Hyperdrive if growth continues. (3) Shard by city/neighborhood before outgrowing D1.
+### Database Query Performance at Scale
+- **Problem:** No query optimization for aggregate calculations. `building_scores` and `landlord_scores` are materialized tables but update strategy is not formalized.
+- **Files:** `src/lib/scoring.ts` (aggregation functions), no dedicated update/invalidation trigger visible
+- **Current capacity:** Works fine for current dataset (single city, < 1000 buildings); scaling concern only relevant if:
+  - Expanding to 5+ cities
+  - Each city has 100+ buildings with 50+ reviews each
+- **Scaling path:**
+  1. Implement background job to recalculate scores on schedule (daily vs real-time trade-off)
+  2. Add indexes on `building_scores.updated_at` and `landlord_scores.updated_at`
+  3. Consider database views instead of materialized tables if write frequency increases
+  4. Timeline: Defer until load testing shows >1s response times
 
-**R2 Storage for Verification Images:**
-- Current capacity: R2 can handle unlimited files. Current usage is minimal (only verification images).
-- Limit: With 10MB max file size and 1 image per review average, R2 can store >1 million verification images. Not a bottleneck in foreseeable future.
-- Scaling path: No action needed short-term. When reaching 10TB+ consider lifecycle policies to archive old images.
-
-**Page Load Time with Large Result Sets:**
-- Current capacity: Building profile pages query all reviews for aggregation. With 10k reviews, this is a few hundred milliseconds.
-- Limit: Beyond 50k reviews per building, full aggregation on page load becomes slow (>2 seconds).
-- Scaling path: Implement caching layer (Cloudflare Cache API) with 1-hour TTL for aggregates. Update aggregates asynchronously after new review approval.
-
-## Dependencies at Risk
-
-**Lucia Auth Library Maintenance:**
-- Risk: Lucia (v3.2.2) is a smaller auth library with limited community compared to Auth0/NextAuth. Future breaking changes in Lucia's API require codebase-wide updates.
-- Impact: `src/lib/auth.ts` and `src/middleware.ts` depend heavily on Lucia's APIs. Session management relies on Lucia's adapter.
-- Migration plan: If Lucia becomes unmaintained, migrate to standard session management using crypto module from `@oslojs/crypto` (already a dependency). Lucia is primarily a convenience wrapper; low-level logic can be ported to custom code within 1 week.
-
-**@oslojs/crypto Dependency Chain:**
-- Risk: `@oslojs/crypto` and `@oslojs/encoding` are very new packages (v1.0.1, v1.1.0). Limited adoption, potential for bugs and breaking changes.
-- Impact: Password hashing (`src/lib/password.ts`) and encoding use these packages. If packages are abandoned, password verification fails.
-- Migration plan: Both packages are wrappers around standard Web Crypto API. Code can be updated to use `crypto.subtle` directly (requires updating `src/lib/password.ts` lines 21-44 and 70-89).
-
-**Google OAuth Integration Dependency:**
-- Risk: Google auth is implemented via `src/pages/api/auth/google.ts` and `src/pages/api/auth/google/callback.ts` using manual OAuth flow. No SDK library; entirely custom implementation. If Google changes OAuth 2.0 spec, custom code breaks.
-- Impact: Users with Google accounts cannot sign in if implementation breaks.
-- Migration plan: Consider adopting Auth0 or Clerk for OAuth management instead of custom implementation. Alternatively, write integration tests against Google OAuth endpoints to detect breaking changes early.
+### Component Size Growing
+- **Problem:** Two React components exceed 700 lines, making them harder to test and modify.
+- **Files:** 
+  - `src/components/reviews/ReviewEditForm.tsx` (907 lines)
+  - `src/components/admin/BuildingsTable.tsx` (844 lines)
+  - `src/components/admin/ReviewsTable.tsx` (733 lines)
+- **Impact:** Difficult to reuse, test in isolation, or debug. Not broken, but increasing complexity debt.
+- **Fix approach:**
+  1. Extract form steps into separate components (ReviewEditForm already uses sub-steps pattern, could go further)
+  2. Split admin tables into smaller components: `TableHeader`, `TableRow`, `TableFilters`, `TablePagination`
+  3. Move filtering/sorting logic to custom hooks
+  4. Cost: Medium (structured refactoring over 2-3 PRs)
+  5. Timeline: Next "cleanup" phase
 
 ## Missing Critical Features
 
-**Email Verification for Account Recovery:**
-- Problem: Users can sign up with any email address. If email is mistyped, account is inaccessible. No password reset mechanism exists.
-- Blocks: Users cannot recover account if password is lost. Multi-user household scenarios are fragile (shared email = shared login).
-- Recommendation: Implement email verification flow: (1) Send verification link on signup. (2) Require email verification before account is active. (3) Add password reset endpoint that emails reset link. (4) Store and validate email verification tokens with expiry.
+### Rate Limiting Coverage Gap
+- **Problem:** Rate limiting only applies to `/api/auth/signin` endpoint. Public-facing endpoints lack protection.
+- **Files:** `src/lib/rateLimit.ts` (implemented), `src/pages/api/**` (mostly not using it)
+- **Unprotected endpoints:** `/api/search`, `/api/buildings/[id]`, `/api/reviews` (GET), `/api/contacts` (POST - especially needed)
+- **Risk:** Brute-force attacks on search, contact form spam, DoS on building details
+- **Recommendations:**
+  1. Apply rate limiting to all public POST endpoints (contacts, bug reports, disputes)
+  2. Apply moderate rate limiting to search (per-IP 100 req/min)
+  3. Add rate limit headers to responses for client awareness
+  4. Files to update: `src/pages/api/search.ts`, `src/pages/api/contacts.ts`, `src/pages/api/bug-reports.ts`, `src/pages/api/disputes.ts`
 
-**Two-Factor Authentication for Admins:**
-- Problem: Admin accounts are protected only by password. High-value target for attackers (access to moderation, user deletion, etc.).
-- Blocks: Cannot safely onboard remote admin team; no audit trail of admin logins.
-- Recommendation: Implement TOTP-based 2FA for admin accounts. Use standard library (e.g., `speakeasy`, `authenticator.ts`). Store secret in database, require code on admin login.
+## Fragile Areas
 
-**Content Moderation Automation:**
-- Problem: `src/pages/api/admin/pending-verifications.ts` and review moderation require manual admin review of all pending items. No automated filtering for spam/abuse.
-- Blocks: As platform scales, manual review becomes bottleneck.
-- Recommendation: Implement simple heuristics: (1) Flag reviews with all-1-star scores as potential spam. (2) Flag reviews mentioning competitor names. (3) Implement user reputation score to auto-approve reviews from trusted users. (4) Add webhook to external moderation service if needed.
+### Survey Field Mapping Complexity
+- **Files:** `src/lib/surveyItems.ts` (579 lines), `src/components/reviews/ReviewForm.tsx`, `src/components/reviews/ReviewEditForm.tsx`
+- **Why fragile:** 27 survey fields spread across 3 domain arrays (UNIT_FIELDS, BUILDING_FIELDS, LANDLORD_FIELDS) in `src/lib/scoring.ts`. Adding a field requires coordinated changes in 4+ places:
+  1. Migration to add column
+  2. `surveyItems.ts` - add to correct domain array and question text
+  3. `scoring.ts` - add to domain array AND set weight in ITEM_WEIGHTS
+  4. ReviewForm component - add input step
+  5. ReviewEditForm component - add input step
+  6. ReviewCard - if displayed
+- **Safe modification:**
+  - Always verify field added to `ALL_SCORE_FIELDS` in scoring.ts before deployment
+  - Add a compile-time check: ensure every field in UNIT_FIELDS/BUILDING_FIELDS/LANDLORD_FIELDS exists in ITEM_WEIGHTS
+  - Create a pre-deploy checklist for survey field additions
+- **Test coverage:** Scoring tests (421 lines) cover weights but not form UI coverage
 
-**Review Edit History / Version Control:**
-- Problem: `src/pages/api/reviews/[id].ts` allows users to edit reviews, but old versions are lost. Users could edit review to change meaning after fact.
-- Blocks: No audit trail; moderators cannot verify if review content changed after approval.
-- Recommendation: Store review edit history: (1) Add `review_versions` table with full review content + edit timestamp. (2) Display "Edited [date]" label on reviews with edit history. (3) Allow moderators to view revision diff in admin dashboard.
+### Auth Session Management
+- **Files:** `src/pages/api/auth/signin.ts`, `src/pages/auth/logout.astro`, `src/lib/**` (Lucia auth)
+- **Why fragile:** OAuth flow has known production issue (Google logins blocked by Cloudflare bot detection). Session invalidation on logout works but edge cases possible with:
+  - Multiple browser tabs with stale sessions
+  - Manual Lucia session table deletes (e.g., admin cleanup)
+  - Clock skew between Cloudflare and browser
+- **Safe modification:**
+  - Always test session invalidation in headless browser (Playwright)
+  - Verify OAuth redirect flow with production credentials before pushing
+  - Add explicit session token validation on protected endpoints (currently relies on Lucia middleware)
+- **Test coverage:** E2E tests in `e2e/` cover happy path; session edge cases not covered
 
 ## Test Coverage Gaps
 
-**API Endpoint Integration Tests Missing:**
-- What's not tested: 26 API endpoints in `src/pages/api/` have minimal test coverage. No tests verify:
-  - Correct database queries are executed
-  - Error responses match expected schema
-  - Authorization checks prevent unauthorized access
-  - Request validation rejects invalid input
-- Files: `src/pages/api/auth/signin.ts`, `src/pages/api/reviews.ts`, `src/pages/api/admin/*` (and 20+ others)
-- Risk: Regression in auth flow, data corruption from invalid requests, or privilege escalation could go undetected.
-- Priority: **High** - Auth and data modification endpoints are most critical.
+### Admin Panel Actions
+- **What's not tested:** Admin approval/rejection workflow, moderation notes, audit log entries
+- **Files:** `src/pages/admin/reviews.astro`, `src/components/admin/ReviewsTable.tsx`, `src/pages/api/admin/reviews/[id].ts`
+- **Risk:** Admin actions could silently fail (e.g., audit log create fails but approval succeeds)
+- **Priority:** High (affects core moderation flow)
 
-**Component Integration Tests Missing:**
-- What's not tested: React components in `src/components/` have limited test coverage. No tests verify:
-  - ReviewForm multi-step flow works end-to-end
-  - Form state persists when navigating between steps
-  - Address autocomplete fetches correct building data
-  - Map component renders buildings correctly
-- Files: `src/components/reviews/ReviewForm.tsx` (916 lines, zero tests), `src/components/BuildingMap.tsx`, `src/components/AddressAutocomplete.tsx`
-- Risk: UI regressions, broken form flows, and bad user experience go undetected.
-- Priority: **Medium** - Important for user experience but less critical than backend tests.
+### Data Consistency Across Views
+- **What's not tested:** Same review appears in multiple places (dashboard, search results, building detail page) — no automated check that scores match
+- **Files:** `src/pages/search.astro`, `src/pages/buildings/[slug].astro`, `src/pages/profile.astro`, `src/components/profile/ProfileDashboard.tsx`
+- **Risk:** Cache staleness or aggregation bugs could cause score mismatches visible to users
+- **Priority:** High (data integrity concern)
+- **Approach:** Add E2E test that creates review, checks score on all 3 views, then edits review and verifies all 3 views update
 
-**Scoring Logic Edge Cases:**
-- What's not tested: `src/lib/scoring.ts` has tests in `src/lib/__tests__/scoring.test.ts` (422 lines) but missing edge cases:
-  - What if all scores are null? (Returns null aggregate - is this correct?)
-  - What if only 1 review exists with partial scores?
-  - Recency weighting at exactly 2, 3, 4, 5 year boundaries
-  - Mixing reviews with old vs new score schemas
-  - Division by zero when total weight is 0
-- Files: `src/lib/scoring.ts`, `src/lib/__tests__/scoring.test.ts`
-- Risk: Incorrect aggregates displayed on building pages; misleading scores to users.
-- Priority: **High** - Scoring is core to platform value.
+### Edge Cases in Scoring
+- **What's not tested:** 
+  - Review with all null scores
+  - Review with mix of null and valid scores
+  - Score calculation for building with 0 or 1 review (edge cases in averaging)
+- **Files:** `src/lib/scoring.ts`, test file `src/lib/__tests__/scoring.test.ts` (422 lines)
+- **Risk:** Aggregation functions could return NaN or Infinity
+- **Priority:** Medium (low probability but high impact if occurs)
 
-**Database Schema Migrations Not Tested:**
-- What's not tested: `migrations/` directory contains SQL files but no tests verify:
-  - Schema is applied correctly
-  - Migrations are idempotent
-  - New columns have correct default values
-  - Foreign key constraints are enforced
-  - Backward compatibility with old schema
-- Files: All files in `migrations/` directory
-- Risk: Production migration could corrupt data or lock database.
-- Priority: **High** - Database integrity is critical.
+### Search & Autocomplete Reliability
+- **What's not tested:** 
+  - Search with special characters (quotes, SQL-like strings)
+  - Autocomplete with building names > 100 chars
+  - Pagination with filters applied
+- **Files:** `src/pages/api/search.ts`, `src/components/AddressAutocomplete.tsx`, `e2e/`
+- **Risk:** Search could fail silently or return incorrect results
+- **Priority:** Medium (user-facing feature)
 
-**Error Handling Edge Cases:**
-- What's not tested: Rate limiting, validation, and storage errors are not tested:
-  - What happens if R2 bucket is unreachable?
-  - What if database transaction is interrupted mid-insert?
-  - What if validation regex fails to parse input?
-- Files: `src/lib/rateLimit.ts`, `src/lib/validation.ts`, `src/lib/storage.ts`, `src/pages/api/verification/upload.ts`
-- Risk: Unexpected crashes, failed uploads without proper error message, degraded functionality.
-- Priority: **Medium** - Important for reliability but less critical than core flow tests.
+## Performance Bottlenecks
+
+### Building Detail Page Rendering
+- **Problem:** When a building has 20+ reviews, the page calculates scores in-component rather than using pre-calculated aggregate.
+- **Files:** `src/pages/buildings/[slug].astro`, `src/components/reviews/ReviewCard.astro`
+- **Cause:** `ReviewCard` component calculates category scores from raw item scores on every render
+- **Impact:** Acceptable for current scale (< 100 reviews per building) but O(n) recalculation waste
+- **Improvement path:**
+  1. Fetch pre-calculated `building_scores` aggregate from API
+  2. Use aggregate scores in ReviewCard instead of per-review calculation
+  3. Cost: Low (aggregate already calculated, just need to pass it)
+
+### Search Filtering Without Database Index
+- **Problem:** Search filters on `neighborhood`, `city`, `building_type` but unclear if these columns are indexed
+- **Files:** `migrations/0001_initial.sql` (lines 40-42 show some indexes), `src/pages/api/search.ts`
+- **Impact:** Full table scans possible on large datasets
+- **Verification needed:** Check production database index coverage on filter columns
+- **Improvement:** Add missing indexes on frequently filtered columns
+
+### Email Sending Synchronously in API Routes
+- **Problem:** Email sends (verify, reset, notifications) block API response in `src/lib/email.ts` (458 lines)
+- **Files:** `src/lib/email.ts`, `src/pages/api/auth/verify.ts`, `src/pages/api/auth/forgot-password.ts`
+- **Impact:** API response time = email send time. Resend API latency (200-500ms) adds to every email route.
+- **Improvement path:**
+  1. Switch to fire-and-forget pattern with best-effort retry
+  2. Log email failures separately; don't block user-facing response
+  3. Cost: Medium (requires error handling strategy for failed emails)
+
+## Known Bugs
+
+### OAuth Redirect Issue in Production
+- **Symptoms:** Google OAuth logins fail on ratemyplace.org; work locally
+- **Files:** `src/pages/api/auth/google-callback.ts`, Cloudflare Workers middleware
+- **Trigger:** User clicks "Sign in with Google" on production
+- **Cause:** Cloudflare bot detection (BotManagement) blocks OAuth redirect verification
+- **Current mitigation:** Workaround uses SITE_URL env var; not fully reliable
+- **Recommendations:**
+  1. Update Cloudflare WAF rules to whitelist OAuth callback paths
+  2. Implement fallback to email-only auth path if OAuth fails
+  3. Add explicit OAuth error logging to diagnose other similar issues
+  4. Test OAuth with production credentials in staging environment before rolling out
+- **Workaround:** Email signup/login works (63 lines in `src/pages/api/auth/signin.ts`)
+
+### Empty State Handling Inconsistency
+- **Problem:** Different empty state messages across pages (search returns "No results", building with 0 reviews shows "Be the first to review")
+- **Files:** `src/pages/search.astro`, `src/pages/buildings/[slug].astro`
+- **Impact:** Minor UX inconsistency, not a bug
+- **Fix:** Create shared empty state component `src/components/EmptyState.tsx` with consistent messaging
+
+## Security Considerations
+
+### API Response Data Leakage
+- **Risk:** Admin-only fields in API responses could expose information if authorization checks are incomplete
+- **Files:** `src/pages/api/reviews/[id].ts`, `src/pages/api/admin/**/*.ts`
+- **Current mitigation:** All API routes check `context.locals.user` before returning data; admin routes check `context.locals.user?.isAdmin`
+- **Verification:** Code review shows all checks in place (lines 94-98 in [id].ts); no leakage detected
+- **Recommendations:**
+  1. Audit all admin endpoints on next security review
+  2. Add explicit allowlist of fields returned in public vs admin responses
+  3. Document which fields are admin-only (inline comments in API routes)
+
+### SQL Injection Prevention
+- **Current status:** All queries use parameterized bindings (`.bind()` pattern)
+- **Files:** Every file in `src/pages/api/` uses D1 parameterized API
+- **Verification:** No string interpolation in SQL queries found; pattern is consistent
+- **Recommendation:** Maintain this pattern (documented in CLAUDE.md)
+
+### CSRF Protection
+- **Current status:** No explicit CSRF token implementation visible
+- **Files:** `src/pages/api/**/*.ts`
+- **Risk:** Form submissions (review create, edit, delete) could be vulnerable to CSRF if user is logged in elsewhere
+- **Verification needed:** Check if Astro or Lucia includes built-in CSRF protection
+- **Recommendation:**
+  1. Audit CSRF protection status (may be built into Lucia/Astro)
+  2. If not present, add CSRF token generation/validation to all state-changing endpoints
+  3. Use SameSite cookie attribute (Lucia may already do this)
+
+### Input Validation Coverage
+- **Risk:** Some endpoints may accept invalid input
+- **Files:** `src/lib/validation.ts` (imported but extent of coverage unknown), `src/pages/api/**/*.ts`
+- **Verification:** Need comprehensive audit of all endpoints for:
+  - Missing length limits (e.g., review text could be >1MB)
+  - Missing type checks (e.g., rent_amount accepts non-numeric)
+  - Missing format validation (e.g., email, zip code)
+- **Recommendation:**
+  1. Create validation test suite
+  2. Add max length constraints on all text fields
+  3. Validate rent_amount/laundry_cost as integers only
+  4. Validate emails with regex or library
 
 ---
 
-*Concerns audit: 2026-02-26*
+*Concerns audit: 2026-04-26*

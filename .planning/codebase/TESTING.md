@@ -1,172 +1,152 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-02-26
+**Analysis Date:** 2026-04-26
 
 ## Test Framework
 
 **Runner:**
 - Vitest 4.0.18
 - Config: `vitest.config.ts`
-- Environment: `happy-dom` (lightweight DOM implementation for unit tests)
+- Environment: `happy-dom` (lightweight DOM implementation for component testing)
 
 **Assertion Library:**
-- Vitest built-in `expect()` API
+- Vitest built-in expect() (compatible with Jest API)
+
+**E2E Framework:**
+- Playwright 1.58.2
+- Config: `playwright.config.ts`
 
 **Run Commands:**
 ```bash
-npm test              # Run all tests once
-npm run test:watch   # Watch mode with re-run on changes
-npm run test:watch   # Coverage not configured (no npm command)
+npm test              # Run all unit tests
+npm test -- scoring   # Filter tests by name pattern
+npm test:watch        # Watch mode (rerun on file changes)
+npm e2e               # Run E2E tests (requires build + fresh DB)
+npm e2e:headed        # E2E tests in headed browser (visible)
 ```
-
-**Additional Testing:**
-- Playwright E2E tests: `npm run e2e`
-- Headed E2E tests: `npm run e2e:headed`
-- Smoke tests: `npm run smoke`
 
 ## Test File Organization
 
 **Location:**
-- Tests co-located with code in `__tests__` subdirectories
-- Pattern: `src/lib/__tests__/` contains tests for `src/lib/` modules
-- Component tests would go in `src/components/__tests__/` (none currently present)
+- Unit tests: `src/lib/__tests__/[name].test.ts` (co-located with implementation)
+- Component tests: Same directory pattern (planned, not yet in use for React components)
+- E2E tests: `e2e/[feature].spec.ts`
 
 **Naming:**
-- `filename.test.ts` for library/utility tests
-- `filename.test.tsx` for component tests (pattern, not yet used)
+- Test files: `[module].test.ts` (e.g., `scoring.test.ts`, `validation.test.ts`, `notifications.test.ts`)
+- E2E test files: `[feature].spec.ts` (e.g., `review.spec.ts`, `auth.spec.ts`, `admin-actions.spec.ts`)
 
 **Structure:**
 ```
-src/
-├── lib/
-│   ├── validation.ts
-│   ├── scoring.ts
-│   └── __tests__/
-│       ├── validation.test.ts
-│       ├── scoring.test.ts
-│       ├── password.test.ts
-│       ├── rateLimit.test.ts
-│       └── formOptions.test.ts
+src/lib/__tests__/
+├── audit.test.ts
+├── disputes.test.ts
+├── enrichment.test.ts
+├── format.test.ts
+├── notifications.test.ts
+├── scoring.test.ts
+└── [15+ more test files]
+
+e2e/
+├── fixtures.ts           # Custom Playwright fixtures
+├── global.setup.ts       # Auth setup before tests
+├── admin-actions.spec.ts
+├── review.spec.ts
+└── [7 more spec files]
 ```
 
 ## Test Structure
 
 **Suite Organization:**
+
+Unit test example from `src/lib/__tests__/scoring.test.ts`:
 ```typescript
 import { describe, it, expect } from 'vitest';
-import { functionName } from '../module';
+import { calculateDomainScores, getRecencyWeight, ITEM_WEIGHTS } from '../scoring';
 
-describe('functionName', () => {
-  it('describes expected behavior', () => {
-    const result = functionName(input);
-    expect(result).toBe(expectedValue);
+describe('Field definitions', () => {
+  it('has 10 unit fields', () => {
+    expect(UNIT_FIELDS).toHaveLength(10);
   });
 
-  it('handles edge case', () => {
-    const result = functionName(edgeCase);
-    expect(result).toEqual(expectedResult);
+  it('has weights defined for every field', () => {
+    for (const field of ALL_SCORE_FIELDS) {
+      expect(ITEM_WEIGHTS[field]).toBeDefined();
+      expect(ITEM_WEIGHTS[field]).toBeGreaterThanOrEqual(1.0);
+    }
+  });
+});
+
+describe('Health/safety weights', () => {
+  it('pests have 1.5x weight', () => {
+    expect(ITEM_WEIGHTS.unit_pests).toBe(1.5);
   });
 });
 ```
 
 **Patterns:**
-
-1. **Section Headers:** Large visual separators used to organize test groups:
-   ```typescript
-   // ═══════════════════════════════════════════════════
-   // validateReviewForm
-   // ═══════════════════════════════════════════════════
-   ```
-
-2. **Setup:** Test data created as constants within or before test suites:
-   ```typescript
-   const validData = {
-     building_id: 'building-123',
-     move_in_year: 2024,
-     move_in_season: 'fall' as const,
-     unit_type: '2br' as const,
-     is_current_tenant: true,
-   };
-   ```
-
-3. **Assertions:** Multiple assertion styles used:
-   - Equality: `expect(value).toBe(expected)`
-   - Array checks: `expect(array).toHaveLength(n)`
-   - Existence: `expect(value).toBeDefined()`
-   - Type checks: `expect(typeof value).toBe('number')`
-   - Array membership: `expect(array.some(e => condition)).toBe(true)`
-   - Mathematical: `expect(value).toBeGreaterThan(n)`, `expect(value).toBeLessThanOrEqual(n)`
-
-4. **Teardown:** Not explicitly used (tests are stateless with isolated data)
+- Setup: Helper functions at file top (e.g., `function allScores(value: number)`, `function domainScores(...)`)
+- Test groups: Nested `describe()` blocks with section headers
+- Section separators: Visual ASCII dividers (e.g., `// ═══════════════════════════════════════════════════`)
+- Assertions: Direct expect() chains, multiple assertions per test when logically related
+- Snapshot testing: Not used; prefer explicit assertions
 
 ## Mocking
 
-**Framework:** Vitest `vi` API
+**Framework:** Vitest's `vi` (vi.fn(), vi.spyOn())
 
-**Patterns:**
-
-1. **Function mocking for database operations:**
+**Patterns from `src/lib/__tests__/notifications.test.ts`:**
 ```typescript
-function mockDB(attemptCount: number = 0, shouldError: boolean = false) {
-  const runFn = vi.fn().mockResolvedValue({});
-  const firstFn = vi.fn().mockResolvedValue({
-    attempt_count: attemptCount,
-    first_attempt: Math.floor(Date.now() / 1000) - 60,
-  });
+import { vi } from 'vitest';
 
-  if (shouldError) {
-    return {
-      prepare: vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({
-          run: vi.fn().mockRejectedValue(new Error('DB error')),
-          first: vi.fn().mockRejectedValue(new Error('DB error')),
-        }),
-      }),
-    };
-  }
+// Mock object factory
+function mockDB(shouldError: boolean = false) {
+  const runFn = shouldError
+    ? vi.fn().mockRejectedValue(new Error('DB error'))
+    : vi.fn().mockResolvedValue({});
 
   return {
     prepare: vi.fn().mockReturnValue({
       bind: vi.fn().mockReturnValue({
         run: runFn,
-        first: firstFn,
       }),
     }),
+    _runFn: runFn,  // Expose for assertions
   };
 }
-```
 
-2. **Object mocking for request context:**
-```typescript
-function mockContext(headers: Record<string, string | null>) {
-  return {
-    request: {
-      headers: {
-        get: (name: string) => headers[name] ?? null,
-      },
-    },
-  };
-}
+// Usage in test
+it('inserts a row into notifications table', async () => {
+  const db = mockDB();
+  await createNotification(db, { userId: 'user-123', ... });
+  expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO'));
+});
+
+// Spy on console
+const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+expect(consoleSpy).toHaveBeenCalled();
+consoleSpy.mockRestore();
 ```
 
 **What to Mock:**
-- Database interactions (D1 database operations)
-- HTTP request context (headers, IP extraction)
-- External service calls (if any)
-- File system operations (R2 storage)
+- Database connections (always mocked in unit tests)
+- Console methods when testing error handling
+- Exported functions when testing integration (e.g., `validateDisputeForm` mocked when testing API that uses it)
+- Never mock: core business logic (scoring, calculations), validation functions
 
 **What NOT to Mock:**
-- Pure utility functions (validation logic, scoring calculations)
-- Cryptographic operations (password hashing/verification)
-- Data transformation functions (should test with real data)
-- Type/constant definitions
+- Core utility functions like `calculateDomainScores`, `validateReviewForm`
+- Type/interface definitions
+- Pure calculations
+- For these, call the real function and assert on output
 
 ## Fixtures and Factories
 
 **Test Data:**
 
-1. **Data builder functions** used to create test objects with default values:
+Example helper from `src/lib/__tests__/scoring.test.ts`:
 ```typescript
+// Helper: create a scores object with all fields set to a value
 function allScores(value: number): Record<string, number> {
   const scores: Record<string, number> = {};
   for (const field of ALL_SCORE_FIELDS) {
@@ -175,6 +155,7 @@ function allScores(value: number): Record<string, number> {
   return scores;
 }
 
+// Helper: create a scores object for one domain only
 function domainScores(fields: readonly string[], value: number): Record<string, number | null> {
   const scores: Record<string, number | null> = {};
   for (const field of ALL_SCORE_FIELDS) {
@@ -185,131 +166,184 @@ function domainScores(fields: readonly string[], value: number): Record<string, 
   }
   return scores;
 }
+
+// Usage
+const result = calculateDomainScores(allScores(3));
+expect(result.overall).toBe(3.0);
 ```
 
-2. **Constants for valid test data** stored at top of test suite:
+**E2E Fixtures from `e2e/fixtures.ts`:**
 ```typescript
-const validData = {
-  building_id: 'building-123',
-  move_in_year: 2024,
-  move_in_season: 'fall' as const,
-  unit_type: '2br' as const,
-  is_current_tenant: true,
+import { test as base, expect } from '@playwright/test';
+
+type CustomFixtures = {
+  authedPage: import('@playwright/test').Page;
+  adminPage: import('@playwright/test').Page;
 };
+
+export const test = base.extend<CustomFixtures>({
+  authedPage: async ({ browser }, use) => {
+    const context = await browser.newContext({
+      storageState: USER_AUTH_FILE,  // Pre-authenticated session
+    });
+    const page = await context.newPage();
+    await use(page);
+    await context.close();
+  },
+  adminPage: async ({ browser }, use) => {
+    const context = await browser.newContext({
+      storageState: ADMIN_AUTH_FILE,
+    });
+    const page = await context.newPage();
+    await use(page);
+    await context.close();
+  },
+});
 ```
 
 **Location:**
-- Inline within test files in `src/lib/__tests__/`
-- No separate fixtures directory
-- Test data builders defined as top-level functions in test files
+- Test helpers: Defined at top of `.test.ts` file (no separate factory files)
+- E2E fixtures: `e2e/fixtures.ts` (extended Playwright test object)
+- Auth state: `playwright/.auth/user.json`, `playwright/.auth/admin.json` (created by `e2e/global.setup.ts`)
 
 ## Coverage
 
-**Requirements:** None enforced
+**Requirements:** No coverage enforcement
 
-**Current Coverage Areas:**
-- Library functions: `src/lib/__tests__/` covers:
-  - Validation (`validation.test.ts` - 50+ test cases)
-  - Scoring algorithms (`scoring.test.ts` - 50+ test cases)
-  - Password hashing (`password.test.ts` - 6 test cases)
-  - Rate limiting (`rateLimit.test.ts` - 8 test cases)
-  - Form options (`formOptions.test.ts` - 15+ test cases)
-- React components: No unit tests present (E2E/smoke tests handle component testing)
+**View Coverage:**
+- Vitest coverage not configured in `vitest.config.ts`
+- To enable: Add `coverage: { provider: 'v8' }` to vitest config
+- Currently no coverage thresholds or reports
+
+**Current State:**
+- 171 unit tests passing (from git status memory)
+- 15+ E2E tests defined
+- No automated coverage reporting
 
 ## Test Types
 
 **Unit Tests:**
-- Framework: Vitest
-- Scope: Individual functions and business logic
-- Approach: Test with isolated test data, mock external dependencies (DB, context)
-- Location: `src/lib/__tests__/*.test.ts`
-- Example: `validateReviewForm` tested with valid/invalid data, edge cases, boundary conditions
-- Coverage: All validation rules, scoring algorithms, utility functions
+- Scope: Individual functions and utilities (non-React)
+- Approach: Direct function calls with mocked dependencies
+- Examples: `scoring.test.ts`, `validation.test.ts`, `disputes.test.ts`
+- Pattern: Create test data → call function → assert output
+- Database: Always mocked (no real DB connections in unit tests)
 
 **Integration Tests:**
-- Not explicitly separated from unit tests
-- Some tests validate multiple related functions working together
-- Example: `calculateAggregatedScores` tests recency weighting applied correctly
+- E2E tests act as integration tests (real database, real Astro runtime)
+- Scope: Full user workflows across multiple components/APIs
+- Approach: Browser automation via Playwright
+- Examples: `review.spec.ts` (complete review submission), `auth.spec.ts` (login flows)
 
 **E2E Tests:**
-- Framework: Playwright
-- Scope: Full application workflows
-- Location: Tests configured in `playwright.config.ts` (implementation files not shown in this analysis)
-- Run: `npm run e2e` or `npm run e2e:headed`
-- Coverage: User journeys, form submissions, authentication, page navigation
+- Framework: Playwright 1.58.2
+- Config: `playwright.config.ts` with setup phase
+- Run with: `npm e2e` (requires build + fresh database via `npm run db:setup`)
+- Browser: Chromium (single worker for serial execution)
+- Auth: Pre-authenticated sessions via fixtures
+- Timeouts: 30s per test, first-failure trace collection
+- Database: Fresh seed before E2E run (`npm run db:fresh && npm run db:seed`)
 
-**Smoke Tests:**
-- Framework: Custom script using tsx
-- Location: `scripts/smoke-test.ts`
-- Run: `npm run smoke`
-- Coverage: Health checks, basic functionality verification
+**E2E Test Structure from `e2e/review.spec.ts`:**
+```typescript
+import { test, expect } from './fixtures';
+
+// Helper: rate all visible items with given score
+async function rateAllItemsInStep(page: Page, score: number) {
+  const scoreButtons = page.locator('button[type="button"]').filter({ hasText: new RegExp(`^${score}$`) });
+  const count = await scoreButtons.count();
+  for (let i = 0; i < count; i++) {
+    await scoreButtons.nth(i).click();
+  }
+  return count;
+}
+
+test.describe('Review Form', () => {
+  test('complete review submission happy path', async ({ authedPage }) => {
+    test.setTimeout(90000);
+
+    // Step 1: Navigate
+    await authedPage.goto('/review/new?building=building-30');
+    await authedPage.waitForLoadState('networkidle');
+
+    // Step 2: Interact
+    await authedPage.fill('input[placeholder*="2A"]', '4B');
+    await authedPage.locator('button', { hasText: 'Continue' }).click();
+
+    // Step 3: Verify
+    await expect(authedPage.locator('text=Rate Your Unit')).toBeVisible();
+  });
+});
+```
 
 ## Common Patterns
 
 **Async Testing:**
-```typescript
-it('returns a string in salt$hash format', async () => {
-  const hash = await hashPassword('testpassword');
-  expect(hash).toContain('$');
-});
 
-it('returns true for correct password', async () => {
-  const hash = await hashPassword('mypassword123');
-  const result = await verifyPassword('mypassword123', hash);
-  expect(result).toBe(true);
+Unit test with async/await:
+```typescript
+it('swallows errors and does not throw when DB call fails', async () => {
+  const db = mockDB(true);  // Mock that rejects
+  const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+  await expect(
+    createNotification(db, { userId: 'user-123', ... })
+  ).resolves.toBeUndefined();  // Should NOT throw
+
+  expect(consoleSpy).toHaveBeenCalled();
+  consoleSpy.mockRestore();
+});
+```
+
+E2E with async/await:
+```typescript
+test('complete review submission happy path', async ({ authedPage }) => {
+  await authedPage.goto('/review/new?building=building-30');
+  await authedPage.waitForLoadState('networkidle');
+  await authedPage.fill('input[placeholder*="2A"]', '4B');
+  await expect(authedPage.locator('text=Rate Your Unit')).toBeVisible();
 });
 ```
 
 **Error Testing:**
-```typescript
-it('blocks requests at the limit', async () => {
-  const db = mockDB(5); // 5 attempts, limit is 5
-  const result = await checkRateLimit(db, '1.2.3.4', 'signin', 5, 900);
-  expect(result.allowed).toBe(false);
-  expect(result.remaining).toBe(0);
-});
 
-it('gracefully handles database errors', async () => {
-  const db = mockDB(0, true); // shouldError = true
-  const result = await checkRateLimit(db, '1.2.3.4', 'signin', 5, 900);
-  expect(result.allowed).toBe(true); // Should allow when DB fails
+```typescript
+describe('Error handling', () => {
+  it('returns error message on invalid data', () => {
+    const errors = validateDisputeForm({ landlordEmail: 'invalid-email' });
+    expect(errors.some(e => e.field === 'landlordEmail')).toBe(true);
+  });
+
+  it('catches and logs DB errors without throwing', async () => {
+    const db = mockDB(true);  // Rejects
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(createAuditLog(db, { ... })).resolves.toBeUndefined();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/Failed to create audit log/)
+    );
+    consoleSpy.mockRestore();
+  });
 });
 ```
 
-**Data Iteration Testing:**
-```typescript
-it('accepts all valid seasons', () => {
-  for (const season of ['winter', 'spring', 'summer', 'fall'] as const) {
-    const errors = validateReviewForm({ ...validData, move_in_season: season });
-    expect(errors.some(e => e.field === 'move_in_season')).toBe(false);
-  }
-});
-```
+**Setup/Teardown:**
+- Setup: Done per-test via test helpers and fixtures (e.g., `mockDB()`)
+- Teardown: Via `mockRestore()` for spies, Playwright context cleanup handled by fixtures
+- Global setup: `e2e/global.setup.ts` authenticates users before E2E tests run
+- No beforeEach/afterEach blocks in unit tests (each test is self-contained)
 
-**Property-Based Testing (implicit):**
-```typescript
-it('accepts valid integer scores 1-5', () => {
-  for (let score = 1; score <= 5; score++) {
-    const errors = validateReviewForm({
-      ...validData,
-      scores: { building_quality: score },
-    });
-    expect(errors.some(e => e.field.startsWith('scores.'))).toBe(false);
-  }
-});
-```
+## Best Practices Observed
 
-## Test Statistics
-
-**Coverage by module:**
-- `src/lib/validation.ts`: 171 lines of test (50+ test cases)
-- `src/lib/scoring.ts`: 423 lines of test (60+ test cases)
-- `src/lib/password.ts`: 72 lines of test (6 test cases)
-- `src/lib/rateLimit.ts`: 130 lines of test (8 test cases)
-- `src/lib/formOptions.ts`: 95 lines of test (15+ test cases)
-
-**Total unit tests:** 122+ tests (as noted in recent commit)
+1. **Test isolation:** Each test is independent; no shared state between tests
+2. **Descriptive names:** Test names match the behavior being tested (e.g., `'returns 1.0 for current year'`)
+3. **Arrange-Act-Assert:** Clear separation in test structure
+4. **No magic:** Helper functions named semantically (e.g., `allScores()` not `createScores()`)
+5. **Realistic data:** E2E tests use real database snapshots; unit tests use simple fixtures
+6. **Single assertion focus:** Most tests assert one behavior (some multi-assert when logically grouped)
+7. **Error path coverage:** Both happy path and error cases tested (e.g., DB error handling)
+8. **No test interdependencies:** Tests can run in any order
 
 ---
 
-*Testing analysis: 2026-02-26*
+*Testing analysis: 2026-04-26*

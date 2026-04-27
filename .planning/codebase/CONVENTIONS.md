@@ -1,152 +1,200 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-02-26
+**Analysis Date:** 2026-04-26
 
 ## Naming Patterns
 
 **Files:**
-- Library files: `camelCase.ts` (e.g., `validation.ts`, `rateLimit.ts`, `scoring.ts`)
-- React components: `PascalCase.tsx` (e.g., `ReviewForm.tsx`, `AddressAutocomplete.tsx`)
-- Test files: `__tests__` directory with `filename.test.ts` or `filename.test.tsx` naming
-- Type/interface files: `types.ts` for shared type definitions
+- API routes: kebab-case (e.g., `admin-actions.ts`, `bug-reports.ts`, `pending-verifications.ts`)
+- Components: PascalCase (e.g., `ReviewForm.tsx`, `ContactForm.tsx`, `BuildingMap.tsx`)
+- Library files: camelCase (e.g., `scoring.ts`, `validation.ts`, `logger.ts`, `notifications.ts`)
+- Test files: `__tests__` directory with `[name].test.ts` pattern (e.g., `src/lib/__tests__/scoring.test.ts`)
+- E2E tests: `e2e/[feature].spec.ts` (e.g., `review.spec.ts`, `auth.spec.ts`)
 
 **Functions:**
-- Library functions: `camelCase` (e.g., `validateReviewForm`, `checkRateLimit`, `calculateOverallScore`)
-- React components: `PascalCase` for component names (e.g., `ReviewForm`, `AddressAutocomplete`)
-- Helper/utility functions: `camelCase` (e.g., `getClientIP`, `formatScore`, `sanitizeText`)
-- Error handler functions: `*Response` pattern (e.g., `jsonResponse`, `errorResponse`, `redirectResponse`)
+- Exported utility functions: camelCase with verb prefixes (e.g., `calculateDomainScores`, `validateReviewForm`, `createAuditLog`, `humanize`)
+- React components: PascalCase named exports (e.g., `export default function ReviewForm(...)`)
+- Callback/handler functions in components: camelCase with `handle` prefix (e.g., `handlePlaceSelect`, `handleSubmit`)
+- Helper functions: camelCase, descriptive names (e.g., `getRecencyWeight`, `extractReviewIdFromUrl`)
+- Mocking functions in tests: camelCase with semantic names (e.g., `mockDB()`, `rateAllItemsInStep()`)
 
 **Variables:**
-- Constants: `UPPER_SNAKE_CASE` (e.g., `ITEM_WEIGHTS`, `ALL_SCORE_FIELDS`, `UNIT_FIELDS`)
-- Regular variables: `camelCase` (e.g., `selectedBuilding`, `unitDetails`, `moveInYear`)
-- React state: `camelCase` with setter function (e.g., `const [step, setStep] = useState()`)
-- Interface/type prefixes: descriptive names without redundant suffixes (e.g., `ValidationError`, `RateLimitResult`)
+- State variables: camelCase (e.g., `selectedBuilding`, `fieldErrors`, `privacyAcknowledged`)
+- Constants: UPPER_SNAKE_CASE (e.g., `ITEM_WEIGHTS`, `UNIT_FIELDS`, `EVENT_MESSAGES`, `DISPUTE_REASONS`)
+- Type unions/discriminators: camelCase (e.g., `eventType: NotificationEventType`)
+- Database columns: snake_case (e.g., `user_id`, `building_id`, `created_at`, `is_admin`)
 
 **Types:**
-- Interfaces: `PascalCase` (e.g., `User`, `Building`, `Review`, `ValidationError`)
-- Type unions: descriptive string literals or union types (e.g., `type Season = 'winter' | 'spring' | 'summer' | 'fall'`)
-- Field names in data models: `snake_case` for database fields (e.g., `building_id`, `move_in_year`, `user_id`, `created_at`)
-- Type exports: `export type` and `export interface` explicitly marked
-- Const assertions: `.as const` for literal type unions in arrays (e.g., `['winter', 'spring'] as const`)
+- Interfaces: PascalCase (e.g., `User`, `Building`, `Review`, `ValidationError`, `AuditLogEntry`)
+- Type aliases: PascalCase (e.g., `Season`, `UnitType`, `ReviewStatus`)
+- Branded types: PascalCase with context suffix (e.g., `ReviewFormData`, `PlaceDetails`, `CreateNotificationParams`)
+- Database result types: PascalCase with semantic naming (e.g., `BuildingScores`, `LandlordScores`)
 
 ## Code Style
 
 **Formatting:**
-- No explicit linting/formatting tool configured in package.json
-- Inferred style from codebase:
-  - 2-space indentation (observed in all files)
-  - Semicolons at end of statements
-  - Single quotes for strings in JS/TS (when applicable), double quotes for HTML attributes
-  - Multiline objects/arrays formatted with items on separate lines
+- No explicit linter/formatter configured in repo (ESLint/Prettier absent)
+- Indentation: 2 spaces (standard across all files)
+- Line length: No hard limit enforced, but generally kept reasonable
+- Trailing commas: Used in multi-line objects/arrays
 
-**Linting:**
-- No `.eslintrc` or `.prettierrc` files present
-- TypeScript strict mode enabled via `tsconfig.json` extending `astro/tsconfigs/strict`
-- JSX mode enabled with `"jsxImportSource": "react"`
+**TypeScript:**
+- Strict mode enabled via `astro/tsconfigs/strict`
+- JSX: `react-jsx` (automatic JSX transform)
+- No use of `any` type except in required contexts (e.g., `db: any` for D1Database binding)
+- Always export types for consumers (e.g., `export interface ValidationError`)
+- Union types for discriminated variants (e.g., `ReviewStatus = 'pending' | 'approved' | 'rejected' | 'flagged'`)
+
+**File Organization:**
+- Single responsibility principle: One main export per file
+- Export types alongside implementation
+- Import order: external packages first, then relative imports from `lib/`, then components
 
 ## Import Organization
 
 **Order:**
-1. External framework imports (`react`, `vitest`, `lucia`, etc.)
-2. Cloudflare/platform-specific imports (`@cloudflare/workers-types`)
-3. Internal library imports (`./types`, `./validation`)
-4. Component imports (relative paths to components)
-5. Type imports explicitly marked with `import type`
+1. External packages from `node_modules` (e.g., `import { useState } from 'react'`, `import { describe, it, expect } from 'vitest'`)
+2. Cloudflare/Framework types (e.g., `import type { APIContext } from 'astro'`, `import type { D1Database } from '@cloudflare/workers-types'`)
+3. Internal lib files (e.g., `import { getDB } from '../../lib/db'`)
+4. Components (e.g., `import { ContactForm } from '../contact/ContactForm'`)
+5. Types (e.g., `import type { ReviewFormData } from '../../lib/types'`)
 
 **Path Aliases:**
-- None detected (no alias configuration in `tsconfig.json`)
-- All imports use relative paths (e.g., `../validation`, `../../lib/surveyItems`)
-
-**Example pattern from codebase:**
-```typescript
-import { describe, it, expect, vi } from 'vitest';
-import { getClientIP, checkRateLimit } from '../rateLimit';
-```
+- No path aliases configured; relative paths used throughout (e.g., `../../lib/db`, `./form-steps`)
 
 ## Error Handling
 
 **Patterns:**
-- Validation functions return error array: `ValidationError[]` with `{ field: string; message: string }` structure (see `src/lib/validation.ts`)
-- API responses use dedicated error response functions:
-  - `errorResponse(message, status)` for generic errors
-  - `ApiErrors` object with predefined error factories (e.g., `ApiErrors.UNAUTHORIZED()`, `ApiErrors.NOT_FOUND()`)
-- Try-catch blocks used for async database operations with fallback behavior
-  - Example: rate limiting gracefully allows requests if database check fails (`src/lib/rateLimit.ts` lines 66-75)
-- Async functions may throw errors or return result objects with error states
-- Type-safe error handling with explicit error types in function signatures
+- API endpoints: Return JSON with `error` field and appropriate HTTP status codes
+  - 401 for missing auth: `{ error: 'Authentication required' }`
+  - 403 for insufficient permissions: `{ error: 'Admin access required' }`
+  - 400 for validation: `{ error: 'Validation failed', details: errors }`
+  - 500 for server errors: `{ error: 'Failed to [action]' }`
+- Try-catch with console.error logging (best-effort pattern for non-critical operations like audit logs and notifications)
+- Error responses always include `Content-Type: application/json` header
+- Best-effort logging: Database operations like audit logs and notifications catch errors but don't throw
+
+**Example:**
+```typescript
+// API route auth check
+if (!context.locals.user) {
+  return new Response(JSON.stringify({ error: 'Authentication required' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+// Best-effort operation
+try {
+  await db.prepare(...).bind(...).run();
+} catch (error) {
+  console.error('Failed to create audit log:', error);
+  // Don't throw - let the primary action succeed
+}
+```
 
 ## Logging
 
-**Framework:** No dedicated logging library
-- Uses `console.error()` for error logging (e.g., `src/lib/rateLimit.ts` line 69)
-- Used sparingly, only for unexpected conditions
+**Framework:** `console.error()` and `console.log()` via `logError()` helper for structured JSON logging
 
 **Patterns:**
-- Log errors that occur in critical operations: `console.error('operation name:', error);`
-- No info/debug logging patterns observed
+- Structured JSON logs: `logError(event: string, context: LogContext)` in `src/lib/logger.ts`
+- Request tracking: Every error log includes `request_id` (auto-generated UUID if not provided)
+- Context fields: `endpoint`, `ip`, `error`, and arbitrary key-value pairs
+- Cloudflare automatically indexes JSON-formatted logs
+
+**Example:**
+```typescript
+import { logError } from '../../lib/logger';
+
+logError('review_submission_failed', {
+  endpoint: '/api/reviews/submit',
+  ip: context.clientAddress,
+  building_id: building.id,
+  error: error.message
+});
+```
 
 ## Comments
 
 **When to Comment:**
-- Complex algorithms or weighting systems include detailed JSDoc comments explaining methodology
-- External references to research papers included in algorithm documentation
-- "How it works" comments for non-obvious logic (e.g., rate limiting key construction)
-- Section separators used in test files with visual formatting: `// ═══════════════════════════════════════════════════`
+- File-level JSDoc for critical modules (e.g., `/**\n * Scoring System for RateMyPlace\n * Methodology based on housing quality research...\n */`)
+- Function-level comments for non-obvious logic (e.g., recency weight calculations, complex filtering)
+- Inline comments for "why" not "what" (explain the intent, not the code)
+- Section headers in tests using visual separators (e.g., `// ═══════════════════════════════════════════════════`)
 
 **JSDoc/TSDoc:**
-- JSDoc style used for public functions with `@param` and function description tags
-- Example pattern from `src/lib/rateLimit.ts`:
+- Function parameters documented with JSDoc for public APIs
+- Example from `scoring.ts`:
 ```typescript
 /**
- * Check and enforce rate limits for an endpoint
- *
- * @param db - D1 database instance
- * @param identifier - Unique identifier (typically IP address)
- * @param endpoint - The endpoint being rate limited (e.g., 'signin', 'signup')
- * @param maxAttempts - Maximum number of attempts allowed in the window
- * @param windowSeconds - Time window in seconds
+ * Calculate weighted score for a set of items
  */
+function calculateWeightedScore(
+  scores: Record<string, number | null | undefined>,
+  fields: readonly string[]
+): WeightedScoreResult | null { ... }
 ```
 
 ## Function Design
 
-**Size:**
-- Most utility functions 20-50 lines (e.g., `validateReviewForm` is 92 lines with multiple validation steps)
-- Complex functions may exceed 50 lines when they perform multiple related validations
-- React component functions often 100+ lines due to state management and render logic
+**Size:** 
+- Functions generally 15-40 lines in utility files
+- Component functions (React) may be longer due to state/hooks
+- Test helper functions kept small and focused (5-15 lines)
 
 **Parameters:**
-- Explicit, named parameters (avoid positional arguments when multiple params of same type)
-- Object parameters used for functions with 3+ boolean/optional parameters
-- Type annotations required for all parameters
-- Optional parameters marked with `?` in interfaces/function signatures
+- Prefer object parameters for functions with 3+ arguments (destructuring)
+- Use readonly arrays for field lists to prevent mutation
+- Type all parameters explicitly
 
 **Return Values:**
-- Explicit return types on all function declarations
-- Validation functions return array of errors (empty array = valid)
-- Async functions return `Promise<T>` with explicit type
-- Database operations return typed result objects
-- React components have no explicit return type (inferred as `JSX.Element` from implementation)
+- Functions return `null` for "no data" scenarios (e.g., `calculateWeightedScore() => WeightedScoreResult | null`)
+- API routes return `Response` objects with JSON bodies and proper headers
+- Most utility functions return typed objects or primitives, never `undefined` (prefer `null`)
+
+**Example:**
+```typescript
+export function calculateWeightedScore(
+  scores: Record<string, number | null | undefined>,
+  fields: readonly string[]
+): WeightedScoreResult | null {
+  let weightedSum = 0;
+  let totalWeight = 0;
+  let itemCount = 0;
+
+  for (const field of fields) {
+    const value = scores[field];
+    if (value !== null && value !== undefined && typeof value === 'number') {
+      const weight = ITEM_WEIGHTS[field as ScoreFieldName] || 1.0;
+      weightedSum += value * weight;
+      totalWeight += weight;
+      itemCount++;
+    }
+  }
+
+  if (itemCount === 0) return null;
+  return { score: weightedSum / totalWeight, weightedSum, totalWeight, itemCount };
+}
+```
 
 ## Module Design
 
 **Exports:**
-- Named exports preferred (e.g., `export function validateReviewForm()`, `export const ITEM_WEIGHTS`)
-- Default exports used only for React components
-- Type exports explicitly marked: `export type Season = ...`, `export interface User { ... }`
-- Constants and types exported from files alongside implementations
+- Each library file exports a primary function or interface set
+- Always export types alongside implementation (e.g., `export interface ValidationError`, `export type NotificationEventType`)
+- Constants exported (e.g., `export const ITEM_WEIGHTS: Record<ScoreFieldName, number> = {...}`)
 
 **Barrel Files:**
-- Not used - imports reference files directly (e.g., `import { validateReviewForm } from '../validation'`)
+- Not used in this codebase; imports use direct file paths
 
-## Database Naming Conventions
-
-**Schema:**
-- Field names in database records: `snake_case` (e.g., `building_id`, `move_in_year`, `created_at`, `updated_at`)
-- Timestamps: stored as Unix epoch seconds (numeric)
-- Boolean fields: named with `had_` or `is_` prefix (e.g., `had_pest_issues`, `is_current_tenant`)
-- Aggregate/computed fields: `avg_` or `pct_` prefix (e.g., `avg_overall`, `pct_would_recommend`)
+**Single Responsibility:**
+- `scoring.ts`: All scoring calculations (weights, domain scores, aggregation)
+- `validation.ts`: All input validation and sanitization
+- `audit.ts`: Audit log creation (immutable trail)
+- `logger.ts`: Structured JSON logging helper
+- `notifications.ts`: User notification creation
 
 ---
 
-*Convention analysis: 2026-02-26*
+*Convention analysis: 2026-04-26*
