@@ -1,12 +1,11 @@
 ---
 import BaseLayout from '../components/layout/BaseLayout.astro';
 import SearchResults from '../components/search/SearchResults';
-import { getDB } from '../lib/db';
 
 const query = (Astro.url.searchParams.get('q') || '').trim();
 const type = Astro.url.searchParams.get('type') || 'all';
 
-const db = getDB((Astro.locals as any).runtime);
+const db = Astro.locals.runtime.env.DB;
 
 const PAGE_SIZE = 10;
 

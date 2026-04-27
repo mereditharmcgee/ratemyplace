@@ -6,7 +6,6 @@ import ScoreCard from '../../components/ratings/ScoreCard.astro';
 import UGCDisclaimer from '../../components/reviews/UGCDisclaimer.astro';
 import BookmarkButton from '../../components/ui/BookmarkButton';
 import PostSubmitVerification from '../../components/profile/PostSubmitVerification';
-import { getDB } from '../../lib/db';
 import { calculateBuildingAverages, calculateDomainScores } from '../../lib/scoring';
 
 const { slug } = Astro.params;
@@ -32,7 +31,7 @@ const unitTypeLabels: Record<string, string> = {
 };
 
 try {
-  const db = getDB((Astro.locals as any).runtime);
+  const db = Astro.locals.runtime.env.DB;
 
   const buildingResult = await db.prepare(`
     SELECT b.*,

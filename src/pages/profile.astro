@@ -1,7 +1,6 @@
 ---
 import BaseLayout from '../components/layout/BaseLayout.astro';
 import ProfileDashboard from '../components/profile/ProfileDashboard';
-import { getDB } from '../lib/db';
 
 const user = Astro.locals.user;
 
@@ -11,7 +10,7 @@ if (!user) {
 }
 
 // Get user profile data from database
-const db = getDB((Astro.locals as any).runtime);
+const db = Astro.locals.runtime.env.DB;
 const dbUser = await db.prepare(
   'SELECT created_at, email_verified, hashed_password, google_id, notification_opt_in FROM users WHERE id = ?'
 )

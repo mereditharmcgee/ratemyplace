@@ -4,7 +4,6 @@ import StarRating from '../../components/ratings/StarRating.astro';
 import ScoreCard from '../../components/ratings/ScoreCard.astro';
 import ReviewCard from '../../components/reviews/ReviewCard.astro';
 import UGCDisclaimer from '../../components/reviews/UGCDisclaimer.astro';
-import { getDB } from '../../lib/db';
 
 const { slug } = Astro.params;
 
@@ -14,7 +13,7 @@ let buildings: any[] = [];
 let recentReviews: any[] = [];
 
 try {
-  const db = getDB((Astro.locals as any).runtime);
+  const db = Astro.locals.runtime.env.DB;
 
   const pmResult = await db.prepare(`
     SELECT * FROM property_managers WHERE slug = ?

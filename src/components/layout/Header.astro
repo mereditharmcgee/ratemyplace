@@ -1,11 +1,10 @@
 ---
-import { getDB } from '../../lib/db';
 
 const user = Astro.locals.user;
 
 let unreadCount = 0;
 if (user) {
-  const db = getDB((Astro.locals as any).runtime);
+  const db = Astro.locals.runtime.env.DB;
   const result = await db.prepare(
     'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read_at IS NULL'
   ).bind(user.id).first<{ count: number }>();

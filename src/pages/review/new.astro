@@ -1,7 +1,6 @@
 ---
 import BaseLayout from '../../components/layout/BaseLayout.astro';
 import ReviewForm from '../../components/reviews/ReviewForm';
-import { getDB } from '../../lib/db';
 
 // Require authentication
 if (!Astro.locals.user) {
@@ -13,7 +12,7 @@ let building: any = null;
 
 if (buildingId) {
   try {
-    const db = getDB((Astro.locals as any).runtime);
+    const db = Astro.locals.runtime.env.DB;
     building = await db.prepare('SELECT * FROM buildings WHERE id = ?').bind(buildingId).first();
   } catch (error) {
     console.error('Error loading building:', error);

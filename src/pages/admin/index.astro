@@ -1,6 +1,5 @@
 ---
 import AdminLayout from '../../components/admin/AdminLayout.astro';
-import { getDB } from '../../lib/db';
 
 const user = Astro.locals.user;
 if (!user) {
@@ -10,7 +9,7 @@ if (!user.isAdmin) {
   return Astro.redirect('/');
 }
 
-const db = getDB((Astro.locals as any).runtime);
+const db = Astro.locals.runtime.env.DB;
 
 // Get stats
 const [
