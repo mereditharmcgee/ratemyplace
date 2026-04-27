@@ -243,7 +243,7 @@ const getStatusColor = (status: string) => {
                     {review.review_title || review.building_address}
                   </p>
                   <p class="text-xs text-gray-500">
-                    {review.user_email} â€¢ {formatDate(review.created_at)}
+                    {review.user_email} • {formatDate(review.created_at)}
                   </p>
                 </div>
                 <span class={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(review.status)}`}>

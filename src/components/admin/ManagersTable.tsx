@@ -313,7 +313,7 @@ export default function ManagersTable() {
                     <p className="text-sm text-gray-600">{manager.company_name}</p>
                   )}
                   <p className="text-sm text-gray-500">
-                    {manager.building_count} buildings â€¢ {manager.review_count} reviews
+                    {manager.building_count} buildings • {manager.review_count} reviews
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
