@@ -12,8 +12,8 @@ Hardening pass. No new user-facing features. Closes security, validation, perfor
 
 ### Infrastructure
 
-- [ ] **INFRA-01**: All Cloudflare Pages secrets typed in `App.Platform.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_MAPS_API_KEY`, `GOOGLE_PLACES_API_KEY`, `RESEND_API_KEY`, `SITE_URL`)
-- [ ] **INFRA-02**: `runtime: App.Platform` declared on `App.Locals`; `getDB` signature updated to consume the typed locals
+- [x] **INFRA-01**: All Cloudflare Pages secrets typed in `App.Platform.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_MAPS_API_KEY`, `GOOGLE_PLACES_API_KEY`, `RESEND_API_KEY`, `SITE_URL`)
+- [x] **INFRA-02**: `runtime: App.Platform` declared on `App.Locals`; `getDB` signature updated to consume the typed locals
 - [ ] **INFRA-03**: All 71 `(context.locals as any).runtime` casts replaced with typed access in a single mechanical PR
 
 ### Security
@@ -93,8 +93,8 @@ Updated by gsd-roadmapper after roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 16 | Pending |
-| INFRA-02 | Phase 16 | Pending |
+| INFRA-01 | Phase 16 | Complete |
+| INFRA-02 | Phase 16 | Complete |
 | INFRA-03 | Phase 16 | Pending |
 | SEC-04 | Phase 17 | Pending |
 | SEC-05 | Phase 17 | Pending |

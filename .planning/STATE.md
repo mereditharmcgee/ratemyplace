@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: planning
-stopped_at: Phase 16 context gathered
-last_updated: "2026-04-27T22:34:57.187Z"
+stopped_at: Completed 16-01-PLAN.md
+last_updated: "2026-04-27T23:17:06.342Z"
 last_activity: 2026-04-27 — Roadmap created, phases 16-21 defined, 24/24 requirements mapped
 progress:
   total_phases: 6
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -50,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 *Updated after each plan completion*
+| Phase 16 P01 | 2 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,9 @@ Progress: [░░░░░░░░░░] 0%
 - DEBT-01..04 (component splits) explicitly deferred to v1.6.0 — not in v1.5.0 scope
 - Migration numbering: through 0023 used; next available 0024
 - D1 index migration must run EXPLAIN QUERY PLAN before writing SQL (PERF-05 before PERF-06/PERF-07)
+- [Phase 16]: runtime: App.Platform declared non-optional in App.Locals; fail-fast guard in getEnv handles missing runtime cleanly
+- [Phase 16]: getDB(context: APIContext) signature safe before 16-02: as-any call sites pass any type which is assignable to APIContext
+- [Phase 16]: 16-01 and 16-02 must ship as one atomic unit — do not deploy between plans
 
 ### Pending Todos
 
@@ -74,9 +78,9 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-04-27T22:34:57.163Z
-Stopped at: Phase 16 context gathered
-Resume file: .planning/phases/16-typed-runtime-foundation/16-CONTEXT.md
+Last session: 2026-04-27T23:17:06.339Z
+Stopped at: Completed 16-01-PLAN.md
+Resume file: None
 
 ---
 *State updated: 2026-04-27 — v1.5.0 roadmap created*
