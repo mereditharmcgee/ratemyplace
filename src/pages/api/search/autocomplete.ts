@@ -11,7 +11,7 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
     const pattern = `%${input}%`;
 
     // Search buildings by address and neighborhood

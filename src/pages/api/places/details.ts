@@ -1,4 +1,5 @@
 import type { APIContext } from 'astro';
+import { getEnv } from '../../../lib/runtime';
 
 export async function GET(context: APIContext): Promise<Response> {
   const placeId = context.url.searchParams.get('placeId') || '';
@@ -10,8 +11,7 @@ export async function GET(context: APIContext): Promise<Response> {
     });
   }
 
-  const runtime = (context.locals as any).runtime;
-  const apiKey = runtime?.env?.GOOGLE_PLACES_API_KEY || runtime?.env?.GOOGLE_MAPS_API_KEY;
+  const apiKey = getEnv(context).GOOGLE_PLACES_API_KEY || getEnv(context).GOOGLE_MAPS_API_KEY;
 
   if (!apiKey) {
     console.error('GOOGLE_MAPS_API_KEY not configured');

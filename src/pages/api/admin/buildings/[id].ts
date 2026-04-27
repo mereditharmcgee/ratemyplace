@@ -45,7 +45,7 @@ export async function PATCH(context: APIContext): Promise<Response> {
       owner_website,
     } = body;
 
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Check if building exists
     const building = await db.prepare('SELECT id FROM buildings WHERE id = ?').bind(buildingId).first();
@@ -171,7 +171,7 @@ export async function DELETE(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Check if building exists
     const building = await db.prepare('SELECT id, address FROM buildings WHERE id = ?').bind(buildingId).first<{ id: string; address: string }>();
@@ -230,7 +230,7 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     const building = await db.prepare(`
       SELECT

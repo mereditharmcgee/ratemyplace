@@ -14,7 +14,7 @@ interface BuildingMapData {
 
 export async function GET(context: APIContext): Promise<Response> {
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Get buildings with coordinates and their review stats
     const result = await db.prepare(`

@@ -18,7 +18,7 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Check building exists
     const building = await db.prepare('SELECT id FROM buildings WHERE id = ?')
@@ -78,7 +78,7 @@ export async function DELETE(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     await db.prepare(
       'DELETE FROM saved_buildings WHERE user_id = ? AND building_id = ?'

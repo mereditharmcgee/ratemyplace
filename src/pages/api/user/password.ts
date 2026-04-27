@@ -41,7 +41,7 @@ export async function PATCH(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
     const userId = context.locals.user.id;
 
     const dbUser = await db.prepare(

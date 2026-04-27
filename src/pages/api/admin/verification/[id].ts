@@ -1,5 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
+import { getEnv } from '../../../../lib/runtime';
 import { getVerificationImage, deleteVerificationImage } from '../../../../lib/storage';
 
 // GET - Stream the verification image
@@ -23,7 +24,7 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Get verification record
     const verification = await db.prepare(`
@@ -38,7 +39,7 @@ export async function GET(context: APIContext): Promise<Response> {
     }
 
     // Get R2 bucket
-    const bucket = (context.locals as any).runtime?.env?.VERIFICATION_BUCKET;
+    const bucket = getEnv(context).VERIFICATION_BUCKET;
     if (!bucket) {
       return new Response(JSON.stringify({ error: 'Storage not configured' }), {
         status: 500,
@@ -103,7 +104,7 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Get verification record
     const verification = await db.prepare(`
@@ -124,7 +125,7 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
-    const bucket = (context.locals as any).runtime?.env?.VERIFICATION_BUCKET;
+    const bucket = getEnv(context).VERIFICATION_BUCKET;
     const now = Math.floor(Date.now() / 1000);
 
     if (action === 'approve') {

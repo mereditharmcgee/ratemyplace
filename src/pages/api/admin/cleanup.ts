@@ -20,7 +20,7 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Find buildings with no reviews
     const emptyBuildings = await db.prepare(`
@@ -85,7 +85,7 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Find buildings with no reviews
     const emptyBuildings = await db.prepare(`

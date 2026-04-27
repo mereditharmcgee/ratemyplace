@@ -11,7 +11,7 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
     const lucia = initializeLucia(db);
 
     await lucia.invalidateSession(context.locals.session.id);

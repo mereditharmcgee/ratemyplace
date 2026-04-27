@@ -32,7 +32,7 @@ export async function PATCH(context: APIContext): Promise<Response> {
     const body = await context.request.json();
     const { name, description, website, phone, email } = body;
 
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Check if landlord exists
     const landlord = await db.prepare('SELECT id FROM landlords WHERE id = ?').bind(landlordId).first();
@@ -122,7 +122,7 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     const landlord = await db.prepare(`
       SELECT * FROM landlords WHERE id = ?
@@ -192,7 +192,7 @@ export async function DELETE(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Check if landlord exists and get details for audit log
     const landlord = await db.prepare('SELECT id, name FROM landlords WHERE id = ?').bind(landlordId).first<{ id: string; name: string }>();

@@ -1,5 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
+import { getEnv } from '../../../lib/runtime';
 import { createPasswordResetToken } from '../../../lib/tokens';
 import { sendPasswordResetEmail } from '../../../lib/email';
 import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
@@ -13,8 +14,7 @@ interface User {
 }
 
 export async function POST(context: APIContext): Promise<Response> {
-  const runtime = (context.locals as any).runtime;
-  const db = getDB(runtime);
+  const db = getDB(context);
 
   // Rate limit: 3 password reset requests per hour per IP
   const clientIP = getClientIP(context);
@@ -86,9 +86,9 @@ export async function POST(context: APIContext): Promise<Response> {
     const token = await createPasswordResetToken(db, user.id);
 
     // Send email
-    const siteUrl = runtime.env.SITE_URL || context.url.origin;
+    const siteUrl = getEnv(context).SITE_URL || context.url.origin;
     const emailResult = await sendPasswordResetEmail(
-      runtime.env.RESEND_API_KEY,
+      getEnv(context).RESEND_API_KEY,
       siteUrl,
       user.email,
       token

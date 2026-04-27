@@ -30,7 +30,7 @@ export async function PATCH(context: APIContext): Promise<Response> {
     const body = await context.request.json();
     const { name, company_name, description, website, phone, email } = body;
 
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Check if property manager exists
     const manager = await db.prepare('SELECT id FROM property_managers WHERE id = ?').bind(managerId).first();
@@ -124,7 +124,7 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     const manager = await db.prepare(`
       SELECT * FROM property_managers WHERE id = ?

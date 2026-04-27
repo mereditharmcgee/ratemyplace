@@ -8,7 +8,7 @@ export async function GET(context: APIContext): Promise<Response> {
   const limit = Math.min(50, Math.max(1, parseInt(context.url.searchParams.get('limit') || '10', 10) || 10));
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     if (resultType === 'buildings') {
       const baseQuery = query

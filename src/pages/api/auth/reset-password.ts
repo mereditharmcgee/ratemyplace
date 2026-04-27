@@ -4,8 +4,7 @@ import { hashPassword } from '../../../lib/password';
 import { initializeLucia } from '../../../lib/auth';
 
 export async function POST(context: APIContext): Promise<Response> {
-  const runtime = (context.locals as any).runtime;
-  const db = getDB(runtime);
+  const db = getDB(context);
 
   try {
     const formData = await context.request.formData();

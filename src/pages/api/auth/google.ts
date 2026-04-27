@@ -1,9 +1,9 @@
 import type { APIContext } from 'astro';
+import { getEnv } from '../../../lib/runtime';
 
 // Initiates Google OAuth flow
 export async function GET(context: APIContext): Promise<Response> {
-  const runtime = (context.locals as any).runtime;
-  const clientId = runtime?.env?.GOOGLE_CLIENT_ID;
+  const clientId = getEnv(context).GOOGLE_CLIENT_ID;
 
   if (!clientId) {
     console.error('GOOGLE_CLIENT_ID not configured');

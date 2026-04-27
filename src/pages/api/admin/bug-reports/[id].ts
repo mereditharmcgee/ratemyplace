@@ -36,7 +36,7 @@ export async function PATCH(context: APIContext): Promise<Response> {
       });
     }
 
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     const resolvedAt = (status === 'resolved' || status === 'wont_fix') ? 'unixepoch()' : 'NULL';
 

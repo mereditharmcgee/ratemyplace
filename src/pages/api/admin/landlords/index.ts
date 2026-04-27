@@ -20,7 +20,7 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     const landlords = await db.prepare(`
       SELECT
@@ -82,7 +82,7 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
     const id = generateIdFromEntropySize(10);
 
     let slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');

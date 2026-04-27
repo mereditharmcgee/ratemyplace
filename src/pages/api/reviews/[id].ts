@@ -99,7 +99,7 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     const review = await db.prepare(`
       SELECT
@@ -165,7 +165,7 @@ export async function PATCH(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Verify ownership
     const existing = await db.prepare('SELECT user_id, building_id FROM reviews WHERE id = ?')

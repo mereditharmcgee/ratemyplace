@@ -1,6 +1,7 @@
 import type { APIContext } from 'astro';
 import { initializeLucia } from '../../../lib/auth';
 import { getDB } from '../../../lib/db';
+import { getEnv } from '../../../lib/runtime';
 import { hashPassword } from '../../../lib/password';
 import { generateIdFromEntropySize } from 'lucia';
 import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
@@ -45,10 +46,9 @@ export async function POST(context: APIContext): Promise<Response> {
 
   // Verify Turnstile token
   const turnstileToken = formData.get('cf-turnstile-response') as string;
-  const runtime = (context.locals as any).runtime;
   const turnstileResult = await verifyTurnstile(
     turnstileToken,
-    runtime.env.TURNSTILE_SECRET_KEY,
+    getEnv(context).TURNSTILE_SECRET_KEY,
     getClientIP(context)
   );
   if (!turnstileResult.success) {
@@ -59,7 +59,7 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Rate limiting: 3 accounts per hour per IP
     const clientIP = getClientIP(context);
@@ -109,12 +109,11 @@ export async function POST(context: APIContext): Promise<Response> {
     ).bind(userId, email.toLowerCase(), hashedPassword).run();
 
     // Create verification token and send email
-    const runtime = (context.locals as any).runtime;
     try {
       const token = await createVerificationToken(db, userId);
-      const siteUrl = runtime.env.SITE_URL || context.url.origin;
+      const siteUrl = getEnv(context).SITE_URL || context.url.origin;
       const emailResult = await sendVerificationEmail(
-        runtime.env.RESEND_API_KEY,
+        getEnv(context).RESEND_API_KEY,
         siteUrl,
         email.toLowerCase(),
         token

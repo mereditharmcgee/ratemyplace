@@ -1,5 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
+import { getEnv } from '../../../lib/runtime';
 import { uploadVerificationImage } from '../../../lib/storage';
 import { generateIdFromEntropySize } from 'lucia';
 
@@ -31,7 +32,7 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Verify user owns this review
     const review = await db.prepare('SELECT user_id, is_verified FROM reviews WHERE id = ?')
@@ -75,7 +76,7 @@ export async function POST(context: APIContext): Promise<Response> {
     }
 
     // Get R2 bucket
-    const bucket = (context.locals as any).runtime?.env?.VERIFICATION_BUCKET;
+    const bucket = getEnv(context).VERIFICATION_BUCKET;
     if (!bucket) {
       console.error('VERIFICATION_BUCKET not configured');
       return new Response(JSON.stringify({ error: 'Storage not configured' }), {

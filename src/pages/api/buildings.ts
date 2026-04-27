@@ -9,7 +9,7 @@ export async function GET(context: APIContext): Promise<Response> {
   // Look up by Google Place ID
   if (placeId) {
     try {
-      const db = getDB((context.locals as any).runtime);
+      const db = getDB(context);
       const building = await db.prepare(`
         SELECT id, address, neighborhood, city, state, slug, google_place_id
         FROM buildings
@@ -35,7 +35,7 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     const result = await db.prepare(`
       SELECT id, address, neighborhood, city, state, slug
@@ -87,7 +87,7 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Check if building already exists with this place ID
     const existing = await db.prepare(

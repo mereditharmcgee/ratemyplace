@@ -1,6 +1,7 @@
 import type { APIContext } from 'astro';
 import { initializeLucia } from '../../../lib/auth';
 import { getDB } from '../../../lib/db';
+import { getEnv } from '../../../lib/runtime';
 import { verifyPassword } from '../../../lib/password';
 import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
 import { logError } from '../../../lib/logger';
@@ -34,10 +35,9 @@ export async function POST(context: APIContext): Promise<Response> {
 
   // Verify Turnstile token
   const turnstileToken = formData.get('cf-turnstile-response') as string;
-  const runtime = (context.locals as any).runtime;
   const turnstileResult = await verifyTurnstile(
     turnstileToken,
-    runtime.env.TURNSTILE_SECRET_KEY,
+    getEnv(context).TURNSTILE_SECRET_KEY,
     getClientIP(context)
   );
   if (!turnstileResult.success) {
@@ -48,7 +48,7 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Rate limiting: 5 attempts per 15 minutes per IP
     const clientIP = getClientIP(context);

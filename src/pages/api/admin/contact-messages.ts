@@ -10,7 +10,7 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
     const { results } = await db.prepare(
       'SELECT * FROM contact_messages ORDER BY created_at DESC LIMIT 100'
     ).all();

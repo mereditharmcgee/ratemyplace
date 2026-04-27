@@ -19,7 +19,7 @@ export async function GET(context: APIContext): Promise<Response> {
     });
   }
 
-  const db = getDB((context.locals as any).runtime);
+  const db = getDB(context);
   const building = await db
     .prepare('SELECT id, address, city, state, zip_code FROM buildings WHERE id = ?')
     .bind(buildingId)

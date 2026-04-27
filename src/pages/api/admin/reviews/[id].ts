@@ -41,7 +41,7 @@ export async function PATCH(context: APIContext): Promise<Response> {
       });
     }
 
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Check if review exists and get current status (for audit log)
     const review = await db.prepare('SELECT id, status FROM reviews WHERE id = ?').bind(reviewId).first();
@@ -145,7 +145,7 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     const review = await db.prepare(`
       SELECT
@@ -205,7 +205,7 @@ export async function DELETE(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Check if review exists and capture data for audit log
     const review = await db.prepare(

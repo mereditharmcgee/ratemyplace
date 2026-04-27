@@ -42,7 +42,7 @@ export async function GET(context: APIContext): Promise<Response> {
     const limit = 50; // Within 25-50 range per CONTEXT.md
     const offset = (page - 1) * limit;
 
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Build WHERE clause dynamically
     const conditions: string[] = ['1=1'];

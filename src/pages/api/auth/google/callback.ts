@@ -1,6 +1,7 @@
 import type { APIContext } from 'astro';
 import { initializeLucia } from '../../../../lib/auth';
 import { getDB } from '../../../../lib/db';
+import { getEnv } from '../../../../lib/runtime';
 import { generateIdFromEntropySize } from 'lucia';
 
 interface GoogleTokenResponse {
@@ -43,9 +44,8 @@ export async function GET(context: APIContext): Promise<Response> {
     return context.redirect('/auth/signin?error=no_code');
   }
 
-  const runtime = (context.locals as any).runtime;
-  const clientId = runtime?.env?.GOOGLE_CLIENT_ID;
-  const clientSecret = runtime?.env?.GOOGLE_CLIENT_SECRET;
+  const clientId = getEnv(context).GOOGLE_CLIENT_ID;
+  const clientSecret = getEnv(context).GOOGLE_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
     console.error('Google OAuth credentials not configured');
@@ -92,7 +92,7 @@ export async function GET(context: APIContext): Promise<Response> {
       return context.redirect('/auth/signin?error=no_email');
     }
 
-    const db = getDB(runtime);
+    const db = getDB(context);
     const lucia = initializeLucia(db);
 
     // Check if user exists with this Google ID

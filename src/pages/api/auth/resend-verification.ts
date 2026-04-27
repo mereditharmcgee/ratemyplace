@@ -1,12 +1,13 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
+import { getEnv } from '../../../lib/runtime';
 import { createVerificationToken } from '../../../lib/tokens';
 import { sendVerificationEmail } from '../../../lib/email';
 import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
 import { logError } from '../../../lib/logger';
 
 export async function POST(context: APIContext): Promise<Response> {
-  const user = (context.locals as any).user;
+  const user = context.locals.user;
 
   if (!user) {
     return new Response(JSON.stringify({ error: 'Not authenticated' }), {
@@ -23,8 +24,7 @@ export async function POST(context: APIContext): Promise<Response> {
     });
   }
 
-  const runtime = (context.locals as any).runtime;
-  const db = getDB(runtime);
+  const db = getDB(context);
 
   // Rate limit: 3 verification emails per hour per IP
   const clientIP = getClientIP(context);
@@ -57,9 +57,9 @@ export async function POST(context: APIContext): Promise<Response> {
     const token = await createVerificationToken(db, user.id);
 
     // Send email
-    const siteUrl = runtime.env.SITE_URL || context.url.origin;
+    const siteUrl = getEnv(context).SITE_URL || context.url.origin;
     const emailResult = await sendVerificationEmail(
-      runtime.env.RESEND_API_KEY,
+      getEnv(context).RESEND_API_KEY,
       siteUrl,
       user.email,
       token

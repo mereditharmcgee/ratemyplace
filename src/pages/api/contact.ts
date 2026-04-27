@@ -1,5 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../lib/db';
+import { getEnv } from '../../lib/runtime';
 import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
 import { getClientIP, checkRateLimit } from '../../lib/rateLimit';
@@ -11,10 +12,9 @@ export async function POST(context: APIContext): Promise<Response> {
 
     // Verify Turnstile token
     const turnstileToken = formData.get('cf-turnstile-response') as string;
-    const runtime = (context.locals as any).runtime;
     const turnstileResult = await verifyTurnstile(
       turnstileToken,
-      runtime.env.TURNSTILE_SECRET_KEY,
+      getEnv(context).TURNSTILE_SECRET_KEY,
       getClientIP(context)
     );
     if (!turnstileResult.success) {
@@ -24,7 +24,7 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
-    const db = getDB(runtime);
+    const db = getDB(context);
     const ip = getClientIP(context);
 
     // Rate limit: 3 submissions per hour per IP
@@ -74,7 +74,7 @@ export async function POST(context: APIContext): Promise<Response> {
     `).bind(id, name, email, safeCategory, message).run();
 
     // Send confirmation email to submitter (best-effort)
-    const resendApiKey = runtime.env.RESEND_API_KEY;
+    const resendApiKey = getEnv(context).RESEND_API_KEY;
     await sendContactConfirmationEmail(resendApiKey, email, name, safeCategory).catch((err) => {
       console.error('Failed to send contact confirmation email:', err);
     });

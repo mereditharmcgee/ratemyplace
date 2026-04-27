@@ -1,5 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../lib/db';
+import { getEnv } from '../../lib/runtime';
 import { calculateDomainScores, ALL_SCORE_FIELDS } from '../../lib/scoring';
 import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
@@ -20,10 +21,9 @@ export async function POST(context: APIContext): Promise<Response> {
 
     // Verify Turnstile token
     const turnstileToken = formData.get('cf-turnstile-response') as string;
-    const runtime = (context.locals as any).runtime;
     const turnstileResult = await verifyTurnstile(
       turnstileToken,
-      runtime.env.TURNSTILE_SECRET_KEY,
+      getEnv(context).TURNSTILE_SECRET_KEY,
       getClientIP(context)
     );
     if (!turnstileResult.success) {
@@ -116,7 +116,7 @@ export async function POST(context: APIContext): Promise<Response> {
     const acceptsHousingVouchers = (formData.get('accepts_housing_vouchers') as string) || null;
     const safelyLitAtNight = (formData.get('safely_lit_at_night') as string) || null;
 
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Verify building exists and get its slug
     const building = await db.prepare('SELECT id, slug FROM buildings WHERE id = ?')

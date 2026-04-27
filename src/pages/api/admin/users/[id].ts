@@ -45,7 +45,7 @@ export async function PATCH(context: APIContext): Promise<Response> {
       });
     }
 
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     // Check if user exists
     const user = await db.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
@@ -101,7 +101,7 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB((context.locals as any).runtime);
+    const db = getDB(context);
 
     const user = await db.prepare(`
       SELECT

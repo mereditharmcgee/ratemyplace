@@ -8,12 +8,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
   context.locals.session = null;
 
   try {
-    const runtime = (context.locals as any).runtime;
-    if (!runtime?.env?.DB) {
+    if (!context.locals.runtime?.env?.DB) {
       return next();
     }
 
-    const db = getDB(runtime);
+    const db = getDB(context);
     const lucia = initializeLucia(db);
 
     const sessionId = context.cookies.get(lucia.sessionCookieName)?.value ?? null;
