@@ -8,6 +8,7 @@
 - ✅ **v1.2.2 Launch Ready** — Phases 2-3 (shipped 2026-02-27)
 - ✅ **v1.3.0 Battle Tested** — Phases 4-9 (shipped 2026-03-10)
 - ✅ **v1.4.0 Open Doors** — Phases 10-15 (shipped 2026-03-22)
+- 🚧 **v1.5.0 Closed Loops** — Phases 16-21 (in progress)
 
 ## Phases
 
@@ -59,5 +60,135 @@ See: `.planning/milestones/v1.4.0-ROADMAP.md`
 
 </details>
 
+### 🚧 v1.5.0 Closed Loops (In Progress)
+
+**Milestone Goal:** Close the security, validation, and quality-debt gaps surfaced by the post-brand codebase audit. Harden public endpoints, fill critical-flow test coverage, and reduce maintenance debt accumulated through v1.4.0.
+
+- [ ] **Phase 16: Typed Runtime Foundation** — Declare all Pages secrets in env.d.ts and wire typed runtime to App.Locals, eliminating 71 unsafe casts
+- [ ] **Phase 17: Public Endpoint Security** — Rate limiting and input validation on all unprotected public POST and search endpoints
+- [ ] **Phase 18: CSRF Audit and Async Email** — Document CSRF posture and convert blocking email sends to fire-and-forget
+- [ ] **Phase 19: D1 Index Migration** — Audit query plans and add missing indexes to eliminate full-table scans on hot paths
+- [ ] **Phase 20: Critical-Flow E2E Coverage** — Causal audit-log assertion and cross-view data consistency test coverage
+- [ ] **Phase 21: Quality Cleanup** — Response header consistency, shared EmptyState component
+
+## Phase Details
+
+### Phase 16: Typed Runtime Foundation
+**Goal**: The Cloudflare runtime is fully typed throughout the codebase — all Pages secrets declared, App.Locals wired to App.Platform, and all 71 unsafe casts eliminated in one batch
+**Depends on**: Phase 15 (v1.4.0 complete)
+**Requirements**: INFRA-01, INFRA-02, INFRA-03
+**Success Criteria** (what must be TRUE):
+  1. `App.Platform.env` in `env.d.ts` declares all 6 Pages secrets (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_MAPS_API_KEY`, `GOOGLE_PLACES_API_KEY`, `RESEND_API_KEY`, `SITE_URL`) alongside existing bindings — TypeScript build is clean
+  2. `App.Locals` declares `runtime: App.Platform` and `getDB()` accepts the typed parameter — IDE autocomplete works on `context.locals.runtime.env.DB` with no `any` cast
+  3. `grep -r '(context.locals as any).runtime' src/` returns zero matches — every call site converted in a single batch PR
+  4. Full TypeScript build (`npm run build`) passes with zero errors after the batch replacement
+**Plans**: TBD
+
+Plans:
+- [ ] 16-01: Declare all Pages secrets in App.Platform.env (env.d.ts) and wire runtime to App.Locals
+- [ ] 16-02: Update getDB and core lib signatures; batch-replace all 71 any-casts across API routes
+
+### Phase 17: Public Endpoint Security
+**Goal**: Every public POST and search endpoint has rate limiting and input validation — no unprotected path remains in the request surface
+**Depends on**: Phase 16
+**Requirements**: SEC-04, SEC-05, VAL-01, VAL-02, VAL-03, VAL-04, VAL-05
+**Success Criteria** (what must be TRUE):
+  1. A script that sends 6 bug reports in one hour receives a 429 on the 6th request with a `Retry-After` header present
+  2. A script sending more than 60 search requests per minute receives a 429 with `Retry-After` header; autocomplete allows up to 120/min before 429
+  3. Submitting a dispute with `landlordEmail` set to `"notanemail"` returns 400 with a field-level error identifying the email field
+  4. Submitting a dispute with `disputeExplanation` exceeding 5000 characters returns 400 with a length error
+  5. Calling `/api/search/results` with a query string longer than 200 characters returns 400 rather than executing the LIKE query
+**Plans**: TBD
+
+Plans:
+- [ ] 17-01: Add shared validation primitives to validation.ts (isValidEmail, isValidZipCode, enforceMaxLength) and implement validateDisputeForm, validateBugReport, validateContactForm, validateSearch
+- [ ] 17-02: Wire rate limiting on /api/bug-reports (5/hr) and /api/search/results + /api/search/autocomplete (60/min, 120/min); integrate validators at all four endpoints
+
+### Phase 18: CSRF Audit and Async Email
+**Goal**: CSRF posture is documented and ratified; email sends no longer block API response times
+**Depends on**: Phase 16 (typed runtime makes ctx.waitUntil access type-safe)
+**Requirements**: SEC-06, PERF-01, PERF-02, PERF-03, PERF-04
+**Success Criteria** (what must be TRUE):
+  1. `middleware.ts` contains an inline comment citing the CSRF audit conclusion — identifying which controls cover which endpoint categories and explicitly confirming no token implementation is required
+  2. `CLAUDE.md` contains a brief CSRF note recording the SameSite=Lax + Turnstile + Astro checkOrigin verdict
+  3. Submitting a signup request completes and returns a 201 response before any Resend API call resolves — the user is not blocked by email latency
+  4. Submitting a forgot-password request, a contact form, or a dispute returns its success response before Resend responds — all four email-sending routes use `ctx.waitUntil` with a null guard for local dev
+**Plans**: TBD
+
+Plans:
+- [ ] 18-01: CSRF audit — verify checkOrigin default, SameSite=Lax coverage, Turnstile scope; document conclusion in middleware.ts and CLAUDE.md
+- [ ] 18-02: Convert all four blocking email sends (signup, forgot-password, contact, disputes) to ctx.waitUntil with null guard
+
+### Phase 19: D1 Index Migration
+**Goal**: Every hot-path query runs against an index — no full-table scans on search joins, rate-limit lookups, or filter queries
+**Depends on**: Phase 16
+**Requirements**: PERF-05, PERF-06, PERF-07
+**Success Criteria** (what must be TRUE):
+  1. `EXPLAIN QUERY PLAN` output for the primary search join (`reviews JOIN buildings WHERE status = 'approved'`) shows an index scan rather than a full scan — confirmed before migration SQL is written
+  2. The composite index `reviews(building_id, status)` is present in the production schema (verified via `PRAGMA index_list('reviews')`)
+  3. Indexes on `buildings(city)` and `buildings(building_type)` are present if `EXPLAIN QUERY PLAN` on the filter queries showed full scans — or those indexes are explicitly skipped with the `EXPLAIN QUERY PLAN` output attached to the migration file comment
+**Plans**: TBD
+
+Plans:
+- [ ] 19-01: Run EXPLAIN QUERY PLAN audit on search joins, rate-limit lookups, and filter queries; document findings
+- [ ] 19-02: Write and apply migration adding confirmed-necessary indexes; verify with post-migration EXPLAIN QUERY PLAN
+
+### Phase 20: Critical-Flow E2E Coverage
+**Goal**: The two highest-priority E2E gaps are closed — admin moderation has a causal audit-log assertion and cross-view data consistency is verified end-to-end
+**Depends on**: Phase 17 (endpoints hardened before E2E covers them), Phase 19 (indexes in place for consistency queries)
+**Requirements**: TEST-01, TEST-02, TEST-03
+**Success Criteria** (what must be TRUE):
+  1. An E2E test captures a `review_id` before triggering admin approval, then asserts that a specific `audit_logs` entry with `action_type = 'review_approved'` and that `entity_id` exists — the assertion is not ordering-dependent
+  2. An E2E test submits a review, triggers admin approval, then verifies the `overall_score` matches across `/api/search/results`, `/building/[slug]`, and `/profile` — any divergence fails the test
+  3. `clearRateLimits()` is defined once in `e2e/fixtures.ts` and imported by both `security.spec.ts` and any new spec that needs it — no duplication
+**Plans**: TBD
+
+Plans:
+- [ ] 20-01: Extract clearRateLimits helper to e2e/fixtures.ts; write causal audit-log E2E test for admin moderation flow
+- [ ] 20-02: Write cross-view data consistency E2E test (submit → approve → verify score on search, building detail, profile)
+
+### Phase 21: Quality Cleanup
+**Goal**: Rate-limit response headers are consistent across all endpoints and a shared EmptyState component replaces ad-hoc empty-state messaging
+**Depends on**: Phase 17 (rate limiting must be in place before headers can be standardized)
+**Requirements**: SEC-07, SEC-08, UX-01
+**Success Criteria** (what must be TRUE):
+  1. Every 429 response across all rate-limited endpoints includes a `Retry-After` header — including `contact.ts` which currently omits it
+  2. Every rate-limited endpoint response (200 or 429) includes `X-RateLimit-Limit` and `X-RateLimit-Remaining` headers
+  3. The search results page, building detail page (zero-review state), user profile (no reviews), and notifications panel all render via the shared `<EmptyState>` component with consistent title/description messaging — no ad-hoc empty-state strings remain on those pages
+**Plans**: TBD
+
+Plans:
+- [ ] 21-01: Standardize Retry-After and add X-RateLimit-Limit / X-RateLimit-Remaining headers across all rate-limited endpoints
+- [ ] 21-02: Build shared EmptyState React component and replace ad-hoc empty-state messaging on search, building detail, profile, and notifications
+
+## Progress
+
+**Execution Order:**
+Phases 16 → 17 and 18 and 19 (parallel after 16) → 20 → 21
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Email Verification | v1.2.1 | 4/4 | Complete | 2026-02-26 |
+| 2. Landlord Disputes | v1.2.2 | 3/3 | Complete | 2026-02-27 |
+| 3. Security Hardening | v1.2.2 | 3/3 | Complete | 2026-02-27 |
+| 4. Database Foundation | v1.3.0 | 3/3 | Complete | 2026-02-28 |
+| 5. Seed Data | v1.3.0 | 2/2 | Complete | 2026-02-28 |
+| 6. Playwright Local Environment | v1.3.0 | 2/2 | Complete | 2026-02-28 |
+| 7. Auth and Review E2E | v1.3.0 | 3/3 | Complete | 2026-02-28 |
+| 8. Admin and Disputes E2E | v1.3.0 | 3/3 | Complete | 2026-03-01 |
+| 9. Security E2E | v1.3.0 | 2/2 | Complete | 2026-03-10 |
+| 10. Foundations and Legal Hardening | v1.4.0 | 3/3 | Complete | 2026-03-20 |
+| 11. Schema, Survey Fields, and Contact Form | v1.4.0 | 2/2 | Complete | 2026-03-21 |
+| 12. Multi-City Enrichment Adapter | v1.4.0 | 2/2 | Complete | 2026-03-21 |
+| 13. Tenant Dashboard Core | v1.4.0 | 3/3 | Complete | 2026-03-22 |
+| 14. Saved Buildings and Verification UX | v1.4.0 | 2/2 | Complete | 2026-03-20 |
+| 15. Notification Gap Closure | v1.4.0 | 1/1 | Complete | 2026-03-22 |
+| 16. Typed Runtime Foundation | v1.5.0 | 0/2 | Not started | - |
+| 17. Public Endpoint Security | v1.5.0 | 0/2 | Not started | - |
+| 18. CSRF Audit and Async Email | v1.5.0 | 0/2 | Not started | - |
+| 19. D1 Index Migration | v1.5.0 | 0/2 | Not started | - |
+| 20. Critical-Flow E2E Coverage | v1.5.0 | 0/2 | Not started | - |
+| 21. Quality Cleanup | v1.5.0 | 0/2 | Not started | - |
+
 ---
-*Roadmap updated: 2026-03-22 — v1.4.0 "Open Doors" shipped*
+*Roadmap updated: 2026-04-27 — v1.5.0 "Closed Loops" phases 16-21 added*

@@ -93,37 +93,37 @@ Updated by gsd-roadmapper after roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | TBD | Pending |
-| INFRA-02 | TBD | Pending |
-| INFRA-03 | TBD | Pending |
-| SEC-04 | TBD | Pending |
-| SEC-05 | TBD | Pending |
-| SEC-06 | TBD | Pending |
-| SEC-07 | TBD | Pending |
-| SEC-08 | TBD | Pending |
-| VAL-01 | TBD | Pending |
-| VAL-02 | TBD | Pending |
-| VAL-03 | TBD | Pending |
-| VAL-04 | TBD | Pending |
-| VAL-05 | TBD | Pending |
-| PERF-01 | TBD | Pending |
-| PERF-02 | TBD | Pending |
-| PERF-03 | TBD | Pending |
-| PERF-04 | TBD | Pending |
-| PERF-05 | TBD | Pending |
-| PERF-06 | TBD | Pending |
-| PERF-07 | TBD | Pending |
-| TEST-01 | TBD | Pending |
-| TEST-02 | TBD | Pending |
-| TEST-03 | TBD | Pending |
-| UX-01 | TBD | Pending |
+| INFRA-01 | Phase 16 | Pending |
+| INFRA-02 | Phase 16 | Pending |
+| INFRA-03 | Phase 16 | Pending |
+| SEC-04 | Phase 17 | Pending |
+| SEC-05 | Phase 17 | Pending |
+| SEC-06 | Phase 18 | Pending |
+| SEC-07 | Phase 21 | Pending |
+| SEC-08 | Phase 21 | Pending |
+| VAL-01 | Phase 17 | Pending |
+| VAL-02 | Phase 17 | Pending |
+| VAL-03 | Phase 17 | Pending |
+| VAL-04 | Phase 17 | Pending |
+| VAL-05 | Phase 17 | Pending |
+| PERF-01 | Phase 18 | Pending |
+| PERF-02 | Phase 18 | Pending |
+| PERF-03 | Phase 18 | Pending |
+| PERF-04 | Phase 18 | Pending |
+| PERF-05 | Phase 19 | Pending |
+| PERF-06 | Phase 19 | Pending |
+| PERF-07 | Phase 19 | Pending |
+| TEST-01 | Phase 20 | Pending |
+| TEST-02 | Phase 20 | Pending |
+| TEST-03 | Phase 20 | Pending |
+| UX-01 | Phase 21 | Pending |
 
 **Coverage:**
 - v1 requirements: 24 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 24 ⚠️
+- Mapped to phases: 24
+- Unmapped: 0 ✓
 
 ---
 
 *Requirements defined: 2026-04-27*
-*Last updated: 2026-04-27 after research synthesis*
+*Last updated: 2026-04-27 after roadmap creation — traceability complete*

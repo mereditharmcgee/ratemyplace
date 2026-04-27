@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Closed Loops
-status: defining_requirements
-last_updated: "2026-04-27T20:30:00.000Z"
-last_activity: 2026-04-27 — Milestone v1.5.0 "Closed Loops" started
+status: ready_to_plan
+last_updated: "2026-04-27T21:00:00.000Z"
+last_activity: 2026-04-27 — Roadmap created for v1.5.0 "Closed Loops" (phases 16-21, 24 requirements)
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
-  total_plans: 0
+  total_plans: 12
   completed_plans: 0
   percent: 0
 ---
@@ -24,44 +24,58 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-27)
 
 **Core value:** Tenants can submit honest, anonymous reviews and see aggregated scores
-**Current focus:** Defining requirements for v1.5.0 hardening pass
+**Current focus:** Phase 16 — Typed Runtime Foundation (ready to plan)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 16 of 21 (Typed Runtime Foundation)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-27 — Milestone v1.5.0 "Closed Loops" started
+Status: Ready to plan
+Last activity: 2026-04-27 — Roadmap created, phases 16-21 defined, 24/24 requirements mapped
 
-## Completed Milestones
+Progress: [░░░░░░░░░░] 0%
 
-- v1.2.1 Email Verification — Phase 1 (4 plans) — shipped 2026-02-26
-- v1.2.2 Launch Ready — Phases 2-3 (6 plans) — shipped 2026-02-27
-- v1.3.0 Battle Tested — Phases 4-9 (15 plans) — shipped 2026-03-10
-- v1.4.0 Open Doors — Phases 10-15 (13 plans) — shipped 2026-03-22
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 0 (this milestone)
+- Average duration: — min
+- Total execution time: —
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| - | - | - | - |
+
+*Updated after each plan completion*
 
 ## Accumulated Context
 
-- Production URL: ratemyplace.org (not ratemyplace.boston)
-- Cloudflare Email Routing catch-all active for all @ratemyplace.org addresses
-- Boston Assessing API: CKAN datastore_search, resource ee73430d-96c0-423e-ad21-c4cfb54c8961
-- CT CAMA API (New Haven): data.ct.gov resource pqrn-qghw — live-tested and confirmed working
-- Migration numbering: through 0023 used; next available 0024
-- Survey fields: use nullable columns (INTEGER, no NOT NULL constraint) — D1 rejects NOT NULL ALTER TABLE on existing rows
-- CAN-SPAM: notification_opt_in column on users table — review status emails should respect this flag
-- Rate limit infrastructure: src/lib/rateLimit.ts exists, currently only wired to /api/auth/signin (gap to close in v1.5.0)
-- 235 unit tests passing as of v1.4.0 close; 170+ E2E tests
-- Brand migration v1.3 merged to main via PR #4 on 2026-04-27 (codebase map refreshed)
-- Brand assets at public/brand/ (logo-mark, logo-lockup, logo-mark-ink, logo-mark-reverse, logo-lockup-utility)
-- Codebase audit (.planning/codebase/CONCERNS.md, 2026-04-26) drives v1.5.0 scope
+### Decisions
 
-## Blockers
+- Phase 16 MUST run before 17/18/19: env.d.ts secrets must be declared before typed wrapper or casts cascade
+- All 71 any-casts must be replaced in a single batch PR — partial migration is worse than none
+- CSRF audit expected to close as "no token needed" — SameSite=Lax + Turnstile + Astro checkOrigin sufficient
+- Session cookie MUST stay SameSite=Lax (Strict breaks Google OAuth cross-site callback)
+- waitUntil null guard required: `if (runtime?.ctx?.waitUntil)` — ctx is undefined in local Wrangler dev
+- DEBT-01..04 (component splits) explicitly deferred to v1.6.0 — not in v1.5.0 scope
+- Migration numbering: through 0023 used; next available 0024
+- D1 index migration must run EXPLAIN QUERY PLAN before writing SQL (PERF-05 before PERF-06/PERF-07)
+
+### Pending Todos
+
+None yet.
+
+### Blockers/Concerns
 
 None currently.
 
-## Decisions
+## Session Continuity
 
-(Decisions accumulate as phases complete. Earlier-milestone decisions archived in .planning/milestones/.)
+Last session: 2026-04-27
+Stopped at: Roadmap written — ready to run /gsd:plan-phase 16
+Resume file: None
 
 ---
-*State updated: 2026-04-27 — v1.5.0 "Closed Loops" milestone init*
+*State updated: 2026-04-27 — v1.5.0 roadmap created*
