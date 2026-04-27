@@ -1,15 +1,16 @@
-import type { APIRoute } from 'astro';
+import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../lib/db';
+import { getEnv } from '../../lib/runtime';
 import { extractReviewIdFromUrl } from '../../lib/disputes';
 import { sanitizeText } from '../../lib/validation';
 import { sendDisputeConfirmationEmail } from '../../lib/email';
 import { checkRateLimit, getClientIP } from '../../lib/rateLimit';
 import { createNotification } from '../../lib/notifications';
 
-export const POST: APIRoute = async ({ request, locals: rawLocals }) => {
-  const locals = rawLocals as any;
+export const POST: APIRoute = async (context: APIContext) => {
+  const { request } = context;
   try {
-    const db = getDB(locals.runtime);
+    const db = getDB(context);
 
     // Rate limiting: 3 dispute submissions per hour per IP
     const clientIP = getClientIP({ request });
@@ -136,7 +137,7 @@ export const POST: APIRoute = async ({ request, locals: rawLocals }) => {
     }
 
     // Send confirmation email (best-effort)
-    const resendApiKey = locals.runtime?.env?.RESEND_API_KEY;
+    const resendApiKey = getEnv(context).RESEND_API_KEY;
     if (resendApiKey) {
       try {
         await sendDisputeConfirmationEmail(
@@ -176,11 +177,10 @@ export const POST: APIRoute = async ({ request, locals: rawLocals }) => {
  * GET /api/disputes
  * Get all disputes with joined review and building data (admin only)
  */
-export const GET: APIRoute = async ({ locals: rawLocals }) => {
-  const locals = rawLocals as any;
+export const GET: APIRoute = async (context: APIContext) => {
   try {
     // Check authentication
-    const user = locals.user;
+    const user = context.locals.user;
     if (!user) {
       return new Response(
         JSON.stringify({ error: 'Authentication required' }),
@@ -197,7 +197,7 @@ export const GET: APIRoute = async ({ locals: rawLocals }) => {
     }
 
     // Get database
-    const db = getDB(locals.runtime);
+    const db = getDB(context);
 
     // Query disputes with joined review and building data
     const disputes = await db

@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../components/layout/BaseLayout.astro';
 
-const user = (Astro.locals as any).user;
+const user = Astro.locals.user;
 ---
 
 <BaseLayout title="Email Verified">

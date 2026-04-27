@@ -1,5 +1,6 @@
-import type { APIRoute } from 'astro';
+import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../../lib/db';
+import { getEnv } from '../../../lib/runtime';
 import { sendDisputeUpheldEmail } from '../../../lib/email';
 import { createAuditLog } from '../../../lib/audit';
 import { getClientIP } from '../../../lib/rateLimit';
@@ -9,13 +10,13 @@ import { createNotification } from '../../../lib/notifications';
  * PATCH /api/disputes/:id
  * Resolve a dispute (admin only)
  */
-export const PATCH: APIRoute = async ({ params, request, locals: rawLocals }) => {
-  const locals = rawLocals as any;
+export const PATCH: APIRoute = async (context: APIContext) => {
+  const { params, request } = context;
   try {
     const disputeId = params.id;
 
     // Check authentication
-    const user = locals.user;
+    const user = context.locals.user;
     if (!user) {
       return new Response(
         JSON.stringify({ error: 'Authentication required' }),
@@ -53,7 +54,7 @@ export const PATCH: APIRoute = async ({ params, request, locals: rawLocals }) =>
     }
 
     // Get database
-    const db = getDB(locals.runtime);
+    const db = getDB(context);
 
     // Get dispute details for email and audit log
     const dispute = await db
@@ -129,7 +130,7 @@ export const PATCH: APIRoute = async ({ params, request, locals: rawLocals }) =>
 
     // If outcome is 'uphold', send notification email to landlord
     if (resolutionOutcome === 'uphold') {
-      const apiKey = locals.runtime?.env?.RESEND_API_KEY;
+      const apiKey = getEnv(context).RESEND_API_KEY;
       if (apiKey) {
         try {
           await sendDisputeUpheldEmail(
