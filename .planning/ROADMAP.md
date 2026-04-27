@@ -82,11 +82,11 @@ See: `.planning/milestones/v1.4.0-ROADMAP.md`
   2. `App.Locals` declares `runtime: App.Platform` and `getDB()` accepts the typed parameter — IDE autocomplete works on `context.locals.runtime.env.DB` with no `any` cast
   3. `grep -r '(context.locals as any).runtime' src/` returns zero matches — every call site converted in a single batch PR
   4. Full TypeScript build (`npm run build`) passes with zero errors after the batch replacement
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 16-01: Declare all Pages secrets in App.Platform.env (env.d.ts) and wire runtime to App.Locals
-- [ ] 16-02: Update getDB and core lib signatures; batch-replace all 71 any-casts across API routes
+- [ ] 16-01-PLAN.md — Type foundation: env.d.ts (App.Platform.env + App.Locals.runtime), src/lib/runtime.ts (getEnv helper), src/lib/db.ts refactor to getDB(context), and verify-typed-runtime.sh script
+- [ ] 16-02-PLAN.md — Cast retirement batch: replace all 70 (context.locals as any).runtime casts in API routes + middleware, all 11 (Astro.locals as any).runtime casts in .astro pages, and 6 rawLocals as any patterns in disputes files
 
 ### Phase 17: Public Endpoint Security
 **Goal**: Every public POST and search endpoint has rate limiting and input validation — no unprotected path remains in the request surface
