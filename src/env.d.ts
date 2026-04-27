@@ -10,6 +10,12 @@ declare namespace App {
       DB: D1Database;
       VERIFICATION_BUCKET: R2Bucket;
       TURNSTILE_SECRET_KEY: string;
+      GOOGLE_CLIENT_ID: string;
+      GOOGLE_CLIENT_SECRET: string;
+      GOOGLE_MAPS_API_KEY: string;
+      GOOGLE_PLACES_API_KEY: string;
+      RESEND_API_KEY: string;
+      SITE_URL: string;
     };
     cf: import('@cloudflare/workers-types').IncomingRequestCfProperties;
     ctx: import('@cloudflare/workers-types').ExecutionContext;
@@ -18,5 +24,6 @@ declare namespace App {
   interface Locals {
     user: import('lucia').User | null;
     session: import('lucia').Session | null;
+    runtime: App.Platform;
   }
 }
