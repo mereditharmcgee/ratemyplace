@@ -59,7 +59,7 @@ export default function AddressAutocomplete({
 
   const totalItems = dbMatches.length + predictions.length;
 
-  // Fast DB search for existing buildings â€” 150ms
+  // Fast DB search for existing buildings — 150ms
   const fetchDbMatches = useCallback(async (input: string) => {
     if (input.length < 2) {
       setDbMatches([]);
@@ -87,7 +87,7 @@ export default function AddressAutocomplete({
     }
   }, []);
 
-  // Google Places for structured address data â€” 300ms
+  // Google Places for structured address data — 300ms
   const fetchPredictions = useCallback(async (input: string) => {
     if (input.length < 3) {
       setPredictions([]);
@@ -123,13 +123,13 @@ export default function AddressAutocomplete({
       return;
     }
 
-    // DB first â€” fast, 150ms
+    // DB first — fast, 150ms
     dbDebounceRef.current = setTimeout(() => {
       fetchDbMatches(value);
       setShowDropdown(true);
     }, 150);
 
-    // Google Places â€” 300ms (needs structured data, always fires)
+    // Google Places — 300ms (needs structured data, always fires)
     googleDebounceRef.current = setTimeout(() => fetchPredictions(value), 300);
   };
 

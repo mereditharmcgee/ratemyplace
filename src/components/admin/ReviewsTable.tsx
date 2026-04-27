@@ -347,7 +347,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                     ) : null}
                   </div>
                   <p className="text-sm text-gray-500">
-                    {review.user_email} â€¢ {formatDate(review.created_at)}
+                    {review.user_email} • {formatDate(review.created_at)}
                   </p>
                   {review.review_title && (
                     <p className="text-sm text-gray-700 mt-1 truncate">

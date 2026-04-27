@@ -328,7 +328,7 @@ export default function LandlordsTable() {
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-gray-900">{landlord.name}</h3>
                   <p className="text-sm text-gray-500">
-                    {landlord.building_count} buildings â€¢ {landlord.review_count} reviews
+                    {landlord.building_count} buildings • {landlord.review_count} reviews
                   </p>
                   {landlord.email && (
                     <p className="text-sm text-teal-700 mt-1">{landlord.email}</p>

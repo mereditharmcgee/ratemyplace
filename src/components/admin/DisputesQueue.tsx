@@ -225,7 +225,7 @@ export default function DisputesQueue() {
                       </h3>
                     </div>
                     <p className="text-sm text-gray-500">
-                      {dispute.landlord_name} â€¢ {formatDate(dispute.created_at)}
+                      {dispute.landlord_name} • {formatDate(dispute.created_at)}
                     </p>
                     <p className="text-sm text-gray-700 mt-1 truncate">
                       {reasonSnippet}

@@ -204,7 +204,7 @@ export default function SettingsTab({
                 Email me when my review status changes
               </span>
               <p className="text-xs text-gray-500 mt-0.5">
-                Email notifications coming soon â€” your preference will be applied when enabled.
+                Email notifications coming soon — your preference will be applied when enabled.
               </p>
             </div>
           </label>

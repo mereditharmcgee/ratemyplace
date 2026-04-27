@@ -71,7 +71,7 @@ export default function HomeSearch() {
     }
   }, [sessionToken]);
 
-  // DB search â€” fires first. If < 3 results, triggers Google fallback.
+  // DB search — fires first. If < 3 results, triggers Google fallback.
   // No race condition: Google is called from the DB response callback, not a separate timer.
   const fetchDbResults = useCallback(async (input: string) => {
     if (input.length < 2) {
@@ -94,7 +94,7 @@ export default function HomeSearch() {
       }
     } catch {
       setDbResults([]);
-      // DB failed â€” try Google as fallback
+      // DB failed — try Google as fallback
       if (input.length >= 3) {
         fetchGoogleResults(input);
       }
@@ -130,7 +130,7 @@ export default function HomeSearch() {
       const { type, slug } = item.data;
       window.location.href = `/${type === 'building' ? 'building' : 'landlord'}/${slug}`;
     } else {
-      // Google result â€” check if building exists in DB, otherwise go to search
+      // Google result — check if building exists in DB, otherwise go to search
       setInputValue(item.data.description);
       try {
         const params = new URLSearchParams({ placeId: item.data.placeId });

@@ -104,7 +104,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
   };
 
   const fetchSavedBuildings = async () => {
-    if (savedLoaded) return; // Cache â€” only fetch once
+    if (savedLoaded) return; // Cache — only fetch once
     try {
       setSavedLoading(true);
       const response = await fetch('/api/buildings/saved');
@@ -124,7 +124,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
   };
 
   const fetchNotifications = async () => {
-    if (notificationsLoaded) return; // Cache â€” only fetch once
+    if (notificationsLoaded) return; // Cache — only fetch once
     try {
       setNotificationsLoading(true);
       const response = await fetch('/api/notifications');
