@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: planning
-stopped_at: Completed 16-01-PLAN.md
-last_updated: "2026-04-27T23:17:06.342Z"
+stopped_at: Completed 16-02-PLAN.md
+last_updated: "2026-04-27T23:29:09.058Z"
 last_activity: 2026-04-27 — Roadmap created, phases 16-21 defined, 24/24 requirements mapped
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -51,6 +51,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 16 P01 | 2 | 3 tasks | 4 files |
+| Phase 16 P02 | 10 | 3 tasks | 60 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,7 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 16]: runtime: App.Platform declared non-optional in App.Locals; fail-fast guard in getEnv handles missing runtime cleanly
 - [Phase 16]: getDB(context: APIContext) signature safe before 16-02: as-any call sites pass any type which is assignable to APIContext
 - [Phase 16]: 16-01 and 16-02 must ship as one atomic unit — do not deploy between plans
+- [Phase 16]: 16-01 + 16-02 ship as one atomic unit — INFRA-03 complete, safe to deploy after 16-02
 
 ### Pending Todos
 
@@ -78,8 +80,8 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-04-27T23:17:06.339Z
-Stopped at: Completed 16-01-PLAN.md
+Last session: 2026-04-27T23:29:09.056Z
+Stopped at: Completed 16-02-PLAN.md
 Resume file: None
 
 ---

@@ -64,7 +64,7 @@ See: `.planning/milestones/v1.4.0-ROADMAP.md`
 
 **Milestone Goal:** Close the security, validation, and quality-debt gaps surfaced by the post-brand codebase audit. Harden public endpoints, fill critical-flow test coverage, and reduce maintenance debt accumulated through v1.4.0.
 
-- [ ] **Phase 16: Typed Runtime Foundation** — Declare all Pages secrets in env.d.ts and wire typed runtime to App.Locals, eliminating 71 unsafe casts
+- [x] **Phase 16: Typed Runtime Foundation** — Declare all Pages secrets in env.d.ts and wire typed runtime to App.Locals, eliminating 71 unsafe casts (completed 2026-04-27)
 - [ ] **Phase 17: Public Endpoint Security** — Rate limiting and input validation on all unprotected public POST and search endpoints
 - [ ] **Phase 18: CSRF Audit and Async Email** — Document CSRF posture and convert blocking email sends to fire-and-forget
 - [ ] **Phase 19: D1 Index Migration** — Audit query plans and add missing indexes to eliminate full-table scans on hot paths
@@ -183,7 +183,7 @@ Phases 16 → 17 and 18 and 19 (parallel after 16) → 20 → 21
 | 13. Tenant Dashboard Core | v1.4.0 | 3/3 | Complete | 2026-03-22 |
 | 14. Saved Buildings and Verification UX | v1.4.0 | 2/2 | Complete | 2026-03-20 |
 | 15. Notification Gap Closure | v1.4.0 | 1/1 | Complete | 2026-03-22 |
-| 16. Typed Runtime Foundation | 1/2 | In Progress|  | - |
+| 16. Typed Runtime Foundation | 2/2 | Complete   | 2026-04-27 | - |
 | 17. Public Endpoint Security | v1.5.0 | 0/2 | Not started | - |
 | 18. CSRF Audit and Async Email | v1.5.0 | 0/2 | Not started | - |
 | 19. D1 Index Migration | v1.5.0 | 0/2 | Not started | - |
