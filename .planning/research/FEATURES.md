@@ -1,151 +1,157 @@
 # Feature Research
 
-**Domain:** Tenant housing review platform — v1.4.0 "Open Doors" milestone
-**Researched:** 2026-03-20
-**Confidence:** MEDIUM-HIGH (competitor patterns from live sites; New Haven API availability is LOW confidence — blocked)
+**Domain:** Security hardening and quality-debt closure for a Cloudflare Workers + Astro SSR tenant review platform
+**Researched:** 2026-04-26
+**Confidence:** HIGH (based on direct codebase audit — no external sources needed for implementation-specific findings)
 
-## Context
+---
 
-This is a subsequent milestone research doc. The platform already ships:
-- 27-item structured review survey with weighted scoring
-- Google OAuth + email/password auth with email verification
-- Admin moderation dashboard (9 pages)
-- Landlord dispute form + admin queue
-- Boston-only auto-research via City of Boston Assessing API (CKAN/Socrata)
-- Basic profile page at `/profile` with `ProfileDashboard.tsx` (review list + verification modal)
-- Contact page at `/contact` with static mailto links — no form, no storage
-- Bug report form with D1 storage + Turnstile
+## Codebase Baseline (What Already Exists)
+
+Before categorizing features, here is the precise state of each gap area as found in the audit. This prevents over-building.
+
+| Area | Status |
+|------|--------|
+| `checkRateLimit()` in `src/lib/rateLimit.ts` | Exists, fail-closed, D1-backed, per-IP |
+| Rate limiting on `/api/contact.ts` | DONE — 3/hr, with `Retry-After` header |
+| Rate limiting on `/api/disputes.ts` | DONE — 3/hr, with `Retry-After` + 503/429 split |
+| Rate limiting on `/api/bug-reports.ts` | MISSING — Turnstile present but no `checkRateLimit` call |
+| Rate limiting on `/api/search/results.ts` | MISSING — no protection at all (GET endpoint) |
+| Rate limiting on `/api/search/autocomplete.ts` | MISSING — no protection at all (GET endpoint) |
+| Input validation on `/api/contact.ts` | Solid — name 2-100, email includes('@'), message 10-3000 |
+| Input validation on `/api/disputes.ts` | Partial — required-field check, no length limits on text fields, email not regex-validated |
+| Input validation on `/api/bug-reports.ts` | Partial — description 10-5000, category allowlist; email field accepted without format check |
+| `validation.ts` | Covers review form only; no shared validators for email, zip, generic text length |
+| CSRF tokens | None. Session cookie is `SameSite=Lax` which blocks cross-site top-level POSTs but NOT fetch/XHR |
+| Lucia CSRF built-in | Lucia v3 does NOT include CSRF protection; it relies on the host framework |
+| Async email in `/api/contact.ts` | Uses `.catch()` but still `await`s both sends before returning — synchronous |
+| `waitUntil` availability | `context.locals.runtime.ctx.waitUntil()` — `ctx: ExecutionContext` is typed in `env.d.ts` but cast to `any` in practice |
+| Admin moderation E2E | UI actions tested (approve/reject/resolve); audit log assertion is ordering-dependent, not action-specific |
+| Cross-view consistency E2E | No coverage — audit explicitly calls this out as HIGH priority |
+| D1 indexes: `reviews(building_id, status)` composite | Missing — search joins `reviews` on both columns repeatedly |
+| D1 indexes: `buildings.city` | Missing — used in search filters |
+| D1 indexes: `buildings.building_type` | Missing — used in search filters |
+| D1 indexes: `buildings.zip_code` | Missing — not currently in search but natural filter candidate |
+| Component LOC: ReviewEditForm | 907 lines |
+| Component LOC: BuildingsTable | 844 lines |
+| Component LOC: ReviewsTable | 733 lines |
+| Typed runtime wrapper | 71 `(context.locals as any).runtime` casts; `App.Platform` type exists in `env.d.ts` but not wired to `locals` |
+| EmptyState component | No shared component; each page has ad-hoc empty state text |
 
 ---
 
 ## Feature Landscape
 
-### Table Stakes (Users Expect These)
+### Table Stakes (Production Web Apps Must Have These)
 
-Features users assume exist on any review platform. Missing these = product feels incomplete.
+These are the behaviors any hardened production web app is expected to have. Missing them is a security or quality deficit, not a missing feature.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| See my submitted reviews with clear status | Every review platform has "My Reviews"; "where did my review go?" is the #1 support question | LOW | Infrastructure exists (ProfileDashboard shows review list) — UX clarity is missing |
-| Know what happens after I submit | Review moderation is invisible; creates abandonment and confusion | LOW | Pending/approved/rejected status already in DB; surface with readable labels and explanatory copy |
-| Email verification status is visible | If email verification is required to publish, users must be able to see their state | LOW | VerificationModal exists; trigger UX is unclear from current code |
-| UGC disclaimer on review submission | Legal standard: users must consent before posting; Section 230 protection depends on this | LOW | Missing from submission flow entirely — highest legal risk per unit of effort |
-| UGC disclaimer on review display pages | Readers need to know content is user-submitted and unverified | LOW | Missing from building/landlord profile pages |
-| Contact form (not just mailto links) | Modern platforms don't use raw mailto — it leaks email, abandons message tracking, breaks on mobile | MEDIUM | Current `/contact` is static mailto only; needs D1 storage + Resend notification |
-| Section 8 acceptance visible | Critical for voucher holders — 1 in 3 Boston-area landlords reportedly refuse; high-value signal | MEDIUM | New survey field; requires migration + survey form update + landlord profile display |
+| Rate limiting on all public POST endpoints | Bot mitigation baseline; spammers target contact/dispute forms | LOW | `checkRateLimit()` already exists; this is call-site wiring only. Bug-reports needs it; search is GET so use a lighter limit |
+| Rate limit response headers (`X-RateLimit-*` + `Retry-After`) | RFC 6585 / industry norm; clients and monitoring tools expect them | LOW | `Retry-After` already present on dispute/signin; needs to be consistent across all rate-limited endpoints |
+| 429 status for rate limit exceeded | HTTP standard — `429 Too Many Requests`; 503 is correct only when the rate-limit DB itself fails | LOW | Pattern already correct in `disputes.ts` (429 vs 503 split); replicate everywhere |
+| Input length limits on all text fields | Prevents DB bloat, log flooding, and denial-of-service via oversized payloads | LOW | `disputeExplanation` has no max; `landlordName`, `landlordPhone` have no limits in disputes.ts |
+| Numeric type guards (`rent_amount`, `laundry_cost_per_load`) | Prevents storing NaN or strings in numeric columns | LOW | `reviews.ts` uses `parseInt()` without `isNaN` guard in some places |
+| Email format validation on all endpoints that accept email | Prevents garbage data in contact/dispute records | LOW | `/api/contact.ts` uses `includes('@')` only; `/api/disputes.ts` accepts any string for `landlordEmail`; use regex `/^[^\s@]+@[^\s@]+\.[^\s@]+$/` |
+| SameSite=Lax cookie attribute | Blocks cross-site form POST attacks (most CSRF vectors) | LOW | Already set in middleware — this is done. Verify it covers all state-changing endpoints |
+| CSRF audit documentation | Know what protection exists before claiming it is sufficient | LOW | SameSite=Lax does NOT block cross-origin fetch/XHR. Authenticated state-changing APIs need an additional check if called by JS |
+| Non-blocking email sends | API response time should not depend on a third-party email SLA (Resend adds 200-500ms) | MEDIUM | Pattern: `context.locals.runtime.ctx.waitUntil(sendEmail(...))` — fire-and-forget without losing the promise to the runtime |
+| E2E coverage for admin moderation with audit-log assertion | Admin approve/reject already tested at UI level but audit log assertion is ordering-dependent, not causal | MEDIUM | Need: trigger approve action, then assert the specific audit log entry exists for that review ID |
+| E2E coverage for cross-view data consistency | Same score appearing correctly on search, building detail, and profile page is the core promise of the platform | MEDIUM | Playwright: submit review → check all 3 views → edit review → check all 3 views again |
+| Composite DB index on `reviews(building_id, status)` | Search query joins reviews on both columns in every request; without composite index, SQLite scans all rows for a building | LOW | Single migration adding `CREATE INDEX idx_reviews_building_status ON reviews(building_id, status)` |
 
-### Differentiators (Competitive Advantage)
+### Differentiators (Quality Bets That Distinguish This Codebase)
 
-Features that set RateMyPlace apart. These map to the platform's public-health research mission.
+Features that go beyond the minimum and reduce long-term maintenance cost. Not expected by users, but valued by the team.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Section 8 acceptance as crowdsourced data | Competitors list apartments but don't crowdsource voucher acceptance; high value for Boston's subsidized housing population | MEDIUM | Tenant-reported (not verified) — needs inline disclosure on landlord profile |
-| Safely lit survey field | Lighting safety is a validated housing quality dimension (PHQS); no competitor captures it at the survey level | LOW | New survey field + migration; clear weight assignment (1.2x, safety-adjacent) |
-| Multi-city auto-research via adapter pattern | Boston-only enrichment limits geographic expansion; abstracted adapters unlock future cities without rewriting the feature | HIGH | Boston adapter works today; New Haven BLOCKED (no public API found — see notes) |
-| Tenant dashboard with verification status | Most apartment review sites have no real logged-in experience; surfacing "your review is pending" reduces admin load | MEDIUM | Extends existing `/profile` — add clear status states, resend email CTA, verification banner |
-| Full review content in admin pending view | Operational: admins currently can't moderate without navigating away from the queue — slows review throughput at launch | LOW | Admin-side only; no user-facing change; high value for a platform with manual moderation |
-| Review verification UX overhaul | Current flow: modal appears with no context about why verification matters. Better: inline prompts, "verify to publish" framing | MEDIUM | Audit current flow first (understand what's broken), then redesign prompt sequence |
+| Typed Cloudflare runtime wrapper | Eliminates 71 `any` casts; IDE completion on `env.DB`, `ctx.waitUntil`; refactoring becomes safe | MEDIUM | Approach: extend `App.Locals` in `env.d.ts` to expose `runtime` with the `App.Platform` type, then update `getDB()` and `rateLimit.ts` signatures. Repetitive but mechanical — can be done in one PR |
+| Shared `<EmptyState>` component | Consistent empty-state UX across 8+ pages; single place to update messaging | LOW | Props: `title`, `description`, optional `action` (label + href). Replace ad-hoc messages in search, building detail, profile, admin tables |
+| Component splits for >700 LOC files | ReviewEditForm (907 lines), BuildingsTable (844), ReviewsTable (733) are hard to test and review | HIGH | Extract form steps into sub-components; move filter/sort logic to custom hooks; split admin tables into `TableRow`, `TableFilters`, `TablePagination`. 2-3 PRs, not one |
+| `X-RateLimit-Remaining` header on all rate-limited endpoints | Allows future API clients and the browser DevTools to show quota state; professional API signal | LOW | Add `X-RateLimit-Limit` and `X-RateLimit-Remaining` to response headers alongside existing `Retry-After` |
+| Centralized validation helpers for email, zip, text length | `validation.ts` currently covers only review form; other endpoints inline the same patterns | LOW | Add `validateEmail()`, `validateZip()`, `validateTextLength(max)` to `validation.ts`; import at each endpoint |
 
-### Anti-Features (Commonly Requested, Often Problematic)
+### Anti-Features (Do Not Build These)
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| Real-time review status notifications (WebSockets/SSE) | "Notify me when my review is approved" feels modern | Cloudflare Workers has no persistent connections; polling is unnecessary complexity at this scale | Email notification via Resend when review transitions to approved/rejected — simpler, more reliable, already has Resend wired |
-| Saved buildings with complex alert rules | "Watch this building for new reviews" | Requires background job scheduler — not available on Cloudflare Workers without Cron Triggers + significant schema work | Simple saved/bookmarked buildings list with manual re-check first; email digests deferred to v2 |
-| Landlord response to reviews | Landlords want to rebut negative reviews | Explicitly excluded in PROJECT.md; creates adversarial UX and chilling effect on tenant honesty | Dispute form already exists for legitimate factual corrections |
-| Verified resident badge via file upload | "Prove you lived there" via lease or utility bill | File storage requires R2 setup (not in current stack); high privacy risk; systems like this are gameable | Email-domain verification (e.g., `.edu` for student housing) as a lightweight proxy signal; keep existing lease-date range self-report |
-| User-to-user messaging | "Contact the reviewer" | Completely breaks anonymity — the platform's core trust mechanism | All contact routes through the RateMyPlace contact form; reviewer identity stays protected |
-| Automatic property data sync on a schedule | Keep city assessor data fresh automatically | No cron job infrastructure currently; data freshness is secondary to data existence at this stage | Human-in-the-loop auto-research (already built for Boston) is the right pattern; keep it |
-| Mandatory identity verification before review | "Require proof of residency" | Would eliminate most reviews; creates barrier that competitors don't have; enforcement is impossible without file upload | Keep email verification as the gate; add strong UGC disclaimers to manage expectations |
+| Separate CSRF token system (cookie + header, double-submit pattern) | "Proper" CSRF protection | Overkill for this architecture. All authenticated state-changing requests are initiated by JavaScript fetches from the same origin (Astro SSR pages), which means `SameSite=Lax` on the session cookie already blocks cross-site attacks. Adding a CSRF token adds a DB round-trip or crypto op per request with no additional security for same-origin JS callers. The gap would only matter if a form were submitted with `method="POST" enctype="application/x-www-form-urlencoded"` from a different site, which Lucia + Astro's architecture does not expose. | Audit the existing SameSite=Lax coverage, document the decision, and verify no forms bypass it. If a specific gap is found (e.g., a form that could be forged), add an `Origin` header check in the middleware — not a full CSRF token system |
+| Email queue worker (Cloudflare Queue or Durable Object) | "Proper" async email at scale | Introduces a separate Cloudflare product (Queues), additional binding, dead-letter handling, and debugging overhead. Resend's own retry logic handles transient failures. `waitUntil()` is the correct Cloudflare Workers pattern for fire-and-forget tasks within a single request lifetime. A queue is only warranted if email volume exceeds Resend's burst limit or if retry logic needs persistence across Worker restarts — neither applies at current scale | Use `ctx.waitUntil(sendEmail(...))` — this is the idiom Cloudflare recommends for non-blocking work |
+| Zod or other schema validation library | Structured validation, better DX | Adds a dependency for a codebase that already has `validation.ts` with working patterns. Cloudflare Workers has strict bundle-size sensitivity. Zod's full bundle is ~13KB gzipped. The payoff (better error messages, schema inference) does not justify the bundle cost for 4-5 endpoints being hardened. | Extend `validation.ts` with typed helper functions. Use the existing `ValidationError[]` return shape |
+| Per-user rate limiting on public endpoints | More nuanced abuse prevention | Contact, bug reports, and dispute endpoints do not require authentication. Per-user rate limiting requires auth state which is not present. Hybrid per-IP-or-user logic adds branching complexity. The current per-IP model is correct for anonymous endpoints. For authenticated endpoints (review submission), Turnstile + auth requirement is the correct gate. | Keep per-IP rate limiting for public endpoints; rely on Turnstile + auth for authenticated endpoints |
+| Stress/load testing phase | Validate rate limits and DB indexes at scale | Deferred from v1.3.0 already. Current dataset is small (single city, <1000 buildings). D1 SQLite at this scale does not need stress testing — the index additions are provably correct by examining the query plans. Stress testing adds significant infra complexity (k6, wrk, synthetic load) for a dataset that won't stress D1. | Defer stress testing until 5+ cities with 50+ reviews per building. The index audit (migration) is sufficient validation now |
+| Sentry or error tracking service | Production visibility | Not wrong, but out of scope for a hardening milestone. Adding Sentry requires a new Cloudflare secret, SDK integration, and PII scrubbing decisions. Cloudflare's `wrangler tail` + structured `console.error()` logging is adequate for current scale. | Log structured JSON errors consistently (already done); revisit Sentry for v2.0 when multi-city traffic justifies it |
 
 ---
 
 ## Feature Dependencies
 
 ```
-[Contact Form with D1 Storage]
-    └──requires──> [Resend email integration] (already exists)
-    └──requires──> [D1 contact_submissions table] (new migration needed)
-    └──enhances──> [Admin dashboard] (new "Contact" tab or section)
+Rate limit headers (X-RateLimit-*)
+    └──requires──> Rate limiting applied to endpoint (checkRateLimit call)
 
-[Tenant Dashboard — Core]
-    └──requires──> [ProfileDashboard.tsx exists] (already exists)
-    └──extends with──> [clear status chips + verification banner + resend CTA]
-    └──enhances──> [Review Verification UX] (dashboard surface for verification prompt)
+Async email (waitUntil)
+    └──requires──> Typed runtime wrapper OR (context.locals as any).runtime cast
 
-[Tenant Dashboard — Extended: Saved Buildings]
-    └──requires──> [Tenant Dashboard Core] (build core first)
-    └──requires──> [saved_buildings table] (new migration)
-    └──enhances──> [Building Profile Pages] (save/bookmark button)
+Typed runtime wrapper
+    └──enhances──> Async email (ctx.waitUntil typed correctly)
+    └──enhances──> getDB(), rateLimit.ts, all API routes (removes any casts)
 
-[Review Verification UX Overhaul]
-    └──requires──> [audit of current VerificationModal flow] (understand state before changing)
-    └──enhances──> [Tenant Dashboard Core] (dashboard surfaces verification prompt inline)
+Centralized validation helpers
+    └──enhances──> All public POST endpoints (email/zip/length validators imported)
 
-[Multi-city Auto-Research]
-    └──requires──> [Boston adapter refactor] (extract current Boston logic to CityAdapter interface)
-    └──requires──> [New Haven API feasibility spike] (BLOCKED — no public API found; Vision GIS has no documented endpoint)
+E2E: audit-log assertion
+    └──requires──> Admin moderation E2E exists (it does — admin-actions.spec.ts)
+    └──extends──> Existing E2E-10 test (audit log row presence check)
 
-[Section 8 Survey Field]
-    └──requires──> [new migration] (add section_8_accepted column to reviews)
-    └──requires──> [surveyItems.ts update]
-    └──requires──> [ReviewForm.tsx update]
-    └──enhances──> [Landlord profile page] (display aggregated acceptance percentage)
+E2E: cross-view consistency
+    └──requires──> Review submission E2E exists (it does — review.spec.ts)
+    └──requires──> Approved review appears on building detail page (moderation needed in test)
 
-[Safely Lit Survey Field]
-    └──requires──> [new migration] (add safely_lit column to reviews)
-    └──requires──> [surveyItems.ts update]
-    └──enhances──> [scoring.ts] (building dimension, 1.2x weight)
+Composite index reviews(building_id, status)
+    └──no dependencies──> standalone migration
 
-[UGC Disclaimers]
-    └──no hard dependencies──> standalone additions
-    └──enhances──> [Review submission form] (consent checkbox before submit button)
-    └──enhances──> [Building/landlord profile pages] (disclaimer banner)
-    └──enhances──> [Terms of Service page] (add UGC clause)
-
-[Move-in Date Seasonal Display Bug]
-    └──no dependencies──> isolated bug fix in date formatting logic
+EmptyState component
+    └──no dependencies──> standalone component extraction
 ```
 
 ### Dependency Notes
 
-- **Tenant dashboard extended requires core first:** Do not build the saved buildings tab before the core dashboard (status + verification + settings) is stabilized. Adding scope to a broken UX creates compounding rework.
-- **Multi-city auto-research is partially blocked:** New Haven does not appear to have a public CKAN/Socrata API. Vision Government Solutions at `gis.vgsi.com/newhavenct/` is a web UI with no documented public API endpoint. The Boston adapter refactor (extracting the interface) is unblocked and should ship in v1.4.0. New Haven implementation requires a separate feasibility spike.
-- **Review verification UX requires audit first:** The current `VerificationModal` is triggered from `ProfileDashboard.tsx` but the trigger logic and copy framing are unclear. An audit must precede redesign to avoid breaking the flow for already-verified users.
-- **UGC disclaimers are fully independent:** No runtime dependencies on any other v1.4.0 feature. Highest legal risk mitigation per unit of effort — do these early.
-- **Survey fields share a migration pattern:** Section 8 and safely lit can be added in the same migration file (`0019_new_survey_fields.sql`) to minimize migration count.
+- **Rate limiting on bug-reports requires nothing new**: `checkRateLimit` and `getClientIP` are already imported in the file (imports visible at top of `bug-reports.ts`) — only the call is missing.
+- **Async email requires runtime context**: `waitUntil` is on `runtime.ctx`, not `runtime`. The access path is `(context.locals as any).runtime?.ctx?.waitUntil(promise)`. Typed wrapper makes this safe; without it the cast works but is fragile.
+- **Component splits are independent of each other**: ReviewEditForm, BuildingsTable, ReviewsTable can be split in separate PRs without affecting each other.
+- **CSRF audit precedes any remediation**: Audit first (check SameSite coverage, verify no unprotected cross-origin vector), then decide if additional mitigations are needed. High probability the audit concludes SameSite=Lax is sufficient for this architecture.
 
 ---
 
-## MVP Definition (v1.4.0 scope)
+## MVP Definition for v1.5.0
 
-### Launch With (v1.4.0)
+### Must Ship (Closed Loops milestone blockers)
 
-These unblock real-user launch or carry legal/trust risk if absent.
+- [ ] Rate limiting on `/api/bug-reports.ts` — security gap; the infrastructure exists, this is one function call
+- [ ] Rate limiting on `/api/search/results.ts` and `/api/search/autocomplete.ts` — DoS vector; use a lighter limit (e.g. 60 req/min) since these are GET endpoints, not spam surfaces
+- [ ] Input validation gaps: `disputeExplanation` max length, `landlordName` max length, `landlordEmail` format, `landlordPhone` max length — data integrity
+- [ ] CSRF audit + documentation of what SameSite=Lax covers and what it does not — required before claiming "CSRF protection done"
+- [ ] Async email in `/api/contact.ts` and any other route that awaits email sends — user-facing latency fix
+- [ ] E2E test: admin approve/reject → verify specific audit log entry for that review ID — closes the causal gap in E2E-10
+- [ ] E2E test: review created → score visible on search results, building detail, and user profile — closes the data-consistency coverage gap
+- [ ] Migration: `CREATE INDEX idx_reviews_building_status ON reviews(building_id, status)` — query plan fix for the most common search join
 
-- [ ] Fix move-in date seasonal display bug — visible data quality issue; erodes trust on first impression
-- [ ] UGC disclaimers (submission flow consent + review display pages + ToS update) — legal requirement; Section 230 protection; no other feature matters if this is missing
-- [ ] Contact form with D1 storage + Resend notification — replaces static mailto; creates admin-accessible message log; enables real user support
-- [ ] Full review content in admin pending view — unblocks faster moderation at launch without additional tooling
-- [ ] Review verification UX improvements (audit first, then implement) — current flow has unclear trigger; new users will be confused and leave reviews unpublished
-- [ ] Tenant dashboard core (review status labels, email verification status, resend CTA, account settings) — users need self-service; eliminates support requests on "where is my review"
-- [ ] Section 8 acceptance survey field — high-value for Boston's subsidized housing population; public health mission alignment
-- [ ] Safely lit survey field — maps to PHQS safety domain; low effort, meaningful signal
-- [ ] Multi-city auto-research: Boston adapter refactor only — New Haven deferred
+### Add After the Critical Path Is Done
 
-### Add After Validation (v1.x)
+- [ ] `X-RateLimit-Limit` and `X-RateLimit-Remaining` headers — consistent with `Retry-After` already present; low effort, add alongside rate limit wiring
+- [ ] Centralized email/zip/text-length validators in `validation.ts` — cleaner than inline checks, but existing inline checks work
+- [ ] Migration: indexes on `buildings.city` and `buildings.building_type` — matters more as dataset grows; not urgent at current scale
+- [ ] Shared `<EmptyState>` component — UX consistency; no user-facing bug, purely cleanup
 
-- [ ] Tenant dashboard extended: saved buildings list — add once core dashboard has real usage data
-- [ ] Tenant dashboard: email notification on review status change — Resend template + trigger in admin moderation action; low complexity but non-essential for launch
-- [ ] New Haven auto-research — blocked on API availability; requires feasibility spike first
+### Defer to v1.6.0 or Later
 
-### Future Consideration (v2+)
-
-- [ ] Email notification digests (weekly saved-building activity) — requires Cloudflare Cron Triggers infrastructure
-- [ ] Verified resident badge — requires R2 file storage or external identity service
-- [ ] Multi-language support — in PROJECT.md as v2.0 deferred
-- [ ] Landlord response features — explicitly excluded in PROJECT.md
+- [ ] Typed Cloudflare runtime wrapper — MEDIUM complexity refactor (71 files), no user-facing impact; schedule as a dedicated cleanup PR when the team has bandwidth
+- [ ] Component splits (ReviewEditForm, BuildingsTable, ReviewsTable) — structural quality improvement; nothing is broken; schedule across 2-3 PRs in a cleanup milestone
+- [ ] `buildings.zip_code` index — not used in current search queries
+- [ ] Stress testing — not warranted at current scale
 
 ---
 
@@ -153,96 +159,104 @@ These unblock real-user launch or carry legal/trust risk if absent.
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Move-in date bug fix | MEDIUM | LOW | P1 |
-| UGC disclaimers | HIGH (legal) | LOW | P1 |
-| Contact form + D1 storage | MEDIUM | MEDIUM | P1 |
-| Full review content in admin pending view | HIGH (ops) | LOW | P1 |
-| Review verification UX audit + fix | HIGH | MEDIUM | P1 |
-| Tenant dashboard — core | HIGH | MEDIUM | P1 |
-| Section 8 survey field | HIGH | LOW | P1 |
-| Safely lit survey field | MEDIUM | LOW | P1 |
-| Multi-city auto-research (Boston refactor only) | MEDIUM | MEDIUM | P2 |
-| Tenant dashboard — saved buildings | MEDIUM | MEDIUM | P2 |
-| Tenant dashboard — email notifications | LOW | LOW | P2 |
-| New Haven auto-research | LOW | HIGH (blocked) | P3 |
-
-**Priority key:**
-- P1: Must have for v1.4.0 launch
-- P2: Add once P1 features are shipping and stable
-- P3: Defer until infrastructure or API is available
+| Rate limiting on bug-reports | LOW (invisible) | LOW (1 function call) | P1 — security gap |
+| Rate limiting on search endpoints | LOW (invisible) | LOW (1-2 function calls) | P1 — security gap |
+| Async email sends | MEDIUM (response time) | LOW (`ctx.waitUntil`) | P1 — UX + correctness |
+| Input validation gaps on disputes | LOW (invisible) | LOW (add length checks) | P1 — data integrity |
+| Rate limit response headers | LOW (invisible) | LOW (add headers) | P2 — API hygiene |
+| CSRF audit + documentation | LOW (invisible) | LOW (analysis + docs) | P1 — security clarity |
+| E2E: audit-log causal assertion | LOW (invisible) | MEDIUM (test authoring) | P1 — coverage gap |
+| E2E: cross-view consistency | MEDIUM (catches real bugs) | MEDIUM (test authoring) | P1 — coverage gap |
+| Composite index reviews(building_id, status) | LOW (invisible at scale) | LOW (1 migration) | P1 — query correctness |
+| Centralized validation helpers | LOW (dev experience) | LOW (refactor) | P2 — cleanup |
+| Shared EmptyState component | LOW (UX consistency) | LOW (new component) | P2 — cleanup |
+| `buildings.city` / `building_type` indexes | LOW (invisible now) | LOW (1 migration) | P2 — scale preparation |
+| Typed runtime wrapper | LOW (dev experience) | MEDIUM (71 files) | P3 — defer |
+| Component splits (3 files >700 LOC) | LOW (dev experience) | HIGH (structured refactor) | P3 — defer |
 
 ---
 
-## Competitor Feature Analysis
+## Implementation Notes Per Feature
 
-Platforms in the tenant-review or housing-review space, patterns observed from public UIs.
+### Rate Limiting on Search Endpoints
 
-| Feature | ApartmentRatings.com | Zillow/Apartments.com | Our Approach |
-|---------|---------------------|----------------------|--------------|
-| Tenant dashboard | "My Reviews" control panel with edit/delete | "Saved homes" list; no review management | Full dashboard: review status + verification state + settings + (later) saved buildings |
-| Review status visibility | Not visible after submission | N/A (no moderation queue) | Explicit status chips: Pending / Under Review / Published / Rejected with copy explaining each state |
-| Review verification | Account creation only; no tenancy proof | None | Email-domain verification + lease date self-report (existing); UX overhaul in v1.4.0 |
-| UGC disclaimers | Inline text on review pages ("reviews reflect individual opinions") | ToS-gated consent on submission | Both: consent checkbox on submit + banner on display pages |
-| Contact mechanism | Standard web form | Help center + web form | Web form with D1 storage + Resend admin notification + Turnstile protection |
-| Section 8 info | Not captured | Listing field (landlord-controlled, biased) | Crowdsourced tenant-reported — more honest signal than landlord-reported |
-| Property data enrichment | None | Zillow proprietary data | City open-data APIs with human-in-the-loop review |
-| Saved/bookmarked properties | Not present | Core feature | Simple save list in v1.4.x; no complex alerts |
+Search endpoints are GET requests, not POST. They should use a higher limit than spam-vector endpoints (contact, disputes) but still be protected. Recommended limits:
+- `/api/search/results`: 60 requests per minute per IP
+- `/api/search/autocomplete`: 120 requests per minute per IP (keystroke-driven, needs higher budget)
 
----
+The response for rate-exceeded search should return `{ results: [], total: 0 }` with status 429 rather than an error shape, to degrade gracefully for the search UI.
 
-## Implementation Notes by Feature
+### Async Email via `waitUntil`
 
-### UGC Disclaimers
-Three additions, no new pages:
-1. Consent checkbox on review submission form: "I certify this reflects my genuine experience and I agree to the [Community Guidelines]" — must be checked to enable submit button.
-2. Disclaimer banner on building/landlord profile pages: "Reviews are submitted by community members and reflect individual experiences. RateMyPlace does not verify tenancy."
-3. UGC clause added to existing `/terms` page (not a new page).
+The correct access pattern in Astro/Cloudflare Pages adapter:
 
-### Contact Form
-Pattern: POST to `/api/contact` → insert into `contact_submissions` D1 table → trigger Resend email to admin with subject + message preview. Fields: subject (dropdown: General / Privacy / Press / Bug / Other), message (textarea), optional name, email (pre-filled if logged in). Add Turnstile (already used on bug report form — reuse that pattern). Add submissions list to admin dashboard (new tab or existing admin section).
+```typescript
+const ctx = (context.locals as any).runtime?.ctx;
+if (ctx) {
+  ctx.waitUntil(sendEmail(...).catch(err => console.error('Email failed:', err)));
+} else {
+  // Dev environment: await directly (no Workers runtime)
+  await sendEmail(...).catch(err => console.error('Email failed:', err));
+}
+```
 
-### Tenant Dashboard — Core
-Existing `/profile` + `ProfileDashboard.tsx` already shows review list. Additions:
-1. Status chips on each review: Pending / Under Review / Published / Rejected with 1-line explanation per state.
-2. Prominent email verification banner at top when `emailVerified === false` with inline resend button.
-3. Account settings tab: change display name, delete account request.
-No new page — extend existing component with tabs.
+This pattern keeps email sends non-blocking in production while not breaking local dev where `ctx` is unavailable. The `waitUntil` call registers the promise with the Workers runtime, which keeps the isolate alive until the promise resolves — no data loss risk.
 
-### Tenant Dashboard — Extended (Saved Buildings)
-New `saved_buildings` table: `(id, user_id, building_id, created_at)`. Save/unsave button on building profile pages. Dashboard "Saved" tab lists buildings with current score and address. No notifications in this iteration.
+### CSRF Audit Scope
 
-### Review Verification UX
-Audit required first. Current state: `VerificationModal` appears when user clicks a "Verify" button on a review list item in ProfileDashboard. Questions to answer before redesigning: Is the modal triggered automatically for unverified reviews? What copy does it show? Is there any prompt for users who haven't submitted verification? After audit: add inline banner at top of review list when any review is unverified, with copy explaining verification increases credibility and prevents removal during moderation.
+The audit should verify:
+1. Session cookie `SameSite=Lax` is confirmed set in middleware (it is — line 30-31 in `middleware.ts`)
+2. All state-changing API routes check `context.locals.user` (authenticated routes) or use Turnstile (public routes) — both patterns exist
+3. No forms use `method="POST"` without JavaScript fetch mediation (check all `.astro` page forms — if any do raw HTML form POST, they are vulnerable to CSRF with `SameSite=Lax` because Lax allows top-level navigation POSTs from other sites)
+4. If no raw HTML POSTs found: document that SameSite=Lax is sufficient, no token needed
 
-### Multi-City Auto-Research (Adapter Pattern)
-Boston implementation lives inline in `/api/admin/buildings/[id]/enrich`. Refactor: extract a `CityAdapter` interface with `enrich(address: string): Promise<EnrichmentResult>`. Boston adapter wraps existing CKAN logic unchanged. New Haven adapter: **blocked** — Vision Government Solutions at `gis.vgsi.com/newhavenct/` has no documented public API. Options: (a) contact New Haven city plan dept for data access, (b) defer and ship Boston refactor only. Recommendation: ship adapter abstraction + Boston adapter in v1.4.0; New Haven as a post-launch spike.
+Most likely outcome: audit confirms SameSite=Lax is sufficient. The audit result goes in a comment in `middleware.ts` and a brief note in CLAUDE.md.
 
-### New Survey Fields
-Both follow the established pattern: migration → `surveyItems.ts` → `scoring.ts` domain array + weight → `ReviewForm.tsx` → `ReviewCard.astro`.
-- **Section 8 acceptance**: Boolean on landlord dimension (does this landlord accept housing vouchers?). Display on landlord profile as "X% of reviewers reported this landlord accepts Section 8." Weight: 1.0x (policy factor, not health/safety). Inline disclosure: "Based on tenant reports — not officially verified."
-- **Safely lit**: Boolean on building dimension (are exterior and common areas adequately lit at night?). Weight: 1.2x (safety-adjacent; aligns with PHQS safety domain). Can go in same migration as Section 8.
+### E2E: Audit Log Causal Assertion
 
-### Move-in Date Seasonal Display Bug
-Isolated fix. Bug is in date formatting/display logic — likely a timezone offset issue causing dates to show as the prior month when `move_in_month` is rendered. Fix in the component that formats month/year display; no schema change needed.
+Current E2E-10 checks that audit log rows exist after prior tests ran in sequence. This is fragile (depends on test ordering). The stronger assertion:
+
+```typescript
+// After approve action, assert audit log has entry for that specific review ID
+const auditRows = await adminPage.evaluate(async () => {
+  const res = await fetch('/api/admin/audit');
+  return (await res.json()).logs;
+});
+const approveEntry = auditRows.find(
+  (r: any) => r.action_type === 'review_approved' && r.entity_id === reviewId
+);
+expect(approveEntry).toBeDefined();
+```
+
+This requires the test to capture the `reviewId` before the approve action and assert after.
+
+### D1 Composite Index
+
+The search query in `search/results.ts` executes:
+```sql
+LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
+```
+
+SQLite will use `idx_reviews_building` (on `building_id` alone) but must then filter by `status` in-memory. The composite index `(building_id, status)` eliminates this secondary filter scan. At 1000 reviews this is microseconds; at 100K reviews this matters. Adding it now costs nothing.
 
 ---
 
 ## Sources
 
-- [ApartmentRatings FAQ — "My Reviews" control panel](https://www.apartmentratings.com/faq/) — MEDIUM confidence
-- [ApartmentRatings platform overview 2026](https://rentalrealestate.com/tools/apartmentratings/) — MEDIUM confidence
-- [UGC legal checklist — key disclaimer components](https://www.cobrief.app/resources/business-checklist-library/legal-issues-with-user-generated-content-free-checklist/) — MEDIUM confidence
-- [TermsFeed — UGC social media legal requirements](https://www.termsfeed.com/blog/user-generated-content-social-media/) — MEDIUM confidence
-- [New Haven Vision GIS portal — no public API found](https://gis.vgsi.com/newhavenct/) — LOW confidence (absence of evidence)
-- [New Haven Assessor's Office](https://www.newhavenct.gov/government/departments-divisions/assessor-s-office) — MEDIUM confidence
-- [HUD pilot study on landlord Section 8 acceptance](https://www.huduser.gov/portal/pilot-study-landlord-acceptance-hcv.html) — HIGH confidence (official HUD research)
-- [Section 8 landlord refusal patterns — WBEZ Chicago investigation 2025](https://www.wbez.org/data/2025/05/14/section-8-renters-say-landlords-routinely-reject-their-housing-choice-vouchers) — MEDIUM confidence
-- [Real estate adapter pattern for multi-source data enrichment](https://batchdata.io/blog/apis-real-estate-data-enrichment) — MEDIUM confidence
-- [Contact form storage best practices 2026](https://www.zoho.com/forms/contact-forms/best-practices.html) — MEDIUM confidence
-- [Identity verification async UX pattern](https://lumitech.co/insights/design-secure-id-systems) — MEDIUM confidence
-- Existing codebase inspection: `src/pages/contact.astro`, `src/components/profile/ProfileDashboard.tsx`, `src/pages/profile.astro`, `migrations/` — HIGH confidence (direct observation)
+- Codebase audit: `.planning/codebase/CONCERNS.md` (2026-04-26) — HIGH confidence, direct inspection
+- `src/lib/rateLimit.ts` — direct read, confirmed implementation
+- `src/lib/validation.ts` — direct read, confirmed coverage gaps
+- `src/pages/api/contact.ts`, `disputes.ts`, `bug-reports.ts` — direct read, confirmed rate limit and validation state
+- `src/pages/api/search/results.ts`, `autocomplete.ts` — direct read, confirmed no rate limiting
+- `src/middleware.ts` — direct read, confirmed SameSite=Lax cookie attribute
+- `src/lib/auth.ts` — direct read, confirmed Lucia v3 with no built-in CSRF
+- `src/env.d.ts` — direct read, confirmed `ctx: ExecutionContext` is typed (waitUntil available)
+- `migrations/0001_initial.sql` through `0023_saved_buildings.sql` — direct read, confirmed existing index set
+- `e2e/admin-actions.spec.ts` — direct read, confirmed audit log assertion gap
+- RFC 6585: HTTP 429 Too Many Requests — rate limit status code standard
+- Cloudflare Workers `ExecutionContext.waitUntil()` — documented in `@cloudflare/workers-types` v4.x
 
 ---
 
-*Feature research for: RateMyPlace — v1.4.0 "Open Doors" milestone*
-*Researched: 2026-03-20*
+*Feature research for: v1.5.0 "Closed Loops" hardening milestone*
+*Researched: 2026-04-26*

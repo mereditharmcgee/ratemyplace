@@ -1,323 +1,321 @@
 # Stack Research
 
-**Domain:** Tenant housing review platform — v1.4.0 "Open Doors" feature additions
-**Researched:** 2026-03-20
-**Confidence:** HIGH (existing stack verified; new additions verified via live API testing and codebase review)
+**Domain:** Security hardening + validation + async email — v1.5.0 "Closed Loops" additions to existing Astro 5 / Cloudflare Workers app
+**Researched:** 2026-04-26
+**Confidence:** HIGH (all key claims verified against official docs and primary sources)
 
 ---
 
-## Existing Stack (Do Not Re-Research)
+## Context: What This Research Covers
 
-The following are validated and in production. This document covers only what is NEW for v1.4.0.
+The existing stack (Astro 5, Cloudflare D1, Lucia v3, Resend, Vitest, Playwright, Tailwind 4) is locked and validated. This research covers only the *additions and changes* needed for v1.5.0:
 
-| Technology | Version (current) | Status |
-|------------|-------------------|--------|
-| Astro | 5.16.11 | Locked — do not upgrade mid-milestone |
-| @astrojs/cloudflare | 12.6.12 | Locked |
-| @astrojs/react | 3.6.3 | Locked |
-| React / React DOM | 18.3.1 | Locked — Cloudflare Workers requires React 18 |
-| Lucia | 3.2.2 | Locked |
-| Tailwind CSS | 4.1.18 | Locked |
-| Resend | 6.9.2 | Locked |
-| D1 / SQLite | CF managed | Locked |
+1. Input validation library decision (introduce Zod/Valibot vs. extend `validation.ts`)
+2. CSRF protection: what Lucia v3 and Astro v5 actually provide vs. what gaps remain
+3. `waitUntil` for fire-and-forget email on Cloudflare Workers (how to access from Astro v12 adapter)
+4. D1 index audit tooling (what queries to run)
+5. Rate limit application pattern (no new library — infrastructure exists)
 
 ---
 
-## New Stack Decisions for v1.4.0
+## Finding 1: Input Validation — Extend validation.ts, No New Library
 
-### No New NPM Dependencies Required
+**Decision: Do NOT add Zod or Valibot. Extend `src/lib/validation.ts`.**
 
-All v1.4.0 features can be implemented with the existing stack. The analysis below explains why for each feature area.
+### Rationale
 
----
+The existing `validation.ts` already handles the review form (the most complex validation in the app). The remaining gaps are simpler endpoints: `/api/bug-reports`, `/api/disputes`, `/api/contacts` — all of which do inline ad-hoc validation today. These need:
 
-## Feature: Tenant Dashboard (Core + Extended)
+- Max-length enforcement on text fields (already the pattern in `validation.ts`)
+- Type coercion guards (string/number checks already in signin.ts pattern)
+- Email format validation (one regex or simple `includes('@')` already used)
 
-### Recommended Pattern: Single React Island with URL Hash Routing
+Zod v3 adds ~17 KB minified (gzipped: ~8–9 KB). Valibot v1.3.1 is ~1–2 KB tree-shaken — meaningfully smaller but still a new dependency with a new API to learn. Neither provides capability that `validation.ts` cannot provide with modest additions.
 
-**Decision:** One React component (`TenantDashboard.tsx`) rendered with `client:load` on a dedicated `/dashboard` Astro page. Tab state is driven by `window.location.hash` (`#reviews`, `#saved`, `#notifications`, `#settings`).
+**The real gap is coverage, not capability.** Adding a library solves the wrong problem and creates integration friction with the existing `ValidationError[]` return shape that API routes already consume.
 
-**Why this pattern over alternatives:**
+### What to add to validation.ts instead
 
-Astro islands cannot share React context across island boundaries. Splitting dashboard tabs into separate islands would require a custom pub/sub mechanism or localStorage to share state (e.g., unread notification counts updating the tab badge). A single island avoids this entirely.
+```typescript
+// Add these validators alongside validateReviewForm():
 
-Hash routing requires zero dependencies. `window.location.hash` and `hashchange` events are native browser APIs available in Cloudflare Workers context. Tab state survives page refresh and is bookmarkable with no router library needed.
+export function validateContactForm(data: unknown): ValidationError[]
+export function validateDisputeForm(data: unknown): ValidationError[]
+export function validateBugReport(data: unknown): ValidationError[]
 
-**SSR data pattern:** Pass initial server-fetched data from the Astro page as props to the island. The island can re-fetch on tab switch for freshness. This prevents flash-of-empty-content on initial load while keeping data current.
-
-```astro
-<!-- src/pages/dashboard.astro -->
-<TenantDashboard
-  client:load
-  userId={locals.user.id}
-  initialReviews={userReviews}
-/>
+// Add shared primitives:
+export function isValidEmail(value: string): boolean   // RFC-lite check
+export function clampLength(s: string, max: number): boolean
 ```
 
-**Why NOT to add a tab library (Radix Tabs, Headless UI, etc.):**
-Dashboard tabs are three `<button onClick>` elements and a conditional render. A headless UI tab library adds 5–15 KB of bundle for functionality that is trivial in React. The existing codebase uses no UI component libraries — stay consistent.
+**Validation gaps by endpoint (from CONCERNS.md audit):**
 
-**Confidence:** HIGH — this is the standard Astro SSR + island pattern used in the existing admin dashboard pages.
+| Endpoint | Missing | Fix |
+|----------|---------|-----|
+| `/api/bug-reports` | No rate limit, no max on `url` field, no email format check | Add `checkRateLimit` (infrastructure exists), add `validateBugReport()` |
+| `/api/disputes` | No max-length on `landlordName`, `landlordPhone`, `disputeExplanation`; no email format on `landlordEmail` | Add `validateDisputeForm()` |
+| `/api/contacts` | Already has rate limit and Turnstile; email check is too weak (`includes('@')` only) | Strengthen email regex in shared `isValidEmail()` |
+| `/api/search/results` | GET endpoint — rate limit at 60 req/min per IP is the real need, not schema validation | Apply `checkRateLimit` with lenient window |
 
----
-
-## Feature: Tenant Notifications (In-App)
-
-### Recommended Pattern: D1 Polling on Focus, NOT Web Push
-
-**Decision:** Store notifications in a D1 `notifications` table. Poll via `fetch('/api/user/notifications')` on component mount and on `visibilitychange` (tab regains focus). No browser push, no service worker, no WebSocket.
-
-**Why polling, not push:**
-
-Cloudflare Workers are stateless request handlers. There is no persistent connection to push from. Durable Objects could enable WebSocket-based push, but that is a significant architectural addition (new binding, new worker class) for notification types that do not warrant real-time delivery (review approved, building saved). Users checking their dashboard will see current state immediately.
-
-Web Push requires a service worker, VAPID key pair management, push subscription storage, and user opt-in UI. For "your review was approved" notifications, this is engineering overhead that exceeds the user value.
-
-Resend (already integrated) covers email notifications, which are the higher-value delivery channel. In-app notifications are the secondary channel — polling is appropriate.
-
-**Polling strategy:** Fetch on mount + on `visibilitychange` (when user returns to tab). No interval polling. Fire-and-forget on user attention signals only.
-
-**Confidence:** HIGH — verified against Cloudflare Workers runtime constraints.
+**Confidence: HIGH** — based on direct code inspection of all target endpoints and `validation.ts`.
 
 ---
 
-## Feature: Multi-City Auto-Research (Boston + New Haven)
+## Finding 2: CSRF Protection — Partial Gap, Two-Layer Fix Required
 
-### Boston (Existing — No Changes)
+### What Astro v5 provides
 
-CKAN `datastore_search` API on `data.boston.gov`. Resource ID `ee73430d-96c0-423e-ad21-c4cfb54c8961`. Fully implemented in `src/pages/api/admin/buildings/[id]/enrich.ts`. No modifications needed.
+Astro v5 enables `security.checkOrigin: true` by default (changed from opt-in in v4). This checks that the `Origin` header matches the request host for state-changing requests (POST, PUT, PATCH, DELETE).
 
-### New Haven (New Addition)
+**Critical limitation:** The check only fires when `Content-Type` is one of:
+- `application/x-www-form-urlencoded`
+- `multipart/form-data`
+- `text/plain`
 
-**Decision:** Use the Connecticut state CAMA dataset on `data.ct.gov` (Socrata SODA API).
+**`application/json` is NOT covered.** POST requests with `Content-Type: application/json` bypass `security.checkOrigin` entirely.
 
-**Verified endpoint:** `https://data.ct.gov/resource/pqrn-qghw.json`
+The current `astro.config.mjs` does not set `security.checkOrigin` explicitly, meaning it is enabled by default (Astro v5 default = `true`). However, this provides no protection for JSON API endpoints.
 
-**Live API verification confirmed:** A direct query to this endpoint for New Haven, 187 County St returned a complete record with owner name, assessed/appraised totals, year built, bedroom/bath counts, building style, and condition. The endpoint is publicly accessible with no API key required.
+**Known CVE:** CVE-2024-56140 (Astro CSRF Content-Type bypass) affected versions < 4.16.17. The project is on Astro 5.16.11, which is fully patched — but only for the three covered content types. JSON remains uncovered by design.
 
-**Working query pattern (Socrata SODA):**
+### What Lucia v3 provides
+
+Lucia v3 does **not** implement CSRF protection. It provides `verifyRequestOrigin()` as a utility function but does not call it automatically. Session cookies use `SameSite=Lax` (confirmed in `src/middleware.ts` line 30: `sameSite: sessionCookie.attributes.sameSite as 'lax' | 'strict' | 'none' ?? 'lax'`).
+
+`SameSite=Lax` provides meaningful CSRF mitigation for cross-site navigations (attackers cannot trigger credentialed POST from a third-party form) but does NOT protect against:
+- CORS-exploiting same-origin-ish attacks
+- JSON requests from JavaScript on a malicious page (those send cookies with SameSite=Lax on cross-site `fetch` POST in some browser versions)
+
+### Gap assessment
+
+| Endpoint category | CSRF risk | Current protection |
+|-------------------|-----------|-------------------|
+| Form-based POST (Turnstile present) | Low | Turnstile + SameSite=Lax |
+| Form-based POST (no Turnstile) | Medium | SameSite=Lax only |
+| JSON POST (`disputes.ts`, `reviews.ts`, etc.) | Real | SameSite=Lax only |
+| Authenticated JSON POST (requires session cookie) | Low-medium | Session auth acts as implicit token |
+
+### Recommended fix: Origin header check in middleware
+
+Add an Origin check to the Astro middleware for all state-changing requests not already protected by Turnstile. No CSRF token library needed.
+
+```typescript
+// In src/middleware.ts — before calling next():
+// For POST/PUT/PATCH/DELETE on /api/* paths, verify Origin matches host
+const method = context.request.method;
+const isStateChanging = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+const isApiRoute = context.url.pathname.startsWith('/api/');
+
+if (isStateChanging && isApiRoute) {
+  const origin = context.request.headers.get('origin');
+  const host = context.url.host;
+  if (origin && !origin.endsWith(host)) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
 ```
-GET https://data.ct.gov/resource/pqrn-qghw.json?
-  property_city=New Haven
-  &address_number=187
-  &street_name=COUNTY ST
-  &$limit=10
-```
 
-Note: `property_city` uses mixed case "New Haven" (verified). `street_name` should be UPPER case to match stored values.
+This is the same approach Lucia v3 docs recommend via `verifyRequestOrigin()`. Implementing it directly in middleware covers all JSON POST endpoints without modifying any individual route.
 
-**Key field mappings for the adapter:**
+**Exclude from check:** Turnstile-verified endpoints are already safe. The check can be universal (Turnstile adds defense-in-depth on top).
 
-| CT CAMA Field | Maps to Existing Output Pattern | Notes |
-|---------------|--------------------------------|-------|
-| `address_number` | `address.number` | Direct |
-| `street_name` | `address.street` | Stored in UPPER — normalize input |
-| `property_city` | `address.city` | "New Haven" mixed case |
-| `owner` | `owner` | Direct |
-| `co_owner` | Available | No Boston equivalent |
-| `ayb` | `yearBuilt` | Actual Year Built |
-| `eyb` | `yearBuilt` fallback | Effective Year Built (use if `ayb` is 0) |
-| `number_of_bedroom` | Available as new field | Not in current Boston output |
-| `number_of_baths` | Available as new field | Not in current Boston output |
-| `state_use_description` | `buildingType` | "Condominium", "Two Family", etc. |
-| `assessed_total` | `totalValue` | Assessed total |
-| `appraised_total` | Available | Appraised (market) value also present |
-| `stories` | Available as new field | Not in current Boston output |
-| `condition_description` | `overallCondition` | "Good", "Average", "Fair" |
-| `grade_desc` | Available | "Average", "Above Average", etc. |
-
-**Data freshness:** Dataset is "2024 Connecticut Parcel and CAMA Data". Valuation year in tested records is 2021 (last statewide revaluation). Owner data reflects current assessor records. This is acceptable for the human-in-the-loop auto-research use case where an admin reviews results before applying.
-
-**Adapter pattern implementation:**
-
-Refactor the enrich endpoint to use a city-routing adapter pattern:
-
-```
-src/lib/enrichAdapters/
-  index.ts          — routes by building.city to correct adapter, exports EnrichResult interface
-  boston.ts         — Boston CKAN logic extracted from current enrich.ts
-  newHaven.ts       — New CT CAMA Socrata adapter
-```
-
-The `EnrichResult` interface stays identical between adapters. The API route at `src/pages/api/admin/buildings/[id]/enrich.ts` becomes a thin router.
-
-No new dependencies. Both APIs are plain `fetch()` calls. Zero npm additions.
-
-**Confidence:** HIGH — live API verified, field schema confirmed, adapter pattern maps directly to existing code structure.
-
-**Alternative considered: Regrid API**
-
-Regrid has Connecticut parcel coverage and a polished address lookup API. Rejected because: (1) paid service with pricing requiring a sales contact — opaque cost for an open-source civic tool, (2) the free CT state CAMA dataset covers New Haven at no cost and confirmed working, (3) external paid dependency adds SLA and budget risk. Regrid is the right choice only if the state dataset proves insufficient for other cities in future milestones (small CT towns may lack coverage in the state dataset).
-
-**Confidence on CT CAMA coverage:** MEDIUM — confirmed for New Haven; coverage for smaller CT towns not verified. This is a v1.4.0 concern only for New Haven.
+**Confidence: HIGH** — Astro v5 default behavior verified via official docs. Lucia CSRF behavior verified via v3 docs. SameSite behavior confirmed in `src/middleware.ts`.
 
 ---
 
-## Feature: Contact Form with D1 Storage
+## Finding 3: waitUntil for Fire-and-Forget Email
 
-### No New Dependencies
+### How to access it in @astrojs/cloudflare v12 (current version)
 
-The contact form uses only existing patterns:
+The project uses `@astrojs/cloudflare@^12.6.12` with Astro 5. In v12, the Cloudflare runtime is accessed via `(context.locals as any).runtime`, and the ExecutionContext is at `runtime.ctx`. This is confirmed by `src/env.d.ts` which declares `Platform.ctx: ExecutionContext`.
 
-- Turnstile (already integrated) for bot protection on the public form
-- D1 for submission storage (`contact_submissions` table, migration 0019)
-- Resend (already integrated) for admin notification email on new submissions
-- Standard Astro API route (`POST /api/contact`) + React island form component
+**Note:** v13 (`@astrojs/cloudflare@13+`, paired with Astro 6) changes this to `Astro.locals.cfContext`. The project should NOT use `cfContext` — that would require upgrading to Astro 6.
 
-**D1 table design:**
-```sql
--- migration 0019_contact_submissions.sql
-CREATE TABLE contact_submissions (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL,
-  subject TEXT NOT NULL,
-  message TEXT NOT NULL,
-  user_id TEXT,
-  status TEXT NOT NULL DEFAULT 'new',
-  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-  resolved_at INTEGER,
-  admin_notes TEXT,
-  FOREIGN KEY (user_id) REFERENCES users(id)
+### The fire-and-forget pattern
+
+```typescript
+// In any API route:
+const runtime = (context.locals as any).runtime;
+const ctx: ExecutionContext = runtime.ctx;
+
+// Respond immediately:
+const response = new Response(JSON.stringify({ success: true }), { status: 201 });
+
+// Then fire email in background (does not block response):
+ctx.waitUntil(
+  sendVerificationEmail(apiKey, siteUrl, email, token).catch((err) => {
+    console.error('Background email failed:', err);
+  })
 );
-CREATE INDEX idx_contact_submissions_status ON contact_submissions(status);
-CREATE INDEX idx_contact_submissions_created ON contact_submissions(created_at DESC);
+
+return response;
 ```
 
-Pattern mirrors the `bug_reports` table (migration 0018). Consistent schema, no new patterns introduced.
+### Constraints and behavior
 
-**Confidence:** HIGH — direct extension of existing bug_reports implementation.
+- `waitUntil` extends Worker lifetime up to **30 seconds** after the response is returned
+- The 30-second window is shared across all `waitUntil` calls in the same request
+- Promises that don't settle within 30 seconds are cancelled (no retry)
+- Failures in one `waitUntil` do not cancel others (`Promise.allSettled` semantics)
+- For email: Resend API latency is 200–500 ms — well within 30 seconds. `waitUntil` is appropriate. Cloudflare Queues would be needed only if retries or guaranteed delivery were required.
+
+### What to change
+
+Currently, `sendVerificationEmail` is `await`ed before returning the response in `signup.ts` (line 116). The same blocking pattern exists in `auth/forgot-password.ts` and `auth/resend-verification.ts`.
+
+The change is: move email calls after constructing the success response, wrap in `ctx.waitUntil()`, and return early. The try/catch error handling for email already exists (best-effort pattern) — keep that inside the waitUntil promise.
+
+**No new library or npm package required.** `ExecutionContext` is a platform API, typed via `@cloudflare/workers-types` (already installed).
+
+**Confidence: HIGH** — `waitUntil` is Cloudflare Workers platform API, documented at developers.cloudflare.com. Access path via `runtime.ctx` confirmed via project's own `env.d.ts` type declarations.
 
 ---
 
-## Feature: Saved Buildings
+## Finding 4: D1 Index Audit Tooling
 
-### No New Dependencies
+### No external tooling needed
 
-Simple D1 join table. One row per (user_id, building_id) pair. Displayed in the tenant dashboard.
+D1 supports standard SQLite PRAGMA statements for index inspection. These run as normal D1 queries via `wrangler d1 execute` or inside API routes.
 
-**D1 table design:**
+### Queries to run
+
 ```sql
--- migration 0020_saved_buildings.sql
-CREATE TABLE saved_buildings (
-  user_id TEXT NOT NULL,
-  building_id TEXT NOT NULL,
-  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-  PRIMARY KEY (user_id, building_id),
-  FOREIGN KEY (user_id) REFERENCES users(id),
-  FOREIGN KEY (building_id) REFERENCES buildings(id)
-);
-CREATE INDEX idx_saved_buildings_user ON saved_buildings(user_id);
+-- List all indexes in the database
+SELECT name, tbl_name, sql
+FROM sqlite_master
+WHERE type = 'index'
+ORDER BY tbl_name, name;
+
+-- Check indexes on a specific table
+PRAGMA index_list('buildings');
+PRAGMA index_list('reviews');
+PRAGMA index_list('rate_limits');
+
+-- See which columns an index covers
+PRAGMA index_info('idx_buildings_neighborhood');
+
+-- Check query plan for a specific search query
+EXPLAIN QUERY PLAN
+SELECT b.*, COUNT(r.id) as review_count
+FROM buildings b
+LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
+WHERE b.address LIKE '%boston%' OR b.neighborhood LIKE '%boston%'
+GROUP BY b.id;
 ```
 
-Composite PRIMARY KEY enforces uniqueness at DB level. Mirrors the UNIQUE constraint pattern on the `disputes` table (`UNIQUE(review_id)`).
-
-**Confidence:** HIGH — standard SQLite join table pattern.
-
----
-
-## Feature: In-App Notifications Table
-
-**D1 table design:**
-```sql
--- migration 0021_notifications.sql
-CREATE TABLE notifications (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  type TEXT NOT NULL,
-  title TEXT NOT NULL,
-  body TEXT,
-  entity_type TEXT,
-  entity_id TEXT,
-  read INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-CREATE INDEX idx_notifications_user_unread ON notifications(user_id, read);
-CREATE INDEX idx_notifications_created ON notifications(created_at DESC);
-```
-
-`type` values: `review_approved`, `review_rejected`, `dispute_resolved`, `building_saved_new_review`
-
-The composite index on `(user_id, read)` is the critical query path — fetching unread count per user without a full table scan.
-
-**Confidence:** HIGH — standard pattern, no D1-specific concerns.
-
----
-
-## D1 Migration Plan for v1.4.0
-
-**Next migration number:** 0019 (current latest is 0018_bug_reports.sql)
-
-| Migration # | Name | Contents |
-|-------------|------|----------|
-| 0019 | contact_submissions | Contact form storage |
-| 0020 | saved_buildings | Saved buildings join table |
-| 0021 | notifications | In-app notification queue |
-| 0022 | new_survey_fields | `section_8_accepted`, `safely_lit` columns on reviews |
-
-**D1 constraints relevant to new tables:**
-
-- No `RETURNING` clause — generate IDs before INSERT using `generateIdFromEntropySize(10)` from Lucia (existing pattern).
-- No cross-request transactions — each API endpoint is atomic on its own request.
-- Composite index `(user_id, read)` on notifications is critical for dashboard unread count query performance.
-- `INTEGER DEFAULT (unixepoch())` for all timestamps — consistent with all existing tables.
-
-**Confidence:** HIGH — verified against existing D1 patterns throughout the codebase.
-
----
-
-## Features Requiring No Stack Research
-
-| Feature | Why No New Stack |
-|---------|-----------------|
-| Move-in date display bug | Pure logic fix in existing component |
-| Full review in admin pending view | UI additions to existing admin Astro page |
-| UGC disclaimers | Copy/markup additions to existing Astro pages |
-| Review verification UX | UI changes to existing flows, no new libraries |
-| New survey fields (Section 8, safely lit) | D1 migration + existing form/scoring patterns |
-
----
-
-## What NOT to Add
-
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| Radix UI / Headless UI | Adds bundle weight for tab/dialog primitives achievable with Tailwind + `useState` | Native React state + Tailwind |
-| Zustand / Jotai / React Context providers | State management overkill for a dashboard with 4 tabs and shallow component tree | Local `useState` + prop drilling |
-| React Router / TanStack Router | Full router for hash-based tab navigation is unnecessary complexity | `window.location.hash` + `hashchange` listener |
-| Web Push / service worker | Stateless Workers runtime cannot maintain push connections; setup complexity exceeds value for this notification scope | D1 polling on `visibilitychange` |
-| Regrid API (paid) | Paid, requires sales contact for pricing, adds external dependency and SLA risk | Free CT state CAMA dataset (`data.ct.gov`) |
-| tRPC / GraphQL | API abstraction not needed; existing `fetch` patterns in React islands are sufficient | Plain Astro API routes |
-| React 19 | Cloudflare Workers constraint — React 18 only until Workers runtime adds full React 19 support | Stay on React 18.3.1 |
-| `@faker-js/faker` (already dev dep) | Was added in v1.3.0 for seeding — already installed | Already available |
-
----
-
-## Installation
-
-No new packages required for any v1.4.0 feature.
+### Run against local D1
 
 ```bash
-# No npm install needed — all features use existing dependencies
+npx wrangler d1 execute ratemyplace-db --local \
+  --command "SELECT name, tbl_name FROM sqlite_master WHERE type = 'index' ORDER BY tbl_name"
 ```
 
-All features use: existing D1 queries, existing Resend integration, existing Turnstile integration, native `fetch()` for external APIs, and React `useState`/`useEffect` for dashboard interactivity.
+### Known gaps from migration audit
+
+From `migrations/0001_initial.sql`, indexes confirmed present:
+- `idx_buildings_slug`, `idx_buildings_landlord`, `idx_buildings_neighborhood`, `idx_buildings_address`
+- `idx_landlords_slug`, `idx_landlords_name`
+- `idx_users_email`, `idx_sessions_user`
+
+**Likely missing (need to verify):**
+- `reviews(building_id)` — used in every join for building detail and search
+- `reviews(status)` — filtered on `status = 'approved'` in every search and listing query
+- `reviews(user_id)` — used in profile dashboard and user review listings
+- `rate_limits(rate_key)` — queried by key on every rate limit check (performance-critical)
+- `rate_limits(expires_at)` — used in DELETE cleanup
+
+**Recommended additions (run `EXPLAIN QUERY PLAN` to confirm):**
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_reviews_building ON reviews(building_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_status ON reviews(status);
+CREATE INDEX IF NOT EXISTS idx_reviews_user ON reviews(user_id);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_key ON rate_limits(rate_key);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_expires ON rate_limits(expires_at);
+```
+
+Verify each with `EXPLAIN QUERY PLAN` before adding — SQLite optimizer may already use the primary key or existing indexes for some of these.
+
+**Confidence: MEDIUM** — D1 PRAGMA support confirmed via official docs. Specific index gaps are inferred from migration files and query patterns; must be confirmed by running `EXPLAIN QUERY PLAN` against actual data.
+
+---
+
+## Finding 5: Rate Limit Application Pattern
+
+**No new library needed.** `src/lib/rateLimit.ts` is complete and production-proven (fail-closed, structured logging, Retry-After headers).
+
+### Endpoints needing rate limits added (from CONCERNS.md)
+
+| Endpoint | Current | Target | Window |
+|----------|---------|--------|--------|
+| `/api/bug-reports` | None | 5 per hour per IP | 3600 |
+| `/api/search/results` | None | 60 per minute per IP | 60 |
+| `/api/search/autocomplete` | None | 30 per minute per IP | 60 |
+
+Note: `/api/disputes` (3/hr) and `/api/contact` (3/hr) already have rate limits applied correctly.
+
+### Integration pattern (copy from signin.ts)
+
+```typescript
+const clientIP = getClientIP(context);
+const rateLimit = await checkRateLimit(db, clientIP, 'bug-report', 5, 3600);
+if (!rateLimit.allowed) {
+  return new Response(JSON.stringify({ error: 'Too many submissions.' }), {
+    status: rateLimit.error ? 503 : 429,
+    headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) }
+  });
+}
+```
+
+**Confidence: HIGH** — infrastructure verified by reading source code.
+
+---
+
+## No New npm Packages Required
+
+The entire v1.5.0 security/validation/async scope can be delivered by extending existing modules:
+
+| Capability | Approach | Files Touched |
+|------------|----------|--------------|
+| Input validation coverage | Extend `validation.ts` | `validation.ts`, 3 API routes |
+| CSRF protection | Middleware Origin check | `middleware.ts` |
+| Async email (fire-and-forget) | `runtime.ctx.waitUntil()` | 3 API routes (`signup.ts`, `forgot-password.ts`, `resend-verification.ts`) |
+| D1 index audit | SQL PRAGMA queries | New migration file |
+| Rate limit coverage | Apply existing `checkRateLimit` | 2–3 API routes |
+
+**Deliberately excluded:**
+- **Zod / Valibot**: Bundle cost and new API surface not justified for coverage-only gap. `validation.ts` has the right shape already.
+- **CSRF token library (csrf, csurf)**: Origin header checking in middleware is sufficient. Token-based CSRF adds state management complexity with no meaningful security gain for an SSR app behind Cloudflare with SameSite=Lax sessions.
+- **Cloudflare Queues**: Not needed for email. `waitUntil` + 30-second window is more than sufficient for Resend API calls (200–500 ms typical). Queues make sense if reliable delivery + retries are needed — they are not for this use case.
+- **@astrojs/cloudflare upgrade to v13**: Would force Astro 6 upgrade. Out of scope for a hardening milestone.
+
+---
+
+## Version Compatibility
+
+| Package | Current Version | Notes |
+|---------|-----------------|-------|
+| `@astrojs/cloudflare` | 12.6.12 | `runtime.ctx` is the ExecutionContext path. Do NOT use `cfContext` (that's v13/Astro 6) |
+| `astro` | 5.16.11 | `security.checkOrigin` defaults to `true` but only covers form content types, not JSON |
+| `lucia` | 3.2.2 | No built-in CSRF; provides `verifyRequestOrigin()` utility but doesn't call it automatically |
+| `@cloudflare/workers-types` | 4.20260117.0 | Provides `ExecutionContext` type for `runtime.ctx.waitUntil()` — already installed |
 
 ---
 
 ## Sources
 
-| Claim | Source | Confidence |
-|-------|--------|------------|
-| CT CAMA endpoint and New Haven field schema | Live API test: `https://data.ct.gov/resource/pqrn-qghw.json?property_city=New%20Haven&address_number=187&$limit=2` | HIGH |
-| CT CAMA dataset scope and coverage | [2024 Connecticut Parcel and CAMA Data — catalog.data.gov](https://catalog.data.gov/dataset/2024-connecticut-parcel-and-cama-data) | HIGH |
-| Astro islands cannot share React context | [Astro Islands Architecture docs](https://docs.astro.build/en/concepts/islands/) | HIGH |
-| Cloudflare Workers are stateless (no push) | [Cloudflare D1 and Workers docs](https://developers.cloudflare.com/d1/) | HIGH |
-| Regrid Connecticut parcel coverage | [Regrid Parcel API](https://regrid.com/api) — coverage confirmed, pricing opaque (sales required) | MEDIUM |
-| Boston adapter — existing implementation | `src/pages/api/admin/buildings/[id]/enrich.ts` in codebase | HIGH |
-| Migration numbering | `migrations/` directory inspection — latest is 0018 | HIGH |
+- https://v3.lucia-auth.com/guides/validate-session-cookies/ — Verified: Lucia v3 does NOT provide automatic CSRF protection; provides `verifyRequestOrigin()` utility only
+- https://docs.astro.build/en/reference/configuration-reference/ — Verified: `security.checkOrigin` defaults to `true` in Astro v5; only covers form content types (NOT `application/json`)
+- https://github.com/withastro/astro/security/advisories/GHSA-c4pw-33h3-35xw — CVE-2024-56140 patched in 4.16.17; project is on 5.16.11 (patched)
+- https://developers.cloudflare.com/workers/runtime-apis/context/ — Verified: `ctx.waitUntil()` extends Worker lifetime up to 30s after response; accepts Promise
+- https://valibot.dev/blog/valibot-v1-the-1-kb-schema-library/ — Valibot v1 stable at 1.3.1; tree-shaken bundle 1–2 KB; rejected because capability gap doesn't justify new dependency
+- https://developers.cloudflare.com/d1/sql-api/sql-statements/ — Verified: D1 supports `PRAGMA index_list()`, `PRAGMA index_info()`, and `sqlite_master` queries
+- Direct source inspection: `src/lib/rateLimit.ts`, `src/lib/validation.ts`, `src/lib/auth.ts`, `src/middleware.ts`, `src/env.d.ts`, `package.json`, `astro.config.mjs`
 
 ---
-*Stack research for: RateMyPlace v1.4.0 "Open Doors" — new feature additions only*
-*Researched: 2026-03-20*
+
+*Stack research for: v1.5.0 "Closed Loops" security hardening milestone*
+*Researched: 2026-04-26*

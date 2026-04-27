@@ -1,558 +1,610 @@
 # Architecture Research
 
-**Domain:** Tenant housing review platform — v1.4.0 "Open Doors" feature integration
-**Researched:** 2026-03-20
-**Confidence:** HIGH (based on direct codebase inspection)
+**Domain:** Hardening retrofit — Astro 5 SSR + Cloudflare Workers + D1 + Lucia v3
+**Researched:** 2026-04-26
+**Confidence:** HIGH (based on direct source reading + official docs)
 
 ---
 
-## System Overview
+## Standard Architecture
+
+### System Overview (Current v1.4.0 → v1.5.0 Delta)
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                      Cloudflare Pages (CDN edge)                     │
-├─────────────────────────────────────────────────────────────────────┤
-│  Astro SSR Pages (.astro)             React Islands (.tsx)            │
-│  ┌──────────────────────┐  ┌────────────────────────────────────┐    │
-│  │ profile.astro        │  │ TenantDashboard.tsx (new)           │    │
-│  │ (modify: more props) │  │  - tab: My Reviews (existing)       │    │
-│  │                      │  │  - tab: Saved Buildings (new)       │    │
-│  │ contact.astro        │  │  - tab: Notifications (new)         │    │
-│  │ (modify: wire POST)  │  └────────────────────────────────────┘    │
-│  └──────────────────────┘  ┌────────────────────────────────────┐    │
-│  ┌──────────────────────┐  │ UGCDisclaimer.astro (new, static)   │    │
-│  │ building/[slug].astro│  │  - variant: banner | inline         │    │
-│  │ (modify: add         │  │  - used on 6+ surfaces              │    │
-│  │  UGCDisclaimer)      │  └────────────────────────────────────┘    │
-│  └──────────────────────┘                                            │
-├─────────────────────────────────────────────────────────────────────┤
-│                    src/pages/api/ (API Routes)                        │
-│  ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────────┐  │
-│  │ /api/contact     │ │ /api/dashboard/  │ │ /api/admin/          │  │
-│  │ (new)            │ │  saved-buildings │ │  buildings/[id]/     │  │
-│  │                  │ │  notifications   │ │  enrich (refactor)   │  │
-│  └──────────────────┘ └──────────────────┘ └──────────────────────┘  │
-├─────────────────────────────────────────────────────────────────────┤
-│                       src/lib/ (Business Logic)                       │
-│  ┌──────────────┐ ┌──────────────────────────────┐ ┌─────────────┐   │
-│  │ scoring.ts   │ │ enrichment/                  │ │ email.ts    │   │
-│  │ surveyItems  │ │   index.ts  (dispatcher)     │ │ (add contact│   │
-│  │ (add 2 items)│ │   types.ts  (interfaces)     │ │  template)  │   │
-│  │              │ │   adapters/boston.ts         │ │             │   │
-│  │              │ │   adapters/new-haven.ts      │ │             │   │
-│  └──────────────┘ └──────────────────────────────┘ └─────────────┘   │
-│  ┌──────────────────────────────────────────────────────────────┐    │
-│  │ notifications.ts (new helper — createNotification())         │    │
-│  └──────────────────────────────────────────────────────────────┘    │
-├─────────────────────────────────────────────────────────────────────┤
-│                    Cloudflare D1 (SQLite at edge)                     │
-│  existing tables (10)          new tables (3)    schema changes (1)  │
-│  ┌─────────────┐               ┌───────────────┐ ┌───────────────┐   │
-│  │ reviews     │               │ contact_msgs  │ │ reviews:      │   │
-│  │ buildings   │               │ saved_bldgs   │ │  section_8    │   │
-│  │ users       │               │ notifications │ │  safely_lit   │   │
-│  │ ...7 more   │               └───────────────┘ └───────────────┘   │
-│  └─────────────┘                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│  Browser                                                              │
+│   React islands (client:load) ←→ fetch() → /api/**                   │
+│   Astro pages (SSR, zero client JS unless island)                    │
+└──────────────────────────────┬───────────────────────────────────────┘
+                               │ HTTP
+┌──────────────────────────────▼───────────────────────────────────────┐
+│  Cloudflare Workers (SSR runtime)                                     │
+│                                                                       │
+│  src/middleware.ts  ←── ALL requests pass here first                 │
+│   [1] Auth: Lucia session validate → context.locals.user              │
+│   [2] Security headers: CSP, X-Frame, etc.                           │
+│   [3] v1.5.0 NEW: Origin check assertion (Astro built-in, verify OK) │
+│                                                                       │
+│  src/pages/api/**/*.ts  ←── API routes                               │
+│   [inline] Rate limit check (checkRateLimit)                         │
+│   [inline] Auth/admin guard                                          │
+│   [inline] Input validation                                          │
+│   [inline] D1 query                                                   │
+│   [async]  Email send (fire-and-forget via ctx.waitUntil)            │
+│                                                                       │
+│  src/pages/*.astro  ←── SSR pages                                    │
+│   Direct D1 queries, no rate limiting (reads only)                   │
+└──────────────────────────────┬───────────────────────────────────────┘
+                               │ D1 SQLite API
+┌──────────────────────────────▼───────────────────────────────────────┐
+│  Cloudflare D1 (SQLite)                                               │
+│   14 tables: users, sessions, reviews, buildings, landlords,          │
+│   rate_limits, disputes, audit_logs, contact_messages,               │
+│   notifications, saved_buildings, bug_reports, ...                   │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-### Component Responsibilities
+### Component Responsibilities (v1.5.0 targets)
 
-| Component | Responsibility | v1.4.0 Change |
+| Component | Responsibility | v1.5.0 Change |
 |-----------|----------------|---------------|
-| `src/pages/profile.astro` | Auth gate + SSR data load | Extend: pass unread notification count as prop |
-| `src/components/profile/ProfileDashboard.tsx` | Review list + email verification | Replace with TenantDashboard.tsx or extend in-place |
-| `src/components/dashboard/TenantDashboard.tsx` | Tabbed tenant self-service | New: wraps existing + adds saved + notifications tabs |
-| `src/pages/api/reviews/user.ts` | Fetch user's own reviews | No change needed |
-| `src/lib/email.ts` | All Resend email templates | Add `sendContactNotificationEmail()` |
-| `src/lib/scoring.ts` + `surveyItems.ts` | Survey definitions + weighted scoring | Add `section_8_accepted`, `safely_lit` fields |
-| `src/pages/api/admin/buildings/[id]/enrich.ts` | Boston assessing API lookup | Refactor: delegate to `lib/enrichment/index.ts` |
-| `src/lib/enrichment/` | Multi-city property data adapter | New module extracted from enrich route |
-| `src/components/ui/UGCDisclaimer.astro` | Shared disclaimer banner/callout | New |
-| `src/lib/notifications.ts` | Notification row creation helper | New |
+| `src/middleware.ts` | Auth context, security headers | No change; rate limiting stays in routes |
+| `src/lib/rateLimit.ts` | D1-backed sliding-window rate limiter | Add `Retry-After` header helper; add typed signature |
+| `src/lib/validation.ts` | Input validation rules | Add schemas for contacts, bug-reports, disputes, search |
+| `src/lib/db.ts` | D1 connection wrapper | Add typed `getRuntime()` wrapper to retire 71 `any` casts |
+| `src/lib/email.ts` | Resend transactional email | Switch to fire-and-forget caller pattern |
+| `src/components/reviews/ReviewEditForm.tsx` | 907-line edit form | Split into step sub-components |
+| `src/components/admin/BuildingsTable.tsx` | 844-line admin table | Split into sub-components + custom hooks |
+| `src/components/admin/ReviewsTable.tsx` | 733-line admin table | Split into sub-components + custom hooks |
+| `src/components/ui/EmptyState.tsx` | (new) Shared empty-state UI | Create once, use everywhere |
+| `e2e/admin-moderation.spec.ts` | (new) Admin approve/reject + audit-log assertion | New spec |
+| `e2e/data-consistency.spec.ts` | (new) Cross-view score consistency | New spec |
 
-## Recommended Project Structure (v1.4.0 additions)
-
-```
-src/
-├── lib/
-│   ├── enrichment/                  # NEW: multi-city adapter module
-│   │   ├── index.ts                 # enrichBuilding() dispatcher
-│   │   ├── types.ts                 # CityAdapter interface, EnrichmentResult type
-│   │   └── adapters/
-│   │       ├── boston.ts            # Extracted from enrich.ts (existing logic)
-│   │       └── new-haven.ts         # New Haven open data API adapter
-│   ├── notifications.ts             # NEW: createNotification() helper
-│   ├── scoring.ts                   # MODIFY: add section_8_accepted, safely_lit
-│   ├── surveyItems.ts               # MODIFY: add 2 new SurveyItem entries
-│   ├── email.ts                     # MODIFY: add sendContactNotificationEmail()
-│   └── validation.ts                # MODIFY: add contact form validation schema
-├── components/
-│   ├── ui/
-│   │   └── UGCDisclaimer.astro      # NEW: shared disclaimer (static Astro)
-│   ├── dashboard/                   # NEW: tenant dashboard islands
-│   │   ├── TenantDashboard.tsx      # Main tabbed island
-│   │   ├── SavedBuildings.tsx       # Saved buildings tab panel
-│   │   └── NotificationsList.tsx   # Notifications tab panel
-│   └── profile/
-│       └── ProfileDashboard.tsx     # MODIFY or replace with TenantDashboard
-├── pages/
-│   ├── profile.astro                # MODIFY: pass unreadNotifications prop
-│   ├── contact.astro                # MODIFY: wire to /api/contact POST
-│   ├── building/[slug].astro        # MODIFY: add UGCDisclaimer
-│   ├── landlord/[slug].astro        # MODIFY: add UGCDisclaimer
-│   └── api/
-│       ├── contact.ts               # NEW: POST handler
-│       ├── dashboard/
-│       │   ├── saved-buildings.ts   # NEW: GET/POST/DELETE
-│       │   └── notifications.ts     # NEW: GET, PATCH (mark read)
-│       └── admin/
-│           └── buildings/[id]/enrich.ts  # MODIFY: delegate to lib/enrichment/
-└── migrations/
-    ├── 0019_contact_messages.sql    # NEW
-    ├── 0020_saved_buildings.sql     # NEW
-    ├── 0021_notifications.sql       # NEW
-    └── 0022_survey_section8_lit.sql # NEW (ALTER TABLE, nullable columns)
-```
-
-### Structure Rationale
-
-- **`src/lib/enrichment/`:** The existing Boston enrichment logic is ~200 lines of API-specific code embedded in an API route. Project convention is that all business logic lives in `src/lib/`. An adapter interface keeps city-specific parsing isolated — adding New Haven requires only a new adapter file with no changes to the route or dispatcher.
-- **`src/components/dashboard/`:** The current `ProfileDashboard.tsx` handles email verification and review listing. Adding saved buildings and notifications is enough scope to warrant a dedicated directory rather than growing one file. The existing component can be refactored to delegate to `TenantDashboard.tsx`.
-- **`src/components/ui/UGCDisclaimer.astro`:** Static Astro component, no client JS needed. Used on building pages, landlord pages, review submission confirmation, and terms/about. Centralizing ensures legal copy stays consistent and is updated in one place.
-- **`src/pages/api/dashboard/`:** Dashboard APIs are user-facing (not admin), so they live under `/api/` not `/api/admin/`. They follow the same auth-check-first pattern as all other user APIs.
-- **`src/lib/notifications.ts`:** Same pattern as `src/lib/audit.ts` — a best-effort helper called inline from state-changing routes. The notification creation must not block or fail the primary action.
+---
 
 ## Architectural Patterns
 
-### Pattern 1: City Enrichment Adapter
+### Pattern 1: Typed Cloudflare Runtime Wrapper
 
-**What:** A typed `CityAdapter` interface that each city adapter implements. A dispatcher in `index.ts` selects the adapter based on the building's `city` field, calls it, and returns a normalized `EnrichmentResult`.
+**What:** Retire the 71 `(context.locals as any).runtime` casts by declaring `runtime` in `App.Locals` and creating a typed `getRuntime()` helper. The project uses `@astrojs/cloudflare` v12 (Astro 5), where `locals.runtime` maps to the `App.Platform` object. The `App.Platform` interface is already defined in `src/env.d.ts` with typed `env`, `cf`, and `ctx`. The missing step is declaring `runtime: App.Platform` in `App.Locals`.
 
-**When to use:** Any time a city is added, or when an existing adapter needs to swap its data source.
+**When to use:** This is the foundation of the hardening work — build it first; every subsequent API route change becomes typesafe.
 
-**Trade-offs:** Adds one indirection layer. Worth it because the alternative (if/else chains in the route) grows unmaintainably at 3+ cities and blends HTTP transport concerns with business logic. Testing each adapter in isolation also becomes possible.
+**Build order:** Must happen BEFORE other API route changes, so each route edit benefits from typed access.
 
-**Example:**
+**Two-file change:**
+
 ```typescript
-// src/lib/enrichment/types.ts
-export interface EnrichmentResult {
-  yearBuilt: number | null;
-  unitCount: number | null;
-  buildingType: string | null;
-  ownerName: string | null;
-  ownerEntity: string | null;
-  source: string;                     // e.g. "boston_assessing" | "new_haven_opendata"
-  confidence: 'exact' | 'fuzzy' | 'none';
-}
+// src/env.d.ts — add `runtime` to App.Locals
+declare namespace App {
+  interface Platform {
+    env: {
+      DB: D1Database;
+      VERIFICATION_BUCKET: R2Bucket;
+      TURNSTILE_SECRET_KEY: string;
+      RESEND_API_KEY: string;
+      GOOGLE_MAPS_API_KEY: string;
+      GOOGLE_PLACES_API_KEY: string;
+      SITE_URL: string;
+    };
+    cf: import('@cloudflare/workers-types').IncomingRequestCfProperties;
+    ctx: import('@cloudflare/workers-types').ExecutionContext;
+  }
 
-export interface CityAdapter {
-  city: string;                       // matches buildings.city value (case-insensitive)
-  enrich(address: string, zipCode: string | null): Promise<EnrichmentResult>;
-}
-
-// src/lib/enrichment/index.ts
-import { bostonAdapter } from './adapters/boston';
-import { newHavenAdapter } from './adapters/new-haven';
-
-const adapters: CityAdapter[] = [bostonAdapter, newHavenAdapter];
-
-export async function enrichBuilding(
-  city: string,
-  address: string,
-  zipCode: string | null
-): Promise<EnrichmentResult | null> {
-  const adapter = adapters.find(
-    a => a.city.toLowerCase() === city.toLowerCase()
-  );
-  if (!adapter) return null;
-  return adapter.enrich(address, zipCode);
-}
-```
-
-The API route becomes a thin coordinator:
-```typescript
-// src/pages/api/admin/buildings/[id]/enrich.ts (refactored)
-const result = await enrichBuilding(building.city, building.address, building.zip_code);
-if (!result) {
-  return new Response(JSON.stringify({ error: 'No enrichment adapter for this city' }), {
-    status: 404, headers: { 'Content-Type': 'application/json' }
-  });
-}
-return new Response(JSON.stringify(result), {
-  status: 200, headers: { 'Content-Type': 'application/json' }
-});
-```
-
-### Pattern 2: Inline Notification Creation (best-effort)
-
-**What:** When an event occurs (review approved, review rejected), the API route that performs the action also creates a notification row in D1 using a shared `createNotification()` helper. Errors are swallowed, same as `createAuditLog()`.
-
-**When to use:** Every event that should surface in the tenant's notification tab.
-
-**Trade-offs:** Notification logic is distributed across multiple routes. Mitigated by the shared helper. No alternative (no background jobs, no queues) is available in Cloudflare Workers.
-
-**Example:**
-```typescript
-// src/lib/notifications.ts
-import type { D1Database } from '@cloudflare/workers-types';
-import { generateIdFromEntropySize } from 'lucia';
-
-export type NotificationType = 'review_approved' | 'review_rejected' | 'system';
-
-export async function createNotification(
-  db: D1Database,
-  userId: string,
-  type: NotificationType,
-  title: string,
-  body: string,
-  linkUrl?: string
-): Promise<void> {
-  try {
-    const id = generateIdFromEntropySize(10);
-    await db.prepare(
-      'INSERT INTO notifications (id, user_id, type, title, body, link_url) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(id, userId, type, title, body, linkUrl ?? null).run();
-  } catch (err) {
-    // Best-effort: notification failure must not break the primary action
-    console.error('Failed to create notification:', err);
+  interface Locals {
+    user: import('lucia').User | null;
+    session: import('lucia').Session | null;
+    runtime: App.Platform;          // ADD THIS LINE
   }
 }
 ```
 
-Called from existing admin review route after status change:
 ```typescript
-// src/pages/api/admin/reviews/[id].ts (existing, modified)
-// After approving a review:
-await createNotification(
-  db, review.user_id, 'review_approved',
-  'Your review was approved',
-  `Your review of ${buildingAddress} is now live.`,
-  `/building/${buildingSlug}`
+// src/lib/db.ts — update getDB to accept typed runtime
+import type { D1Database } from '@cloudflare/workers-types';
+
+export function getDB(runtime: App.Platform): D1Database {
+  const db = runtime?.env?.DB;
+  if (!db) {
+    throw new Error('D1 Database not found. Make sure you have configured the DB binding.');
+  }
+  return db;
+}
+```
+
+**After this change**, all 71 call sites change from:
+```typescript
+const runtime = (context.locals as any).runtime;
+const db = getDB(runtime);
+```
+to:
+```typescript
+const db = getDB(context.locals.runtime);
+```
+
+This is a purely mechanical find-and-replace. Run it last in a single PR to batch all 71 changes cleanly. Do not mix with other logic changes in the same PR.
+
+**Note on Astro 6 migration:** In `@astrojs/cloudflare` v13+ (Astro 6), `locals.runtime` is removed and `waitUntil` moves to `Astro.locals.cfContext`. The typed wrapper insulates call sites from this future change — only `db.ts` would need updating at migration time.
+
+---
+
+### Pattern 2: Middleware Ordering (Rate Limit vs. Auth)
+
+**What:** Rate limiting should run **inside the route handler**, NOT as a middleware layer before auth. This is the existing pattern in `signin.ts` and `contact.ts` and it is correct.
+
+**Why rate limit stays in route handlers (not middleware):**
+- Rate limit keys are endpoint-specific (e.g., `signin:1.2.3.4`, `contact:1.2.3.4`). A middleware would need to map URL paths to configs.
+- Auth context is NOT needed before rate limiting public endpoints — the IP is extracted from request headers before any user lookup.
+- Middleware in Astro runs for ALL requests including static assets and admin routes. Adding rate limiting there would require URL filtering that is error-prone.
+- The existing pattern in `checkRateLimit()` already accepts `db` — requiring the runtime to be available — which is only guaranteed after the middleware runs and sets `context.locals`.
+
+**Correct execution order per request:**
+
+```
+middleware.ts
+  → Lucia session validate (sets context.locals.user)
+  → Security headers (post-response)
+  → [call next()]
+
+route handler (e.g., /api/disputes.ts POST)
+  → 1. Extract IP: getClientIP(context)
+  → 2. Get runtime: context.locals.runtime
+  → 3. Get DB: getDB(context.locals.runtime)
+  → 4. Rate limit: checkRateLimit(db, ip, 'dispute', 3, 3600)
+     ↳ 429 if exceeded
+  → 5. Auth check (if route requires it): context.locals.user
+     ↳ 401 if missing
+  → 6. Admin check (if admin route): context.locals.user?.isAdmin
+     ↳ 403 if not admin
+  → 7. Input validation: validateXxx(body)
+     ↳ 400 if invalid
+  → 8. D1 query
+  → 9. Fire-and-forget email (ctx.waitUntil)
+  → 10. Return 2xx response
+```
+
+**Routes that need rate limiting added in v1.5.0:**
+- `src/pages/api/bug-reports.ts` — has Turnstile but no `checkRateLimit` call (line 6 only imports `getClientIP`, never calls `checkRateLimit`)
+- `src/pages/api/search/results.ts` — GET endpoint, no rate limiting, LIKE queries on full table
+- `src/pages/api/search/autocomplete.ts` — GET endpoint, no rate limiting
+
+Routes already covered: `contact.ts` (3/hr), `disputes.ts` (3/hr), `auth/signin.ts` (5/15min), `auth/signup.ts` (3/hr).
+
+**Rate limit config for new routes:**
+
+| Route | Key | Limit | Window | Rationale |
+|-------|-----|-------|--------|-----------|
+| `bug-reports.ts` | `bug-report` | 5 | 3600 | Low-frequency form |
+| `search/results.ts` | `search` | 60 | 60 | 1/sec average; LIKE is O(n) |
+| `search/autocomplete.ts` | `autocomplete` | 120 | 60 | Keystroke-driven, higher tolerance |
+
+---
+
+### Pattern 3: Input Validation — Shared Schema Library
+
+**What:** Validation schemas live in `src/lib/validation.ts` (shared), NOT inline per-route. The existing `validateReviewForm()` function is already in the library. v1.5.0 adds sibling validators for the unprotected public endpoints.
+
+**When to use:** Any route that accepts POST body data from unauthenticated or low-trust callers.
+
+**Where new validators go:**
+
+```typescript
+// src/lib/validation.ts — ADD alongside existing validateReviewForm()
+
+export interface BugReportInput {
+  description: string;
+  category?: string;
+  email?: string;
+  url?: string;
+}
+
+export function validateBugReport(data: Partial<BugReportInput>): ValidationError[] {
+  const errors: ValidationError[] = [];
+  if (!data.description || data.description.trim().length < 10) {
+    errors.push({ field: 'description', message: 'Description must be at least 10 characters' });
+  }
+  if (data.description && data.description.length > 5000) {
+    errors.push({ field: 'description', message: 'Description must be 5000 characters or less' });
+  }
+  if (data.email && !data.email.includes('@')) {
+    errors.push({ field: 'email', message: 'Invalid email format' });
+  }
+  if (data.url && data.url.length > 2000) {
+    errors.push({ field: 'url', message: 'URL too long' });
+  }
+  return errors;
+}
+
+export interface ContactInput {
+  name: string;
+  email: string;
+  message: string;
+  category?: string;
+}
+
+export function validateContact(data: Partial<ContactInput>): ValidationError[] {
+  const errors: ValidationError[] = [];
+  if (!data.name || data.name.trim().length < 2 || data.name.length > 100) {
+    errors.push({ field: 'name', message: 'Name must be 2-100 characters' });
+  }
+  if (!data.email || !data.email.includes('@')) {
+    errors.push({ field: 'email', message: 'Valid email required' });
+  }
+  if (!data.message || data.message.trim().length < 10 || data.message.length > 3000) {
+    errors.push({ field: 'message', message: 'Message must be 10-3000 characters' });
+  }
+  return errors;
+}
+
+export interface SearchInput {
+  q?: string;
+  type?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export function validateSearch(params: SearchInput): ValidationError[] {
+  const errors: ValidationError[] = [];
+  if (params.q && params.q.length > 200) {
+    errors.push({ field: 'q', message: 'Search query too long (max 200 chars)' });
+  }
+  if (params.type && !['buildings', 'landlords'].includes(params.type)) {
+    errors.push({ field: 'type', message: 'Type must be buildings or landlords' });
+  }
+  if (params.limit !== undefined && (params.limit < 1 || params.limit > 50)) {
+    errors.push({ field: 'limit', message: 'Limit must be 1-50' });
+  }
+  return errors;
+}
+```
+
+**Contact.ts already has inline validation** (lines 40-64) that duplicates the library approach. Keep the inline validation working for now; the new validators replace it in a follow-up cleanup PR to avoid scope creep in v1.5.0.
+
+---
+
+### Pattern 4: CSRF Protection — Astro Built-in + Lucia SameSite
+
+**What:** Astro 5 has built-in CSRF protection enabled by default via `security.checkOrigin`. It validates the `Origin` request header matches the site origin for all non-safe methods (POST, PUT, PATCH, DELETE). Lucia sets session cookies with `sameSite: 'lax'` by default (confirmed in `middleware.ts` lines 28-31).
+
+**Current status (verified by reading middleware.ts):**
+- Session cookies use `sameSite: 'lax'` — confirmed in `middleware.ts` lines 28-31 and 40-43
+- The security test suite (`e2e/security.spec.ts` line 116) already includes `headers: { Origin: ORIGIN }` on form POST tests, which implies Astro's Origin check IS active
+
+**CVE-2024-56140 status:** This bypass (Content-Type header manipulation) was patched in Astro 5.x. Running Astro 5.16.x is not affected by the original CVE.
+
+**What v1.5.0 needs to verify:**
+1. Confirm `security.checkOrigin` is not explicitly disabled in `astro.config.mjs` — currently it is not present, meaning it defaults to `true` (safe)
+2. JSON body API routes (e.g., `disputes.ts` uses `request.json()`) — Origin check covers these since the header is still sent by browsers
+3. No explicit CSRF token infrastructure is needed; SameSite=Lax + Origin check is the defense-in-depth approach sufficient for this app
+
+**Where to check if adding CSRF tokens becomes necessary:**
+- If any endpoint accepts cross-origin requests from third parties (currently none do)
+- If Cloudflare Turnstile is removed from form endpoints (unlikely)
+
+**No new files needed for CSRF.** The audit outcome is: "Origin check active, SameSite=Lax confirmed, no token implementation required."
+
+---
+
+### Pattern 5: waitUntil for Fire-and-Forget Email
+
+**What:** Email sends currently block the API response. The fix is to call `ctx.waitUntil(emailPromise)` so the response returns immediately and email sends happen asynchronously (up to 30 seconds after response).
+
+**How to access `ctx` in `@astrojs/cloudflare` v12 / Astro 5:**
+
+```typescript
+// In any API route handler:
+const ctx = (context.locals.runtime as App.Platform).ctx;
+// After typed wrapper: context.locals.runtime.ctx
+ctx.waitUntil(
+  sendVerificationEmail(resendApiKey, siteUrl, email, token).catch((err) => {
+    console.error('Verification email failed (background):', err);
+  })
 );
 ```
 
-### Pattern 3: Tenant Dashboard as Tabbed Island
-
-**What:** The existing `/profile` page uses `ProfileDashboard.tsx` as a `client:load` React island. The Astro page fetches unread notification count server-side (one fast query) and passes it as a prop to avoid flash. The island renders a tab bar: "My Reviews" (existing), "Saved" (new), "Notifications" (new).
-
-**When to use:** Any time a new top-level section is added to the tenant's self-service area.
-
-**Trade-offs:** All three tabs are bundled together in the initial JS. Acceptable at this scale — lazy tab loading adds complexity that is not warranted for a 3-tab UI. Three separate islands would require shared-state coordination and is messier.
-
-**Example:**
-```astro
----
-// src/pages/profile.astro (modified)
-const db = getDB((Astro.locals as any).runtime);
-const unreadRow = await db.prepare(
-  'SELECT COUNT(*) as n FROM notifications WHERE user_id = ? AND is_read = 0'
-).bind(user.id).first<{ n: number }>();
-const unreadNotifications = unreadRow?.n ?? 0;
----
-<TenantDashboard
-  client:load
-  userEmail={user.email}
-  userName={user.name}
-  avatarUrl={user.avatarUrl}
-  memberSince={memberSince}
-  emailVerified={emailVerified}
-  unreadNotifications={unreadNotifications}
-/>
+**After the typed runtime wrapper** (Pattern 1), this simplifies to:
+```typescript
+const ctx = context.locals.runtime.ctx;
+ctx.waitUntil(
+  sendVerificationEmail(resendApiKey, siteUrl, email, token).catch(logErr)
+);
 ```
 
-### Pattern 4: UGC Disclaimer Component
+**Files that need this change** (email sends that block response):
 
-**What:** A single Astro component with a `variant` prop that controls layout. Imported wherever a disclaimer is needed.
+| File | Current pattern | Change |
+|------|----------------|--------|
+| `src/pages/api/auth/signup.ts` | `await sendVerificationEmail(...)` | `ctx.waitUntil(send...)` |
+| `src/pages/api/auth/forgot-password.ts` | `await sendPasswordResetEmail(...)` | `ctx.waitUntil(send...)` |
+| `src/pages/api/auth/verify-email.ts` | check file — likely await | `ctx.waitUntil(send...)` |
+| `src/pages/api/contact.ts` lines 78-86 | `await send...().catch(...)` | already catch, add `ctx.waitUntil()` |
+| `src/pages/api/disputes.ts` lines 139-158 | `await sendDisputeConfirmationEmail(...)` | `ctx.waitUntil(send...)` |
 
-**When to use:** Any page or component that displays user-submitted content: building profile pages, landlord profile pages, review cards, review submission confirmation, about page.
+**`contact.ts` is already close** — lines 78-86 show `.catch()` error handling. Just wrap in `ctx.waitUntil()`.
 
-**Trade-offs:** None meaningful. This is purely a centralization pattern.
+**Do NOT use `waitUntil` for:**
+- D1 writes (must complete before response — rate limit logging, review insert, audit log)
+- Auth session creation (must complete before cookie is set in response)
 
-**Example:**
-```astro
+**30-second time limit:** Resend typically responds in 200-500ms, well within the limit. No concern here.
+
 ---
-// src/components/ui/UGCDisclaimer.astro
-interface Props {
-  variant?: 'banner' | 'inline' | 'footer';
+
+### Pattern 6: Component Splitting for React Islands
+
+**What:** Split three oversized React components without changing behavior. All three follow the same pattern: large monolithic component with state, fetch logic, and multiple render sections. Split into: state/logic hook + smaller sub-components.
+
+**ReviewEditForm.tsx (907 lines) — split target:**
+
+```
+src/components/reviews/
+  ReviewEditForm.tsx          ← keep as orchestrator (~200 lines)
+  form-steps/
+    UnitDetailsStep.tsx       ← bedroom/bath/unit-number/sq-footage
+    UnitRatingStep.tsx        ← 10 survey rating items
+    BuildingRatingStep.tsx    ← 9 survey rating items
+    LandlordRatingStep.tsx    ← 8 survey rating items
+    AdditionalDetailsStep.tsx ← tenure, amenities, pets, pests
+    ReviewTextStep.tsx        ← title, text, would-recommend
+    ConfirmStep.tsx           ← summary + consent checkbox
+  hooks/
+    useReviewEditForm.ts      ← all useState declarations + submit handler
+```
+
+The existing `ReviewForm.tsx` (new review) already uses a `form-steps/` subdirectory — mirror that structure for the edit form.
+
+**BuildingsTable.tsx (844 lines) — split target:**
+
+```
+src/components/admin/buildings/
+  BuildingsTable.tsx          ← keep as orchestrator (~150 lines)
+  BuildingRow.tsx             ← single row expand/collapse
+  BuildingEditForm.tsx        ← inline edit form (landlord, notes, etc.)
+  BuildingEnrichPanel.tsx     ← enrichment result display
+  hooks/
+    useBuildingsTable.ts      ← useState, fetchBuildings, fetchLandlords
+```
+
+**ReviewsTable.tsx (733 lines) — split target:**
+
+```
+src/components/admin/reviews/
+  ReviewsTable.tsx            ← keep as orchestrator (~150 lines)
+  ReviewRow.tsx               ← single row expand/collapse + status badge
+  ReviewDetailPanel.tsx       ← expanded view with approve/reject/link
+  hooks/
+    useReviewsTable.ts        ← useState, fetchReviews, fetchLandlords
+```
+
+**Behavioral preservation guarantee:**
+- Move state declarations to hook file without renaming them
+- Sub-components receive state and handlers as props (no new state)
+- No API changes — fetch URLs unchanged
+- E2E tests (`admin-actions.spec.ts`) target CSS selectors and text content, not component boundaries — they will continue passing
+
+---
+
+### Pattern 7: Playwright E2E Extensions for v1.5.0
+
+**What:** Two new spec files and an extension to `fixtures.ts` for a DB-access helper.
+
+**New specs:**
+
+```
+e2e/
+  admin-moderation.spec.ts    ← already exists (admin-actions.spec.ts covers E2E-07–10)
+                               ← v1.5.0 needs: audit-log field assertion (old/new values)
+  data-consistency.spec.ts    ← NEW: review create → verify score on 3 views
+```
+
+**`data-consistency.spec.ts` test flow:**
+
+```typescript
+// e2e/data-consistency.spec.ts
+test('review score appears consistently across search, building detail, and profile', async ({ authedPage }) => {
+  // 1. Create review via POST /api/reviews (or via form)
+  // 2. Admin approves it (reuse adminPage fixture)
+  // 3. GET /api/search/results?q=[building address] — assert score present
+  // 4. Navigate to /building/[slug] — assert same overall_score
+  // 5. Navigate to /profile — assert review in dashboard with same score
+});
+```
+
+**Fixture extension — no new fixtures needed.** The existing `authedPage` and `adminPage` fixtures (loading `playwright/.auth/user.json` and `admin.json`) are sufficient. For DB access in tests, continue the existing pattern: `execSync('npx wrangler d1 execute ratemyplace-db --local --command ...')`.
+
+**Rate limit clearing helper** (already in `security.spec.ts`, extract to fixtures if used in multiple new tests):
+
+```typescript
+// e2e/fixtures.ts — ADD helper (not a fixture, just a function)
+export function clearRateLimits() {
+  execSync(
+    'npx wrangler d1 execute ratemyplace-db --local --command "DELETE FROM rate_limits"',
+    { cwd: PROJECT_ROOT, stdio: 'pipe' }
+  );
 }
-const { variant = 'inline' } = Astro.props;
----
-
-{variant === 'banner' && (
-  <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 mb-6">
-    Reviews represent tenant opinions. RateMyPlace does not verify the accuracy of individual claims.
-  </div>
-)}
-{variant === 'inline' && (
-  <p class="text-xs text-gray-500 mt-2">
-    Content submitted by users. RateMyPlace does not verify accuracy of individual claims.
-  </p>
-)}
 ```
+
+Currently `clearRateLimits` is duplicated in `security.spec.ts`. If `data-consistency.spec.ts` also needs rate limit clearing, move it to `fixtures.ts` and import from there.
+
+**Global setup (`e2e/global.setup.ts`) — no changes needed.** The two seed users (user@test / admin@test) are sufficient for all new E2E tests. The admin approval step in `data-consistency.spec.ts` uses the existing `adminPage` fixture.
+
+---
 
 ## Data Flow
 
-### Contact Form Flow
+### Hardened Public POST Request Flow (v1.5.0 target)
 
 ```
-User submits contact form (contact.astro)
-    ↓
-POST /api/contact (with Turnstile token)
-    ↓
-validateContactForm() in validation.ts
-    → 400 if invalid
-    ↓
-INSERT into contact_messages (D1)
-    ↓
-sendContactNotificationEmail() (email.ts, best-effort)
-    → notifies admin@ratemyplace.org
-    ↓
-Return { success: true }
-    ↓
-contact.astro renders confirmation state (client-side JS or redirect)
+Browser POST /api/disputes
+  ↓
+middleware.ts
+  → Lucia session validate (sets locals.user = null for unauthenticated)
+  → [call next()]
+  ↓
+src/pages/api/disputes.ts POST handler
+  → getClientIP(context)                    // CF-Connecting-IP header
+  → getDB(context.locals.runtime)           // typed after Pattern 1
+  → checkRateLimit(db, ip, 'dispute', 3, 3600)
+     ↳ 429 if exceeded (Retry-After header)
+  → request.json() body parse
+  → validateDisputeInput(body)             // new validator in validation.ts
+     ↳ 400 if invalid
+  → extractReviewIdFromUrl(reviewUrl)
+     ↳ 400 if bad URL
+  → db.prepare(...).bind(...).run()        // D1 insert
+  → context.locals.runtime.ctx.waitUntil( // fire-and-forget
+      sendDisputeConfirmationEmail(...)
+    )
+  → return Response 201
 ```
 
-### Enrichment Flow (multi-city)
+### waitUntil Email Flow
 
 ```
-Admin clicks "Auto-Research" on building
-    ↓
-GET /api/admin/buildings/[id]/enrich
-    ↓ (admin auth check)
-Fetch building from D1 → { city, address, zip_code }
-    ↓
-enrichBuilding(city, address, zipCode) [lib/enrichment/index.ts]
-    ↓
-Select adapter by city field
-    ├── city = "Boston" → bostonAdapter.enrich()
-    │     Queries CKAN datastore_search (existing logic, extracted)
-    └── city = "New Haven" → newHavenAdapter.enrich()
-          Queries New Haven open data API
-    ↓
-Return EnrichmentResult (normalized shape)
-    ↓
-API route returns result to admin UI
-    ↓
-Admin reviews → clicks "Apply" → pre-fills edit form
-    ↓
-Admin saves → PATCH /api/admin/buildings/[id]
+Route handler
+  → builds response object
+  → ctx.waitUntil(emailPromise)    // schedules background work
+  → return response                // client receives response immediately
+
+[Background, up to 30 seconds]
+  → Resend API call completes (200-500ms typical)
+  → error logged if failure (best-effort)
+  → Worker lifetime ends
 ```
 
-### Notification Generation Flow
+---
+
+## Integration Points (New vs. Modified Files)
+
+### New Files (v1.5.0)
+
+| File | Type | Purpose |
+|------|------|---------|
+| `src/components/ui/EmptyState.tsx` | React component | Shared empty-state with icon, title, message props |
+| `src/components/reviews/form-steps/` | Directory | Step sub-components for ReviewEditForm split |
+| `src/components/reviews/hooks/useReviewEditForm.ts` | Hook | State + submit logic extracted from ReviewEditForm |
+| `src/components/admin/buildings/` | Directory | Sub-components for BuildingsTable split |
+| `src/components/admin/buildings/hooks/useBuildingsTable.ts` | Hook | State + fetch logic |
+| `src/components/admin/reviews/` | Directory | Sub-components for ReviewsTable split |
+| `src/components/admin/reviews/hooks/useReviewsTable.ts` | Hook | State + fetch logic |
+| `e2e/data-consistency.spec.ts` | E2E test | Cross-view score consistency checks |
+
+### Modified Files (v1.5.0)
+
+| File | Change | Impact |
+|------|--------|--------|
+| `src/env.d.ts` | Add `runtime: App.Platform` to `App.Locals` | Enables typed wrapper; no behavior change |
+| `src/lib/db.ts` | Change `runtime: any` to `runtime: App.Platform` | Type safety only |
+| `src/lib/validation.ts` | Add `validateBugReport`, `validateContact`, `validateSearch` | New exports |
+| `src/pages/api/bug-reports.ts` | Add `checkRateLimit` call + use `validateBugReport` | New behavior |
+| `src/pages/api/search/results.ts` | Add `checkRateLimit` call + use `validateSearch` | New behavior |
+| `src/pages/api/search/autocomplete.ts` | Add `checkRateLimit` call | New behavior |
+| `src/pages/api/auth/signup.ts` | `await email` → `ctx.waitUntil(email)` | Response time improvement |
+| `src/pages/api/auth/forgot-password.ts` | `await email` → `ctx.waitUntil(email)` | Response time improvement |
+| `src/pages/api/contact.ts` | Wrap existing `.catch()` sends in `ctx.waitUntil()` | Response time improvement |
+| `src/pages/api/disputes.ts` | Wrap existing email send in `ctx.waitUntil()` | Response time improvement |
+| `src/pages/api/**/*.ts` (71 files) | `(context.locals as any).runtime` → `context.locals.runtime` | Type safety; batch in one PR |
+| `src/components/reviews/ReviewEditForm.tsx` | Orchestrator reduced to ~200 lines | Behavior unchanged |
+| `src/components/admin/BuildingsTable.tsx` | Orchestrator reduced to ~150 lines | Behavior unchanged |
+| `src/components/admin/ReviewsTable.tsx` | Orchestrator reduced to ~150 lines | Behavior unchanged |
+| `e2e/admin-actions.spec.ts` | Extend E2E-10 audit log test to assert old/new field values | More specific assertions |
+
+---
+
+## Build Order (Dependency-Aware)
+
+Phases should be sequenced to maximize type-safety gains before touching other routes:
 
 ```
-Admin takes action (approve/reject review)
-    [src/pages/api/admin/reviews/[id].ts]
-    ↓
-Primary DB write (UPDATE reviews SET status = ?)
-    ↓
-createAuditLog() [existing, best-effort]
-    ↓
-createNotification() [new, best-effort]
-    INSERT into notifications (user_id, type, title, body, link_url)
-    ↓
-Tenant loads /profile → SSR query for unread count
-    ↓
-TenantDashboard island mounts → badge shown if unread > 0
-    ↓
-Tenant opens Notifications tab → GET /api/dashboard/notifications
-    ↓
-Display list → tenant clicks "Mark all read"
-    PATCH /api/dashboard/notifications { markAllRead: true }
+1. Typed runtime wrapper (env.d.ts + db.ts)
+      ↓
+2. Validation schema additions (validation.ts)
+      ↓ (parallel after step 1)
+3a. Rate limit additions (bug-reports.ts, search/results.ts, search/autocomplete.ts)
+3b. fire-and-forget email (signup.ts, forgot-password.ts, contact.ts, disputes.ts)
+3c. CSRF audit (read-only verification, astro.config.mjs check)
+      ↓
+4. Retire 71 any-casts (batch find-and-replace across all api routes)
+      ↓ (parallel after step 4)
+5a. Component splits (ReviewEditForm, BuildingsTable, ReviewsTable)
+5b. EmptyState component
+5c. New E2E specs (admin-moderation audit assertions, data-consistency)
+      ↓
+6. D1 index audit (migrations/)
 ```
 
-### Saved Buildings Flow
+**Rationale:**
+- Step 1 before Step 4: Typed wrapper is only useful once `App.Locals` declares `runtime`. The 71-cast batch benefits from the type being defined.
+- Step 2 before Steps 3a/3c: New validators are imported by the route changes.
+- Steps 3a/3b/3c can run in parallel as they touch different files.
+- Step 4 (71-cast batch) should be its own isolated PR — large but mechanical, low risk.
+- Steps 5a/5b/5c and 6 are independent of each other.
 
-```
-Tenant views building page
-    ↓
-Building page shows bookmark icon (Astro, uses fetch on click)
-    ↓
-POST /api/dashboard/saved-buildings { buildingId }
-    ↓ (auth check, UNIQUE constraint prevents duplicates)
-INSERT into saved_buildings (user_id, building_id)
-    ↓
-TenantDashboard "Saved" tab: GET /api/dashboard/saved-buildings
-    SELECT b.*, bs.avg_overall FROM saved_buildings s
-    JOIN buildings b ON s.building_id = b.id
-    LEFT JOIN building_scores bs ON b.id = bs.building_id
-    WHERE s.user_id = ?
-```
-
-## New D1 Tables
-
-### `contact_messages` (migration 0019)
-
-Mirrors the `bug_reports` table structure — admin manages both through similar patterns.
-
-```sql
-CREATE TABLE contact_messages (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL,
-  subject TEXT NOT NULL,
-  message TEXT NOT NULL,
-  user_id TEXT,
-  status TEXT NOT NULL DEFAULT 'new'
-    CHECK (status IN ('new', 'read', 'replied', 'closed')),
-  admin_notes TEXT,
-  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-  replied_at INTEGER,
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-CREATE INDEX idx_contact_status ON contact_messages(status);
-CREATE INDEX idx_contact_created ON contact_messages(created_at DESC);
-```
-
-### `saved_buildings` (migration 0020)
-
-UNIQUE constraint on (user_id, building_id) enforced at DB level, same pattern as `review_votes`.
-
-```sql
-CREATE TABLE saved_buildings (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  building_id TEXT NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
-  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-  UNIQUE(user_id, building_id)
-);
-CREATE INDEX idx_saved_user ON saved_buildings(user_id);
-```
-
-### `notifications` (migration 0021)
-
-Intentionally no FK to `reviews` — notifications survive review deletion.
-
-```sql
-CREATE TABLE notifications (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  type TEXT NOT NULL,
-  title TEXT NOT NULL,
-  body TEXT NOT NULL,
-  link_url TEXT,
-  is_read INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-  read_at INTEGER
-);
-CREATE INDEX idx_notifications_user ON notifications(user_id);
-CREATE INDEX idx_notifications_unread ON notifications(user_id, is_read);
-```
-
-### `reviews` column additions (migration 0022)
-
-Nullable columns — NULL means the question was not answered. No data migration needed for existing reviews.
-
-```sql
-ALTER TABLE reviews ADD COLUMN section_8_accepted INTEGER;  -- NULL | 0 | 1
-ALTER TABLE reviews ADD COLUMN safely_lit INTEGER;          -- NULL | 1-5 scale
-```
-
-**Relationships:** All three new tables follow existing FK conventions. `contact_messages.user_id` is nullable (anonymous submissions allowed). `saved_buildings` and `notifications` both cascade-delete with user deletion.
-
-## Integration Points
-
-### External Services
-
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| Boston Assessing API (CKAN) | Moved into `adapters/boston.ts` — same HTTP calls | Existing logic extracted, behavior unchanged |
-| New Haven Open Data | New `adapters/new-haven.ts` | Research needed: identify resource ID and field mapping before building |
-| Resend | Add `sendContactNotificationEmail()` to `email.ts` | Same pattern as existing four templates; sends to admin on contact submission |
-
-### Internal Boundaries
-
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| Admin enrich route ↔ enrichment lib | Direct function call `enrichBuilding()` | Admin-only; no user-facing enrichment |
-| Admin review approval ↔ notifications | `createNotification()` called inline, best-effort | Mirrors audit log pattern exactly |
-| Profile Astro page ↔ TenantDashboard island | Props: unreadNotifications, emailVerified, etc. | SSR query for unread count avoids client flash |
-| Contact form page ↔ API route | Standard POST with JSON body | Same pattern as bug-reports |
-| UGC disclaimer ↔ all consumer pages | Astro component import, no props required for basic use | Static render |
-| Saved buildings bookmark ↔ building page | Small inline fetch on click event in Astro page | Does not need a full React island for this interaction |
+---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Keeping enrichment logic in the API route
+### Anti-Pattern 1: Rate Limiting in Middleware
 
-**What people do:** Add New Haven as an `else if` block in `enrich.ts`, growing it to 400+ lines.
+**What people do:** Add `checkRateLimit()` to `middleware.ts` with URL-based routing.
+**Why it's wrong:** Requires URL-to-config mapping that is fragile, applies to admin routes unnecessarily, and cannot access endpoint-specific keys cleanly.
+**Do this instead:** Call `checkRateLimit()` as the first operation inside each route handler that needs it.
 
-**Why it's wrong:** City-specific parsing, field mapping, and address normalization are mixed with HTTP response handling. Testing requires mocking the Astro API context. Three cities makes this unmanageable.
+### Anti-Pattern 2: await on Email Sends
 
-**Do this instead:** Extract to `src/lib/enrichment/` with the adapter interface. The route becomes ~20 lines: auth check, fetch building, call `enrichBuilding()`, return result.
+**What people do:** `await sendVerificationEmail(...)` inside an API route handler.
+**Why it's wrong:** Adds 200-500ms Resend latency to every user-facing response. Email delivery is best-effort; blocking the user for it is unnecessary.
+**Do this instead:** `ctx.waitUntil(sendVerificationEmail(...).catch(logErr))`. Return the response immediately.
 
-### Anti-Pattern 2: Separate Astro page for the tenant dashboard
+### Anti-Pattern 3: Inline Validation Logic in Route Handlers
 
-**What people do:** Create `/dashboard.astro` as a distinct route from `/profile.astro`.
+**What people do:** Validate inputs directly in each API route file (e.g., `if (!name || name.length < 2)`).
+**Why it's wrong:** Already happening in `contact.ts` and `bug-reports.ts`. Cannot be unit-tested in isolation. Gets out of sync across routes.
+**Do this instead:** Define validators in `src/lib/validation.ts` and import them. Unit-test the validator function separately.
 
-**Why it's wrong:** Duplicates the auth check, SSR data load, and layout. Creates navigation confusion. Forces a URL change that breaks any existing links or bookmarks. The profile page already exists and already has auth gating.
+### Anti-Pattern 4: Single Monolithic React Island
 
-**Do this instead:** Extend `/profile.astro` to pass additional props to a `TenantDashboard.tsx` island. URL stays `/profile`. Existing behavior is preserved, new features are additive.
+**What people do:** Put all state, all fetch calls, and all render branches into one 900-line TSX file.
+**Why it's wrong:** Cannot test sub-sections in isolation. Full re-render on any state change. Impossible to reason about props flow.
+**Do this instead:** Extract state to a custom hook. Extract each form step or table section into a focused sub-component. Pass state/handlers as explicit props.
 
-### Anti-Pattern 3: Generating notifications from a separate scheduled endpoint
+### Anti-Pattern 5: `(context.locals as any).runtime` in Library Functions
 
-**What people do:** Create a background job or cron endpoint that scans for review status changes and generates notifications.
+**What people do:** Pass `runtime: any` all the way into `src/lib/db.ts`, `src/lib/audit.ts`, `src/lib/notifications.ts`.
+**Why it's wrong:** TypeScript cannot catch a typo like `runtime.env.RESEND_APY_KEY`. IDE autocomplete is useless.
+**Do this instead:** Accept `App.Platform` at the library boundary. The typed declaration in `env.d.ts` carries the full env shape.
 
-**Why it's wrong:** Cloudflare Workers have no persistent background tasks outside of Cloudflare Cron Triggers (which would require wrangler.jsonc configuration, a new route, and polling logic). It introduces a delay between the event and the notification.
+---
 
-**Do this instead:** Call `createNotification()` inline in the same API route that changes the review status. Best-effort (errors swallowed). Same pattern as the existing `createAuditLog()` calls — already proven in production.
+## Scaling Considerations
 
-### Anti-Pattern 4: Hardcoding UGC disclaimer text in each template
+| Scale | Architecture Adjustment |
+|-------|------------------------|
+| Current (< 1K reviews) | Rate limiting in D1 `rate_limits` table — fine; cleanup query runs per-request |
+| 10K reviews | Add DB index on `rate_limits(rate_key, created_at)` if not present; check with `EXPLAIN QUERY PLAN` |
+| 100K reviews | Consider Cloudflare KV or Durable Objects for rate limiting to avoid D1 write pressure |
 
-**What people do:** Copy-paste the disclaimer paragraph into building pages, landlord pages, review cards, and submission confirmation.
-
-**Why it's wrong:** Legal language needs consistency and easy updating. Five separate strings will diverge over time. Any copy change requires hunting down all instances.
-
-**Do this instead:** `UGCDisclaimer.astro` with a `variant` prop. All surfaces import and render it. One place to update copy.
-
-### Anti-Pattern 5: Making `section_8_accepted` and `safely_lit` required survey fields
-
-**What people do:** Add new survey questions as `required: true` with `NOT NULL` constraints, requiring all existing reviews to be migrated.
-
-**Why it's wrong:** 100+ existing reviews have no data for these fields. A NOT NULL constraint requires a migration that either deletes existing reviews or sets a default that misrepresents historical data.
-
-**Do this instead:** Nullable columns with `allowNA: true` in `surveyItems.ts`. NULL means unanswered. Scoring logic skips NULL scores (already the pattern for NA items). The review form shows these as optional questions.
-
-## Suggested Build Order
-
-Dependencies drive this order. Features in the same group can be built in parallel.
-
-**Group 1 — No dependencies (isolated changes):**
-1. Fix move-in date seasonal display bug — isolated to display component rendering the date string
-2. Full review content in admin pending reviews view — UI-only change to `ReviewsTable.tsx` + `AdminReview` type in `api-types.ts`
-3. `UGCDisclaimer.astro` component + placement on building, landlord, review pages, submission flow
-4. New survey fields: migration 0022 + `surveyItems.ts` + `scoring.ts` + `ReviewForm.tsx`
-
-**Group 2 — Depends on Group 1 being stable:**
-5. Contact form: migration 0019 + `/api/contact.ts` + `email.ts` template + `contact.astro` UI + `validation.ts`
-6. Multi-city enrichment refactor: create `src/lib/enrichment/`, extract Boston adapter, add New Haven adapter, update route
-
-**Group 3 — Depends on schema from Group 2:**
-7. Tenant dashboard core: migration 0021 notifications + `notifications.ts` helper + modify admin review routes to call it + `TenantDashboard.tsx` + `/api/dashboard/notifications.ts` + extend `profile.astro`
-8. Tenant dashboard extended: migration 0020 saved buildings + `SavedBuildings.tsx` + `/api/dashboard/saved-buildings.ts` + bookmark UI on building pages
-
-**Group 4 — Depends on dashboard foundation:**
-9. Review verification UX improvements — audit current `VerificationModal.tsx` flow first, then implement UX changes; benefits from dashboard already being stable
-
-**Rationale:**
-- Bug fixes and display-only changes first to eliminate noise before adding features.
-- Survey fields early because they affect the review submission form — best to stabilize before the dashboard displays review data.
-- Contact form and enrichment refactor are independent of each other but both involve new files — can proceed in parallel within Group 2.
-- Tenant dashboard last because it depends on the notifications schema and the `createNotification()` calls in admin routes (Group 3), and the saved buildings feature depends on the dashboard shell existing (Group 3 before Group 3 extended).
-- Verification UX last because it requires auditing the existing flow before implementing changes — that audit can happen in parallel with Groups 1-3 but implementation should come after dashboard is settled.
+The `rate_limits` table currently lacks a composite index on `(rate_key, created_at)`. The `checkRateLimit()` function at `src/lib/rateLimit.ts` line 39 runs `WHERE rate_key = ? AND created_at > ?` — this should be verified in the D1 index audit (v1.5.0 Phase 6).
 
 ---
 
 ## Sources
 
-- Direct inspection of `src/pages/api/admin/buildings/[id]/enrich.ts` (existing Boston adapter logic)
-- Direct inspection of `src/components/profile/ProfileDashboard.tsx` (existing dashboard structure)
-- Direct inspection of `src/lib/audit.ts`, `src/lib/email.ts` (patterns to replicate)
-- Direct inspection of `migrations/0018_bug_reports.sql` (contact_messages table model)
-- Direct inspection of `src/lib/types.ts`, `src/lib/api-types.ts` (type conventions)
-- Direct inspection of `src/middleware.ts`, `src/pages/profile.astro` (auth and SSR data load patterns)
+- `src/middleware.ts` — confirmed: SameSite=lax, Lucia session validation, security headers (direct read)
+- `src/lib/rateLimit.ts` — confirmed: D1-backed, fail-closed, sliding window (direct read)
+- `src/lib/validation.ts` — confirmed: only `validateReviewForm` exists, no contact/dispute validators (direct read)
+- `src/env.d.ts` — confirmed: `App.Platform` typed with `env`, `cf`, `ctx`; `runtime` NOT in `App.Locals` (direct read)
+- `src/pages/api/contact.ts` — confirmed: rate limiting present, email awaited synchronously (direct read)
+- `src/pages/api/bug-reports.ts` — confirmed: `getClientIP` imported but `checkRateLimit` never called (direct read)
+- `src/pages/api/search/results.ts` — confirmed: no rate limiting (direct read)
+- `e2e/fixtures.ts` — confirmed: `authedPage` and `adminPage` fixtures use storageState files (direct read)
+- `e2e/global.setup.ts` — confirmed: two seed users signed in for auth fixture files (direct read)
+- `playwright.config.ts` — confirmed: `workers: 1`, global setup project dependency (direct read)
+- [Cloudflare Workers `ctx.waitUntil` docs](https://developers.cloudflare.com/workers/runtime-apis/context/) — confirms 30-second post-response lifetime, Promise-based API (MEDIUM confidence — current as of 2026)
+- [Astro CSRF `security.checkOrigin`](https://github.com/withastro/astro/security/advisories/GHSA-c4pw-33h3-35xw) — CVE-2024-56140 patch confirms Origin check is default-on and patched in Astro 5.x (HIGH confidence)
+- `@astrojs/cloudflare` v12 changelog — confirmed: `locals.runtime` still present in v12 (Astro 5); `cfContext` replacement is v13+ (Astro 6) only (MEDIUM confidence)
 
 ---
-*Architecture research for: RateMyPlace v1.4.0 "Open Doors" feature integration*
-*Researched: 2026-03-20*
+
+*Architecture research for: RateMyPlace Boston v1.5.0 "Closed Loops" hardening*
+*Researched: 2026-04-26*

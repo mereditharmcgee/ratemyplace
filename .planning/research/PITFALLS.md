@@ -1,358 +1,316 @@
 # Pitfalls Research
 
-**Domain:** Adding tenant dashboards, contact forms, notification systems, multi-source data adapters, and UGC disclaimers to an existing Astro 5 + Cloudflare Pages + D1 review platform
-**Researched:** 2026-03-20
-**Confidence:** HIGH — based on direct codebase inspection (migrations 0001–0018, all API routes, scoring system, email.ts, rateLimit.ts) and verified patterns from the v1.3.0 QA milestone
+**Domain:** Retrofitting security hardening, validation, CSRF, async email, D1 indexes, and component refactors to a live production Astro + Cloudflare Pages app
+**Researched:** 2026-04-26
+**Confidence:** HIGH (based on direct codebase inspection; retrofit-specific risks from verified Cloudflare Workers documentation patterns)
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that require schema rollbacks, data loss, broken production pages, or legal exposure.
-
----
-
-### Pitfall 1: Adding NOT NULL Columns to the Reviews Table Without DEFAULT Values
+### Pitfall 1: Rate Limit False Positives Block Legitimate Users on First Deploy
 
 **What goes wrong:**
-Adding `section_8_accepted` or `safely_lit` as `NOT NULL INTEGER` columns without a DEFAULT on a table that already has real production reviews fails in D1. SQLite (and D1) rejects `ALTER TABLE ... ADD COLUMN col INTEGER NOT NULL` unless a DEFAULT is provided, because existing rows would violate the constraint immediately.
+The `checkRateLimit` function in `rateLimit.ts` is fail-closed: if D1 returns an error, the function returns `allowed: false` with a 503. This is the correct security posture (v1.2.2 decision). But when adding rate limits to new endpoints — specifically `bug-reports` and `search.astro` — the thresholds set in the first deploy are the live thresholds with no ability to tune them without a redeployment. Setting them too low (e.g., 5 bug reports per hour) blocks a legitimate user who submits on behalf of multiple household members. Setting `search` too low blocks a user who quickly tries several query variations.
 
 **Why it happens:**
-Developers write migration SQL that works for fresh inserts but forget existing rows. The reviews table currently has 100+ rows in the seed data and will have real rows in production. Running a migration like:
-```sql
-ALTER TABLE reviews ADD COLUMN section_8_accepted INTEGER NOT NULL;
-```
-will throw `Cannot add a NOT NULL column with no default value` in D1.
+Greenfield implementations set thresholds conservatively with no traffic baseline. Retrofit implementations set thresholds against a live app with real usage patterns but no instrumentation to know what those patterns actually are. The existing implementation has zero rate-limit observability: there is no logging when a limit fires, only when D1 fails (`rate_limit_db_failure` in signin). Hitting 429 on a production endpoint leaves no Cloudflare log to diagnose.
 
 **How to avoid:**
-Always provide a DEFAULT when adding NOT NULL columns to existing tables:
-```sql
--- Migration 0019_add_survey_fields.sql
-ALTER TABLE reviews ADD COLUMN section_8_accepted INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE reviews ADD COLUMN safely_lit INTEGER NOT NULL DEFAULT 0;
-```
-If a DEFAULT of 0 is semantically wrong for some rows (e.g., 0 means "No" but you want "Unknown" for old reviews), use a nullable column with NULL representing "not answered":
-```sql
-ALTER TABLE reviews ADD COLUMN section_8_accepted INTEGER;  -- NULL = not answered
-ALTER TABLE reviews ADD COLUMN safely_lit INTEGER;
-```
-Then handle NULL in the scoring logic — skip fields where value IS NULL rather than treating them as 0.
+1. Before implementing rate limits on `bug-reports` and `search`, add structured logging to the `allowed: false` path in `checkRateLimit` (not just the `error: true` path). Log the endpoint, the key, and the current count. Review Cloudflare logs for 24 hours post-deploy.
+2. Set initial thresholds conservatively high, then tighten. For `bug-reports`: start at 10/hour (current contact is 3/hour — bug reports are anonymous and lower-friction). For `search.astro`: start at 200/minute per IP. Note that `search.astro` is an SSR page doing DB queries directly, not an API route — a rate limit must be implemented in the page's frontmatter or a middleware check, not just in an API handler.
+3. Include `Retry-After` header on all 429 responses. The `disputes.ts` and `signin.ts` routes do this correctly. `contact.ts` does not — it returns 429 without `Retry-After`. Fix this inconsistency during the retrofit.
 
 **Warning signs:**
-Migration runs locally but throws an error against the remote D1. Or migration appears to succeed locally but existing reviews have unexpected 0 values in scoring calculations.
+- Cloudflare analytics show a spike in 429s after deploy
+- User reports they cannot submit a form they haven't submitted before
+- `rate_limits` table grows faster than expected (check via admin or D1 console)
 
-**Phase to address:** Survey fields phase (adding `section_8_accepted`, `safely_lit`). Also applies to any new nullable columns added for saved buildings, notification preferences, or contact message metadata.
+**Phase to address:**
+Phase that adds rate limiting to `bug-reports` and `search`. Add Cloudflare log alerting for 429 responses before ship. Do NOT gate `search.astro` rate limiting on the API rate-limit helper — the page is SSR and runs in the same Worker request; implement it identically to how `contact.ts` does it (pull DB from runtime, call `checkRateLimit` before the main query block).
 
 ---
 
-### Pitfall 2: Migration 0019+ Number Collision — Assuming Sequential Is Safe
+### Pitfall 2: `waitUntil` Not Available on Context Path Assumed During Retrofit
 
 **What goes wrong:**
-Two features in v1.4.0 both need new migrations (survey fields + contact form storage + notification preferences + saved buildings). If multiple migrations are written in parallel or assigned numbers without checking, two migrations get the same number (e.g., both become `0019_xxx.sql`). Wrangler applies migrations by filename order. A collision means one migration silently overwrites the other in the applied-migrations tracking, and one schema change never runs.
+The async email pattern (fire-and-forget via `ctx.waitUntil`) requires access to `runtime.ctx.waitUntil`. This is declared in `env.d.ts` as `App.Platform.ctx: ExecutionContext`. However, `ctx` is on the `runtime` object accessed via `(context.locals as any).runtime`, not on `context.locals` directly. The current pattern for getting `runtime` is `(context.locals as any).runtime`, and `runtime.ctx` would be `runtime?.ctx`. But in Astro Pages adapter for Cloudflare, the actual property path exposed to SSR pages differs from what `env.d.ts` declares: the `runtime` shape from `@astrojs/cloudflare` adapter is `{ env, cf, ctx }` but this is accessed as `(context.locals as any).runtime` which is actually `Astro.locals.runtime` — the entire `App.Platform` object. So `runtime.ctx.waitUntil` is the correct path, but zero code in the codebase currently accesses `runtime.ctx` at all, meaning this has never been tested in production.
+
+A specific failure mode: on a Cloudflare Pages cold start, if `runtime.ctx` is undefined (platform not yet initialized, or test/dev environment), calling `runtime.ctx.waitUntil(emailPromise)` throws a TypeError that kills the entire request, blocking the response completely — exactly the opposite of the desired fire-and-forget behavior.
 
 **Why it happens:**
-The current highest migration is `0018_bug_reports.sql`. If two phases both start their migration at `0019_`, the second one will either conflict on filename or (if named differently) both be `0019` in the wrangler migration log, causing one to be skipped.
+Developers pattern-match from Node.js background task idioms without verifying the exact Cloudflare Workers contract. `waitUntil` is not available in all execution environments — specifically not in Cloudflare Pages local dev (Wrangler simulates it but behavior differs), and not guaranteed if `ctx` is missing.
 
 **How to avoid:**
-Assign migration numbers sequentially with a strict plan before writing any migration:
-- `0019_` — survey fields (section_8_accepted, safely_lit)
-- `0020_` — contact messages table
-- `0021_` — saved buildings table
-- `0022_` — notification preferences column on users (or separate table)
-
-Write the list before writing any SQL. If phases are built in a different order, renumber before applying.
+1. Gate every `waitUntil` call: `if (runtime?.ctx?.waitUntil) { runtime.ctx.waitUntil(emailPromise); } else { await emailPromise; }` — this falls back gracefully to synchronous send in dev/test environments where `ctx` is unavailable.
+2. Add a test that calls the email-sending path with a mock runtime where `ctx` is undefined. Verify the response still returns 200.
+3. Keep the existing best-effort `.catch()` wrapping on the email promise when passed to `waitUntil`. A `waitUntil` promise that rejects does not crash the worker, but unhandled rejection logging in Cloudflare is noisy and hard to correlate.
 
 **Warning signs:**
-`wrangler d1 migrations apply` reports "already applied" for a migration you just wrote. Or the `d1_migrations` table shows duplicate version numbers.
+- `TypeError: Cannot read properties of undefined (reading 'waitUntil')` in Cloudflare Functions logs
+- API response times get worse after the async email retrofit instead of better (means `waitUntil` is not being reached and sync path is running)
+- Local dev email sends stop working after the change (mock environment may not stub `ctx`)
 
-**Phase to address:** Before any migration is written for v1.4.0. Establish the numbering plan in the first phase.
+**Phase to address:**
+Phase implementing async email. Must include: (a) a null guard wrapper function — e.g., `function fireAndForget(ctx, promise)` in `lib/email.ts` that handles the `ctx` check, (b) a unit test with `runtime.ctx = undefined`, (c) a manual Cloudflare Pages deploy verification that email fires without blocking response time.
 
 ---
 
-### Pitfall 3: Tenant Notifications Without an Unsubscribe Mechanism
+### Pitfall 3: CSRF Token Breaks Google OAuth Callback
 
 **What goes wrong:**
-Sending notification emails (review status changes, moderation outcomes, contact form replies) without a one-click unsubscribe link violates CAN-SPAM (US), CASL (Canada), and GDPR (EU). Resend's sending reputation degrades when recipients mark emails as spam. At scale, this can cause Resend to suspend the account or reduce deliverability to zero.
+The Google OAuth callback at `/api/auth/google/callback` is a GET handler that creates a session by reading from cookies and URL params. It is not a form POST. Adding a blanket CSRF middleware that requires a CSRF token on all session-creating requests would break this endpoint because: (1) it is a GET, not a POST, (2) the CSRF-protection mechanism for OAuth is the state cookie (already correctly implemented — `oauth_state` is set as `httpOnly`, `secure`, `sameSite: lax`), and (3) there is no frontend opportunity to inject a CSRF token into a Google redirect.
+
+A separate but related risk: if CSRF remediation involves changing session cookie `sameSite` from `lax` to `strict`, the Google OAuth callback will stop working. The callback is a cross-site redirect from `accounts.google.com` back to `ratemyplace.org`. With `SameSite=Strict`, the session cookie set just after the OAuth exchange would not be sent on the first navigation request from Google's domain to ratemyplace.org, leaving the user in a logged-out state despite a successful OAuth flow.
 
 **Why it happens:**
-Transactional email flows (password reset, email verification) legally don't require unsubscribe. But "your review was approved" or "you have a new notification" are borderline marketing/notification emails. Developers treat them like transactional email and skip unsubscribe infrastructure.
-
-The existing `email.ts` has no unsubscribe mechanism in any of its four email functions. This was fine for purely transactional emails (password reset, verification, dispute confirmation). It becomes a legal requirement the moment notification emails go out to tenants who didn't explicitly request them.
+CSRF retrofits often try to be comprehensive — "add CSRF protection to everything that changes state" — without accounting for OAuth flows that specifically depend on cross-site redirects. The `SameSite=Lax` default on Lucia session cookies is correct for this app. Strict would break OAuth.
 
 **How to avoid:**
-Before sending any notification email that isn't a direct response to a user action (password reset, email verification), add:
-1. A `notification_opt_in` column to the users table (default 1 for new users, present a preference toggle in the dashboard)
-2. A signed, one-click unsubscribe link in every notification email body (not just a footer link to settings)
-3. An API endpoint `/api/notifications/unsubscribe?token=...` that sets `notification_opt_in = 0` without requiring sign-in
-
-For the contact form reply emails (admin replying to a contact message), include a plain-text unsubscribe line. It takes 10 minutes and eliminates legal risk.
+1. Do not change `sameSite` on the Lucia session cookie from `lax` to `strict`. The current setting is already in `src/lib/auth.ts` (via sessionCookie attributes) and `src/middleware.ts` (explicit `sameSite: 'lax'`). Leave both as-is.
+2. The existing OAuth CSRF protection (state cookie) is correct. Do not add a second CSRF layer on top of the GET callback.
+3. If adding a CSRF token to POST endpoints, apply it only to `application/json` and `multipart/form-data` POST routes. Scope the middleware to: `/api/reviews`, `/api/reviews/[id]`, and any other authenticated POST endpoints. Exempt: `/api/auth/google/callback`, `/api/auth/signin`, `/api/auth/signup` (Turnstile serves as the bot-protection layer here).
+4. Verify CSRF protection audit conclusion before implementing tokens at all: the app's mutation endpoints require auth (session cookie, `SameSite=Lax`). A cross-site form POST cannot include the session cookie under `SameSite=Lax` unless it is a top-level navigation. Review actual risk before retrofitting token-based CSRF on top of existing controls.
 
 **Warning signs:**
-The notification email template in `email.ts` has no unsubscribe footer. The users table has no opt-in column.
+- Google OAuth login works in dev but produces a logged-out state in production after CSRF changes
+- 403 errors on the OAuth callback endpoint after deploying CSRF middleware
+- Session cookie missing from OAuth-initiated requests in browser DevTools
 
-**Phase to address:** Contact form + notification system phase. Must be built before the first notification email is sent to real users.
+**Phase to address:**
+Phase doing CSRF audit. Start with the audit conclusion: is the current `SameSite=Lax` + Turnstile posture sufficient? If yes, document why and close the finding without adding tokens. If CSRF tokens are added, do not add them to auth routes, and include an E2E test that completes a full Google OAuth flow (or mock it) to verify the callback path still works.
 
 ---
 
-### Pitfall 4: UGC Disclaimers on Review Pages Without Inline Proximity
+### Pitfall 4: Input Validation Retrofit Breaks Existing Valid Submissions
 
 **What goes wrong:**
-Adding disclaimers only to the Terms of Service page (which already exists at `/terms`) or the footer provides no meaningful legal protection. Courts and regulators in defamation cases have found that disclaimers buried in ToS, reached via a footer link, provide weak protection compared to disclaimers shown in close proximity to the content itself — particularly for statements of fact (e.g., "this landlord has pests").
+`validation.ts` validates `ReviewFormData` but the review submission endpoint (`/api/reviews.ts`) parses `FormData` independently — it does not call `validateReviewForm()`. The validation function checks a `scores` subobject, but the API endpoint reads scores individually from formdata (`formData.get('unit_pests')`). They are not wired together. Adding strict validation to the API endpoints risks rejecting reviews that the current frontend submits successfully, if the validation logic diverges from what the form actually sends.
 
-The existing ToS has good language (Section 230 citation, "your reviews represent your personal opinions," indemnification). But review pages — where a landlord is most likely to object — currently show reviews with no inline disclaimer.
+Specific known gap: `validation.ts` has a legacy `scoreFields` list (12 v1 fields: `building_quality`, `maintenance`, etc.) that does not match the 27-item v2 survey fields now used. If a validation retrofit copies this list, it will not validate any of the real 29 survey items in production.
 
 **Why it happens:**
-Developers add disclaimers to legal pages and consider the job done. Inline disclaimers feel cluttered and are deferred.
+Validation logic in `validation.ts` was written to validate a `ReviewFormData` interface that was kept synchronized with an earlier version of the form. The API endpoint grew independently. There is no compile-time enforcement that the validator and the API handler agree on field names.
 
 **How to avoid:**
-Add a concise inline disclaimer to:
-1. **Every building review page** (`/building/[slug]`) — a single sentence above or below the reviews list: *"Reviews reflect individual tenant experiences and personal opinions. RateMyPlace does not verify or endorse review content."*
-2. **The review submission confirmation** — immediately after a review is submitted: *"Your review will be visible once approved. By submitting, you confirm you lived at this property and take responsibility for the accuracy of your statements."*
-3. **The review form itself** — a checkbox or acknowledged consent before the final submit button (a submission-time consent record is stronger evidence than a ToS scroll).
-
-The disclaimer does not need to be visually prominent — even small gray text is sufficient — but it must be on the same page as the content.
+1. Before retrofitting any input validation, do a diff between: (a) every field read from `formData` in `/api/reviews.ts`, (b) every field in `ReviewFormData` in `types.ts`, (c) every field in `validateReviewForm` in `validation.ts`. The three must agree before adding validation calls.
+2. The `ALL_SCORE_FIELDS` constant in `scoring.ts` is the authoritative list of 29 survey fields. Any input validation on review scores must iterate `ALL_SCORE_FIELDS`, not the 12-field legacy list in `validation.ts`. Update `validation.ts` to import and use `ALL_SCORE_FIELDS`.
+3. Add max-length validation for free-text fields (`review_title`, `review_text`, `comments`) to the API endpoint, but verify against the frontend character limit already enforced in the form. If the form allows 2000 chars and the API now rejects > 1000, existing reviews submitted before the limit will fail on edit.
+4. For numeric coercion: `rent_amount` is currently parsed via `parseInt()` which returns `NaN` for non-numeric input. `NaN` inserted into D1 becomes NULL. Add explicit `isNaN` checks, but do NOT make rent_amount required — it is optional and many users skip it.
 
 **Warning signs:**
-Building pages render review cards with no disclaimer text near them. The review submission form has no consent acknowledgment near the submit button.
+- Review form submissions return 400 after validation retrofit
+- "Validation failed" errors in production with no corresponding user-visible error because the frontend does not display all `details` fields
+- `validateReviewForm` test suite passes but live submissions fail (indicates the form and the validator diverge)
 
-**Phase to address:** UGC disclaimers phase. Treat as a prerequisites block before any real-user launch.
+**Phase to address:**
+Phase adding input validation to POST endpoints. Prerequisite step: audit the three sources of truth (form fields, API formData reads, validation function) and reconcile them before writing any new validation logic. Write unit tests against the validation function first, then wire it into the endpoint.
 
 ---
 
-### Pitfall 5: Multi-City Adapter Pattern Without City Routing in the Enrich Endpoint
+### Pitfall 5: D1 `ALTER TABLE` Limitations Block Migration Strategy
 
 **What goes wrong:**
-The current `/api/admin/buildings/[id]/enrich` endpoint hardcodes the Boston Assessing API. Adding New Haven support by adding `if (building.city === 'New Haven') ...` inline in the same file creates a God Function that grows with every new city, making it impossible to test individual city adapters in isolation, and making the URL no longer reflect a single responsibility.
+D1 (SQLite) does not support `ALTER TABLE ... ADD COLUMN ... NOT NULL` without a `DEFAULT` clause. Any attempt to add a required column without a default will fail with `Cannot add a NOT NULL column with no default value` on a table that already has rows. This is a known SQLite constraint (not just a D1 limitation). Any index migration that accidentally introduces a NOT NULL column (e.g., a developer writes `ADD COLUMN city TEXT NOT NULL`) will fail silently during `npx wrangler d1 migrations apply --local` only if the local DB is freshly seeded; it will fail loudly on production where the table has real rows.
 
-More concretely: if the Boston API goes down, the adapter should fail gracefully for Boston buildings without impacting New Haven. If they are in the same function with shared error handling, a failure in one city's adapter can affect the other.
+Additionally, `CREATE INDEX` statements on D1 production may take several seconds on large tables. D1 does not support `CREATE INDEX CONCURRENTLY` (that is a Postgres feature). Index creation blocks writes on the affected table for its duration. For the `buildings` table (current index candidate: `neighborhood`, `city`, `building_type`), this is low risk at current data volume. For the `rate_limits` table, which receives writes on every request, index creation during peak traffic is higher risk.
 
 **Why it happens:**
-The adapter pattern is easy to defer — "I'll just add an if/else for now." It works for two cities but immediately becomes a problem at three.
+Developers write migrations locally against a freshly created schema with no rows, then apply to production against a table with data. The local migration succeeds (empty table accepts any column definition), the production migration fails.
 
 **How to avoid:**
-Create a proper adapter interface before writing the second city:
-```typescript
-// src/lib/enrichment/types.ts
-export interface CityAdapter {
-  city: string;         // e.g., 'Boston'
-  canEnrich(building: { city: string }): boolean;
-  enrich(building: Building): Promise<EnrichmentResult>;
-}
-
-// src/lib/enrichment/boston.ts
-export const bostonAdapter: CityAdapter = { ... };
-
-// src/lib/enrichment/new-haven.ts
-export const newHavenAdapter: CityAdapter = { ... };
-
-// src/lib/enrichment/index.ts
-const adapters: CityAdapter[] = [bostonAdapter, newHavenAdapter];
-export function getAdapter(building: Building): CityAdapter | null {
-  return adapters.find(a => a.canEnrich(building)) ?? null;
-}
-```
-
-The API route becomes trivially simple:
-```typescript
-const adapter = getAdapter(building);
-if (!adapter) return 200 with { results: [], message: 'No adapter for this city' };
-return adapter.enrich(building);
-```
-
-Each adapter is independently testable. Adding a third city is a new file, not a modified existing file.
+1. Rule: every new column in a migration must have a `DEFAULT` clause or be added as `NULL` (i.e., no `NOT NULL` constraint). Enforce this as a review checklist item.
+2. For index additions to `rate_limits`: apply during off-peak hours (Sunday early morning; the site has minimal traffic). The current `rate_limits` table has `expires_at` and `rate_key` — if adding an index on `expires_at` to speed up the cleanup `DELETE`, this is the highest-traffic column. Apply this migration outside business hours.
+3. Test every migration against the seeded local database (`npm run db:seed` before `npx wrangler d1 migrations apply --local`), not an empty schema. The seeder provides realistic data volume to catch performance issues.
+4. Never drop columns in a migration unless you've confirmed zero code references that column. The dual `had_pests`/`had_pest_issues` cleanup is in scope for v1.5.0 — the migration must set `had_pest_issues = 1 WHERE had_pests = 1` BEFORE dropping `had_pests`, and it must be a single transaction-like migration sequence (SQLite has no multi-statement transactions in D1 migration files).
 
 **Warning signs:**
-The enrich endpoint has any `if (city === ...)` branching logic. There is no `src/lib/enrichment/` directory.
+- Migration `apply --remote` fails with "Cannot add NOT NULL column"
+- Wrangler reports migration applied successfully locally but remote apply hangs
+- `SELECT COUNT(*)` on `rate_limits` shows rows accumulating without cleanup (indicates a missing index on `expires_at` is hurting the DELETE cleanup query)
 
-**Phase to address:** Multi-city auto-research phase. Write the adapter interface first, before implementing the New Haven adapter.
+**Phase to address:**
+Phase doing D1 index audit. Migration checklist: (1) run migration against seeded local DB first, (2) check EXPLAIN QUERY PLAN on the search queries in `search.astro` to confirm indexes are hit, (3) apply production index migrations during lowest-traffic window, (4) verify via D1 query performance metrics in Cloudflare dashboard post-deploy.
 
 ---
 
-### Pitfall 6: Dashboard N+1 Queries — One DB Call Per Review
+### Pitfall 6: Partial Runtime Wrapper Migration Leaves a Mixed-Typing Minefield
 
 **What goes wrong:**
-The tenant dashboard loads a user's reviews, then for each review also loads the building details, verification status, and dispute status in separate queries — one query per review. With 5 reviews, that is 5 × 3 = 15 queries on a single page load. D1's per-request pricing and cold start latency makes N+1 patterns more expensive than in a traditional hosted database.
+There are 71 instances of `(context.locals as any).runtime`. A partial migration — where 30 are converted to the typed wrapper and 41 remain as `any` casts — is worse than no migration. Two reasons:
+1. If the typed wrapper gets the shape wrong (e.g., `env` is typed as `Record<string, string>` but a consumer expects `D1Database`), TypeScript reports errors on the converted sites but passes on the `any` sites. The type error is hidden half the time.
+2. After partial conversion, future developers copying code from an unconverted file perpetuate the `any` pattern. The goal of the migration is lost.
 
-The existing `/api/reviews/user` endpoint already does this correctly with a JOIN. But the dashboard may call multiple endpoints — `/api/reviews/user`, then individually fetch verification status or dispute status per review — especially if the dashboard is built as a React island making multiple `useEffect` calls.
+The current `env.d.ts` already has the correct shape via `App.Platform`:
+```
+env: { DB: D1Database; VERIFICATION_BUCKET: R2Bucket; TURNSTILE_SECRET_KEY: string; }
+ctx: ExecutionContext;
+```
+But it omits the env vars accessed at runtime: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_MAPS_API_KEY`, `GOOGLE_PLACES_API_KEY`, `RESEND_API_KEY`, `SITE_URL`. A typed wrapper that only exposes what is in `env.d.ts` will cause TypeScript errors at all the sites that access those vars, forcing developers to add `as any` right back to get past the type error.
 
 **Why it happens:**
-React island dashboards fetch data independently via multiple `useEffect` hooks ("load reviews, load verification status, load saved buildings"), making parallel requests but duplicating data across calls and sometimes sequencing them when they could be joined server-side.
+Typed wrapper shape is scoped to what's formally declared, not what's actually used. Secret env vars (keys, URLs) are not declared in `env.d.ts` because they are not bindings — they are Cloudflare Pages secrets that appear at runtime but are not in `wrangler.jsonc`.
 
 **How to avoid:**
-Create a single `/api/dashboard` endpoint that returns all data the dashboard needs in one response:
-```json
-{
-  "reviews": [...with building + dispute + verification status],
-  "savedBuildings": [...],
-  "notificationPreferences": { ... },
-  "unreadNotifications": 0
-}
-```
-Perform all necessary JOINs server-side. The React island receives one prop object. Only one D1 round-trip occurs on page load.
-
-If the dashboard grows complex, split into logical sections (reviews vs. saved buildings) with separate endpoints, but each endpoint should still do a single query with JOINs, not multiple queries per item.
+1. Before writing a single line of the typed wrapper, audit every `runtime.env.SOMETHING` access across all 71 sites. The full set of env var names is: `DB`, `VERIFICATION_BUCKET`, `TURNSTILE_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_MAPS_API_KEY`, `GOOGLE_PLACES_API_KEY`, `RESEND_API_KEY`, `SITE_URL`. Update `env.d.ts` `App.Platform.env` to include all of these before writing the wrapper.
+2. The wrapper function must be a complete drop-in for every use site. Recommended shape:
+   ```typescript
+   export function getRuntime(locals: App.Locals & { runtime?: App.Platform }): App.Platform {
+     const runtime = (locals as any).runtime;
+     if (!runtime) throw new Error('Cloudflare runtime not available');
+     return runtime as App.Platform;
+   }
+   ```
+   This keeps the `any` cast in one place and types every call site correctly.
+3. Do the migration in a single PR, not incrementally. 71 sites is a find-and-replace operation. A script using `sed` or a TypeScript codemod can mechanically replace `(context.locals as any).runtime` with `getRuntime(context.locals)`. Do not hand-edit 71 files — that introduces bugs.
+4. After migration, add a `no-explicit-any` ESLint rule that flags `as any` in API routes specifically. This prevents regression.
 
 **Warning signs:**
-Dashboard React component has multiple `useEffect(() => fetch('/api/...'), [])` calls at the top level. Each call hits a different endpoint and all run on mount.
+- TypeScript build passes but at runtime gets `Cannot read properties of undefined` on a typed `runtime.env.RESEND_API_KEY` because it was not added to `App.Platform.env`
+- Partial migration causes `git diff` to show some files converted and some not, making future code review harder
+- `getRuntime()` is called from a context where `locals.runtime` is undefined (unit test environment without Cloudflare simulation)
 
-**Phase to address:** Tenant dashboard phase. Design the API contract before building the React component.
+**Phase to address:**
+Phase doing typed runtime wrapper. First commit: update `env.d.ts` with full env var list. Second commit: write `getRuntime()` wrapper and update `lib/db.ts` and `lib/rateLimit.ts` and `lib/audit.ts` (the core lib files). Third commit: mechanical replacement of all 71 API route call sites. Verify build passes before merging.
 
 ---
 
-### Pitfall 7: Contact Form Without Rate Limiting Enables Spam and Admin Inbox Flooding
+### Pitfall 7: Component Split Breaks React Hydration Boundary
 
 **What goes wrong:**
-The new contact form stores messages in D1 and sends a Resend notification to the admin. Without rate limiting, a malicious actor can POST thousands of messages to `/api/contact`, filling the `contact_messages` D1 table and triggering thousands of Resend notification emails, which will exhaust the Resend free tier (100 emails/day) and potentially flag the account for spam behavior.
+`ReviewEditForm.tsx` (907 lines) is used as a `client:load` island in an Astro page. Splitting it into sub-components (e.g., `ReviewEditFormUnit.tsx`, `ReviewEditFormBuilding.tsx`) introduces new hydration boundaries if any sub-component is itself declared as a separate island. The failure mode: a sub-component that manages state (e.g., the current step indicator or score state) re-renders independently from the parent, losing shared state. More concretely: if step state lives in the parent and a child sub-component is separately hydrated, the child may receive stale props on first render while hydration is pending.
 
-The bug report form (`/api/bug-reports`) uses Turnstile but no database-level rate limiting. The contact form needs both.
+For `BuildingsTable.tsx` (844 lines) and `ReviewsTable.tsx` (733 lines), the risk is different: these components manage filter state, sort state, and pagination state. If filtering logic is extracted into a custom hook and the hook's initial state depends on URL search params (e.g., preserving filter state on page reload), the hook must initialize from the URL before the component first renders — otherwise the table flashes unfiltered content before the filter applies.
+
+**Why it happens:**
+Large component splits in React island architectures are done thinking about code organization, not about Astro's hydration model. Each `client:load` component gets its own hydration pass. Shared state between separately-hydrated components is only possible through lifting state to a common parent or a context provider — both require the parent to also be a React island.
 
 **How to avoid:**
-Apply the existing `checkRateLimit` pattern (already in `src/lib/rateLimit.ts`) to the contact form endpoint:
-```typescript
-const rl = await checkRateLimit(db, getClientIP(context), 'contact', 3, 3600); // 3/hour per IP
-if (!rl.allowed) return 429;
-```
-Also: cap the Resend notification to a digest (if more than 5 contact messages arrive in an hour, send one "you have 5 new messages" email, not 5 individual emails). Store messages in D1 (which the contact form already plans to do) and let the admin read them in the admin panel rather than relying on email for every message.
+1. Keep all split sub-components as internal React components (not separate Astro islands). Export only the root component from each file. The split is purely for maintainability, not for independent hydration.
+2. The parent component (`ReviewEditForm`, `BuildingsTable`, `ReviewsTable`) remains the single `client:load` entry point. Sub-components are imported as regular React components within the same module graph.
+3. Before splitting, verify how each component receives its initial data: from Astro props (SSR), from URL params, or from an API call. State that initializes from URL params must be read via `window.location.search` or a custom hook that reads the URL — not from an Astro prop that is only available at SSR time.
+4. After splitting, verify that stale event handler references do not occur: if a sub-component holds a callback from a parent via props, and the parent re-renders with a new callback, the sub-component must receive the new callback. This is standard React behavior but large components sometimes use closure references over `useRef` patterns that break under extraction.
 
 **Warning signs:**
-Contact form API endpoint calls Resend on every successful POST without a rate limit guard. No call to `checkRateLimit` in the handler.
+- After split, a filter change in `BuildingsTable` causes the table to reset to page 1 unexpectedly (stale closure on pagination handler)
+- Review edit form loses score data when navigating between steps after the split (step state not shared correctly between sub-components)
+- TypeScript reports no errors but the browser shows React key warnings or hydration mismatch warnings in console
 
-**Phase to address:** Contact form phase. Add rate limiting and Resend digest before deploying.
+**Phase to address:**
+Component refactor phase. Mandatory: run the full E2E suite after each file's split. Do not split all three files in one PR — split one, verify E2E, merge, repeat. The ReviewEditForm split is highest risk because it is a multi-step form with complex interdependent state. Split BuildingsTable or ReviewsTable first to build confidence.
 
 ---
 
 ## Technical Debt Patterns
 
-Shortcuts that seem reasonable but create long-term problems.
-
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Inline city logic in enrich endpoint (`if city === 'Boston'`) | Faster to ship New Haven | Every new city requires modifying a shared file; untestable in isolation | Never — the adapter takes 1 extra hour and is worth it |
-| Sending notifications without opt-out | Simpler email.ts | CAN-SPAM liability, Resend suspension, user complaints | Never for unsolicited notification emails |
-| Dashboard calls 4 separate API endpoints | Each endpoint is simpler | N+1 latency, D1 cost, Cloudflare Workers request overhead | Never — join server-side, not client-side |
-| UGC disclaimer only in ToS | Legal team satisfied | Weak defamation protection when disclaimer is 3 clicks from the content | Never for review-display pages |
-| Adding boolean columns as `INTEGER NOT NULL` with no DEFAULT | Strict type checking | Migration fails on existing production data | Never on tables with existing rows |
-| Contact form emails sent on every POST | Simple implementation | Resend quota exhaustion, spam risk | Only if contact volume is < 5/day (unacceptable assumption pre-launch) |
-| New survey fields scored as 0 when NULL | Simple scoring math | Old reviews (NULL = "not answered") scored lower than new reviews for no reason | Never — NULL should mean "skip" in weighted average |
+| Copy-paste `checkRateLimit` call pattern into each endpoint without abstraction | Fast to ship per-endpoint rate limiting | Different endpoints accidentally get different error response formats (contact.ts already omits `Retry-After` header) | Never — extract a shared `applyRateLimit(db, context, endpoint, max, window)` helper that handles the 429/503 response itself |
+| Add validation as inline if-blocks in each API endpoint | Requires no refactoring | Validation logic diverges across endpoints; no single test suite covers it | Only acceptable for a single new endpoint with no analogous endpoints — not for a cross-cutting retrofit |
+| Skip CSRF analysis and add CSRF tokens to all POST routes | Feels comprehensive | Breaks OAuth callback path; adds frontend complexity for no practical security gain if SameSite+Turnstile already covers the risk | Never without completing the threat model analysis first |
+| Migrate only the "easy" 30 of 71 `any` casts | Reduces PR size | Partial migration is permanent; the remaining 41 are never cleaned up in practice | Never — do all 71 in one PR or defer the entire migration |
+| Fire-and-forget email without null guard on `runtime.ctx` | Simple code change | Silent failure in dev/test; TypeErrors in cold-start edge cases | Never in production without the null guard |
 
 ---
 
 ## Integration Gotchas
 
-Common mistakes when connecting to external services or extending existing integrations.
-
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Boston Assessing API (CKAN) | Hardcoding FY2026 resource ID `ee73430d-...` without documenting it | Add a comment with the data source URL and fiscal year so the next developer knows when to update it |
-| New Haven property API | Assuming same CKAN format as Boston | Investigate API format before writing adapter — New Haven may use Socrata, GIS REST, or a different schema entirely |
-| Resend (notifications) | Creating a new `Resend` instance per email call (already done in email.ts) | This is fine for Cloudflare Workers (no persistent connection cost), but be aware the constructor call counts toward Worker CPU time |
-| Resend (notifications) | Adding new email function directly to `email.ts` without an unsubscribe parameter | Pass `unsubscribeUrl` as a required parameter to any new notification email function so it cannot be omitted |
-| D1 (saved buildings) | Using the user_id + building_id combination without a UNIQUE constraint | Without `UNIQUE(user_id, building_id)`, a user can save the same building multiple times, corrupting saved count and causing duplicate display |
-| Cloudflare Turnstile | Adding Turnstile to the contact form but not validating server-side | The Turnstile token must be verified via the `verifyTurnstile()` function already in `src/lib/turnstile.ts` — client-side validation only is trivially bypassed |
+| Cloudflare `waitUntil` | Calling `runtime.ctx.waitUntil()` without checking that `runtime.ctx` exists | Guard: `if (runtime?.ctx?.waitUntil) { runtime.ctx.waitUntil(p) } else { await p }` |
+| Cloudflare `waitUntil` | Passing a promise that does not have a `.catch()` handler — unhandled rejection logs appear in Cloudflare dashboard | Always wrap: `runtime.ctx.waitUntil(emailPromise.catch(err => logError(...)))` |
+| D1 `checkRateLimit` in SSR pages | Calling `checkRateLimit` in an Astro `.astro` file frontmatter where the response is returned by `Astro.redirect()` — need to verify the redirect path also returns the 429 response correctly | In SSR pages, return `new Response(...)` with status 429 from the frontmatter using `Astro.response` pattern, or redirect to an error page; do not silently swallow the rate limit |
+| Google OAuth + SameSite cookies | Setting session cookie to `SameSite=Strict` during CSRF hardening | Leave Lucia session cookie as `SameSite=Lax`; the OAuth flow requires cross-site redirect to complete successfully |
+| Resend email + `waitUntil` | Assuming Resend client SDK handles retries internally | It does not retry on transient errors; if fire-and-forget is critical, add one manual retry with exponential backoff before passing to `waitUntil` |
+| D1 index creation | Running `CREATE INDEX` on `rate_limits` during peak traffic | Apply during off-peak; the table is write-heavy and index creation will briefly lock writes |
 
 ---
 
 ## Performance Traps
 
-Patterns that work at small scale but fail as usage grows.
-
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Tenant dashboard fetches all user reviews with no pagination | Dashboard slow for users with 5+ reviews (each includes full building JOINs) | Add LIMIT to the dashboard query; paginate or lazy-load older reviews | Starts degrading at 10+ reviews per user; unlikely pre-launch but design for it |
-| Saved buildings table queried with no index on user_id | Slow saved buildings load as table grows | Add `CREATE INDEX idx_saved_buildings_user ON saved_buildings(user_id)` in the creation migration | Breaks at ~10,000 saved building rows across all users |
-| Multi-city enrich making sequential API calls | Admin "Auto-Research" button takes 3–5s | Each city adapter should independently time out (2s max) and return empty results, not block | Immediate — external API latency is unpredictable |
-| Rate limit table scanned without partial index | Every contact form POST does a full `rate_limits` table scan | The existing `rateLimit.ts` pattern already cleans up expired rows, but add `CREATE INDEX idx_rate_limits_key_created ON rate_limits(rate_key, created_at)` for the contact endpoint specifically | Breaks at ~50,000 rate limit rows (easily reached with spam) |
-| `building_scores` / `landlord_scores` not updated after new survey fields | New fields collected but never aggregated | If `section_8_accepted` or `safely_lit` should appear in aggregate displays, the score update trigger/recalculation logic must explicitly include them | Immediate — new fields will show as NULL in aggregate tables |
+| `LIKE '%query%'` search without FTS or index | Search slows proportionally as `buildings` and `landlords` tables grow; full table scans on every search | Add composite index on `(address, neighborhood)` and `(name)` or migrate to D1 FTS (experimental) | Noticeable at ~5,000 buildings; critical at 50,000 |
+| Rate limit cleanup DELETE on every request | Every `checkRateLimit` call issues a `DELETE FROM rate_limits WHERE expires_at < ?` before the count query — two D1 round trips per rate-limited endpoint | Add an index on `rate_limits(expires_at)` to speed the DELETE; consider decoupling cleanup to a scheduled Worker (Cloudflare Cron Triggers) | Currently fine at low volume; degrades as rate_limits table grows and cleanup slows |
+| Sync email blocking response | Every email route (verify, forgot-password, notification) awaits Resend before returning to user | Switch to `waitUntil` fire-and-forget pattern | Already noticeable — Resend API adds 200-500ms to each response that sends email |
+| Search SSR page does 4 DB queries per page load | `search.astro` does COUNT + SELECT for buildings AND COUNT + SELECT for landlords synchronously | Parallelize with `Promise.all()` on the two independent query pairs | Doubles the search response time at current scale; worse as data grows |
 
 ---
 
 ## Security Mistakes
 
-Domain-specific security issues specific to v1.4.0 features.
-
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Contact form stores message body without sanitization | Stored XSS in admin panel — an attacker submits `<script>` tags in a message, admin views it, script executes | Escape HTML in the admin panel display of contact messages; do not render contact message bodies as raw HTML |
-| Saved buildings endpoint returns ALL saved buildings for any authenticated user if user_id is not scoped to `context.locals.user.id` | User A can retrieve User B's saved buildings by calling the API with a different user_id | Always scope saved buildings queries to `WHERE user_id = context.locals.user.id` — never accept user_id from the request body |
-| Notification email tokens that expire but are not deleted from DB | Token table grows unboundedly; expired tokens waste storage | Add cleanup: `DELETE FROM notification_tokens WHERE expires_at < unixepoch()` on each token creation (same pattern as email_verification_tokens) |
-| Multi-source adapter makes outbound HTTP to untrusted city APIs without timeout | Cloudflare Worker can be held open for 30s by a slow external API, consuming CPU time | Set a 3-second `AbortController` timeout on all external API calls in city adapters |
-| Contact form accepts message from unauthenticated users, stores email field as-is | Spam with fake emails; admin wastes time on junk | Require authentication for contact form OR apply strict Turnstile + rate limit (3/hour/IP) for anonymous submissions |
+| `bug-reports.ts` has Turnstile but no `checkRateLimit` | Turnstile protects against bots but not against a legitimate user (or someone with Turnstile tokens) spamming the endpoint | Add `checkRateLimit` with endpoint `'bug_report'` and limit 5/hour; existing Turnstile stays as a first layer |
+| `search.astro` has no rate limiting of any kind | The page executes 4 D1 queries per request; a scraper or load test can DoS the database | Add IP-based rate limit check at the top of the SSR frontmatter using the same `checkRateLimit` helper and `getClientIP` |
+| CSRF audit conclusion skipped in favor of blanket token implementation | Blanket CSRF tokens on all POST routes breaks Google OAuth callback and adds frontend complexity with marginal benefit given Turnstile + SameSite=Lax | Audit first: document the current protection (Turnstile on unauthenticated POSTs, session cookie SameSite=Lax on authenticated POSTs, state cookie on OAuth GET) and determine if a gap actually exists |
+| Typed wrapper exposes only `wrangler.jsonc` bindings but not Pages secrets | After migration, `runtime.env.RESEND_API_KEY` fails TypeScript type check because `RESEND_API_KEY` is a Pages secret not a D1 binding — developer adds `as any` back, negating the whole migration | Update `App.Platform.env` in `env.d.ts` to declare all Pages secrets before starting the migration |
+| Error response format drift after validation retrofit | Some endpoints return `{ error: string }` and some return `{ error: string, details: ValidationError[] }` — frontend components that only handle the first format silently drop field-level error detail | Audit every `fetch()` call in React components to confirm they handle both formats, or standardize on `{ error: string, details?: ValidationError[] }` |
 
 ---
 
 ## UX Pitfalls
 
-Common user experience mistakes in the features being added.
-
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Dashboard shows "Review Pending" with no explanation of what "pending" means or how long it takes | Users submit a review, see "Pending," and re-submit thinking it failed — creating duplicate submission attempts | Inline explanation: "Your review is under moderation. This typically takes 1–3 business days." |
-| Move-in date bug fix changes how existing data is displayed without showing what changed | Users see different dates than before; may report as a bug | Add a note to the migration comment explaining the display fix, and verify existing data still renders correctly after the fix |
-| Notifications sent for review approved/rejected, but no way to turn them off from within the email | Users mark email as spam; Resend deliverability degrades | One-click unsubscribe link in every notification email footer (also required for CAN-SPAM compliance — see Pitfall 3) |
-| Saved buildings feature with no confirmation on "unsave" | Users accidentally unsave a building and cannot recover it | Add a simple undo toast or confirmation for destructive save actions |
-| Contact form submits successfully but admin never sees it because Resend notification goes to spam | User believes their message was received; admin misses it | Store all contact messages in D1 admin panel as primary delivery mechanism; Resend notification is secondary |
-| Inline UGC disclaimers styled with `text-gray-400` (too low contrast) | Screen reader and accessibility users may miss disclaimer; legally weakens the protection | Use `text-gray-500` minimum; ensure disclaimer passes WCAG 2.1 AA contrast ratio |
+| Adding stricter input validation without updating frontend error messages | User sees "Validation failed" with no indication of which field is wrong (backend returns `details` array but form only shows `error` string) | Before adding backend validation, verify the frontend form renders `details[].message` per field; ReviewForm and ContactForm both need audit |
+| Rate limit 429 with no `Retry-After` header (contact.ts currently missing this) | User hits "Too many submissions" with no idea when they can retry; some users will assume the form is broken | All 429 responses must include `Retry-After` header; frontend forms should surface "Try again in X minutes" from this header |
+| EmptyState component inconsistency across pages | New users see different empty state messages depending on which page they land on first; undermines trust | Build `EmptyState` component before or alongside the component refactor phase to ensure the 3 large components use it consistently |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-Things that appear complete but are missing critical pieces.
-
-- [ ] **Contact form:** Often missing rate limiting — verify `checkRateLimit` is called before the INSERT and before the Resend notification send
-- [ ] **Contact form:** Often missing server-side Turnstile validation — verify `verifyTurnstile()` is called (not just client-side widget rendering)
-- [ ] **Survey fields (section_8_accepted, safely_lit):** Often missing from the scoring calculation — verify `src/lib/scoring.ts` includes new fields with correct weights AND that NULL handling skips them rather than treating as 0
-- [ ] **Survey fields:** Often missing from the `ReviewCard.astro` display — verify new fields are shown in the card or at minimum are not silently dropped
-- [ ] **UGC disclaimers:** Often only added to Terms of Service — verify disclaimer text exists on `/building/[slug]` review list AND on the review submission form/confirmation
-- [ ] **Tenant dashboard notifications:** Often missing unsubscribe — verify every notification email has a working unsubscribe link that does not require sign-in to use
-- [ ] **Saved buildings:** Often missing the UNIQUE constraint — verify `UNIQUE(user_id, building_id)` is in the CREATE TABLE statement
-- [ ] **Multi-city adapter:** Often the Boston adapter behavior is changed when adding New Haven — verify Boston enrich still works after adapter refactor (run a manual enrich on a Boston building)
-- [ ] **Notification preferences:** Often stored as a user table column without a migration — verify migration 0019+ actually adds the column before the dashboard reads it
-- [ ] **Move-in date bug fix:** Often fixes the display but breaks something in the E2E tests that asserted the old (buggy) display format — verify E2E tests updated to match the fix
+- [ ] **Rate limiting on bug-reports**: `checkRateLimit` import added, but `Retry-After` header missing on 429 response — verify header is present in all rate-limited endpoints
+- [ ] **Async email via waitUntil**: email function updated to pass promise to `waitUntil`, but null guard on `runtime.ctx` missing — verify `runtime?.ctx?.waitUntil` guard exists before every `waitUntil()` call
+- [ ] **CSRF audit complete**: CSRF finding marked resolved, but the actual audit conclusion (threat present or not) is not documented — verify a written decision exists stating whether CSRF tokens are needed and why
+- [ ] **Typed runtime wrapper**: all 71 `(context.locals as any).runtime` casts replaced, but `env.d.ts` still missing Pages secrets — verify `App.Platform.env` lists every env var accessed at runtime, not just wrangler.jsonc bindings
+- [ ] **D1 index migrations**: `CREATE INDEX` statements added to migration file, but never verified against actual query execution plan — verify `EXPLAIN QUERY PLAN` on search queries shows index scan, not full table scan
+- [ ] **Component split complete**: large component extracted into sub-components, but the Astro page still uses `client:load` on a now-deleted component name — verify the import path in every `.astro` page that uses the split component
+- [ ] **Input validation retrofit**: validation added to API endpoints, but `validation.ts` still references the 12 legacy v1 score fields instead of `ALL_SCORE_FIELDS` — verify the validator uses the current 29-item field list
+- [ ] **Error format consistency**: validation now returns `{ error, details }` but frontend `fetch` handlers in React components only read `data.error` — verify every form component surfaces field-level validation errors from `details`
 
 ---
 
 ## Recovery Strategies
 
-When pitfalls occur despite prevention, how to recover.
-
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| NOT NULL migration failed on production D1 | MEDIUM | Write a new migration that drops and recreates the column as nullable, or adds with a DEFAULT; apply with `wrangler d1 migrations apply --remote` |
-| Duplicate migration number applied | HIGH | Inspect `d1_migrations` table in production (`wrangler d1 execute --remote --command "SELECT * FROM d1_migrations"`); manually delete the incorrect entry; rename the file with the next available number and re-apply |
-| Notification emails sent without unsubscribe | MEDIUM | Deploy unsubscribe endpoint immediately; add unsubscribe link to email templates; monitor Resend dashboard for spam complaints |
-| N+1 dashboard queries degrading performance | LOW | Add a combined `/api/dashboard` endpoint; update the React island to use it; the old individual endpoints can remain for backward compat |
-| Contact form spammed before rate limit was added | LOW | Truncate `contact_messages` table; add rate limit; redeploy |
-| Adapter refactor broke Boston enrich | LOW | Roll back `src/lib/enrichment/boston.ts` to the inline version; Boston adapter is the only one used in production until the refactor is validated |
+| Rate limit thresholds too low, users blocked in production | LOW | Deploy a new build with increased thresholds; no DB schema change needed; rate_limits table auto-expires via TTL |
+| `waitUntil` TypeError crashes API responses after async email retrofit | MEDIUM | Revert the async email change via git revert deploy; add null guard; redeploy; takes one deploy cycle (5-10 min on Cloudflare Pages) |
+| CSRF token implementation breaks Google OAuth login | HIGH | Immediate revert required — OAuth is the primary auth path for most users; deploy revert within minutes; then re-approach with OAuth-exempt scope |
+| D1 migration fails on production (NOT NULL column) | LOW | D1 migration failures do not corrupt the database — the migration is rejected. Roll back the migration file, fix the column definition, redeploy |
+| D1 migration fails mid-apply (partial index creation) | LOW | D1 migrations are not transactional for DDL. If `CREATE INDEX` fails midway, check D1 console for current schema state, then write a compensating migration |
+| Typed wrapper migration causes TypeScript errors on deploy | LOW | TypeScript errors block the Astro build, so the broken build does not ship. Fix the env.d.ts declarations and rebuild |
+| Component split breaks E2E tests | MEDIUM | E2E suite catches this before production if run pre-deploy (as mandated by CLAUDE.md QA process). Revert the component split for the broken component; split other components first |
+| Input validation rejects valid existing data in edit flow | MEDIUM | Any review submitted before the new length limits was valid under old rules. Must grandfather: validate `max_length` only on new submissions (create), not on edit if the existing value exceeds the limit; or increase the limit to cover historical data |
 
 ---
 
 ## Pitfall-to-Phase Mapping
 
-How roadmap phases should address these pitfalls.
-
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| NOT NULL migration without DEFAULT (Pitfall 1) | Survey fields phase | Run migration against local DB with existing seed data; verify old reviews query correctly |
-| Migration number collision (Pitfall 2) | First phase that writes a migration | Assign all migration numbers in the roadmap plan before any SQL is written |
-| Notifications without unsubscribe (Pitfall 3) | Contact form + notifications phase | Send a test notification to a real email; verify unsubscribe link works without sign-in |
-| UGC disclaimers only in ToS (Pitfall 4) | UGC disclaimers phase | Manual review of `/building/[slug]`, review submission form, and confirmation page |
-| Multi-city adapter as God Function (Pitfall 5) | Multi-city auto-research phase | Adapter interface defined before New Haven code is written; Boston adapter passes existing manual tests |
-| Dashboard N+1 queries (Pitfall 6) | Tenant dashboard phase | Check browser Network tab: exactly one (or two) API calls on dashboard load, not four or more |
-| Contact form without rate limiting (Pitfall 7) | Contact form phase | Attempt >3 POST requests in one hour from same IP; verify 429 response on the 4th |
+| Rate limit false positives on bug-reports and search | Rate limiting + input validation phase | Check Cloudflare 429 analytics 24h post-deploy; confirm `Retry-After` header in network tab |
+| `waitUntil` TypeError on null ctx | Async email phase | Unit test with `runtime.ctx = undefined`; Cloudflare Pages deploy smoke test confirming email fires without blocking response |
+| CSRF retrofit breaks Google OAuth | CSRF audit phase — audit before implementing | E2E test completing full auth flow (sign in with Google mock); check Playwright test still passes with any CSRF changes applied |
+| Validation retrofit breaks existing form submissions | Input validation phase | Smoke test review create and review edit flows with production-realistic data; run E2E review.spec.ts suite before merge |
+| D1 migration NOT NULL failure | D1 index phase | Run `npx wrangler d1 migrations apply --local` against seeded local DB before any `--remote` apply |
+| Partial typed wrapper migration | Typed runtime wrapper phase — do all 71 in one PR | `grep -r '(context.locals as any).runtime\|locals as any).runtime' src/` returns zero matches after migration |
+| Component split hydration issue | Component refactor phase — split one file per PR, E2E between each | Full Playwright E2E suite green after each component is split; manual test of multi-step ReviewEditForm before/after |
 
 ---
 
 ## Sources
 
-- Codebase inspection: `migrations/0001–0018`, `src/pages/api/**`, `src/lib/email.ts`, `src/lib/rateLimit.ts`, `src/lib/scoring.ts`, `src/pages/terms.astro`, `src/pages/contact.astro` — HIGH confidence (direct inspection)
-- [D1 ALTER TABLE constraints](https://developers.cloudflare.com/d1/sql-api/d1-sql-api/) — NOT NULL column addition requires DEFAULT — HIGH confidence
-- [CAN-SPAM Act Requirements](https://www.ftc.gov/business-guidance/resources/can-spam-act-compliance-guide-business) — unsubscribe requirement for commercial email — HIGH confidence
-- [Section 230 Communications Decency Act](https://www.law.cornell.edu/uscode/text/47/230) — platform safe harbor — HIGH confidence
-- [Resend Terms of Service: Spam Policy](https://resend.com/legal/anti-spam-policy) — account suspension for spam behavior — HIGH confidence
-- [Cloudflare Workers CPU time limits](https://developers.cloudflare.com/workers/platform/limits/) — AbortController timeout necessity for external calls — HIGH confidence
-- General pattern: Astro island dashboard anti-pattern (multiple useEffect fetches) — MEDIUM confidence (common community pattern, verified against project codebase architecture)
+- Direct codebase inspection: `src/lib/rateLimit.ts`, `src/pages/api/contact.ts`, `src/pages/api/disputes.ts`, `src/pages/api/bug-reports.ts`, `src/pages/api/auth/google/callback.ts`, `src/lib/auth.ts`, `src/middleware.ts`, `src/env.d.ts`, `wrangler.jsonc`
+- `.planning/codebase/CONCERNS.md` audit (2026-04-26)
+- Cloudflare Workers `ExecutionContext.waitUntil()` — [developers.cloudflare.com/workers/runtime-apis/context](https://developers.cloudflare.com/workers/runtime-apis/context/) (verified: `waitUntil` keeps the worker alive after response is returned; requires `ExecutionContext` passed from `fetch` handler event)
+- Cloudflare Pages Functions and `@astrojs/cloudflare` adapter runtime shape — `App.Platform.ctx` is the `ExecutionContext`
+- SQLite `ALTER TABLE` constraints (official SQLite docs): NOT NULL without DEFAULT is rejected on non-empty tables — identical behavior in D1
+- Lucia v3 session cookie defaults: `SameSite=Lax` is the default; `SameSite=Strict` breaks cross-site OAuth redirects (Lucia docs: [lucia-auth.com/guides/oauth/basics](https://lucia-auth.com/guides/oauth/basics))
+- `@astrojs/cloudflare` adapter runtime access pattern: `(context.locals as any).runtime` is the current access path per adapter docs for Astro 5 SSR
 
 ---
-*Pitfalls research for: v1.4.0 "Open Doors" — feature additions to existing tenant review platform*
-*Researched: 2026-03-20*
+*Pitfalls research for: v1.5.0 "Closed Loops" — security hardening retrofit on live production app*
+*Researched: 2026-04-26*
