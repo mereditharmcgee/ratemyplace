@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: planning
-stopped_at: Completed 17-01-PLAN.md
-last_updated: "2026-04-28T16:45:00.460Z"
+stopped_at: Completed 17-02-PLAN.md
+last_updated: "2026-04-28T17:04:22.158Z"
 last_activity: 2026-04-27 — Roadmap created, phases 16-21 defined, 24/24 requirements mapped
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 16 P02 | 10 | 3 tasks | 60 files |
 | Phase 17 P00 | 2 | 2 tasks | 2 files |
 | Phase 17-public-endpoint-security P01 | 1 | 2 tasks | 1 files |
+| Phase 17-public-endpoint-security P02 | 16 | 5 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 17]: isValidEmail uses pragmatic regex rejecting 'notanemail', accepting 'a@b.c' (locked per CONTEXT.md)
 - [Phase 17]: escapeLikePattern escapes backslash first then % and _ to prevent double-escaping SQL LIKE wildcards
 - [Phase 17]: Sanitization stays at endpoint after validation — validators are pure (locked per CONTEXT.md)
+- [Phase 17]: contact.ts intentionally omits Retry-After on 429 — deferred to Phase 21 SEC-07 (clean header-only patch)
+- [Phase 17]: All 10 Phase 17 E2E tests GREEN via --no-deps (Phase 17 tests use {request} only, no browser auth needed)
 
 ### Pending Todos
 
@@ -87,8 +90,8 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-04-28T16:45:00.457Z
-Stopped at: Completed 17-01-PLAN.md
+Last session: 2026-04-28T17:04:22.156Z
+Stopped at: Completed 17-02-PLAN.md
 Resume file: None
 
 ---
