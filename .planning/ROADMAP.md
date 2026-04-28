@@ -113,12 +113,14 @@ Plans:
   1. `middleware.ts` contains an inline comment citing the CSRF audit conclusion — identifying which controls cover which endpoint categories and explicitly confirming no token implementation is required
   2. `CLAUDE.md` contains a brief CSRF note recording the SameSite=Lax + Turnstile + Astro checkOrigin verdict
   3. Submitting a signup request completes and returns a 201 response before any Resend API call resolves — the user is not blocked by email latency
-  4. Submitting a forgot-password request, a contact form, or a dispute returns its success response before Resend responds — all four email-sending routes use `ctx.waitUntil` with a null guard for local dev
-**Plans**: TBD
+  4. Submitting a forgot-password request, a contact form, or a dispute returns its success response before Resend responds — all five email-sending routes (signup, forgot-password, resend-verification, contact, disputes) use `fireAndForget(context, ...)` with a null guard for local dev
+**Plans**: 4 plans
 
 Plans:
-- [ ] 18-01: CSRF audit — verify checkOrigin default, SameSite=Lax coverage, Turnstile scope; document conclusion in middleware.ts and CLAUDE.md
-- [ ] 18-02: Convert all four blocking email sends (signup, forgot-password, contact, disputes) to ctx.waitUntil with null guard
+- [ ] 18-00-PLAN.md — Wave 0 RED scaffolding: failing unit tests for `fireAndForget` and `recipientHash` in `src/lib/__tests__/runtime.test.ts` (no production code touched)
+- [ ] 18-01-PLAN.md — Implement `fireAndForget(context, promise)` and `recipientHash(email)` in `src/lib/runtime.ts` (alongside existing `getEnv`); turns Wave 0 unit tests GREEN
+- [ ] 18-02-PLAN.md — Convert all 5 blocking email-send sites to `fireAndForget` (signup, forgot-password, resend-verification, contact x2, disputes); append PERF-01 companion note to REQUIREMENTS.md
+- [ ] 18-03-PLAN.md — CSRF audit: write `.planning/audits/csrf-2026-04.md` (per-endpoint-category structure, JSON checkOrigin caveat, no-token verdict), add inline comment to `src/middleware.ts`, append CSRF subsection to CLAUDE.md Security Checklist
 
 ### Phase 19: D1 Index Migration
 **Goal**: Every hot-path query runs against an index — no full-table scans on search joins, rate-limit lookups, or filter queries
@@ -186,10 +188,10 @@ Phases 16 → 17 and 18 and 19 (parallel after 16) → 20 → 21
 | 15. Notification Gap Closure | v1.4.0 | 1/1 | Complete | 2026-03-22 |
 | 16. Typed Runtime Foundation | 2/2 | Complete    | 2026-04-27 | - |
 | 17. Public Endpoint Security | 3/3 | Complete    | 2026-04-28 | - |
-| 18. CSRF Audit and Async Email | v1.5.0 | 0/2 | Not started | - |
+| 18. CSRF Audit and Async Email | v1.5.0 | 0/4 | Planned | - |
 | 19. D1 Index Migration | v1.5.0 | 0/2 | Not started | - |
 | 20. Critical-Flow E2E Coverage | v1.5.0 | 0/2 | Not started | - |
 | 21. Quality Cleanup | v1.5.0 | 0/2 | Not started | - |
 
 ---
-*Roadmap updated: 2026-04-27 — v1.5.0 "Closed Loops" phases 16-21 added*
+*Roadmap updated: 2026-04-28 — Phase 18 plans finalized (4 plans: Wave 0 tests, helper impl, route conversions, CSRF audit doc)*
