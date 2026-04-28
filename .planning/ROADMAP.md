@@ -185,7 +185,7 @@ Phases 16 → 17 and 18 and 19 (parallel after 16) → 20 → 21
 | 14. Saved Buildings and Verification UX | v1.4.0 | 2/2 | Complete | 2026-03-20 |
 | 15. Notification Gap Closure | v1.4.0 | 1/1 | Complete | 2026-03-22 |
 | 16. Typed Runtime Foundation | 2/2 | Complete    | 2026-04-27 | - |
-| 17. Public Endpoint Security | v1.5.0 | 0/3 | Not started | - |
+| 17. Public Endpoint Security | 1/3 | In Progress|  | - |
 | 18. CSRF Audit and Async Email | v1.5.0 | 0/2 | Not started | - |
 | 19. D1 Index Migration | v1.5.0 | 0/2 | Not started | - |
 | 20. Critical-Flow E2E Coverage | v1.5.0 | 0/2 | Not started | - |

@@ -18,19 +18,19 @@ Hardening pass. No new user-facing features. Closes security, validation, perfor
 
 ### Security
 
-- [ ] **SEC-04**: Rate limiting wired on `/api/bug-reports` (5/hr per IP, fail-closed pattern matching `contact.ts`)
-- [ ] **SEC-05**: Rate limiting wired on `/api/search/results` (60/min per IP) and `/api/search/autocomplete` (120/min per IP)
+- [x] **SEC-04**: Rate limiting wired on `/api/bug-reports` (5/hr per IP, fail-closed pattern matching `contact.ts`)
+- [x] **SEC-05**: Rate limiting wired on `/api/search/results` (60/min per IP) and `/api/search/autocomplete` (120/min per IP)
 - [ ] **SEC-06**: CSRF protection audit completed against Astro 5 `security.checkOrigin` defaults, Lucia v3 session cookie attributes, and Cloudflare Turnstile coverage; conclusion documented in `middleware.ts` (inline comment) and `CLAUDE.md`
 - [ ] **SEC-07**: `Retry-After` header present on every 429 response (fix `contact.ts` consistency gap; verify all rate-limited endpoints)
 - [ ] **SEC-08**: `X-RateLimit-Limit` and `X-RateLimit-Remaining` headers on every rate-limited endpoint response
 
 ### Validation
 
-- [ ] **VAL-01**: `validateDisputeForm` adds email format check on `landlordEmail` and length limits (`disputeExplanation` 5000 chars, `landlordName` 200, `landlordPhone` 30)
-- [ ] **VAL-02**: `validateBugReport` adds length limits and content-type guard on `/api/bug-reports`
-- [ ] **VAL-03**: `validateContactForm` adds email format and length limits on `/api/contact` payload
-- [ ] **VAL-04**: `validateSearch` adds query-length cap and special-character handling on `/api/search/*` inputs
-- [ ] **VAL-05**: Shared primitives in `validation.ts`: `isValidEmail()`, `isValidZipCode()`, `enforceMaxLength()` — used by all four validators above
+- [x] **VAL-01**: `validateDisputeForm` adds email format check on `landlordEmail` and length limits (`disputeExplanation` 5000 chars, `landlordName` 200, `landlordPhone` 30)
+- [x] **VAL-02**: `validateBugReport` adds length limits and content-type guard on `/api/bug-reports`
+- [x] **VAL-03**: `validateContactForm` adds email format and length limits on `/api/contact` payload
+- [x] **VAL-04**: `validateSearch` adds query-length cap and special-character handling on `/api/search/*` inputs
+- [x] **VAL-05**: Shared primitives in `validation.ts`: `isValidEmail()`, `isValidZipCode()`, `enforceMaxLength()` — used by all four validators above
 
 ### Performance
 
@@ -96,16 +96,16 @@ Updated by gsd-roadmapper after roadmap creation.
 | INFRA-01 | Phase 16 | Complete |
 | INFRA-02 | Phase 16 | Complete |
 | INFRA-03 | Phase 16 | Complete |
-| SEC-04 | Phase 17 | Pending |
-| SEC-05 | Phase 17 | Pending |
+| SEC-04 | Phase 17 | Complete |
+| SEC-05 | Phase 17 | Complete |
 | SEC-06 | Phase 18 | Pending |
 | SEC-07 | Phase 21 | Pending |
 | SEC-08 | Phase 21 | Pending |
-| VAL-01 | Phase 17 | Pending |
-| VAL-02 | Phase 17 | Pending |
-| VAL-03 | Phase 17 | Pending |
-| VAL-04 | Phase 17 | Pending |
-| VAL-05 | Phase 17 | Pending |
+| VAL-01 | Phase 17 | Complete |
+| VAL-02 | Phase 17 | Complete |
+| VAL-03 | Phase 17 | Complete |
+| VAL-04 | Phase 17 | Complete |
+| VAL-05 | Phase 17 | Complete |
 | PERF-01 | Phase 18 | Pending |
 | PERF-02 | Phase 18 | Pending |
 | PERF-03 | Phase 18 | Pending |
