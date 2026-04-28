@@ -4,30 +4,26 @@ import { getEnv } from '../../lib/runtime';
 import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
 import { getClientIP, checkRateLimit } from '../../lib/rateLimit';
+import { validateContactForm } from '../../lib/validation';
 import { sendContactConfirmationEmail, sendContactNotificationEmail } from '../../lib/email';
 
 export async function POST(context: APIContext): Promise<Response> {
+  // 1. Content-type guard
+  const contentType = context.request.headers.get('content-type') || '';
+  const isForm = contentType.includes('multipart/form-data') ||
+                 contentType.includes('application/x-www-form-urlencoded');
+  if (!isForm) {
+    return new Response(JSON.stringify({ error: 'Unsupported Media Type' }), {
+      status: 415,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
   try {
-    const formData = await context.request.formData();
-
-    // Verify Turnstile token
-    const turnstileToken = formData.get('cf-turnstile-response') as string;
-    const turnstileResult = await verifyTurnstile(
-      turnstileToken,
-      getEnv(context).TURNSTILE_SECRET_KEY,
-      getClientIP(context)
-    );
-    if (!turnstileResult.success) {
-      return new Response(JSON.stringify({ error: turnstileResult.error || 'Security check failed. Please try again.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
     const db = getDB(context);
     const ip = getClientIP(context);
 
-    // Rate limit: 3 submissions per hour per IP
+    // 2. Rate limit (existing 3/hr — Phase 21 SEC-07 will retro-fit Retry-After header on this 429)
     const rateLimitResult = await checkRateLimit(db, ip, 'contact', 3, 3600);
     if (!rateLimitResult.allowed) {
       return new Response(JSON.stringify({ error: 'Too many submissions. Please wait before trying again.' }), {
@@ -36,50 +32,53 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
-    // Parse and validate inputs
+    // 3. Body parse
+    const formData = await context.request.formData();
+
+    // 4. Turnstile
+    const turnstileToken = formData.get('cf-turnstile-response') as string;
+    const turnstileResult = await verifyTurnstile(
+      turnstileToken,
+      getEnv(context).TURNSTILE_SECRET_KEY,
+      ip
+    );
+    if (!turnstileResult.success) {
+      return new Response(JSON.stringify({ error: turnstileResult.error || 'Security check failed. Please try again.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // 5. Validate (VAL-03)
     const name = (formData.get('name') as string || '').trim();
     const email = (formData.get('email') as string || '').trim();
     const category = (formData.get('category') as string || '').trim();
     const message = (formData.get('message') as string || '').trim();
 
-    if (!name || name.length < 2 || name.length > 100) {
-      return new Response(JSON.stringify({ error: 'Name must be between 2 and 100 characters.' }), {
+    const errors = validateContactForm({ name, email, category, message });
+    if (errors.length > 0) {
+      return new Response(JSON.stringify({ error: 'Validation failed', details: errors }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    if (!email || !email.includes('@')) {
-      return new Response(JSON.stringify({ error: 'Please provide a valid email address.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (!message || message.length < 10 || message.length > 3000) {
-      return new Response(JSON.stringify({ error: 'Message must be between 10 and 3000 characters.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
+    // 6. Insert
     const validCategories = ['general', 'privacy', 'support', 'landlord'];
     const safeCategory = validCategories.includes(category) ? category : 'general';
 
-    // Insert into D1
     const id = generateIdFromEntropySize(10);
     await db.prepare(`
       INSERT INTO contact_messages (id, name, email, category, message)
       VALUES (?, ?, ?, ?, ?)
     `).bind(id, name, email, safeCategory, message).run();
 
-    // Send confirmation email to submitter (best-effort)
+    // Best-effort email — Phase 18 PERF-03 will convert to ctx.waitUntil
     const resendApiKey = getEnv(context).RESEND_API_KEY;
     await sendContactConfirmationEmail(resendApiKey, email, name, safeCategory).catch((err) => {
       console.error('Failed to send contact confirmation email:', err);
     });
 
-    // Send notification email to admin (best-effort)
     const messagePreview = message.length > 200 ? message.slice(0, 200) + '...' : message;
     await sendContactNotificationEmail(resendApiKey, name, email, safeCategory, messagePreview).catch((err) => {
       console.error('Failed to send contact notification email:', err);
