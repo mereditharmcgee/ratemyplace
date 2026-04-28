@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
-import { getEnv } from '../../../lib/runtime';
+import { getEnv, fireAndForget } from '../../../lib/runtime';
 import { createPasswordResetToken } from '../../../lib/tokens';
 import { sendPasswordResetEmail } from '../../../lib/email';
 import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
@@ -85,19 +85,13 @@ export async function POST(context: APIContext): Promise<Response> {
     // Create password reset token
     const token = await createPasswordResetToken(db, user.id);
 
-    // Send email
+    // Send email — Phase 18 PERF-02: fire-and-forget; DB token write already committed.
+    // Returns successResponse regardless (existing enumeration prevention preserved).
     const siteUrl = getEnv(context).SITE_URL || context.url.origin;
-    const emailResult = await sendPasswordResetEmail(
-      getEnv(context).RESEND_API_KEY,
-      siteUrl,
-      user.email,
-      token
+    fireAndForget(
+      context,
+      sendPasswordResetEmail(getEnv(context).RESEND_API_KEY, siteUrl, user.email, token),
     );
-
-    if (!emailResult.success) {
-      console.error('Failed to send password reset email:', emailResult.error);
-      // Still return success to prevent enumeration
-    }
 
     return successResponse;
   } catch (error) {

@@ -1,7 +1,7 @@
 import type { APIContext } from 'astro';
 import { initializeLucia } from '../../../lib/auth';
 import { getDB } from '../../../lib/db';
-import { getEnv } from '../../../lib/runtime';
+import { getEnv, fireAndForget } from '../../../lib/runtime';
 import { hashPassword } from '../../../lib/password';
 import { generateIdFromEntropySize } from 'lucia';
 import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
@@ -108,25 +108,14 @@ export async function POST(context: APIContext): Promise<Response> {
       'INSERT INTO users (id, email, hashed_password) VALUES (?, ?, ?)'
     ).bind(userId, email.toLowerCase(), hashedPassword).run();
 
-    // Create verification token and send email
-    try {
-      const token = await createVerificationToken(db, userId);
-      const siteUrl = getEnv(context).SITE_URL || context.url.origin;
-      const emailResult = await sendVerificationEmail(
-        getEnv(context).RESEND_API_KEY,
-        siteUrl,
-        email.toLowerCase(),
-        token
-      );
-
-      if (!emailResult.success) {
-        // Log but don't fail signup - user can request new email later
-        console.error('Verification email failed:', emailResult.error);
-      }
-    } catch (emailError) {
-      // Log but don't fail signup
-      console.error('Verification email error:', emailError);
-    }
+    // Create verification token and send email (Phase 18 PERF-01)
+    const token = await createVerificationToken(db, userId);
+    const siteUrl = getEnv(context).SITE_URL || context.url.origin;
+    // DB write (token row) already committed above — DB-then-email ordering preserved.
+    fireAndForget(
+      context,
+      sendVerificationEmail(getEnv(context).RESEND_API_KEY, siteUrl, email.toLowerCase(), token),
+    );
 
     const session = await lucia.createSession(userId, {});
     const sessionCookie = lucia.createSessionCookie(session.id);

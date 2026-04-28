@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
-import { getEnv } from '../../../lib/runtime';
+import { getEnv, fireAndForget } from '../../../lib/runtime';
 import { createVerificationToken } from '../../../lib/tokens';
 import { sendVerificationEmail } from '../../../lib/email';
 import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
@@ -56,21 +56,15 @@ export async function POST(context: APIContext): Promise<Response> {
     // Create new token (deletes any existing)
     const token = await createVerificationToken(db, user.id);
 
-    // Send email
+    // Phase 18 PERF-01 (companion): email is fire-and-forgot. Always return 200 —
+    // failures log via logError in fireAndForget; user can click resend button to retry.
+    // BEHAVIOR CHANGE: previously returned 500 on email failure; now always returns 200.
+    // DB token write already committed above — DB-then-email ordering preserved.
     const siteUrl = getEnv(context).SITE_URL || context.url.origin;
-    const emailResult = await sendVerificationEmail(
-      getEnv(context).RESEND_API_KEY,
-      siteUrl,
-      user.email,
-      token
+    fireAndForget(
+      context,
+      sendVerificationEmail(getEnv(context).RESEND_API_KEY, siteUrl, user.email, token),
     );
-
-    if (!emailResult.success) {
-      return new Response(JSON.stringify({ error: 'Failed to send verification email' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
 
     return new Response(JSON.stringify({ success: true, message: 'Verification email sent' }), {
       status: 200,
