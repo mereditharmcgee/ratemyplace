@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../lib/db';
-import { getEnv } from '../../lib/runtime';
+import { getEnv, fireAndForget } from '../../lib/runtime';
 import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
 import { getClientIP, checkRateLimit } from '../../lib/rateLimit';
@@ -73,16 +73,13 @@ export async function POST(context: APIContext): Promise<Response> {
       VALUES (?, ?, ?, ?, ?)
     `).bind(id, name, email, safeCategory, message).run();
 
-    // Best-effort email — Phase 18 PERF-03 will convert to ctx.waitUntil
+    // Phase 18 PERF-03: emails are fire-and-forgot — response returns before Resend resolves.
+    // DB write (contact_messages INSERT) already committed above — DB-then-email ordering preserved.
     const resendApiKey = getEnv(context).RESEND_API_KEY;
-    await sendContactConfirmationEmail(resendApiKey, email, name, safeCategory).catch((err) => {
-      console.error('Failed to send contact confirmation email:', err);
-    });
+    fireAndForget(context, sendContactConfirmationEmail(resendApiKey, email, name, safeCategory));
 
     const messagePreview = message.length > 200 ? message.slice(0, 200) + '...' : message;
-    await sendContactNotificationEmail(resendApiKey, name, email, safeCategory, messagePreview).catch((err) => {
-      console.error('Failed to send contact notification email:', err);
-    });
+    fireAndForget(context, sendContactNotificationEmail(resendApiKey, name, email, safeCategory, messagePreview));
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

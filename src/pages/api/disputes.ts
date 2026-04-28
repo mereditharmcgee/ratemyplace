@@ -1,6 +1,6 @@
 import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../lib/db';
-import { getEnv } from '../../lib/runtime';
+import { getEnv, fireAndForget } from '../../lib/runtime';
 import { extractReviewIdFromUrl } from '../../lib/disputes';
 import { sanitizeText, validateDisputeForm } from '../../lib/validation';
 import { sendDisputeConfirmationEmail } from '../../lib/email';
@@ -155,25 +155,19 @@ export const POST: APIRoute = async (context: APIContext) => {
       });
     }
 
-    // Send confirmation email (best-effort)
+    // Send confirmation email — Phase 18 PERF-04: fire-and-forgot.
+    // DB dispute INSERT already committed above — DB-then-email ordering preserved.
     const resendApiKey = getEnv(context).RESEND_API_KEY;
     if (resendApiKey) {
-      try {
-        await sendDisputeConfirmationEmail(
-          resendApiKey,
-          siteUrl,
-          landlordEmail,
-          {
-            landlordName,
-            buildingAddress,
-            disputeReasons,
-            disputeExplanation,
-          }
-        );
-      } catch (emailError) {
-        console.error('Failed to send confirmation email:', emailError);
-        // Continue - don't fail the request if email fails
-      }
+      fireAndForget(
+        context,
+        sendDisputeConfirmationEmail(resendApiKey, siteUrl, landlordEmail, {
+          landlordName,
+          buildingAddress,
+          disputeReasons,
+          disputeExplanation,
+        }),
+      );
     } else {
       console.warn('RESEND_API_KEY not configured - skipping confirmation email');
     }
