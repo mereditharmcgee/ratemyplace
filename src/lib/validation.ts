@@ -100,6 +100,63 @@ export function validateReviewForm(data: Partial<ReviewFormData & { move_in_mont
   return errors;
 }
 
+// ═══════════════════════════════════════════════════
+// Shared validation primitives (VAL-05)
+// ═══════════════════════════════════════════════════
+
+/**
+ * Pragmatic email format check. Accepts anything with non-whitespace before
+ * '@', non-whitespace before '.', non-whitespace after. Catches "notanemail"
+ * and typical typos. NOT RFC 5322 strict — accepts a@b.c.
+ *
+ * Locked in CONTEXT.md: must reject 'notanemail', accept 'a@b.c'.
+ */
+export function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+/**
+ * US zip code: 5-digit or 5+4 (ZIP+4) format.
+ * Future-proof for out-of-state landlords on disputes.
+ */
+export function isValidZipCode(zip: string): boolean {
+  return /^\d{5}(-\d{4})?$/.test(zip);
+}
+
+/**
+ * Canonical max-length helper. Returns null when value is undefined/null/empty
+ * or within bounds; returns ValidationError when over max.
+ *
+ * Validators stay pure — this helper is the only allocation path for
+ * length errors so error shapes stay consistent across forms.
+ */
+export function enforceMaxLength(
+  value: string | undefined | null,
+  max: number,
+  fieldName: string,
+  label: string
+): ValidationError | null {
+  if (value && value.length > max) {
+    return { field: fieldName, message: `${label} must be ${max} characters or less.` };
+  }
+  return null;
+}
+
+/**
+ * Escape SQLite LIKE wildcards so user input matches literally.
+ * Order matters: escape backslash FIRST (it's the chosen escape char itself),
+ * then percent and underscore. Without escaping the backslash, an input like
+ * '\%' would consume the next character and break the escape sequence.
+ *
+ * Use with `LIKE ? ESCAPE '\'` in the SQL clause (one ESCAPE per LIKE).
+ */
+export function escapeLikePattern(input: string): string {
+  return input
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_');
+}
+
 export function sanitizeText(text: string): string {
   return text
     .trim()
