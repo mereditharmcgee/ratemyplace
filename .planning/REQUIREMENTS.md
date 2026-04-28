@@ -20,7 +20,7 @@ Hardening pass. No new user-facing features. Closes security, validation, perfor
 
 - [x] **SEC-04**: Rate limiting wired on `/api/bug-reports` (5/hr per IP, fail-closed pattern matching `contact.ts`)
 - [x] **SEC-05**: Rate limiting wired on `/api/search/results` (60/min per IP) and `/api/search/autocomplete` (120/min per IP)
-- [ ] **SEC-06**: CSRF protection audit completed against Astro 5 `security.checkOrigin` defaults, Lucia v3 session cookie attributes, and Cloudflare Turnstile coverage; conclusion documented in `middleware.ts` (inline comment) and `CLAUDE.md`
+- [x] **SEC-06**: CSRF protection audit completed against Astro 5 `security.checkOrigin` defaults, Lucia v3 session cookie attributes, and Cloudflare Turnstile coverage; conclusion documented in `middleware.ts` (inline comment) and `CLAUDE.md`
 - [ ] **SEC-07**: `Retry-After` header present on every 429 response (fix `contact.ts` consistency gap; verify all rate-limited endpoints)
 - [ ] **SEC-08**: `X-RateLimit-Limit` and `X-RateLimit-Remaining` headers on every rate-limited endpoint response
 
@@ -98,7 +98,7 @@ Updated by gsd-roadmapper after roadmap creation.
 | INFRA-03 | Phase 16 | Complete |
 | SEC-04 | Phase 17 | Complete |
 | SEC-05 | Phase 17 | Complete |
-| SEC-06 | Phase 18 | Pending |
+| SEC-06 | Phase 18 | Complete |
 | SEC-07 | Phase 21 | Pending |
 | SEC-08 | Phase 21 | Pending |
 | VAL-01 | Phase 17 | Complete |
