@@ -1,9 +1,41 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
+import { getClientIP, checkRateLimit } from '../../../lib/rateLimit';
+import { validateSearch, escapeLikePattern } from '../../../lib/validation';
 
 export async function GET(context: APIContext): Promise<Response> {
-  const input = (context.url.searchParams.get('q') || '').trim();
+  const db = getDB(context);
+  const ip = getClientIP(context);
 
+  // 1. Rate limit: 120 / minute per IP (SEC-05)
+  const rateLimit = await checkRateLimit(db, ip, 'search-autocomplete', 120, 60);
+  if (!rateLimit.allowed) {
+    const status = rateLimit.error ? 503 : 429;
+    const message = rateLimit.error
+      ? 'Service temporarily unavailable. Please try again in a few minutes.'
+      : 'Too many requests. Please slow down.';
+    return new Response(JSON.stringify({ error: message }), {
+      status,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': String(rateLimit.retryAfterSeconds)
+      }
+    });
+  }
+
+  // 2. Validate (VAL-04)
+  const rawInput = context.url.searchParams.get('q');
+  const errors = validateSearch(rawInput);
+  if (errors.length > 0) {
+    return new Response(JSON.stringify({ error: 'Validation failed', details: errors }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  const input = (rawInput || '').trim();
+
+  // Existing min-length silent return (no 400 — keeps autocomplete UX clean per CONTEXT.md)
   if (!input || input.length < 2) {
     return new Response(JSON.stringify({ results: [] }), {
       headers: { 'Content-Type': 'application/json' }
@@ -11,10 +43,9 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
-    const db = getDB(context);
-    const pattern = `%${input}%`;
+    const escaped = escapeLikePattern(input);
+    const pattern = `%${escaped}%`;
 
-    // Search buildings by address and neighborhood
     const buildingResults = await db.prepare(`
       SELECT
         b.id, b.address, b.neighborhood, b.city, b.state, b.slug,
@@ -22,13 +53,12 @@ export async function GET(context: APIContext): Promise<Response> {
         ROUND(AVG(r.overall_score), 1) as avg_overall
       FROM buildings b
       LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
-      WHERE b.address LIKE ? OR b.neighborhood LIKE ?
+      WHERE b.address LIKE ? ESCAPE '\\' OR b.neighborhood LIKE ? ESCAPE '\\'
       GROUP BY b.id
       ORDER BY review_count DESC, b.address ASC
       LIMIT 5
     `).bind(pattern, pattern).all();
 
-    // Search landlords by name
     const landlordResults = await db.prepare(`
       SELECT
         l.id, l.name, l.slug,
@@ -37,7 +67,7 @@ export async function GET(context: APIContext): Promise<Response> {
       FROM landlords l
       LEFT JOIN buildings b ON b.landlord_id = l.id
       LEFT JOIN reviews r ON r.building_id = b.id AND r.status = 'approved'
-      WHERE l.name LIKE ?
+      WHERE l.name LIKE ? ESCAPE '\\'
       GROUP BY l.id
       ORDER BY review_count DESC, l.name ASC
       LIMIT 3

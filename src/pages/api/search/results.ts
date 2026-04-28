@@ -1,21 +1,50 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
+import { getClientIP, checkRateLimit } from '../../../lib/rateLimit';
+import { validateSearch, escapeLikePattern } from '../../../lib/validation';
 
 export async function GET(context: APIContext): Promise<Response> {
-  const query = (context.url.searchParams.get('q') || '').trim();
+  const db = getDB(context);
+  const ip = getClientIP(context);
+
+  // 1. Rate limit: 60 / minute per IP (SEC-05)
+  const rateLimit = await checkRateLimit(db, ip, 'search-results', 60, 60);
+  if (!rateLimit.allowed) {
+    const status = rateLimit.error ? 503 : 429;
+    const message = rateLimit.error
+      ? 'Service temporarily unavailable. Please try again in a few minutes.'
+      : 'Too many requests. Please slow down.';
+    return new Response(JSON.stringify({ error: message }), {
+      status,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': String(rateLimit.retryAfterSeconds)
+      }
+    });
+  }
+
+  // 2. Validate (VAL-04: length cap on trimmed query)
+  const rawQuery = context.url.searchParams.get('q');
+  const errors = validateSearch(rawQuery);
+  if (errors.length > 0) {
+    return new Response(JSON.stringify({ error: 'Validation failed', details: errors }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  const query = (rawQuery || '').trim();
   const resultType = context.url.searchParams.get('type') || 'buildings';
   const offset = Math.max(0, parseInt(context.url.searchParams.get('offset') || '0', 10) || 0);
   const limit = Math.min(50, Math.max(1, parseInt(context.url.searchParams.get('limit') || '10', 10) || 10));
 
   try {
-    const db = getDB(context);
-
     if (resultType === 'buildings') {
       const baseQuery = query
         ? `FROM buildings b
            LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
            LEFT JOIN landlords l ON b.landlord_id = l.id
-           WHERE b.address LIKE ? OR b.neighborhood LIKE ? OR l.name LIKE ?
+           WHERE b.address LIKE ? ESCAPE '\\' OR b.neighborhood LIKE ? ESCAPE '\\' OR l.name LIKE ? ESCAPE '\\'
            GROUP BY b.id
            HAVING COUNT(r.id) > 0`
         : `FROM buildings b
@@ -24,7 +53,9 @@ export async function GET(context: APIContext): Promise<Response> {
            GROUP BY b.id
            HAVING COUNT(r.id) > 0`;
 
-      const binds = query ? [`%${query}%`, `%${query}%`, `%${query}%`] : [];
+      const escaped = query ? escapeLikePattern(query) : '';
+      const pattern = `%${escaped}%`;
+      const binds = query ? [pattern, pattern, pattern] : [];
 
       const countResult = await db.prepare(
         `SELECT COUNT(*) as total FROM (SELECT b.id ${baseQuery})`
@@ -48,7 +79,7 @@ export async function GET(context: APIContext): Promise<Response> {
         ? `FROM landlords l
            LEFT JOIN buildings b ON b.landlord_id = l.id
            LEFT JOIN reviews r ON r.building_id = b.id AND r.status = 'approved'
-           WHERE l.name LIKE ?
+           WHERE l.name LIKE ? ESCAPE '\\'
            GROUP BY l.id
            HAVING COUNT(r.id) > 0`
         : `FROM landlords l
@@ -57,7 +88,9 @@ export async function GET(context: APIContext): Promise<Response> {
            GROUP BY l.id
            HAVING COUNT(r.id) > 0`;
 
-      const binds = query ? [`%${query}%`] : [];
+      const escaped = query ? escapeLikePattern(query) : '';
+      const pattern = `%${escaped}%`;
+      const binds = query ? [pattern] : [];
 
       const countResult = await db.prepare(
         `SELECT COUNT(*) as total FROM (SELECT l.id ${baseQuery})`
