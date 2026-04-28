@@ -34,7 +34,7 @@ Hardening pass. No new user-facing features. Closes security, validation, perfor
 
 ### Performance
 
-- [x] **PERF-01**: `/api/auth/signup` converted to `ctx.waitUntil(emailPromise.catch(logError))` with null guard for local Wrangler dev
+- [x] **PERF-01**: `/api/auth/signup` converted to `ctx.waitUntil(emailPromise.catch(logError))` with null guard for local Wrangler dev. Companion: `/api/auth/resend-verification` gets the same treatment for consistency (behavior change: previously returned 500 on email failure, now always returns 200 — users have explicit resend buttons).
 - [x] **PERF-02**: `/api/auth/forgot-password` converted to `waitUntil` with null guard
 - [x] **PERF-03**: `/api/contact` converted to `waitUntil` (admin notification email)
 - [x] **PERF-04**: `/api/disputes` converted to `waitUntil` (landlord confirmation email)
