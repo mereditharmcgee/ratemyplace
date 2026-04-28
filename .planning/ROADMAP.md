@@ -66,7 +66,7 @@ See: `.planning/milestones/v1.4.0-ROADMAP.md`
 
 - [x] **Phase 16: Typed Runtime Foundation** — Declare all Pages secrets in env.d.ts and wire typed runtime to App.Locals, eliminating 71 unsafe casts (completed 2026-04-27)
 - [x] **Phase 17: Public Endpoint Security** — Rate limiting and input validation on all unprotected public POST and search endpoints (completed 2026-04-28)
-- [ ] **Phase 18: CSRF Audit and Async Email** — Document CSRF posture and convert blocking email sends to fire-and-forget
+- [x] **Phase 18: CSRF Audit and Async Email** — Document CSRF posture and convert blocking email sends to fire-and-forget (completed 2026-04-28)
 - [ ] **Phase 19: D1 Index Migration** — Audit query plans and add missing indexes to eliminate full-table scans on hot paths
 - [ ] **Phase 20: Critical-Flow E2E Coverage** — Causal audit-log assertion and cross-view data consistency test coverage
 - [ ] **Phase 21: Quality Cleanup** — Response header consistency, shared EmptyState component
@@ -188,7 +188,7 @@ Phases 16 → 17 and 18 and 19 (parallel after 16) → 20 → 21
 | 15. Notification Gap Closure | v1.4.0 | 1/1 | Complete | 2026-03-22 |
 | 16. Typed Runtime Foundation | 2/2 | Complete    | 2026-04-27 | - |
 | 17. Public Endpoint Security | 3/3 | Complete    | 2026-04-28 | - |
-| 18. CSRF Audit and Async Email | 3/4 | In Progress|  | - |
+| 18. CSRF Audit and Async Email | 4/4 | Complete   | 2026-04-28 | - |
 | 19. D1 Index Migration | v1.5.0 | 0/2 | Not started | - |
 | 20. Critical-Flow E2E Coverage | v1.5.0 | 0/2 | Not started | - |
 | 21. Quality Cleanup | v1.5.0 | 0/2 | Not started | - |
