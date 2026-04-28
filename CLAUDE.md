@@ -182,6 +182,54 @@ npm test -- scoring   # Filter by name
 - Unit tests: `src/lib/__tests__/*.test.ts`
 - E2E tests: `e2e/*.spec.ts`
 
+## Pre-Deploy QA Process
+
+**Run this before every deploy. No exceptions.**
+
+Before pushing any change to production, walk through every user-facing flow affected by the change and check all five categories below. If the change touches data display, check ALL pages where that data appears, not just the page you modified.
+
+### 1. Display & UI Check
+- Does any content overflow its container?
+- Are internal variable names, database field names, or snake_case values visible to users?
+- Do all counts, labels, and text display correctly (no "undefined", "null", "NaN", or empty strings where data should be)?
+- Does the layout hold on mobile (375px), tablet (768px), and desktop (1280px)?
+
+### 2. Data Consistency Check
+- Does the same data (review counts, averages, scores, property details) show correctly across EVERY view where it appears (search results, property detail, admin panel, user profile)?
+- Are calculated values (averages, aggregate scores) mathematically correct? Spot-check at least 3 properties.
+- After adding/editing/deleting a review, do all views update to reflect the change?
+
+### 3. Empty & Edge State Check
+- What happens when search returns no results? Is the message helpful?
+- What happens with an empty search query?
+- What happens when a property has zero reviews?
+- What happens when a user submits a form with missing or invalid data?
+- What happens with extremely long text inputs?
+
+### 4. Security Audit
+- Are any API keys, database field names, or internal IDs exposed in the frontend HTML/JS?
+- Can a non-authenticated user access authenticated routes by navigating directly to the URL?
+- Can a non-admin user access admin routes?
+- Are all database queries parameterized (no string interpolation with user input)?
+- Do API error responses avoid leaking server details, file paths, or stack traces?
+- Can the database be queried directly from the browser console or by manipulating frontend requests?
+
+### 5. Search & Filter Logic
+- Does search return the expected results for common queries?
+- Does filtering narrow results correctly?
+- Are results sorted as expected?
+- Does pagination work (if applicable)?
+- Is the result count accurate and consistent with what's displayed?
+
+### When to Run a Full QA Pass
+- Before every deploy to production
+- After any change to database queries, scoring logic, or search
+- After any change to components that appear on multiple pages
+- After adding a new API endpoint
+
+### QA Slash Command
+Use `/qa` to run this checklist. Prompt: "Walk through every user-facing page and flow in this app. For each, check for display bugs, data consistency across views, empty/edge states, security vulnerabilities, and search/filter logic. Report everything you find, organized by category."
+
 ## Migrations
 
 ### Create Migration
@@ -210,6 +258,18 @@ When adding new endpoints:
 - [ ] Rate limiting for public endpoints
 - [ ] Audit logging for admin actions
 
+### CSRF Protection
+
+CSRF protection comes from three layers — no token implementation required (audited 2026-04-28):
+
+- **SameSite=Lax** on session cookies (`src/middleware.ts`) and the OAuth state cookie (`src/pages/api/auth/google.ts`) — cross-site POSTs do not carry the session cookie, so authenticated endpoints are inherently protected
+- **Cloudflare Turnstile** on every unauthenticated public POST form (signup, forgot-password, contact, disputes, bug-reports)
+- **Astro `security.checkOrigin`** (default `true` for SSR) — rejects cross-origin form-content-type POSTs
+
+**Important caveat:** `checkOrigin` does NOT cover `application/json` POSTs. `/api/disputes` accepts JSON, so its CSRF protection is Turnstile + rate limit + Phase 17 content-type guard, NOT checkOrigin. When adding a new JSON-accepting endpoint, ensure these three controls are wired.
+
+Full audit: `.planning/audits/csrf-2026-04.md`. Re-audit triggers: Astro major version upgrade, Lucia replacement, new OAuth provider, or new non-form content-type endpoint.
+
 ## Common Mistakes to Avoid
 
 1. **Don't use `datetime('now')`** - Use `unixepoch()` for timestamps
@@ -217,6 +277,8 @@ When adding new endpoints:
 3. **Don't modify scoring without documentation** - Update methodology page
 4. **Don't use `any` types** - Define interfaces in `types.ts`
 5. **Don't put business logic in components** - Use `lib/` files
+6. **Don't deploy without running `/qa`** - The QA process exists for a reason
+7. **Don't assume one page is the only place data appears** - Always check all views that show the same data
 
 ## Git Workflow
 
