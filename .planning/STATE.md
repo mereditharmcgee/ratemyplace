@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: planning
-stopped_at: Completed 17-00-PLAN.md
-last_updated: "2026-04-28T16:40:51.861Z"
+stopped_at: Completed 17-01-PLAN.md
+last_updated: "2026-04-28T16:45:00.460Z"
 last_activity: 2026-04-27 — Roadmap created, phases 16-21 defined, 24/24 requirements mapped
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -53,6 +53,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 16 P01 | 2 | 3 tasks | 4 files |
 | Phase 16 P02 | 10 | 3 tasks | 60 files |
 | Phase 17 P00 | 2 | 2 tasks | 2 files |
+| Phase 17-public-endpoint-security P01 | 1 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,9 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 16]: 16-01 + 16-02 ship as one atomic unit — INFRA-03 complete, safe to deploy after 16-02
 - [Phase 17]: Wave 0 scaffolding only — no production code touched. RED state intentional per Nyquist rule.
 - [Phase 17]: Reserved review IDs review-080/081/082 for Phase 17 E2E dispute tests (existing: review-030/040/060/070)
+- [Phase 17]: isValidEmail uses pragmatic regex rejecting 'notanemail', accepting 'a@b.c' (locked per CONTEXT.md)
+- [Phase 17]: escapeLikePattern escapes backslash first then % and _ to prevent double-escaping SQL LIKE wildcards
+- [Phase 17]: Sanitization stays at endpoint after validation — validators are pure (locked per CONTEXT.md)
 
 ### Pending Todos
 
@@ -83,8 +87,8 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-04-28T16:40:51.859Z
-Stopped at: Completed 17-00-PLAN.md
+Last session: 2026-04-28T16:45:00.457Z
+Stopped at: Completed 17-01-PLAN.md
 Resume file: None
 
 ---
