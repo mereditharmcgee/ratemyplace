@@ -2,18 +2,27 @@ import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../lib/db';
 import { getEnv } from '../../lib/runtime';
 import { extractReviewIdFromUrl } from '../../lib/disputes';
-import { sanitizeText } from '../../lib/validation';
+import { sanitizeText, validateDisputeForm } from '../../lib/validation';
 import { sendDisputeConfirmationEmail } from '../../lib/email';
 import { checkRateLimit, getClientIP } from '../../lib/rateLimit';
 import { createNotification } from '../../lib/notifications';
 
 export const POST: APIRoute = async (context: APIContext) => {
+  // Content-type guard — MUST come before request.json() (which throws SyntaxError on non-JSON)
+  const contentType = context.request.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    return new Response(JSON.stringify({ error: 'Unsupported Media Type' }), {
+      status: 415,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
   const { request } = context;
   try {
     const db = getDB(context);
 
     // Rate limiting: 3 dispute submissions per hour per IP
-    const clientIP = getClientIP({ request });
+    const clientIP = getClientIP(context);
     const rateLimit = await checkRateLimit(db, clientIP, 'dispute', 3, 3600);
 
     if (!rateLimit.allowed) {
@@ -38,17 +47,27 @@ export const POST: APIRoute = async (context: APIContext) => {
       disputeExplanation,
     } = body;
 
-    // Validate required fields
-    if (!reviewUrl || !landlordName || !landlordEmail || !landlordPhone || !disputeReasons) {
+    // VAL-01: validate landlord fields and explanation length
+    const errors = validateDisputeForm(body);
+    if (errors.length > 0) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields' }),
+        JSON.stringify({ error: 'Validation failed', details: errors }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
+    // reviewUrl is NOT in validateDisputeForm — it's a business-logic field validated below
+    if (!reviewUrl || typeof reviewUrl !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'Validation failed', details: [{ field: 'reviewUrl', message: 'Review URL is required.' }] }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // disputeReasons stays as inline business-logic check (it's an array, not a form field value)
     if (!Array.isArray(disputeReasons) || disputeReasons.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'At least one dispute reason is required' }),
+        JSON.stringify({ error: 'Validation failed', details: [{ field: 'disputeReasons', message: 'At least one dispute reason is required.' }] }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
