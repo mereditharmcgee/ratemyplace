@@ -260,3 +260,148 @@ test.describe('XSS Prevention (SEC-08)', () => {
     expect(xssFired).toBeUndefined();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 17: Public Endpoint Security
+// Reserved review IDs for this block: review-080, review-081, review-082
+// (Do NOT reuse these IDs in other test blocks — see clearSecurityTestDisputes
+//  for the existing review-030/040/060/070 reservations.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('Phase 17: Public Endpoint Security', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test.beforeEach(() => {
+    clearRateLimits();
+  });
+
+  // ─── SEC-04: bug-reports rate limit ───
+  test('SEC-04: 6th /api/bug-reports POST in 1hr returns 429 with Retry-After', async ({ request }) => {
+    test.setTimeout(60000);
+    // 5 successful posts (rate limit allows 5/hr)
+    for (let i = 0; i < 5; i++) {
+      const res = await request.post('/api/bug-reports', {
+        multipart: {
+          'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX',
+          description: `bug report number ${i} with enough characters to pass length check`,
+          category: 'bug',
+        },
+        headers: { Origin: BASE_URL },
+      });
+      // Note: status may be 200 or 400 (Turnstile fails in test env), but rate limit MUST count attempts
+      expect([200, 400]).toContain(res.status());
+    }
+    // 6th attempt — must be 429
+    const sixth = await request.post('/api/bug-reports', {
+      multipart: {
+        'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX',
+        description: 'sixth attempt should be rate-limited',
+        category: 'bug',
+      },
+      headers: { Origin: BASE_URL },
+    });
+    expect(sixth.status()).toBe(429);
+    expect(sixth.headers()['retry-after']).toBeDefined();
+    expect(Number(sixth.headers()['retry-after'])).toBeGreaterThan(0);
+  });
+
+  // ─── SEC-05: search/results rate limit ───
+  test('SEC-05: 61st /api/search/results GET in 1min returns 429 with Retry-After', async ({ request }) => {
+    test.setTimeout(120000);
+    for (let i = 0; i < 60; i++) {
+      const res = await request.get('/api/search/results?q=test');
+      expect([200, 500]).toContain(res.status());
+    }
+    const overflow = await request.get('/api/search/results?q=test');
+    expect(overflow.status()).toBe(429);
+    expect(overflow.headers()['retry-after']).toBeDefined();
+  });
+
+  // ─── SEC-05: search/autocomplete rate limit ───
+  test('SEC-05: 121st /api/search/autocomplete GET in 1min returns 429', async ({ request }) => {
+    test.setTimeout(180000);
+    for (let i = 0; i < 120; i++) {
+      const res = await request.get('/api/search/autocomplete?q=ab');
+      expect([200, 500]).toContain(res.status());
+    }
+    const overflow = await request.get('/api/search/autocomplete?q=ab');
+    expect(overflow.status()).toBe(429);
+    expect(overflow.headers()['retry-after']).toBeDefined();
+  });
+
+  // ─── VAL-01 + content-type guard: disputes ───
+  test('VAL-01: POST /api/disputes with text/plain returns 415', async ({ request }) => {
+    const res = await request.post('/api/disputes', {
+      data: 'not json',
+      headers: { 'Content-Type': 'text/plain', Origin: BASE_URL },
+    });
+    expect(res.status()).toBe(415);
+  });
+
+  // ─── VAL-01: dispute landlordEmail format ───
+  test('VAL-01: POST /api/disputes with landlordEmail "notanemail" returns 400 with field error', async ({ request }) => {
+    const res = await request.post('/api/disputes', {
+      data: makeDisputePayload('review-080', 'a valid explanation'),
+      // override email to bad value
+      headers: { 'Content-Type': 'application/json', Origin: BASE_URL },
+    });
+    // Re-issue with explicit bad email (makeDisputePayload generates valid email)
+    const badRes = await request.post('/api/disputes', {
+      data: { ...makeDisputePayload('review-081', 'a valid explanation'), landlordEmail: 'notanemail' },
+      headers: { 'Content-Type': 'application/json', Origin: BASE_URL },
+    });
+    expect(badRes.status()).toBe(400);
+    const body = await badRes.json();
+    expect(body.error).toBe('Validation failed');
+    expect(Array.isArray(body.details)).toBe(true);
+    expect(body.details.some((d: any) => d.field === 'landlordEmail')).toBe(true);
+  });
+
+  // ─── VAL-01: dispute explanation length ───
+  test('VAL-01: POST /api/disputes with disputeExplanation > 5000 chars returns 400', async ({ request }) => {
+    const res = await request.post('/api/disputes', {
+      data: makeDisputePayload('review-082', 'a'.repeat(5001)),
+      headers: { 'Content-Type': 'application/json', Origin: BASE_URL },
+    });
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.details.some((d: any) => d.field === 'disputeExplanation')).toBe(true);
+  });
+
+  // ─── VAL-02 + content-type guard: bug-reports ───
+  test('VAL-02: POST /api/bug-reports with application/json returns 415', async ({ request }) => {
+    const res = await request.post('/api/bug-reports', {
+      data: { description: 'hello world long enough', category: 'bug' },
+      headers: { 'Content-Type': 'application/json', Origin: BASE_URL },
+    });
+    expect(res.status()).toBe(415);
+  });
+
+  // ─── VAL-03 + content-type guard: contact ───
+  test('VAL-03: POST /api/contact with application/json returns 415', async ({ request }) => {
+    const res = await request.post('/api/contact', {
+      data: { name: 'X', email: 'x@y.z', message: 'hello world long enough' },
+      headers: { 'Content-Type': 'application/json', Origin: BASE_URL },
+    });
+    expect(res.status()).toBe(415);
+  });
+
+  // ─── VAL-04: search query length cap ───
+  test('VAL-04: GET /api/search/results?q=<201 chars> returns 400', async ({ request }) => {
+    const longQuery = 'a'.repeat(201);
+    const res = await request.get(`/api/search/results?q=${encodeURIComponent(longQuery)}`);
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Validation failed');
+    expect(body.details.some((d: any) => d.field === 'q')).toBe(true);
+  });
+
+  // ─── VAL-04: SQL LIKE wildcard escape (literal % search) ───
+  test('VAL-04: GET /api/search/autocomplete?q=5%25 escapes % literal (does not error)', async ({ request }) => {
+    // Search for literal '5%' (URL-encoded as 5%25). Should return 200 with empty or matching results.
+    const res = await request.get('/api/search/autocomplete?q=5%25');
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body.results)).toBe(true);
+  });
+});
