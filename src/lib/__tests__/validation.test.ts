@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { validateReviewForm, sanitizeText } from '../validation';
+import {
+  validateReviewForm,
+  sanitizeText,
+  isValidEmail,
+  isValidZipCode,
+  enforceMaxLength,
+  escapeLikePattern,
+  validateDisputeForm,
+  validateBugReport,
+  validateContactForm,
+  validateSearch,
+} from '../validation';
 
 // ═══════════════════════════════════════════════════
 // validateReviewForm
@@ -230,5 +241,348 @@ describe('sanitizeText', () => {
 
   it('handles tabs and newlines', () => {
     expect(sanitizeText('hello\t\nworld')).toBe('hello world');
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// isValidEmail — VAL-05
+// ═══════════════════════════════════════════════════
+
+describe('isValidEmail', () => {
+  it('rejects "notanemail"', () => {
+    expect(isValidEmail('notanemail')).toBe(false);
+  });
+
+  it('rejects empty string', () => {
+    expect(isValidEmail('')).toBe(false);
+  });
+
+  it('rejects email with whitespace', () => {
+    expect(isValidEmail('a b@c.d')).toBe(false);
+    expect(isValidEmail('a@b. c')).toBe(false);
+  });
+
+  it('rejects email missing @', () => {
+    expect(isValidEmail('userexample.com')).toBe(false);
+  });
+
+  it('rejects email missing dot in domain', () => {
+    expect(isValidEmail('user@example')).toBe(false);
+  });
+
+  it('accepts standard email', () => {
+    expect(isValidEmail('user@example.com')).toBe(true);
+  });
+
+  it('accepts minimal valid email a@b.c', () => {
+    expect(isValidEmail('a@b.c')).toBe(true);
+  });
+
+  it('accepts email with subdomain', () => {
+    expect(isValidEmail('user@mail.example.com')).toBe(true);
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// isValidZipCode — VAL-05
+// ═══════════════════════════════════════════════════
+
+describe('isValidZipCode', () => {
+  it('accepts 5-digit zip', () => {
+    expect(isValidZipCode('02134')).toBe(true);
+  });
+
+  it('accepts 5+4 zip', () => {
+    expect(isValidZipCode('02134-5678')).toBe(true);
+  });
+
+  it('rejects 4-digit zip', () => {
+    expect(isValidZipCode('1234')).toBe(false);
+  });
+
+  it('rejects 6-digit zip', () => {
+    expect(isValidZipCode('123456')).toBe(false);
+  });
+
+  it('rejects letters in zip', () => {
+    expect(isValidZipCode('0213A')).toBe(false);
+  });
+
+  it('rejects empty string', () => {
+    expect(isValidZipCode('')).toBe(false);
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// enforceMaxLength — VAL-05
+// ═══════════════════════════════════════════════════
+
+describe('enforceMaxLength', () => {
+  it('returns null for value at exactly max length', () => {
+    expect(enforceMaxLength('a'.repeat(200), 200, 'name', 'Name')).toBeNull();
+  });
+
+  it('returns ValidationError for value one char over max', () => {
+    const result = enforceMaxLength('a'.repeat(201), 200, 'name', 'Name');
+    expect(result).not.toBeNull();
+    expect(result!.field).toBe('name');
+    expect(result!.message).toContain('200');
+  });
+
+  it('returns null for undefined value', () => {
+    expect(enforceMaxLength(undefined, 100, 'x', 'X')).toBeNull();
+  });
+
+  it('returns null for null value', () => {
+    expect(enforceMaxLength(null, 100, 'x', 'X')).toBeNull();
+  });
+
+  it('returns null for empty string', () => {
+    expect(enforceMaxLength('', 100, 'x', 'X')).toBeNull();
+  });
+
+  it('message references the human-readable label', () => {
+    const err = enforceMaxLength('a'.repeat(101), 100, 'description', 'Description');
+    expect(err).not.toBeNull();
+    expect(err!.message).toContain('Description');
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// escapeLikePattern — VAL-04
+// ═══════════════════════════════════════════════════
+
+describe('escapeLikePattern', () => {
+  it('escapes percent sign', () => {
+    // input: '5%'  expected: '5\\%'
+    expect(escapeLikePattern('5%')).toBe('5\\%');
+  });
+
+  it('escapes underscore', () => {
+    // input: 'a_b'  expected: 'a\\_b'
+    expect(escapeLikePattern('a_b')).toBe('a\\_b');
+  });
+
+  it('escapes backslash before wildcards (avoids double-escaping)', () => {
+    // input bytes: backslash + percent (\%)
+    // expected bytes: backslash backslash + backslash percent (\\\\%)
+    // As JS string literals: input = '\\%', expected = '\\\\\\%'
+    expect(escapeLikePattern('\\%')).toBe('\\\\\\%');
+  });
+
+  it('leaves non-special chars untouched', () => {
+    expect(escapeLikePattern('Hello World 123')).toBe('Hello World 123');
+  });
+
+  it('returns empty string for empty input', () => {
+    expect(escapeLikePattern('')).toBe('');
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// validateDisputeForm — VAL-01
+// ═══════════════════════════════════════════════════
+
+describe('validateDisputeForm', () => {
+  it('rejects "notanemail" as landlordEmail', () => {
+    const errors = validateDisputeForm({
+      landlordName: 'X', landlordEmail: 'notanemail', landlordPhone: '555',
+    });
+    expect(errors.some(e => e.field === 'landlordEmail')).toBe(true);
+  });
+
+  it('rejects disputeExplanation > 5000 chars', () => {
+    const errors = validateDisputeForm({
+      landlordName: 'X', landlordEmail: 'x@y.z', landlordPhone: '555',
+      disputeExplanation: 'a'.repeat(5001),
+    });
+    expect(errors.some(e => e.field === 'disputeExplanation')).toBe(true);
+  });
+
+  it('accepts disputeExplanation at exactly 5000 chars', () => {
+    const errors = validateDisputeForm({
+      landlordName: 'X', landlordEmail: 'x@y.z', landlordPhone: '555',
+      disputeExplanation: 'a'.repeat(5000),
+    });
+    expect(errors.some(e => e.field === 'disputeExplanation')).toBe(false);
+  });
+
+  it('rejects landlordName > 200 chars', () => {
+    const errors = validateDisputeForm({
+      landlordName: 'a'.repeat(201), landlordEmail: 'x@y.z', landlordPhone: '555',
+    });
+    expect(errors.some(e => e.field === 'landlordName')).toBe(true);
+  });
+
+  it('rejects landlordPhone > 30 chars', () => {
+    const errors = validateDisputeForm({
+      landlordName: 'X', landlordEmail: 'x@y.z', landlordPhone: 'a'.repeat(31),
+    });
+    expect(errors.some(e => e.field === 'landlordPhone')).toBe(true);
+  });
+
+  it('requires landlordName', () => {
+    const errors = validateDisputeForm({
+      landlordName: '', landlordEmail: 'x@y.z', landlordPhone: '555',
+    });
+    expect(errors.some(e => e.field === 'landlordName')).toBe(true);
+  });
+
+  it('requires landlordEmail', () => {
+    const errors = validateDisputeForm({
+      landlordName: 'X', landlordEmail: '', landlordPhone: '555',
+    });
+    expect(errors.some(e => e.field === 'landlordEmail')).toBe(true);
+  });
+
+  it('requires landlordPhone', () => {
+    const errors = validateDisputeForm({
+      landlordName: 'X', landlordEmail: 'x@y.z', landlordPhone: '',
+    });
+    expect(errors.some(e => e.field === 'landlordPhone')).toBe(true);
+  });
+
+  it('returns no errors for valid input', () => {
+    const errors = validateDisputeForm({
+      landlordName: 'Test Landlord', landlordEmail: 'landlord@example.com', landlordPhone: '555-1234',
+    });
+    expect(errors).toHaveLength(0);
+  });
+
+  it('collects all errors instead of short-circuiting', () => {
+    const errors = validateDisputeForm({
+      landlordName: '', landlordEmail: 'notanemail', landlordPhone: '',
+    });
+    expect(errors.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// validateBugReport — VAL-02
+// ═══════════════════════════════════════════════════
+
+describe('validateBugReport', () => {
+  it('rejects description shorter than 10 chars', () => {
+    const errors = validateBugReport({ description: 'short', category: 'bug' });
+    expect(errors.some(e => e.field === 'description')).toBe(true);
+  });
+
+  it('rejects description > 5000 chars', () => {
+    const errors = validateBugReport({ description: 'a'.repeat(5001), category: 'bug' });
+    expect(errors.some(e => e.field === 'description')).toBe(true);
+  });
+
+  it('rejects email with bad format when provided', () => {
+    const errors = validateBugReport({
+      email: 'notanemail',
+      description: 'long enough description here',
+      category: 'bug',
+    });
+    expect(errors.some(e => e.field === 'email')).toBe(true);
+  });
+
+  it('allows missing email (email is optional)', () => {
+    const errors = validateBugReport({ description: 'long enough description here', category: 'bug' });
+    expect(errors.some(e => e.field === 'email')).toBe(false);
+  });
+
+  it('rejects url > 2000 chars', () => {
+    const errors = validateBugReport({
+      description: 'long enough description here',
+      url: 'a'.repeat(2001),
+    });
+    expect(errors.some(e => e.field === 'url')).toBe(true);
+  });
+
+  it('returns no errors for valid input', () => {
+    const errors = validateBugReport({ description: 'long enough description here', category: 'bug' });
+    expect(errors).toHaveLength(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// validateContactForm — VAL-03
+// ═══════════════════════════════════════════════════
+
+describe('validateContactForm', () => {
+  it('rejects "notanemail" as email', () => {
+    const errors = validateContactForm({
+      name: 'Alice', email: 'notanemail', category: 'general', message: 'hello world long enough',
+    });
+    expect(errors.some(e => e.field === 'email')).toBe(true);
+  });
+
+  it('requires email', () => {
+    const errors = validateContactForm({
+      name: 'Alice', email: '', category: 'general', message: 'hello world long enough',
+    });
+    expect(errors.some(e => e.field === 'email')).toBe(true);
+  });
+
+  it('requires name 2-100 chars', () => {
+    const shortErrors = validateContactForm({
+      name: 'A', email: 'alice@example.com', category: 'general', message: 'hello world long enough',
+    });
+    expect(shortErrors.some(e => e.field === 'name')).toBe(true);
+
+    const longErrors = validateContactForm({
+      name: 'A'.repeat(101), email: 'alice@example.com', category: 'general', message: 'hello world long enough',
+    });
+    expect(longErrors.some(e => e.field === 'name')).toBe(true);
+  });
+
+  it('requires message 10-3000 chars', () => {
+    const shortErrors = validateContactForm({
+      name: 'Alice', email: 'alice@example.com', category: 'general', message: 'short',
+    });
+    expect(shortErrors.some(e => e.field === 'message')).toBe(true);
+
+    const longErrors = validateContactForm({
+      name: 'Alice', email: 'alice@example.com', category: 'general', message: 'a'.repeat(3001),
+    });
+    expect(longErrors.some(e => e.field === 'message')).toBe(true);
+  });
+
+  it('returns no errors for valid input', () => {
+    const errors = validateContactForm({
+      name: 'Alice',
+      email: 'alice@example.com',
+      category: 'general',
+      message: 'a'.repeat(20),
+    });
+    expect(errors).toHaveLength(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// validateSearch — VAL-04
+// ═══════════════════════════════════════════════════
+
+describe('validateSearch', () => {
+  it('rejects query > 200 chars (after trim)', () => {
+    const errors = validateSearch('a'.repeat(201));
+    expect(errors.some(e => e.field === 'q')).toBe(true);
+  });
+
+  it('accepts query at exactly 200 chars', () => {
+    const errors = validateSearch('a'.repeat(200));
+    expect(errors).toHaveLength(0);
+  });
+
+  it('allows empty query (browse-all use case)', () => {
+    expect(validateSearch('')).toHaveLength(0);
+    expect(validateSearch(null)).toHaveLength(0);
+  });
+
+  it('trims whitespace before length check', () => {
+    // 50 spaces + 200 a's + 50 spaces — trimmed length is 200, should pass
+    const errors = validateSearch(' '.repeat(50) + 'a'.repeat(200) + ' '.repeat(50));
+    expect(errors).toHaveLength(0);
+  });
+
+  it('rejects query that is 201 chars after trim', () => {
+    // 1 leading space + 201 a's + 1 trailing space — trimmed length is 201
+    const errors = validateSearch(' ' + 'a'.repeat(201) + ' ');
+    expect(errors.some(e => e.field === 'q')).toBe(true);
   });
 });
