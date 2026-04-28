@@ -3,6 +3,11 @@ import { initializeLucia } from './lib/auth';
 import { getDB } from './lib/db';
 
 export const onRequest = defineMiddleware(async (context, next) => {
+  // CSRF audit (2026-04-28): see .planning/audits/csrf-2026-04.md
+  // Verdict: SameSite=Lax session cookie + Cloudflare Turnstile + Astro checkOrigin sufficient.
+  // No token-based CSRF implementation required.
+  // Note: checkOrigin does NOT cover application/json — disputes.ts relies on Turnstile + rate limit + content-type guard.
+
   // Set default auth state
   context.locals.user = null;
   context.locals.session = null;
