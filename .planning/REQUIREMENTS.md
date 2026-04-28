@@ -34,10 +34,10 @@ Hardening pass. No new user-facing features. Closes security, validation, perfor
 
 ### Performance
 
-- [ ] **PERF-01**: `/api/auth/signup` converted to `ctx.waitUntil(emailPromise.catch(logError))` with null guard for local Wrangler dev
-- [ ] **PERF-02**: `/api/auth/forgot-password` converted to `waitUntil` with null guard
-- [ ] **PERF-03**: `/api/contact` converted to `waitUntil` (admin notification email)
-- [ ] **PERF-04**: `/api/disputes` converted to `waitUntil` (landlord confirmation email)
+- [x] **PERF-01**: `/api/auth/signup` converted to `ctx.waitUntil(emailPromise.catch(logError))` with null guard for local Wrangler dev
+- [x] **PERF-02**: `/api/auth/forgot-password` converted to `waitUntil` with null guard
+- [x] **PERF-03**: `/api/contact` converted to `waitUntil` (admin notification email)
+- [x] **PERF-04**: `/api/disputes` converted to `waitUntil` (landlord confirmation email)
 - [ ] **PERF-05**: D1 query plans audited via `EXPLAIN QUERY PLAN` for search joins, rate-limit lookups, and any other hot paths
 - [ ] **PERF-06**: Composite index `reviews(building_id, status)` added (verified necessary by audit in PERF-05)
 - [ ] **PERF-07**: Additional indexes on `buildings(city)` and `buildings(building_type)` added if `EXPLAIN QUERY PLAN` shows full scans on filter queries
@@ -106,10 +106,10 @@ Updated by gsd-roadmapper after roadmap creation.
 | VAL-03 | Phase 17 | Complete |
 | VAL-04 | Phase 17 | Complete |
 | VAL-05 | Phase 17 | Complete |
-| PERF-01 | Phase 18 | Pending |
-| PERF-02 | Phase 18 | Pending |
-| PERF-03 | Phase 18 | Pending |
-| PERF-04 | Phase 18 | Pending |
+| PERF-01 | Phase 18 | Complete |
+| PERF-02 | Phase 18 | Complete |
+| PERF-03 | Phase 18 | Complete |
+| PERF-04 | Phase 18 | Complete |
 | PERF-05 | Phase 19 | Pending |
 | PERF-06 | Phase 19 | Pending |
 | PERF-07 | Phase 19 | Pending |
