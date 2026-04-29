@@ -130,11 +130,11 @@ Plans:
   1. `EXPLAIN QUERY PLAN` output for the primary search join (`reviews JOIN buildings WHERE status = 'approved'`) shows an index scan rather than a full scan — confirmed before migration SQL is written
   2. The composite index `reviews(building_id, status)` is present in the production schema (verified via `PRAGMA index_list('reviews')`)
   3. Indexes on `buildings(city)` and `buildings(building_type)` are present if `EXPLAIN QUERY PLAN` on the filter queries showed full scans — or those indexes are explicitly skipped with the `EXPLAIN QUERY PLAN` output attached to the migration file comment
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 19-01: Run EXPLAIN QUERY PLAN audit on search joins, rate-limit lookups, and filter queries; document findings
-- [ ] 19-02: Write and apply migration adding confirmed-necessary indexes; verify with post-migration EXPLAIN QUERY PLAN
+- [ ] 19-01-PLAN.md — Run EXPLAIN QUERY PLAN audit against production D1 for the 5 hot-path queries; write .planning/audits/d1-indexes-2026-04-28.md with per-query evidence and add/skip decisions (PERF-05 evidence, PERF-07 verdict)
+- [ ] 19-02-PLAN.md — Write migrations/0024_perf_indexes.sql per audit decisions, apply local-then-remote with PRAGMA optimize, populate after-state EXPLAIN sections in audit doc (PERF-06 ships, PERF-05/PERF-07 finalized)
 
 ### Phase 20: Critical-Flow E2E Coverage
 **Goal**: The two highest-priority E2E gaps are closed — admin moderation has a causal audit-log assertion and cross-view data consistency is verified end-to-end
@@ -189,7 +189,7 @@ Phases 16 → 17 and 18 and 19 (parallel after 16) → 20 → 21
 | 16. Typed Runtime Foundation | 2/2 | Complete    | 2026-04-27 | - |
 | 17. Public Endpoint Security | 3/3 | Complete    | 2026-04-28 | - |
 | 18. CSRF Audit and Async Email | 4/4 | Complete    | 2026-04-28 | - |
-| 19. D1 Index Migration | v1.5.0 | 0/2 | Not started | - |
+| 19. D1 Index Migration | 1/2 | In Progress|  | - |
 | 20. Critical-Flow E2E Coverage | v1.5.0 | 0/2 | Not started | - |
 | 21. Quality Cleanup | v1.5.0 | 0/2 | Not started | - |
 

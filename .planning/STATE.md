@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: planning
-stopped_at: Phase 19 context gathered
-last_updated: "2026-04-28T20:41:33.905Z"
+stopped_at: Completed 19-d1-index-migration 19-01-PLAN.md
+last_updated: "2026-04-29T00:36:19.241Z"
 last_activity: 2026-04-27 — Roadmap created, phases 16-21 defined, 24/24 requirements mapped
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 11
+  completed_plans: 10
   percent: 0
 ---
 
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 18-csrf-audit-and-async-email P03 | 3 | 3 tasks | 3 files |
 | Phase 18-csrf-audit-and-async-email P01 | 1 | 1 tasks | 1 files |
 | Phase 18-csrf-audit-and-async-email P02 | 20 | 3 tasks | 6 files |
+| Phase 19-d1-index-migration P01 | 8 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,10 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 18-csrf-audit-and-async-email]: recipient_hash NOT in fireAndForget logError — generic helper; call sites add it per CONTEXT.md
 - [Phase 18-csrf-audit-and-async-email]: resend-verification.ts behavior change: 500 on email failure removed; always returns 200 — token is in DB, user retries via resend button
 - [Phase 18-csrf-audit-and-async-email]: disputes.ts if (resendApiKey) guard preserved — cheap, defensive, removing it is out of scope per CONTEXT.md
+- [Phase 19-d1-index-migration]: idx_reviews_building_status composite add confirmed — planner uses idx_reviews_status alone on all 3 search join queries; composite satisfies both building_id and status predicates in one lookup
+- [Phase 19-d1-index-migration]: idx_rate_limits_key_created skipped — SEARCH USING INDEX idx_rate_limits_key already covers equality predicate; created_at filter runs on at most ~60 in-memory rows per window
+- [Phase 19-d1-index-migration]: idx_buildings_city and idx_buildings_building_type skipped — grep confirms zero SELECT WHERE on these columns in src/; PERF-07 not applicable
+- [Phase 19-d1-index-migration]: Wrangler heredoc pattern fails on Windows bash; workaround: write SQL to /tmp/q.sql then use --command "$(cat /tmp/q.sql)"
 
 ### Pending Todos
 
@@ -102,9 +107,9 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-04-28T20:41:33.902Z
-Stopped at: Phase 19 context gathered
-Resume file: .planning/phases/19-d1-index-migration/19-CONTEXT.md
+Last session: 2026-04-29T00:36:19.236Z
+Stopped at: Completed 19-d1-index-migration 19-01-PLAN.md
+Resume file: None
 
 ---
 *State updated: 2026-04-27 — v1.5.0 roadmap created*

@@ -38,9 +38,9 @@ Hardening pass. No new user-facing features. Closes security, validation, perfor
 - [x] **PERF-02**: `/api/auth/forgot-password` converted to `waitUntil` with null guard
 - [x] **PERF-03**: `/api/contact` converted to `waitUntil` (admin notification email)
 - [x] **PERF-04**: `/api/disputes` converted to `waitUntil` (landlord confirmation email)
-- [ ] **PERF-05**: D1 query plans audited via `EXPLAIN QUERY PLAN` for search joins, rate-limit lookups, and any other hot paths
+- [x] **PERF-05**: D1 query plans audited via `EXPLAIN QUERY PLAN` for search joins, rate-limit lookups, and any other hot paths
 - [ ] **PERF-06**: Composite index `reviews(building_id, status)` added (verified necessary by audit in PERF-05)
-- [ ] **PERF-07**: Additional indexes on `buildings(city)` and `buildings(building_type)` added if `EXPLAIN QUERY PLAN` shows full scans on filter queries
+- [x] **PERF-07**: Additional indexes on `buildings(city)` and `buildings(building_type)` added if `EXPLAIN QUERY PLAN` shows full scans on filter queries
 
 ### Testing
 
@@ -110,9 +110,9 @@ Updated by gsd-roadmapper after roadmap creation.
 | PERF-02 | Phase 18 | Complete |
 | PERF-03 | Phase 18 | Complete |
 | PERF-04 | Phase 18 | Complete |
-| PERF-05 | Phase 19 | Pending |
+| PERF-05 | Phase 19 | Complete |
 | PERF-06 | Phase 19 | Pending |
-| PERF-07 | Phase 19 | Pending |
+| PERF-07 | Phase 19 | Complete |
 | TEST-01 | Phase 20 | Pending |
 | TEST-02 | Phase 20 | Pending |
 | TEST-03 | Phase 20 | Pending |
