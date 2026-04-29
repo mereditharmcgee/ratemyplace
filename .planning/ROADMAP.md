@@ -144,11 +144,11 @@ Plans:
   1. An E2E test captures a `review_id` before triggering admin approval, then asserts that a specific `audit_logs` entry with `action_type = 'review_approved'` and that `entity_id` exists — the assertion is not ordering-dependent
   2. An E2E test submits a review, triggers admin approval, then verifies the `overall_score` matches across `/api/search/results`, `/building/[slug]`, and `/profile` — any divergence fails the test
   3. `clearRateLimits()` is defined once in `e2e/fixtures.ts` and imported by both `security.spec.ts` and any new spec that needs it — no duplication
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 20-01: Extract clearRateLimits helper to e2e/fixtures.ts; write causal audit-log E2E test for admin moderation flow
-- [ ] 20-02: Write cross-view data consistency E2E test (submit → approve → verify score on search, building detail, profile)
+- [ ] 20-01-PLAN.md — Extract clearRateLimits to e2e/fixtures.ts (TEST-03), seed building-e2e-01, write TEST-01 causal audit-log E2E in e2e/critical-flows.spec.ts
+- [ ] 20-02-PLAN.md — Add TEST-02 cross-view consistency E2E (search vs building detail vs profile) to e2e/critical-flows.spec.ts
 
 ### Phase 21: Quality Cleanup
 **Goal**: Rate-limit response headers are consistent across all endpoints and a shared EmptyState component replaces ad-hoc empty-state messaging
