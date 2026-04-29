@@ -45,7 +45,7 @@ Hardening pass. No new user-facing features. Closes security, validation, perfor
 ### Testing
 
 - [x] **TEST-01**: E2E test for admin moderation flow with **causal** audit-log assertion (capture `review_id` before approve action, assert specific entry exists in `audit_logs` after — not ordering-dependent)
-- [ ] **TEST-02**: E2E test for cross-view data consistency: submit review → admin approve → assert `overall_score` matches across `/api/search/results`, `/building/[slug]`, and `/profile`
+- [x] **TEST-02**: E2E test for cross-view data consistency: submit review → admin approve → assert `overall_score` matches across `/api/search/results`, `/building/[slug]`, and `/profile`
 - [x] **TEST-03**: `clearRateLimits()` helper extracted from `security.spec.ts` into `e2e/fixtures.ts` for cross-spec reuse
 
 ### UX Consistency
@@ -114,7 +114,7 @@ Updated by gsd-roadmapper after roadmap creation.
 | PERF-06 | Phase 19 | Complete |
 | PERF-07 | Phase 19 | Complete |
 | TEST-01 | Phase 20 | Complete |
-| TEST-02 | Phase 20 | Pending |
+| TEST-02 | Phase 20 | Complete |
 | TEST-03 | Phase 20 | Complete |
 | UX-01 | Phase 21 | Pending |
 

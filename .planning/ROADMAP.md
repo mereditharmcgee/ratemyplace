@@ -68,7 +68,7 @@ See: `.planning/milestones/v1.4.0-ROADMAP.md`
 - [x] **Phase 17: Public Endpoint Security** — Rate limiting and input validation on all unprotected public POST and search endpoints (completed 2026-04-28)
 - [x] **Phase 18: CSRF Audit and Async Email** — Document CSRF posture and convert blocking email sends to fire-and-forget (completed 2026-04-28)
 - [x] **Phase 19: D1 Index Migration** — Audit query plans and add missing indexes to eliminate full-table scans on hot paths (completed 2026-04-29)
-- [ ] **Phase 20: Critical-Flow E2E Coverage** — Causal audit-log assertion and cross-view data consistency test coverage
+- [x] **Phase 20: Critical-Flow E2E Coverage** — Causal audit-log assertion and cross-view data consistency test coverage (completed 2026-04-29)
 - [ ] **Phase 21: Quality Cleanup** — Response header consistency, shared EmptyState component
 
 ## Phase Details
@@ -190,7 +190,7 @@ Phases 16 → 17 and 18 and 19 (parallel after 16) → 20 → 21
 | 17. Public Endpoint Security | 3/3 | Complete    | 2026-04-28 | - |
 | 18. CSRF Audit and Async Email | 4/4 | Complete    | 2026-04-28 | - |
 | 19. D1 Index Migration | 2/2 | Complete    | 2026-04-29 | - |
-| 20. Critical-Flow E2E Coverage | 1/2 | In Progress|  | - |
+| 20. Critical-Flow E2E Coverage | 2/2 | Complete   | 2026-04-29 | - |
 | 21. Quality Cleanup | v1.5.0 | 0/2 | Not started | - |
 
 ---
