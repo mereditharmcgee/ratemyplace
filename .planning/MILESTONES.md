@@ -1,4 +1,47 @@
 # Milestones: RateMyPlace Boston
+## v1.5.0 Closed Loops (Shipped: 2026-04-29)
+
+**Phases:** 6 (16-21) | **Plans:** 15 | **Timeline:** 3 days (2026-04-27 → 2026-04-29)
+
+### Delivered
+
+Hardening pass with no new user-facing features — closed the security, validation, performance, and quality-debt gaps surfaced by the post-brand codebase audit. 24 requirements across infrastructure, security, validation, performance, testing, and UX consistency.
+
+### Key Accomplishments
+
+1. Typed Cloudflare runtime — all 6 Pages secrets declared in `App.Platform.env`, 89 unsafe `(context.locals as any).runtime` casts eliminated across 60 files in one batch
+2. Public endpoint hardening — rate limiting + content-type guards + length-bounded validators on `/api/bug-reports` (5/hr), `/api/contact`, `/api/disputes`, `/api/search/results` (60/min), `/api/search/autocomplete` (120/min); shared validation primitives (`isValidEmail`, `enforceMaxLength`, `escapeLikePattern`)
+3. CSRF audit closed as no-token-required — SameSite=Lax + Turnstile + Astro `checkOrigin` ratified at `.planning/audits/csrf-2026-04.md`, with explicit `application/json` caveat documented across audit, middleware, and CLAUDE.md
+4. Async email sends — all 5 blocking `await sendXxxEmail` call sites converted to `fireAndForget(context, ...)` with `ctx.waitUntil`; users no longer wait on Resend latency
+5. D1 hot-path indexing — composite `idx_reviews_building_status` added (verified via live production EXPLAIN); 3 unnecessary indexes documented as skipped with grep evidence
+6. Critical-flow E2E coverage — causal audit-log assertion (capture review_id before approve, query by entity_id) and exact cross-view score equality (search ↔ detail ↔ profile)
+7. Header consistency — `Retry-After`, `X-RateLimit-Limit`, and `X-RateLimit-Remaining` standardized across all 9 rate-limited endpoints via shared `buildRateLimitHeaders` helper
+8. Shared `<EmptyState>` component — `.astro` + `.tsx` byte-identical twins, 6 ad-hoc empty-state strings replaced across 4 surfaces
+
+### Tech Debt (accepted, not blocking)
+
+- `src/pages/api/disputes/[id].ts` admin update retains blocking `await sendDisputeUpheldEmail` (deferred to v1.6.0)
+- `signup.ts` still uses inline `email.includes('@')` rather than VAL-05 `isValidEmail` primitive
+- Duplicate `validateDisputeForm` symbol in `src/lib/disputes.ts` (test-only consumer)
+- `isValidZipCode` exported but no production consumer (intentional future-proofing)
+- 400/500 paths after rate-limit check don't carry rate-limit headers (within SEC-08 acceptance scope)
+- SUMMARY frontmatter `requirements-completed` missing INFRA-01..03, SEC-06, SEC-07, SEC-08 (metadata only)
+
+### Stats
+
+- Codebase: ~28,000 LOC (TypeScript/TSX/Astro), 18 unit test files
+- Migrations: 24 (added 0024_perf_indexes.sql)
+- Requirements completed: 24/24
+- Audit status: tech_debt (no blockers)
+
+### Archive
+
+- Roadmap: `.planning/milestones/v1.5.0-ROADMAP.md`
+- Requirements: `.planning/milestones/v1.5.0-REQUIREMENTS.md`
+- Audit: `.planning/milestones/v1.5.0-MILESTONE-AUDIT.md`
+
+---
+
 ## v1.4.0 Open Doors (Shipped: 2026-03-22)
 
 **Phases completed:** 6 phases, 13 plans, 4 tasks

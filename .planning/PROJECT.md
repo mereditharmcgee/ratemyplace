@@ -38,18 +38,22 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 - ✓ Tenant dashboard: review status, account settings, notifications — v1.4.0
 - ✓ Saved buildings with bookmark button — v1.4.0
 - ✓ Verification UX with post-submission prompt and visual distinction — v1.4.0
+- ✓ Typed Cloudflare runtime wrapper (89 `as any` casts eliminated) — v1.5.0
+- ✓ Rate limiting and input validation on all public POST endpoints — v1.5.0
+- ✓ CSRF protection audit (SameSite=Lax + Turnstile + checkOrigin sufficient) — v1.5.0
+- ✓ Async email send pattern (fireAndForget with ctx.waitUntil) — v1.5.0
+- ✓ D1 hot-path index migration (idx_reviews_building_status) — v1.5.0
+- ✓ Admin moderation flow E2E with causal audit-log assertion — v1.5.0
+- ✓ Cross-view data consistency E2E (search ↔ detail ↔ profile) — v1.5.0
+- ✓ Standardized rate-limit response headers (Retry-After, X-RateLimit-*) — v1.5.0
+- ✓ Shared EmptyState component for consistent messaging — v1.5.0
 
 ### Active
 
-- [ ] Rate limiting and input validation on all public POST endpoints
-- [ ] CSRF protection audit and remediation
-- [ ] Admin moderation flow E2E test coverage
-- [ ] Cross-view data consistency E2E coverage
-- [ ] Async email send pattern (fire-and-forget)
-- [ ] D1 search-filter index audit
-- [ ] Component refactors (3 files >700 LOC)
-- [ ] Typed Cloudflare runtime wrapper to retire `(context.locals as any).runtime` casts
-- [ ] Shared EmptyState component for consistent messaging
+- [ ] Component refactors (3 files >700 LOC: ReviewEditForm, BuildingsTable, ReviewsTable)
+- [ ] Convert admin dispute-upheld email to fireAndForget (`disputes/[id].ts` follow-up from v1.5.0)
+- [ ] Apply `isValidEmail` primitive to signup.ts (consistency follow-up)
+- [ ] Email unsubscribe management before scaling notification emails
 
 ### Out of Scope
 
@@ -60,36 +64,25 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 - Email unsubscribe management — track in v1.5.0 before scaling notification emails
 - Stress testing — deferred from v1.3.0, lower priority than user-facing features
 
-## Current Milestone: v1.5.0 "Closed Loops"
+## Latest Shipped: v1.5.0 "Closed Loops" (2026-04-29)
 
-**Goal:** Close the security, validation, and quality-debt gaps surfaced by the post-brand codebase audit. Harden public endpoints, fill critical-flow test coverage, and reduce maintenance debt accumulated through v1.4.0.
+**Delivered:** Hardening pass with no new user-facing features. 24 requirements across infrastructure, security, validation, performance, testing, and UX consistency — typed Cloudflare runtime, rate-limited and validated public endpoints, CSRF audit ratified, async email sends, indexed search joins, causal E2E coverage, header consistency, and shared EmptyState component.
 
-**Target features:**
-- Rate limiting + input validation across all public POST endpoints (`/api/contacts`, `/api/bug-reports`, `/api/disputes`, `/api/search`)
-- CSRF protection audit (Lucia/Astro defaults) with token + SameSite remediation if gaps found
-- E2E coverage for admin moderation flow with audit-log assertion
-- E2E coverage for cross-view data consistency (review created → search/profile/detail all updated)
-- Email sends switched to fire-and-forget so Resend latency no longer blocks API responses
-- D1 search-filter column index audit and additions
-- Component refactor pass on 3 files >700 LOC (ReviewEditForm, BuildingsTable, ReviewsTable)
-- Typed Cloudflare runtime wrapper replacing 71 `(context.locals as any).runtime` casts
-- Shared `<EmptyState>` component for consistent empty-state messaging
+## Next Milestone
 
-**Source:** `.planning/codebase/CONCERNS.md` audit (2026-04-26)
-
-## Latest Shipped: v1.4.0 "Open Doors" (2026-03-22)
-
-**Delivered:** Trust infrastructure, self-service tenant tools, and public health survey improvements. 31 requirements across 6 phases — UGC legal protections, contact form, multi-city enrichment, tenant dashboard with notifications, saved buildings, and verification UX overhaul.
+**v1.6.0** — Planning to be initiated via `/gsd:new-milestone`. Carry-over candidates: component refactors (>700 LOC files: ReviewEditForm, BuildingsTable, ReviewsTable); admin `disputes/[id].ts` fireAndForget conversion; signup.ts validation consistency; email unsubscribe management.
 
 ## Context
 
 - **Tech stack**: Astro 5 + Cloudflare Pages + D1 (SQLite) + Lucia Auth + Tailwind CSS 4 + Resend
-- **Current version**: v1.4.0 "Open Doors" (shipped 2026-03-22)
+- **Current version**: v1.5.0 "Closed Loops" (shipped 2026-04-29)
 - **Production URL**: ratemyplace.org
-- **Codebase**: ~26,200 LOC (TypeScript/TSX/Astro), 235 unit tests
+- **Codebase**: ~28,000 LOC (TypeScript/TSX/Astro), 322+ unit tests, 18 test files
 - **Database tables**: 14 (users, sessions, reviews, buildings, landlords, property_managers, email_verification_tokens, rate_limits, disputes, audit_logs, contact_messages, notifications, saved_buildings, bug_reports)
+- **Migrations**: 24 (most recent: 0024_perf_indexes.sql for hot-path index)
 - **Admin pages**: Dashboard, Users, Reviews, Buildings, Landlords, Managers, Verification, Disputes, Audit Log, Contact
 - **Survey items**: 29 (27 original + Section 8 acceptance + safely lit at night)
+- **Runtime typing**: All Cloudflare Pages secrets declared in `App.Platform.env`; zero `(context.locals as any).runtime` casts in `src/`
 
 ## Constraints
 
@@ -113,6 +106,12 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 | CityAdapter pattern for enrichment | Extensible multi-city support without modifying dispatcher | ✓ Good (v1.4.0) |
 | Best-effort notifications | Notification failures don't break admin actions | ✓ Good (v1.4.0) |
 | SSR bell badge for notifications | Server-rendered unread count avoids client flash | ✓ Good (v1.4.0) |
+| Atomic typed-runtime cast retirement | All 89 cast sites in one PR avoids partial-migration cascade | ✓ Good (v1.5.0) |
+| `fireAndForget` with `ctx.waitUntil` over queues | Canonical Workers pattern at this scale; no extra product dependency | ✓ Good (v1.5.0) |
+| CSRF: SameSite=Lax + Turnstile + checkOrigin (no token) | Sufficient for current request patterns; checkOrigin JSON gap covered by Turnstile + rate limit + content-type guard | ✓ Good (v1.5.0) |
+| Causal E2E assertion (capture-then-query by entity_id) | Not ordering-dependent; resilient to test parallelism | ✓ Good (v1.5.0) |
+| Shared `buildRateLimitHeaders` helper | Pure function; no DB; consistent headers across 9 endpoints | ✓ Good (v1.5.0) |
+| EmptyState .astro + .tsx byte-identical twins | Same DOM from SSR and React-island consumers | ✓ Good (v1.5.0) |
 
 ---
-*Last updated: 2026-04-27 after starting v1.5.0 "Closed Loops" milestone*
+*Last updated: 2026-04-29 after v1.5.0 "Closed Loops" milestone*
