@@ -158,11 +158,11 @@ Plans:
   1. Every 429 response across all rate-limited endpoints includes a `Retry-After` header — including `contact.ts` which currently omits it
   2. Every rate-limited endpoint response (200 or 429) includes `X-RateLimit-Limit` and `X-RateLimit-Remaining` headers
   3. The search results page, building detail page (zero-review state), user profile (no reviews), and notifications panel all render via the shared `<EmptyState>` component with consistent title/description messaging — no ad-hoc empty-state strings remain on those pages
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 21-01: Standardize Retry-After and add X-RateLimit-Limit / X-RateLimit-Remaining headers across all rate-limited endpoints
-- [ ] 21-02: Build shared EmptyState React component and replace ad-hoc empty-state messaging on search, building detail, profile, and notifications
+- [ ] 21-01-PLAN.md — Add buildRateLimitHeaders helper to src/lib/rateLimit.ts and retrofit Retry-After + X-RateLimit-Limit/Remaining onto all 9 rate-limited endpoints (closes contact.ts SEC-07 gap; SEC-08 across the board)
+- [ ] 21-02-PLAN.md — Build shared EmptyState component (Astro + React, identical markup) and refactor 6 ad-hoc empty states across search.astro, building/[slug].astro, ProfileDashboard.tsx (reviews + saved tabs), and NotificationsTab.tsx
 
 ## Progress
 
