@@ -2,6 +2,64 @@
 
 *A living document updated after each milestone. Lessons feed forward into future planning.*
 
+## Milestone: v1.5.0 — Closed Loops
+
+**Shipped:** 2026-04-29
+**Phases:** 6 (16-21) | **Plans:** 15 | **Timeline:** 3 days (2026-04-27 → 2026-04-29)
+
+### What Was Built
+
+- Typed Cloudflare runtime — `App.Platform.env` declares all 6 Pages secrets; 89 unsafe `as any` runtime casts eliminated across 60 files
+- Public endpoint hardening — rate limits + content-type guards + length-bounded validators on bug-reports/contact/disputes/search routes
+- CSRF audit closed as no-token-required — SameSite=Lax + Turnstile + Astro `checkOrigin` ratified across audit doc, middleware comment, and CLAUDE.md
+- Async email sends — all 5 blocking `await sendXxxEmail` calls converted to `fireAndForget` with `ctx.waitUntil`
+- D1 hot-path index — `idx_reviews_building_status` composite confirmed via live production EXPLAIN; 3 unnecessary indexes documented as skipped with grep evidence
+- Causal E2E coverage — admin moderation captures `review_id` then queries audit_logs by `entity_id` (not ordering-dependent); cross-view exact score equality across search/detail/profile
+- Header consistency — `Retry-After` + `X-RateLimit-Limit` + `X-RateLimit-Remaining` across all 9 rate-limited endpoints via shared `buildRateLimitHeaders` helper
+- Shared `<EmptyState>` component — `.astro` + `.tsx` byte-identical twins, 6 ad-hoc empty-state strings replaced
+
+### What Worked
+
+- Wave 0 RED scaffolding pattern (Phase 17, Phase 18) locked the API surface before implementation, eliminated drift between tests and production code
+- Atomic batch retirement (16-01 + 16-02 shipped together) avoided the cascade-failure mode of partial cast migration
+- Audit-doc-as-deliverable convention (`.planning/audits/csrf-2026-04.md`, `d1-indexes-2026-04-28.md`) — frees verification from re-deriving evidence; doubles as institutional memory
+- Causal capture-then-query E2E pattern is dramatically more robust than badge-based approve confirmations (which raced with pending-filter view removal)
+- 3 phases of parallel work after Phase 16 foundation (17/18/19 in parallel) — minimal coordination cost, maximal throughput
+- Pure helper functions (`buildRateLimitHeaders`, `isValidEmail`, `escapeLikePattern`) trivial to unit test, easy to retrofit across endpoints
+
+### What Was Inefficient
+
+- SUMMARY.md `requirements-completed` frontmatter inconsistently filled — INFRA-01..03, SEC-06, SEC-07, SEC-08 missing despite implementations completed and verified. Same gap noted in v1.2.2 retrospective; still not fixed.
+- Audit doc location convention (`.planning/audits/`) only emerged in Phase 18 — earlier phases mixed evidence into VERIFICATION.md or PLAN.md
+- Phase 18 had to explicitly out-of-scope `disputes/[id].ts` admin endpoint to keep scope tight, leaving a known follow-up for v1.6.0 (admin endpoint blocking await)
+- Phase 17's contact.ts intentionally deferred Retry-After to Phase 21 — clean separation but added dependency edge that could have been collapsed
+
+### Patterns Established
+
+- `fireAndForget(context, promise)` helper — standard pattern for non-blocking IO with `ctx.waitUntil` + null-guard fallback for local Wrangler dev
+- `getEnv(context)` typed accessor — replaces `(context.locals as any).runtime.env` everywhere; throws on missing runtime
+- `buildRateLimitHeaders(result, limit)` — pure function spread on both blocked and allowed paths
+- `clearRateLimits()` extracted to `e2e/fixtures.ts` — reusable across spec files instead of duplicating
+- `.astro` + `.tsx` byte-identical component twins for surfaces consumed by both SSR pages and React islands
+- Migration-with-skip-evidence: `0024_perf_indexes.sql` block-comment header records what was skipped and why (with grep output)
+
+### Key Lessons
+
+1. SUMMARY.md frontmatter discipline still slips even when explicitly noted in prior retrospectives — automate the check (lint or pre-commit) rather than relying on memory
+2. Audit doc convention should be defined in CLAUDE.md or a workflow template before the first phase that needs it, not retroactively
+3. Cross-view consistency tests need exact equality (`.toBe`), not `.toBeCloseTo` — controlled single-review fixtures collapse all code paths into the same number
+4. Atomic cast migration in one PR is the right pattern for cross-cutting refactors — partial migration is worse than none
+5. `EXPLAIN QUERY PLAN` evidence belongs in the audit doc, not just the verification — future maintainers need the before/after to evaluate index churn
+
+### Cost Observations
+
+- 3-day milestone (vs 12 days for v1.3.0 of similar phase count) — narrower scope per phase, no new user-facing features
+- 6 phases × ~2.5 plans average — tighter than v1.3.0's broader E2E sweeps
+- Wave 0 RED tests added cost upfront but eliminated rework downstream
+- Phase 19 audit docs (465 lines + 169 lines) — heavier doc-to-code ratio than typical; appropriate for performance work that needs evidence trails
+
+---
+
 ## Milestone: v1.2.2 — Launch Ready
 
 **Shipped:** 2026-02-27
