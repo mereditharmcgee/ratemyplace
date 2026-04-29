@@ -20,6 +20,7 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:8788';
 
 const TEST_BUILDING_ID = 'building-e2e-01';
 const TEST_BUILDING_ADDRESS = '999 E2E Test Way';
+const TEST_BUILDING_SLUG = 'test-cross-view-consistency';
 
 function cleanupPhase20Reviews(): void {
   // Find any reviews for the test building and delete their audit_logs first,
@@ -167,5 +168,127 @@ test.describe('Phase 20: Critical Flows', () => {
       auditCount,
       `Expected an audit_logs row with entity_id='${reviewId}' AND action_type='review_approved'`
     ).toBeGreaterThanOrEqual(1);
+  });
+
+  // ─── TEST-02: Cross-view data consistency ────────────────────────────────
+  test('cross-view consistency: overall_score matches across search, building detail, and profile', async ({
+    authedPage,
+    adminPage,
+  }) => {
+    test.setTimeout(60000);
+
+    // 1. Submit a single review against the test building. All 27 score fields
+    //    are rated 4 in the helper, so the stored overall_score is deterministic.
+    //    Single review + current-year submission collapses all three view code paths
+    //    to the same rounded value: SQL ROUND(AVG(x),1) = JS Math.round(x*10)/10
+    //    when x is itself the result of Math.round(...*10)/10 at submission time,
+    //    and recency weight = 1.0 for a current-year review.
+    const reviewId = await submitReviewAsAuthedUser(authedPage, TEST_BUILDING_ID);
+
+    // 2. Approve via the admin UI. Uses the same waitForResponse pattern as TEST-01
+    //    (not a UI badge assertion) because the pending-filtered view removes the card
+    //    from the DOM once its status changes — the badge disappears before we can
+    //    assert on it. The PATCH response confirms the approve completed before we
+    //    read any of the three score views.
+    const patchResponsePromise = adminPage.waitForResponse(
+      (resp) => resp.url().includes('/api/admin/reviews/') && resp.request().method() === 'PATCH',
+      { timeout: 15000 }
+    );
+
+    await adminPage.goto('/admin/reviews?status=pending');
+    await adminPage.waitForLoadState('networkidle');
+
+    const reviewCard = adminPage.locator('.bg-white.rounded-xl', { hasText: TEST_BUILDING_ADDRESS }).first();
+    await expect(reviewCard).toBeVisible({ timeout: 10000 });
+
+    const reviewHeader = reviewCard.locator('.cursor-pointer').first();
+    await reviewHeader.click();
+
+    const approveButton = reviewCard.locator('button', { hasText: 'Approve' }).first();
+    await expect(approveButton).toBeVisible({ timeout: 10000 });
+    await approveButton.click();
+
+    const patchResponse = await patchResponsePromise;
+    expect(
+      patchResponse.status(),
+      `PATCH approve failed with status ${patchResponse.status()}`
+    ).toBe(200);
+    expect(patchResponse.url(), `PATCH was for wrong review`).toContain(reviewId);
+
+    // 3. View 1: Search API. ROUND(AVG(overall_score), 1) for one approved review.
+    //    Use authedPage.request.get — no page navigation needed for JSON response.
+    //    The search endpoint matches on address/neighborhood/landlord name (not slug),
+    //    so we query by TEST_BUILDING_ADDRESS to guarantee a hit on building-e2e-01.
+    const searchRes = await authedPage.request.get(
+      `/api/search/results?q=${encodeURIComponent(TEST_BUILDING_ADDRESS)}`
+    );
+    expect(searchRes.status(), 'Search API must return 200').toBe(200);
+    const searchData = await searchRes.json();
+    expect(
+      searchData.results?.length,
+      `Search must return at least one result for query "${TEST_BUILDING_ADDRESS}"`
+    ).toBeGreaterThanOrEqual(1);
+    // Defensive slug-match: the query may match other buildings if any other building
+    // shares address tokens; filter to the specific slug to guarantee we read the right row.
+    const searchRow = searchData.results.find(
+      (r: { slug: string }) => r.slug === TEST_BUILDING_SLUG
+    );
+    expect(searchRow, `Search results must include slug=${TEST_BUILDING_SLUG}`).toBeDefined();
+    const searchScore: number = searchRow.avg_overall;
+    expect(typeof searchScore, 'avg_overall must be a number').toBe('number');
+
+    // 4. View 2: Building detail page. The detail page reads building_scores, falls
+    //    back to calculateBuildingAverages(reviews) when no row exists — which is
+    //    the path for building-e2e-01 (no pre-seeded building_scores row).
+    await authedPage.goto(`/building/${TEST_BUILDING_SLUG}`);
+    await authedPage.waitForLoadState('networkidle');
+    const detailScoreText = await authedPage
+      .locator('.text-4xl.font-bold.text-teal-600')
+      .first()
+      .textContent();
+    expect(detailScoreText, 'Detail page must render score').toBeTruthy();
+    const detailScore: number = parseFloat(detailScoreText!.trim());
+    expect(Number.isFinite(detailScore), `Detail score must be a finite number, got: "${detailScoreText}"`).toBe(true);
+
+    // 5. View 3: Profile page (as the user who submitted). Profile lists per-review
+    //    stored overall_score from the reviews table — different aggregation level
+    //    than search/detail but identical value for a single review.
+    await authedPage.goto('/profile');
+    await authedPage.waitForLoadState('networkidle');
+    // Wait for the review card containing the test address to render.
+    const profileReviewCard = authedPage
+      .locator('.bg-white.border.border-gray-200.rounded-\\[6px\\]')
+      .filter({ hasText: TEST_BUILDING_ADDRESS });
+    await expect(profileReviewCard).toBeVisible({ timeout: 10000 });
+    // The score is inside a .bg-teal-50 badge as .font-medium.text-teal-700.
+    // Scope to the review card first to avoid matching other .font-medium.text-teal-700
+    // elements on the page (e.g. the "View building" link or autocomplete headers).
+    const profileScoreText = await profileReviewCard
+      .locator('.font-medium.text-teal-700')
+      .first()
+      .textContent();
+    expect(profileScoreText, 'Profile must render review score').toBeTruthy();
+    const profileScore: number = parseFloat(profileScoreText!.trim());
+    expect(
+      Number.isFinite(profileScore),
+      `Profile score must be a finite number, got: "${profileScoreText}"`
+    ).toBe(true);
+
+    // 6. THE ASSERTION. Exact equality across all three views.
+    //    Math justification: SQL ROUND(AVG(x), 1) on one row = JS Math.round(x*10)/10
+    //    when x is the stored overall_score (itself produced by Math.round(...*10)/10
+    //    at submission time). Recency weight = 1.0 for current-year review; single-row
+    //    average = the value itself. Any failure here is a real divergence bug.
+    //    Note: If a floating-point edge case ever surfaces, the RESEARCH.md fallback is
+    //    toBeCloseTo(value, 1). Do NOT preemptively use toBeCloseTo — toBe catches
+    //    divergence which is the actual bug class TEST-02 exists to detect.
+    expect(
+      searchScore,
+      `Search vs detail divergence: search=${searchScore}, detail=${detailScore}`
+    ).toBe(detailScore);
+    expect(
+      detailScore,
+      `Detail vs profile divergence: detail=${detailScore}, profile=${profileScore}`
+    ).toBe(profileScore);
   });
 });
