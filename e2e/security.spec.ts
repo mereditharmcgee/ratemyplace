@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, clearRateLimits } from './fixtures';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
@@ -7,13 +7,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const BASE_URL = process.env.BASE_URL || 'http://localhost:8788';
-
-function clearRateLimits() {
-  execSync(
-    'npx wrangler d1 execute ratemyplace-db --local --command "DELETE FROM rate_limits"',
-    { cwd: PROJECT_ROOT, stdio: 'pipe' }
-  );
-}
 
 // Remove any disputes created by previous security test runs for the reserved review IDs.
 // This makes injection/XSS tests re-runnable without a full db:setup.

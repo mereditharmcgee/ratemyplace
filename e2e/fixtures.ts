@@ -1,6 +1,7 @@
 import { test as base, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,3 +34,17 @@ export const test = base.extend<CustomFixtures>({
 });
 
 export { expect };
+
+// --- DB Helpers ---
+
+/**
+ * Clear all rate-limit rows from local D1.
+ * Used by specs that exercise rate-limited endpoints to keep tests deterministic.
+ * Always operates on --local (no params); remote support is YAGNI.
+ */
+export function clearRateLimits(): void {
+  execSync(
+    'npx wrangler d1 execute ratemyplace-db --local --command "DELETE FROM rate_limits"',
+    { cwd: path.resolve(__dirname, '..'), stdio: 'pipe' }
+  );
+}
