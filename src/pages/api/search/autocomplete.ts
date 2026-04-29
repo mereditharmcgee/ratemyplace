@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
-import { getClientIP, checkRateLimit } from '../../../lib/rateLimit';
+import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { validateSearch, escapeLikePattern } from '../../../lib/validation';
 
 export async function GET(context: APIContext): Promise<Response> {
@@ -18,7 +18,7 @@ export async function GET(context: APIContext): Promise<Response> {
       status,
       headers: {
         'Content-Type': 'application/json',
-        'Retry-After': String(rateLimit.retryAfterSeconds)
+        ...buildRateLimitHeaders(rateLimit, 120),
       }
     });
   }
@@ -38,7 +38,7 @@ export async function GET(context: APIContext): Promise<Response> {
   // Existing min-length silent return (no 400 — keeps autocomplete UX clean per CONTEXT.md)
   if (!input || input.length < 2) {
     return new Response(JSON.stringify({ results: [] }), {
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 120) }
     });
   }
 
@@ -95,7 +95,7 @@ export async function GET(context: APIContext): Promise<Response> {
     ];
 
     return new Response(JSON.stringify({ results }), {
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 120) }
     });
   } catch (error) {
     console.error('Search autocomplete error:', error);

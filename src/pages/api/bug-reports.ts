@@ -3,7 +3,7 @@ import { getDB } from '../../lib/db';
 import { getEnv } from '../../lib/runtime';
 import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
-import { getClientIP, checkRateLimit } from '../../lib/rateLimit';
+import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
 import { validateBugReport } from '../../lib/validation';
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -33,7 +33,7 @@ export async function POST(context: APIContext): Promise<Response> {
         status,
         headers: {
           'Content-Type': 'application/json',
-          'Retry-After': String(rateLimit.retryAfterSeconds)
+          ...buildRateLimitHeaders(rateLimit, 5),
         }
       });
     }
@@ -95,7 +95,10 @@ export async function POST(context: APIContext): Promise<Response> {
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildRateLimitHeaders(rateLimit, 5),
+      }
     });
   } catch (error) {
     console.error('Bug report submission error:', error);

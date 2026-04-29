@@ -3,7 +3,7 @@ import { initializeLucia } from '../../../lib/auth';
 import { getDB } from '../../../lib/db';
 import { getEnv } from '../../../lib/runtime';
 import { verifyPassword } from '../../../lib/password';
-import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
+import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { logError } from '../../../lib/logger';
 import { verifyTurnstile } from '../../../lib/turnstile';
 
@@ -71,7 +71,7 @@ export async function POST(context: APIContext): Promise<Response> {
         status,
         headers: {
           'Content-Type': 'application/json',
-          'Retry-After': String(rateLimit.retryAfterSeconds)
+          ...buildRateLimitHeaders(rateLimit, 5),
         }
       });
     }
@@ -112,7 +112,10 @@ export async function POST(context: APIContext): Promise<Response> {
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildRateLimitHeaders(rateLimit, 5),
+      }
     });
   } catch (error) {
     console.error('Sign in error:', error);

@@ -3,7 +3,7 @@
  * Tracks request counts per IP per endpoint within a time window
  */
 
-interface RateLimitResult {
+export interface RateLimitResult {
   allowed: boolean;
   remaining: number;
   retryAfterSeconds: number;
@@ -75,6 +75,30 @@ export async function checkRateLimit(
       error: true,
     };
   }
+}
+
+/**
+ * Build the standard rate-limit response headers.
+ *
+ * Spread the return value into a Response's headers object. Always emits
+ * X-RateLimit-Limit and X-RateLimit-Remaining; emits Retry-After iff the
+ * request was blocked (covers both 429-by-rate and 503-fail-closed paths).
+ *
+ * @param result - the RateLimitResult returned by checkRateLimit
+ * @param limit - the maxAttempts argument passed to checkRateLimit (e.g., 3, 5, 60, 120)
+ */
+export function buildRateLimitHeaders(
+  result: RateLimitResult,
+  limit: number
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    'X-RateLimit-Limit': String(limit),
+    'X-RateLimit-Remaining': String(result.remaining),
+  };
+  if (!result.allowed) {
+    headers['Retry-After'] = String(result.retryAfterSeconds);
+  }
+  return headers;
 }
 
 /**

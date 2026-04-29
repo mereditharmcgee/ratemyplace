@@ -3,7 +3,7 @@ import { getDB } from '../../../lib/db';
 import { getEnv, fireAndForget } from '../../../lib/runtime';
 import { createVerificationToken } from '../../../lib/tokens';
 import { sendVerificationEmail } from '../../../lib/email';
-import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
+import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { logError } from '../../../lib/logger';
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -47,7 +47,7 @@ export async function POST(context: APIContext): Promise<Response> {
       status,
       headers: {
         'Content-Type': 'application/json',
-        'Retry-After': String(rateLimit.retryAfterSeconds)
+        ...buildRateLimitHeaders(rateLimit, 3),
       }
     });
   }
@@ -68,7 +68,10 @@ export async function POST(context: APIContext): Promise<Response> {
 
     return new Response(JSON.stringify({ success: true, message: 'Verification email sent' }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildRateLimitHeaders(rateLimit, 3),
+      }
     });
   } catch (error) {
     console.error('Resend verification error:', error);

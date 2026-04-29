@@ -4,7 +4,7 @@ import { getEnv, fireAndForget } from '../../lib/runtime';
 import { extractReviewIdFromUrl } from '../../lib/disputes';
 import { sanitizeText, validateDisputeForm } from '../../lib/validation';
 import { sendDisputeConfirmationEmail } from '../../lib/email';
-import { checkRateLimit, getClientIP } from '../../lib/rateLimit';
+import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../lib/rateLimit';
 import { createNotification } from '../../lib/notifications';
 
 export const POST: APIRoute = async (context: APIContext) => {
@@ -33,7 +33,7 @@ export const POST: APIRoute = async (context: APIContext) => {
 
       return new Response(
         JSON.stringify({ error: message }),
-        { status, headers: { 'Content-Type': 'application/json', 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+        { status, headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 3) } }
       );
     }
 
@@ -175,7 +175,7 @@ export const POST: APIRoute = async (context: APIContext) => {
     // Return success
     return new Response(
       JSON.stringify({ success: true, disputeId }),
-      { status: 201, headers: { 'Content-Type': 'application/json' } }
+      { status: 201, headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 3) } }
     );
   } catch (error) {
     console.error('Dispute submission error:', error);

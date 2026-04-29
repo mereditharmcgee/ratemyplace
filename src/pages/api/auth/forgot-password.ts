@@ -3,7 +3,7 @@ import { getDB } from '../../../lib/db';
 import { getEnv, fireAndForget } from '../../../lib/runtime';
 import { createPasswordResetToken } from '../../../lib/tokens';
 import { sendPasswordResetEmail } from '../../../lib/email';
-import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
+import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { logError } from '../../../lib/logger';
 
 interface User {
@@ -37,7 +37,7 @@ export async function POST(context: APIContext): Promise<Response> {
       status,
       headers: {
         'Content-Type': 'application/json',
-        'Retry-After': String(rateLimit.retryAfterSeconds)
+        ...buildRateLimitHeaders(rateLimit, 3),
       }
     });
   }
@@ -61,7 +61,10 @@ export async function POST(context: APIContext): Promise<Response> {
       }),
       {
         status: 200,
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          ...buildRateLimitHeaders(rateLimit, 3),
+        }
       }
     );
 

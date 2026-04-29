@@ -4,7 +4,7 @@ import { getDB } from '../../../lib/db';
 import { getEnv, fireAndForget } from '../../../lib/runtime';
 import { hashPassword } from '../../../lib/password';
 import { generateIdFromEntropySize } from 'lucia';
-import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
+import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { createVerificationToken } from '../../../lib/tokens';
 import { sendVerificationEmail } from '../../../lib/email';
 import { logError } from '../../../lib/logger';
@@ -82,7 +82,7 @@ export async function POST(context: APIContext): Promise<Response> {
         status,
         headers: {
           'Content-Type': 'application/json',
-          'Retry-After': String(rateLimit.retryAfterSeconds)
+          ...buildRateLimitHeaders(rateLimit, 3),
         }
       });
     }
@@ -124,7 +124,10 @@ export async function POST(context: APIContext): Promise<Response> {
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildRateLimitHeaders(rateLimit, 3),
+      }
     });
   } catch (error) {
     console.error('Sign up error:', error);

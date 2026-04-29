@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
-import { getClientIP, checkRateLimit } from '../../../lib/rateLimit';
+import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { validateSearch, escapeLikePattern } from '../../../lib/validation';
 
 export async function GET(context: APIContext): Promise<Response> {
@@ -18,7 +18,7 @@ export async function GET(context: APIContext): Promise<Response> {
       status,
       headers: {
         'Content-Type': 'application/json',
-        'Retry-After': String(rateLimit.retryAfterSeconds)
+        ...buildRateLimitHeaders(rateLimit, 60),
       }
     });
   }
@@ -71,7 +71,7 @@ export async function GET(context: APIContext): Promise<Response> {
       return new Response(JSON.stringify({
         results: rows.results || [],
         total: countResult?.total || 0,
-      }), { headers: { 'Content-Type': 'application/json' } });
+      }), { headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) } });
     }
 
     if (resultType === 'landlords') {
@@ -106,11 +106,11 @@ export async function GET(context: APIContext): Promise<Response> {
       return new Response(JSON.stringify({
         results: rows.results || [],
         total: countResult?.total || 0,
-      }), { headers: { 'Content-Type': 'application/json' } });
+      }), { headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) } });
     }
 
     return new Response(JSON.stringify({ results: [], total: 0 }), {
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) }
     });
   } catch (error) {
     console.error('Search results error:', error);

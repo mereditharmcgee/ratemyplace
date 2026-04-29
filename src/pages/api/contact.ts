@@ -3,7 +3,7 @@ import { getDB } from '../../lib/db';
 import { getEnv, fireAndForget } from '../../lib/runtime';
 import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
-import { getClientIP, checkRateLimit } from '../../lib/rateLimit';
+import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
 import { validateContactForm } from '../../lib/validation';
 import { sendContactConfirmationEmail, sendContactNotificationEmail } from '../../lib/email';
 
@@ -23,12 +23,19 @@ export async function POST(context: APIContext): Promise<Response> {
     const db = getDB(context);
     const ip = getClientIP(context);
 
-    // 2. Rate limit (existing 3/hr — Phase 21 SEC-07 will retro-fit Retry-After header on this 429)
+    // 2. Rate limit (3/hr per IP — SEC-07: Retry-After on 429; SEC-08: X-RateLimit-* on all responses)
     const rateLimitResult = await checkRateLimit(db, ip, 'contact', 3, 3600);
     if (!rateLimitResult.allowed) {
-      return new Response(JSON.stringify({ error: 'Too many submissions. Please wait before trying again.' }), {
-        status: 429,
-        headers: { 'Content-Type': 'application/json' }
+      const status = rateLimitResult.error ? 503 : 429;
+      const message = rateLimitResult.error
+        ? 'Service temporarily unavailable. Please try again in a few minutes.'
+        : 'Too many submissions. Please wait before trying again.';
+      return new Response(JSON.stringify({ error: message }), {
+        status,
+        headers: {
+          'Content-Type': 'application/json',
+          ...buildRateLimitHeaders(rateLimitResult, 3),
+        }
       });
     }
 
@@ -83,7 +90,10 @@ export async function POST(context: APIContext): Promise<Response> {
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildRateLimitHeaders(rateLimitResult, 3),
+      }
     });
   } catch (error) {
     console.error('Contact form submission error:', error);
