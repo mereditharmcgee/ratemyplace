@@ -39,10 +39,12 @@ const RESET = '\x1b[0m';
  * Run a SELECT query against the local D1 database and return results.
  * Uses --command --json flags (same pattern as db-fresh.ts).
  */
+const DB_TARGET = process.env.D1_REMOTE === '1' ? '--remote' : '--local';
+
 function wranglerQuery(sql: string): any[] {
   const escaped = sql.replace(/"/g, '\\"');
   const raw = execSync(
-    `npx wrangler d1 execute ratemyplace-db --local --command "${escaped}" --json`,
+    `npx wrangler d1 execute ratemyplace-db ${DB_TARGET} --command "${escaped}" --json`,
     { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
   );
   return JSON.parse(raw)[0].results;
@@ -59,7 +61,7 @@ function executeSqlBatch(statements: string[]): void {
   writeFileSync(tmp, sql, 'utf8');
   try {
     execSync(
-      `npx wrangler d1 execute ratemyplace-db --local --file "${tmp}"`,
+      `npx wrangler d1 execute ratemyplace-db ${DB_TARGET} --file "${tmp}"`,
       { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
     );
   } catch (err: any) {
@@ -806,6 +808,27 @@ const BUILDINGS: Building[] = [
     created_at: 1699500000,
     updated_at: 1699500000,
   },
+  // ── Phase 20 E2E test isolation (do NOT remove) ──────────────────────────────
+  // Reserved building for e2e/critical-flows.spec.ts (TEST-01 + TEST-02).
+  // Slug intentionally non-real to avoid collision with any real Boston address.
+  // Zero pre-seeded reviews — score is fully determined by what the test inserts.
+  {
+    id: 'building-e2e-01',
+    landlord_id: null,
+    address: '999 E2E Test Way',
+    slug: 'test-cross-view-consistency',
+    neighborhood: 'Allston',
+    city: 'Boston',
+    state: 'MA',
+    zip_code: '02115',
+    year_built: 2000,
+    unit_count: 1,
+    building_type: 'apartment',
+    latitude: 42.3533,
+    longitude: -71.1326,
+    created_at: 1700000000,
+    updated_at: 1700000000,
+  },
 ];
 
 // ─── Reviews ───────────────────────────────────────────────────────────────────
@@ -1538,13 +1561,17 @@ function verifyScores(): boolean {
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
 function main() {
-  console.log(`\n  ${BOLD}Seed local database${RESET}\n`);
+  const isRemote = process.env.D1_REMOTE === '1';
+  const reviewsOnly = process.env.SEED_REVIEWS_ONLY === '1';
+  console.log(`\n  ${BOLD}Seed ${isRemote ? 'REMOTE' : 'local'} database${reviewsOnly ? ' (reviews only)' : ''}${RESET}\n`);
 
-  assertDatabaseEmpty();
+  if (!reviewsOnly) {
+    assertDatabaseEmpty();
+    run('Insert users (8)', () => insertUsers(TEST_PASSWORD_HASH));
+    run('Insert landlords (10)', insertLandlords);
+    run('Insert buildings (30)', insertBuildings);
+  }
 
-  run('Insert users (8)', () => insertUsers(TEST_PASSWORD_HASH));
-  run('Insert landlords (10)', insertLandlords);
-  run('Insert buildings (30)', insertBuildings);
   run('Insert reviews (128)', insertReviews);
   run('Insert disputes (10)', insertDisputes);
   run('Compute building scores', insertBuildingScores);
@@ -1557,9 +1584,12 @@ function main() {
   }
 
   console.log(`\n  ${GREEN}✓ Seed complete — database ready${RESET}`);
-  console.log(`\n  Summary: 8 users, 10 landlords, 30 buildings, 128 reviews, 10 disputes`);
-  console.log(`  Test credentials:  user@test.ratemyplace.local / TestPassword123!`);
-  console.log(`  Admin credentials: admin@test.ratemyplace.local / TestPassword123!\n`);
+  console.log(`\n  Summary: ${reviewsOnly ? '' : '8 users, 10 landlords, 30 buildings, '}128 reviews, 10 disputes`);
+  if (!reviewsOnly) {
+    console.log(`  Test credentials:  user@test.ratemyplace.local / TestPassword123!`);
+    console.log(`  Admin credentials: admin@test.ratemyplace.local / TestPassword123!`);
+  }
+  console.log('');
   process.exit(0);
 }
 
