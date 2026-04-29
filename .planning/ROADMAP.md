@@ -191,7 +191,7 @@ Phases 16 → 17 and 18 and 19 (parallel after 16) → 20 → 21
 | 18. CSRF Audit and Async Email | 4/4 | Complete    | 2026-04-28 | - |
 | 19. D1 Index Migration | 2/2 | Complete    | 2026-04-29 | - |
 | 20. Critical-Flow E2E Coverage | 2/2 | Complete    | 2026-04-29 | - |
-| 21. Quality Cleanup | v1.5.0 | 0/2 | Not started | - |
+| 21. Quality Cleanup | 1/2 | In Progress|  | - |
 
 ---
 *Roadmap updated: 2026-04-28 — Phase 18 plans finalized (4 plans: Wave 0 tests, helper impl, route conversions, CSRF audit doc)*
