@@ -50,7 +50,7 @@ Hardening pass. No new user-facing features. Closes security, validation, perfor
 
 ### UX Consistency
 
-- [ ] **UX-01**: Shared `<EmptyState>` React component with consistent messaging across search, building detail, profile (no reviews), notifications
+- [x] **UX-01**: Shared `<EmptyState>` React component with consistent messaging across search, building detail, profile (no reviews), notifications
 
 ---
 
@@ -116,7 +116,7 @@ Updated by gsd-roadmapper after roadmap creation.
 | TEST-01 | Phase 20 | Complete |
 | TEST-02 | Phase 20 | Complete |
 | TEST-03 | Phase 20 | Complete |
-| UX-01 | Phase 21 | Pending |
+| UX-01 | Phase 21 | Complete |
 
 **Coverage:**
 - v1 requirements: 24 total

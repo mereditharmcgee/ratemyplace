@@ -69,7 +69,7 @@ See: `.planning/milestones/v1.4.0-ROADMAP.md`
 - [x] **Phase 18: CSRF Audit and Async Email** — Document CSRF posture and convert blocking email sends to fire-and-forget (completed 2026-04-28)
 - [x] **Phase 19: D1 Index Migration** — Audit query plans and add missing indexes to eliminate full-table scans on hot paths (completed 2026-04-29)
 - [x] **Phase 20: Critical-Flow E2E Coverage** — Causal audit-log assertion and cross-view data consistency test coverage (completed 2026-04-29)
-- [ ] **Phase 21: Quality Cleanup** — Response header consistency, shared EmptyState component
+- [x] **Phase 21: Quality Cleanup** — Response header consistency, shared EmptyState component (completed 2026-04-29)
 
 ## Phase Details
 
@@ -191,7 +191,7 @@ Phases 16 → 17 and 18 and 19 (parallel after 16) → 20 → 21
 | 18. CSRF Audit and Async Email | 4/4 | Complete    | 2026-04-28 | - |
 | 19. D1 Index Migration | 2/2 | Complete    | 2026-04-29 | - |
 | 20. Critical-Flow E2E Coverage | 2/2 | Complete    | 2026-04-29 | - |
-| 21. Quality Cleanup | 1/2 | In Progress|  | - |
+| 21. Quality Cleanup | 2/2 | Complete   | 2026-04-29 | - |
 
 ---
 *Roadmap updated: 2026-04-28 — Phase 18 plans finalized (4 plans: Wave 0 tests, helper impl, route conversions, CSRF audit doc)*
