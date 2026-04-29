@@ -1,0 +1,26 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  action?: { label: string; href: string };
+  className?: string;
+}
+const { title, description, action, className = '' } = Astro.props;
+---
+<div class={`bg-gray-50 rounded-[6px] p-8 text-center ${className}`}>
+  {Astro.slots.has('icon') && (
+    <div class="text-gray-400 mx-auto mb-4 w-12 h-12 flex items-center justify-center">
+      <slot name="icon" />
+    </div>
+  )}
+  <h3 class="text-lg font-medium text-gray-900 mb-2">{title}</h3>
+  <p class="text-gray-600 mb-4">{description}</p>
+  {action && (
+    <a
+      href={action.href}
+      class="inline-flex items-center gap-2 px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 transition-colors"
+    >
+      {action.label}
+    </a>
+  )}
+</div>
