@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: planning
-stopped_at: Phase 20 context gathered
-last_updated: "2026-04-29T01:42:26.940Z"
+stopped_at: Completed 20-critical-flow-e2e-coverage-20-01-PLAN.md
+last_updated: "2026-04-29T02:46:40.497Z"
 last_activity: 2026-04-27 — Roadmap created, phases 16-21 defined, 24/24 requirements mapped
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 13
+  completed_plans: 12
   percent: 0
 ---
 
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 18-csrf-audit-and-async-email P02 | 20 | 3 tasks | 6 files |
 | Phase 19-d1-index-migration P01 | 8 | 2 tasks | 1 files |
 | Phase 19-d1-index-migration P02 | 4 | 3 tasks | 2 files |
+| Phase 20-critical-flow-e2e-coverage P01 | 90 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,9 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 19-d1-index-migration]: Wrangler heredoc pattern fails on Windows bash; workaround: write SQL to /tmp/q.sql then use --command "$(cat /tmp/q.sql)"
 - [Phase 19-d1-index-migration]: idx_reviews_building_status composite confirmed in production — all 3 search queries now use (building_id=? AND status=?) in one lookup; Q2 gained bonus Bloom filter optimization
 - [Phase 19-d1-index-migration]: Three indexes stayed skipped as Plan 19-01 determined: idx_rate_limits_key_created, idx_buildings_city, idx_buildings_building_type — documented in migration block-comment and audit doc
+- [Phase 20-01]: clearRateLimits extracted as standalone export in fixtures.ts (no auto-fixture, no implicit beforeEach)
+- [Phase 20-01]: building-e2e-01 cleanup by building_id subquery (review-090/091 are used in seed data — reserved ID approach invalid)
+- [Phase 20-01]: PATCH waitForResponse used as approve confirmation (not UI badge) — pending-filtered view removes approved card from DOM
 
 ### Pending Todos
 
@@ -110,9 +114,9 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-04-29T01:42:26.925Z
-Stopped at: Phase 20 context gathered
-Resume file: .planning/phases/20-critical-flow-e2e-coverage/20-CONTEXT.md
+Last session: 2026-04-29T02:46:40.493Z
+Stopped at: Completed 20-critical-flow-e2e-coverage-20-01-PLAN.md
+Resume file: None
 
 ---
 *State updated: 2026-04-27 — v1.5.0 roadmap created*
