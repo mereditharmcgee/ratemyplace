@@ -189,7 +189,7 @@ Phases 16 → 17 and 18 and 19 (parallel after 16) → 20 → 21
 | 16. Typed Runtime Foundation | 2/2 | Complete    | 2026-04-27 | - |
 | 17. Public Endpoint Security | 3/3 | Complete    | 2026-04-28 | - |
 | 18. CSRF Audit and Async Email | 4/4 | Complete    | 2026-04-28 | - |
-| 19. D1 Index Migration | 2/2 | Complete   | 2026-04-29 | - |
+| 19. D1 Index Migration | 2/2 | Complete    | 2026-04-29 | - |
 | 20. Critical-Flow E2E Coverage | v1.5.0 | 0/2 | Not started | - |
 | 21. Quality Cleanup | v1.5.0 | 0/2 | Not started | - |
 
