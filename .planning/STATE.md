@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: planning
-stopped_at: Completed 19-d1-index-migration 19-01-PLAN.md
-last_updated: "2026-04-29T00:36:19.241Z"
+stopped_at: Completed 19-d1-index-migration 19-02-PLAN.md
+last_updated: "2026-04-29T00:45:17.371Z"
 last_activity: 2026-04-27 — Roadmap created, phases 16-21 defined, 24/24 requirements mapped
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
   percent: 0
 ---
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 18-csrf-audit-and-async-email P01 | 1 | 1 tasks | 1 files |
 | Phase 18-csrf-audit-and-async-email P02 | 20 | 3 tasks | 6 files |
 | Phase 19-d1-index-migration P01 | 8 | 2 tasks | 1 files |
+| Phase 19-d1-index-migration P02 | 4 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,8 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 19-d1-index-migration]: idx_rate_limits_key_created skipped — SEARCH USING INDEX idx_rate_limits_key already covers equality predicate; created_at filter runs on at most ~60 in-memory rows per window
 - [Phase 19-d1-index-migration]: idx_buildings_city and idx_buildings_building_type skipped — grep confirms zero SELECT WHERE on these columns in src/; PERF-07 not applicable
 - [Phase 19-d1-index-migration]: Wrangler heredoc pattern fails on Windows bash; workaround: write SQL to /tmp/q.sql then use --command "$(cat /tmp/q.sql)"
+- [Phase 19-d1-index-migration]: idx_reviews_building_status composite confirmed in production — all 3 search queries now use (building_id=? AND status=?) in one lookup; Q2 gained bonus Bloom filter optimization
+- [Phase 19-d1-index-migration]: Three indexes stayed skipped as Plan 19-01 determined: idx_rate_limits_key_created, idx_buildings_city, idx_buildings_building_type — documented in migration block-comment and audit doc
 
 ### Pending Todos
 
@@ -107,8 +110,8 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-04-29T00:36:19.236Z
-Stopped at: Completed 19-d1-index-migration 19-01-PLAN.md
+Last session: 2026-04-29T00:45:17.367Z
+Stopped at: Completed 19-d1-index-migration 19-02-PLAN.md
 Resume file: None
 
 ---
