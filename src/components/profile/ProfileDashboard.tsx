@@ -3,6 +3,7 @@ import ReviewListItem from './ReviewListItem';
 import VerificationModal from './VerificationModal';
 import NotificationsTab from './NotificationsTab';
 import SettingsTab from './SettingsTab';
+import EmptyState from '../ui/EmptyState';
 import type { Notification } from './NotificationsTab';
 import type { UserReview, UserReviewsResponse, SavedBuilding, SavedBuildingsResponse } from '../../lib/api-types';
 import { getScoreColor } from '../../lib/scoring-colors';
@@ -344,21 +345,12 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
               {error}
             </div>
           ) : reviews.length === 0 ? (
-            <div className="bg-gray-50 rounded-[6px] p-8 text-center">
-              <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No reviews yet</h3>
-              <p className="text-gray-600 mb-4">
-                Share your rental experience to help other tenants find great places to live.
-              </p>
-              <a
-                href="/review/new"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 transition-colors"
-              >
-                Write Your First Review
-              </a>
-            </div>
+            <EmptyState
+              title="No reviews yet"
+              description="Share your rental experience to help other tenants find great places to live."
+              icon={<svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>}
+              action={{ label: 'Write Your First Review', href: '/review/new' }}
+            />
           ) : (
             <div className="space-y-4">
               {reviews.map((review) => (
@@ -385,21 +377,12 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
               {savedError}
             </div>
           ) : savedBuildings.length === 0 ? (
-            <div className="bg-gray-50 rounded-[6px] p-8 text-center">
-              <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-              </svg>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No saved buildings yet</h3>
-              <p className="text-gray-600 mb-4">
-                Browse buildings and tap the bookmark icon to save them for later.
-              </p>
-              <a
-                href="/search"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 transition-colors"
-              >
-                Browse Buildings
-              </a>
-            </div>
+            <EmptyState
+              title="No saved buildings yet"
+              description="Browse buildings and tap the bookmark icon to save them for later."
+              icon={<svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>}
+              action={{ label: 'Browse Buildings', href: '/search' }}
+            />
           ) : (
             <div className="space-y-4">
               {savedBuildings.map((building) => (
