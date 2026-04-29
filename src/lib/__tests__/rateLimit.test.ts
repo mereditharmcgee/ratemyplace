@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getClientIP, checkRateLimit } from '../rateLimit';
+import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../rateLimit';
+import type { RateLimitResult } from '../rateLimit';
 
 // ═══════════════════════════════════════════════════
 // getClientIP
@@ -127,5 +128,54 @@ describe('checkRateLimit', () => {
     const db = mockDB(0); // 0 attempts, limit is 3
     const result = await checkRateLimit(db, '1.2.3.4', 'signup', 3, 3600);
     expect(result.remaining).toBe(2); // 3 - 0 - 1 = 2
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// buildRateLimitHeaders
+// ═══════════════════════════════════════════════════
+
+describe('buildRateLimitHeaders', () => {
+  const allowed: RateLimitResult = { allowed: true, remaining: 4, retryAfterSeconds: 0 };
+  const blocked: RateLimitResult = { allowed: false, remaining: 0, retryAfterSeconds: 1800 };
+  const failed: RateLimitResult = { allowed: false, remaining: 0, retryAfterSeconds: 60, error: true };
+
+  it('returns X-RateLimit-Limit and X-RateLimit-Remaining but no Retry-After when allowed', () => {
+    const headers = buildRateLimitHeaders(allowed, 5);
+    expect(headers['X-RateLimit-Limit']).toBe('5');
+    expect(headers['X-RateLimit-Remaining']).toBe('4');
+    expect('Retry-After' in headers).toBe(false);
+  });
+
+  it('returns all three headers including Retry-After when blocked (429-shape)', () => {
+    const headers = buildRateLimitHeaders(blocked, 3);
+    expect(headers['X-RateLimit-Limit']).toBe('3');
+    expect(headers['X-RateLimit-Remaining']).toBe('0');
+    expect(headers['Retry-After']).toBe('1800');
+  });
+
+  it('returns all three headers when error===true (fail-closed 503-shape)', () => {
+    const headers = buildRateLimitHeaders(failed, 3);
+    expect(headers['X-RateLimit-Limit']).toBe('3');
+    expect(headers['X-RateLimit-Remaining']).toBe('0');
+    expect(headers['Retry-After']).toBe('60');
+  });
+
+  it('all header values are strings (safe to spread into Record<string, string>)', () => {
+    const headers = buildRateLimitHeaders(allowed, 5);
+    for (const val of Object.values(headers)) {
+      expect(typeof val).toBe('string');
+    }
+    const headersBlocked = buildRateLimitHeaders(blocked, 3);
+    for (const val of Object.values(headersBlocked)) {
+      expect(typeof val).toBe('string');
+    }
+  });
+
+  it('reflects the limit argument verbatim as a string (60→"60", 120→"120")', () => {
+    const h60 = buildRateLimitHeaders(allowed, 60);
+    expect(h60['X-RateLimit-Limit']).toBe('60');
+    const h120 = buildRateLimitHeaders(allowed, 120);
+    expect(h120['X-RateLimit-Limit']).toBe('120');
   });
 });

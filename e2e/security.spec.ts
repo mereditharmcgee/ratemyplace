@@ -398,3 +398,80 @@ test.describe('Phase 17: Public Endpoint Security', () => {
     expect(Array.isArray(body.results)).toBe(true);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 21: Rate Limit Headers (SEC-07, SEC-08)
+// Proves that rate-limit headers land on the wire for both 429 and 200 paths.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('Phase 21: Rate Limit Headers', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test.beforeEach(() => {
+    clearRateLimits();
+  });
+
+  // ─── Test A: POST /api/contact 4th hit → 429 has Retry-After + X-RateLimit-* ───
+  test('SEC-07/SEC-08: 4th POST /api/contact returns 429 with Retry-After, x-ratelimit-limit=3, x-ratelimit-remaining=0', async ({ request }) => {
+    test.setTimeout(60000);
+    // Rate limit is 3/hr — rate-limit check runs BEFORE Turnstile, so 429 fires regardless of token.
+    for (let i = 0; i < 3; i++) {
+      await request.post('/api/contact', {
+        multipart: {
+          name: 'Test User',
+          email: 'test@example.com',
+          category: 'general',
+          message: 'Phase 21 header test message',
+          'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX',
+        },
+        headers: { Origin: BASE_URL },
+      });
+    }
+    // 4th attempt — must be 429 (rate limit exhausted)
+    const res = await request.post('/api/contact', {
+      multipart: {
+        name: 'Test User',
+        email: 'test@example.com',
+        category: 'general',
+        message: 'Phase 21 header test message fourth',
+        'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX',
+      },
+      headers: { Origin: BASE_URL },
+    });
+    expect(res.status()).toBe(429);
+    expect(res.headers()['retry-after']).toBeDefined();
+    expect(Number(res.headers()['retry-after'])).toBeGreaterThan(0);
+    expect(res.headers()['x-ratelimit-limit']).toBe('3');
+    expect(res.headers()['x-ratelimit-remaining']).toBe('0');
+  });
+
+  // ─── Test B: GET /api/search/results → 200 has X-RateLimit-* but no Retry-After ───
+  test('SEC-08: GET /api/search/results returns x-ratelimit-limit=60 and x-ratelimit-remaining on success', async ({ request }) => {
+    const res = await request.get('/api/search/results?q=test');
+    // Accept 200 (success) or 400 (validation rejects query) — assertion is on headers
+    expect([200, 400]).toContain(res.status());
+    expect(res.headers()['x-ratelimit-limit']).toBe('60');
+    expect(res.headers()['x-ratelimit-remaining']).toBeDefined();
+    expect(Number(res.headers()['x-ratelimit-remaining'])).toBeLessThan(60);
+    // Success path must NOT have Retry-After
+    expect(res.headers()['retry-after']).toBeUndefined();
+  });
+
+  // ─── Test C: POST /api/bug-reports (under limit) → 200 has X-RateLimit-* but no Retry-After ───
+  test('SEC-08: POST /api/bug-reports under limit returns x-ratelimit-limit=5 and x-ratelimit-remaining on success', async ({ request }) => {
+    const res = await request.post('/api/bug-reports', {
+      multipart: {
+        'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX',
+        description: 'Phase 21 header test bug report with enough characters to pass length check',
+        category: 'bug',
+      },
+      headers: { Origin: BASE_URL },
+    });
+    // Accept 200 (success) or 400 (Turnstile fails in test env) — assertion is on headers
+    expect([200, 400]).toContain(res.status());
+    expect(res.headers()['x-ratelimit-limit']).toBe('5');
+    expect(res.headers()['x-ratelimit-remaining']).toBeDefined();
+    // Success/validation-fail path must NOT have Retry-After
+    expect(res.headers()['retry-after']).toBeUndefined();
+  });
+});
