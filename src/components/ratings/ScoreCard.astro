@@ -11,7 +11,7 @@ const { scores, type, grouped = true } = Astro.props;
 
 // New domain-based categories
 const domainCategories = [
-  { key: 'avg_unit', label: 'Unit Quality', icon: 'home' },
+  { key: 'avg_unit', label: 'Unit quality', icon: 'home' },
   { key: 'avg_building', label: 'Building', icon: 'building' },
   { key: 'avg_landlord', label: 'Landlord', icon: 'user' },
 ];
@@ -54,7 +54,7 @@ const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.k
 ---
 
 <div class="bg-white rounded-[6px] border border-gray-200 p-6">
-  <h3 class="font-semibold text-gray-900 mb-4">Rating Breakdown</h3>
+  <h3 class="font-semibold text-gray-900 mb-4">Rating breakdown</h3>
 
   {hasNewDomainScores ? (
     <!-- New domain-based display -->
@@ -113,7 +113,7 @@ const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.k
       <!-- Methodology Note -->
       <div class="pt-3 border-t border-gray-100">
         <p class="text-xs text-gray-400">
-          Scores are weighted by health/safety factors. Recent reviews weighted more heavily.
+          Scores are weighted by health and safety factors. Newer reviews count more than older ones.
           <a href="/methodology" class="text-teal-500 hover:text-teal-700 ml-1">Learn more</a>
         </p>
       </div>

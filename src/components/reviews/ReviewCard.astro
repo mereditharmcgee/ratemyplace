@@ -20,10 +20,10 @@ const domainScores = calculateDomainScores(review);
 
 const unitTypeLabels: Record<string, string> = {
   'studio': 'Studio',
-  '1br': '1 Bedroom',
-  '2br': '2 Bedrooms',
-  '3br': '3 Bedrooms',
-  '4br+': '4+ Bedrooms',
+  '1br': '1 bedroom',
+  '2br': '2 bedrooms',
+  '3br': '3 bedrooms',
+  '4br+': '4+ bedrooms',
   'house': 'House'
 };
 
@@ -39,22 +39,22 @@ const unitScores = [
   { key: 'unit_structural', label: 'Structure', weighted: ITEM_WEIGHTS.unit_structural > 1 },
   { key: 'unit_plumbing', label: 'Plumbing', weighted: ITEM_WEIGHTS.unit_plumbing > 1 },
   { key: 'unit_electrical', label: 'Electrical', weighted: ITEM_WEIGHTS.unit_electrical > 1 },
-  { key: 'unit_climate', label: 'Climate Control', weighted: ITEM_WEIGHTS.unit_climate > 1 },
+  { key: 'unit_climate', label: 'Climate control', weighted: ITEM_WEIGHTS.unit_climate > 1 },
   { key: 'unit_ventilation', label: 'Ventilation', weighted: ITEM_WEIGHTS.unit_ventilation > 1 },
-  { key: 'unit_pests', label: 'Pest Control', weighted: ITEM_WEIGHTS.unit_pests > 1 },
-  { key: 'unit_mold', label: 'Mold/Moisture', weighted: ITEM_WEIGHTS.unit_mold > 1 },
+  { key: 'unit_pests', label: 'Pest control', weighted: ITEM_WEIGHTS.unit_pests > 1 },
+  { key: 'unit_mold', label: 'Mold and moisture', weighted: ITEM_WEIGHTS.unit_mold > 1 },
   { key: 'unit_appliances', label: 'Appliances', weighted: ITEM_WEIGHTS.unit_appliances > 1 },
   { key: 'unit_layout', label: 'Layout', weighted: ITEM_WEIGHTS.unit_layout > 1 },
-  { key: 'unit_accuracy', label: 'As Advertised', weighted: ITEM_WEIGHTS.unit_accuracy > 1 },
+  { key: 'unit_accuracy', label: 'As advertised', weighted: ITEM_WEIGHTS.unit_accuracy > 1 },
 ];
 
 const buildingScores = [
-  { key: 'building_common_areas', label: 'Common Areas', weighted: ITEM_WEIGHTS.building_common_areas > 1 },
+  { key: 'building_common_areas', label: 'Common areas', weighted: ITEM_WEIGHTS.building_common_areas > 1 },
   { key: 'building_security', label: 'Security', weighted: ITEM_WEIGHTS.building_security > 1 },
   { key: 'building_exterior', label: 'Exterior', weighted: ITEM_WEIGHTS.building_exterior > 1 },
-  { key: 'building_noise_neighbors', label: 'Neighbor Noise', weighted: ITEM_WEIGHTS.building_noise_neighbors > 1 },
-  { key: 'building_noise_external', label: 'External Noise', weighted: ITEM_WEIGHTS.building_noise_external > 1 },
-  { key: 'building_mail', label: 'Mail/Packages', weighted: ITEM_WEIGHTS.building_mail > 1 },
+  { key: 'building_noise_neighbors', label: 'Neighbor noise', weighted: ITEM_WEIGHTS.building_noise_neighbors > 1 },
+  { key: 'building_noise_external', label: 'External noise', weighted: ITEM_WEIGHTS.building_noise_external > 1 },
+  { key: 'building_mail', label: 'Mail and packages', weighted: ITEM_WEIGHTS.building_mail > 1 },
   { key: 'building_laundry', label: 'Laundry', weighted: ITEM_WEIGHTS.building_laundry > 1 },
   { key: 'building_parking', label: 'Parking', weighted: ITEM_WEIGHTS.building_parking > 1 },
   { key: 'building_trash', label: 'Trash', weighted: ITEM_WEIGHTS.building_trash > 1 },
@@ -64,11 +64,11 @@ const landlordScores = [
   { key: 'landlord_maintenance', label: 'Maintenance', weighted: ITEM_WEIGHTS.landlord_maintenance > 1 },
   { key: 'landlord_communication', label: 'Communication', weighted: ITEM_WEIGHTS.landlord_communication > 1 },
   { key: 'landlord_professionalism', label: 'Professionalism', weighted: ITEM_WEIGHTS.landlord_professionalism > 1 },
-  { key: 'landlord_lease_clarity', label: 'Lease Clarity', weighted: ITEM_WEIGHTS.landlord_lease_clarity > 1 },
-  { key: 'landlord_privacy', label: 'Privacy Respect', weighted: ITEM_WEIGHTS.landlord_privacy > 1 },
-  { key: 'landlord_deposit', label: 'Deposit Handling', weighted: ITEM_WEIGHTS.landlord_deposit > 1 },
-  { key: 'landlord_rent_practices', label: 'Rent Practices', weighted: ITEM_WEIGHTS.landlord_rent_practices > 1 },
-  { key: 'landlord_non_retaliation', label: 'Non-Retaliation', weighted: ITEM_WEIGHTS.landlord_non_retaliation > 1 },
+  { key: 'landlord_lease_clarity', label: 'Lease clarity', weighted: ITEM_WEIGHTS.landlord_lease_clarity > 1 },
+  { key: 'landlord_privacy', label: 'Privacy respect', weighted: ITEM_WEIGHTS.landlord_privacy > 1 },
+  { key: 'landlord_deposit', label: 'Deposit handling', weighted: ITEM_WEIGHTS.landlord_deposit > 1 },
+  { key: 'landlord_rent_practices', label: 'Rent practices', weighted: ITEM_WEIGHTS.landlord_rent_practices > 1 },
+  { key: 'landlord_non_retaliation', label: 'Non-retaliation', weighted: ITEM_WEIGHTS.landlord_non_retaliation > 1 },
 ];
 
 // Filter to only scores that exist
@@ -109,7 +109,7 @@ import { humanize } from '../../lib/format';
 
 // Labels for amenities
 const amenityLabels: Record<string, string> = {
-  'pet_friendly': 'Pet Friendly',
+  'pet_friendly': 'Pet friendly',
   'laundry_in_unit': 'In-Unit Laundry',
   'laundry_in_building': 'Building Laundry',
   'dishwasher': 'Dishwasher',
@@ -128,7 +128,7 @@ const amenityLabels: Record<string, string> = {
 // Labels for utilities
 const utilityLabels: Record<string, string> = {
   'heat': 'Heat',
-  'hot_water': 'Hot Water',
+  'hot_water': 'Hot water',
   'electricity': 'Electric',
   'gas': 'Gas',
   'water': 'Water',
@@ -149,7 +149,7 @@ const laundryLabels: Record<string, string> = {
 const parkingLabels: Record<string, string> = {
   'included': 'Included',
   'available': 'Available (Extra)',
-  'street': 'Street Only',
+  'street': 'Street only',
   'none': 'None',
 };
 
@@ -324,7 +324,7 @@ const pestLabels: Record<string, string> = {
           </div>
         )}
       </div>
-      <p class="text-xs text-gray-400 mt-3"><span class="text-red-400">*</span> Health/safety weighted &mdash; these factors count more in the overall score. <a href="/methodology" class="text-teal-500 hover:text-teal-700">Learn more</a></p>
+      <p class="text-xs text-gray-400 mt-3"><span class="text-red-400">*</span> Health and safety weighted. These factors count more in the overall score. <a href="/methodology" class="text-teal-500 hover:text-teal-700">Learn more</a></p>
     </div>
   )}
 
@@ -443,17 +443,17 @@ const pestLabels: Record<string, string> = {
       <span class="text-sm text-gray-600 font-medium">Issues reported:</span>
       {(review.had_pest_issues === 1 || review.had_pests === 1) && (
         <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full break-words">
-          Pest Issues{pestTypes.length > 0 && `: ${pestTypes.map(p => pestLabels[p] || humanize(p)).join(', ')}`}
+          Pest issues{pestTypes.length > 0 && `: ${pestTypes.map(p => pestLabels[p] || humanize(p)).join(', ')}`}
         </span>
       )}
       {review.had_heat_issues === 1 && (
-        <span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">Heat/Hot Water Issues</span>
+        <span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">Heat and hot water issues</span>
       )}
       {review.had_water_issues === 1 && (
-        <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Plumbing Issues</span>
+        <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Plumbing issues</span>
       )}
       {review.had_security_deposit_issues === 1 && (
-        <span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">Deposit Issues</span>
+        <span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">Deposit issues</span>
       )}
     </div>
   )}
@@ -501,8 +501,5 @@ const pestLabels: Record<string, string> = {
       {review.user_email_verified === 1 && <EmailVerifiedBadge size="sm" />}
       {review.is_verified === 1 && <VerifiedBadge size="sm" />}
     </div>
-    <span class="text-gray-400">
-      Posted {new Date(review.created_at * 1000).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-    </span>
   </div>
 </article>
