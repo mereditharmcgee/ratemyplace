@@ -194,7 +194,7 @@ export default function SearchResults({
         <div className="mb-10">
           <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
             {showIcons && buildingIcon}
-            {query ? `Buildings (${totalBuildings})` : `Reviewed Buildings (${totalBuildings})`}
+            {query ? `Buildings (${totalBuildings})` : `Reviewed buildings (${totalBuildings})`}
           </h2>
           <div className="grid gap-4">
             {buildings.map((building) => (

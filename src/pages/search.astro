@@ -202,8 +202,8 @@ const hasResults = buildings.length > 0 || landlords.length > 0;
     {query && !hasResults && (
       <div>
         <EmptyState
-          title={`No properties found for "${query}"`}
-          description="Try a different address or neighborhood."
+          title="No buildings match that search"
+          description="Try a wider neighborhood or a partial street name."
           action={{ label: 'Browse all properties', href: '/search' }}
           className="py-12"
         >
@@ -224,7 +224,7 @@ const hasResults = buildings.length > 0 || landlords.length > 0;
       <div>
         {hasAnyListings ? (
           <>
-            <p class="text-gray-600 mb-8">Browse reviewed properties or use the search bar above to find a specific address or landlord.</p>
+            <p class="text-gray-600 mb-8">Browse reviewed buildings and landlords, or search for a specific address.</p>
             <SearchResults
               client:load
               initialBuildings={buildings}
