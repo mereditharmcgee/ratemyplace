@@ -67,20 +67,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2 sm:col-span-1">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Unit Number <span className="text-gray-400">(optional)</span>
-          </label>
-          <input
-            type="text"
-            value={unitDetails.unitNumber}
-            onChange={(e) => onChange({ ...unitDetails, unitNumber: e.target.value })}
-            placeholder="e.g., 2A, 301"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-          />
-        </div>
-
-        <div className="col-span-2 sm:col-span-1">
+        <div className="col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Square Footage <span className="text-gray-400">(optional)</span>
           </label>

@@ -34,7 +34,6 @@ export default function ReviewEditForm({ review }: Props) {
   const [unitType, setUnitType] = useState(review.unit_type || 'unknown');
   const [bedrooms, setBedrooms] = useState((review as any).bedrooms || '1');
   const [bathrooms, setBathrooms] = useState((review as any).bathrooms || '1');
-  const [unitNumber, setUnitNumber] = useState((review as any).unit_number || '');
   const [squareFootage, setSquareFootage] = useState((review as any).square_footage?.toString() || '');
   const [rentAmount, setRentAmount] = useState(review.rent_amount?.toString() || '');
   const [reviewTitle, setReviewTitle] = useState(review.review_title || '');
@@ -136,7 +135,6 @@ export default function ReviewEditForm({ review }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           unit_type: unitType,
-          unit_number: unitNumber || null,
           bedrooms,
           bathrooms,
           square_footage: squareFootage || null,
@@ -286,20 +284,7 @@ export default function ReviewEditForm({ review }: Props) {
         <h3 className="text-lg font-semibold text-gray-900">Unit Details</h3>
 
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Unit Number <span className="text-gray-400">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={unitNumber}
-              onChange={(e) => setUnitNumber(e.target.value)}
-              placeholder="e.g., 2A, 301"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-            />
-          </div>
-
-          <div>
+          <div className="col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Square Footage <span className="text-gray-400">(optional)</span>
             </label>

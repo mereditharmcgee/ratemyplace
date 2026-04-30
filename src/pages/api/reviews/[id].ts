@@ -246,11 +246,13 @@ export async function PATCH(context: APIContext): Promise<Response> {
     const wouldRecommendNew = body.would_recommend_new || null;
     const wouldRecommendLegacy = wouldRecommendNew === 'yes' ? 1 : wouldRecommendNew === 'no' ? 0 : (body.would_recommend ? 1 : 0);
 
-    // Update review with all 27 score fields + unit details
+    // Update review with all 27 score fields + unit details.
+    // Note: unit_number is intentionally NOT updated here. New collection has been removed
+    // from the form; legacy values on existing rows are preserved (never displayed publicly)
+    // and a separate migration will null them out when approved.
     await db.prepare(`
       UPDATE reviews SET
         unit_type = ?,
-        unit_number = ?,
         bedrooms = ?,
         bathrooms = ?,
         square_footage = ?,
@@ -312,7 +314,6 @@ export async function PATCH(context: APIContext): Promise<Response> {
       WHERE id = ?
     `).bind(
       body.unit_type,
-      body.unit_number || null,
       body.bedrooms || null,
       body.bathrooms || null,
       body.square_footage ? parseInt(body.square_footage) : null,

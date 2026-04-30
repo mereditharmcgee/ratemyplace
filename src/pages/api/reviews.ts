@@ -51,7 +51,8 @@ export async function POST(context: APIContext): Promise<Response> {
     const bedroomsForType = formData.get('bedrooms') as string || '1';
     const unitTypeMap: Record<string, string> = { '0': 'studio', '1': '1br', '2': '2br', '3': '3br', '4': '4br+' };
     const unitType = formData.get('unit_type') as string || unitTypeMap[bedroomsForType] || '1br';
-    const unitNumber = formData.get('unit_number') as string || null;
+    // Unit numbers are intentionally never collected — they identify tenants. Defense-in-depth: ignore even if a client sends one.
+    const unitNumber = null;
     const bedrooms = formData.get('bedrooms') as string || null;
     const bathrooms = formData.get('bathrooms') as string || null;
     const squareFootage = formData.get('square_footage') ? parseInt(formData.get('square_footage') as string) : null;
