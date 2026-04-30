@@ -17,7 +17,7 @@
 ### Legacy v1 Score Columns (12 columns)
 - **Issue:** Redundant old scoring columns kept for backward compatibility: `score_building_quality`, `score_maintenance`, `score_pest_control`, `score_safety`, `score_noise`, `score_landlord_responsiveness`, `score_landlord_communication`, `score_landlord_fairness`, `score_lease_clarity`, `score_deposit_handling`, `score_rent_value`, `score_amenities`.
 - **Files:** `migrations/0001_initial.sql` (lines 82-94), `src/lib/types.ts` (lines 57-68), `src/pages/api/reviews/[id].ts` (lines 59-71)
-- **Impact:** New reviews use 27-item survey (v2); legacy columns are never written. No runtime impact but clutters schema and API responses. Database footprint cost is minimal.
+- **Impact:** New reviews use the 27-item rating instrument (v2); legacy columns are never written. No runtime impact but clutters schema and API responses. Database footprint cost is minimal.
 - **Fix approach:** 
   1. Keep columns for backward-compatible data reads (safe for historical data)
   2. If ever removing: requires audit of any external consumers, then safe migration

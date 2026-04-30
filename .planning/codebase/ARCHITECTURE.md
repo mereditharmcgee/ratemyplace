@@ -110,10 +110,10 @@
 ## Key Abstractions
 
 **Review Scoring:**
-- Purpose: Calculate weighted scores from 27-item survey
+- Purpose: Calculate weighted scores from the 27-item rating instrument (5 ancillary survey items are not scored)
 - Location: `src/lib/scoring.ts`
 - Pattern: Pure functions that aggregate review scores by domain
-  - `calculateOverallScore(review)` - Weighted average of all 27 items
+  - `calculateOverallScore(review)` - Weighted average of all 27 scored rating items
   - `calculateBuildingAverages(reviews)` - Compute avg scores across 3 domains (unit, building, landlord)
   - `calculateDomainScores(reviews)` - Per-category analysis
   - Domain weights: Health/safety items (pests, mold, structural) weighted 1.3-1.5x, others 1.0x

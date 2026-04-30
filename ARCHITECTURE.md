@@ -37,7 +37,7 @@ RateMyPlace is a **public health-focused tenant housing review platform**. It he
 - Landlord profile pages with recent reviews
 - Property Manager profile pages (buildings can have both)
 - Unit-level review grouping with collapsible cards
-- Comprehensive 27-item survey instrument (OHQS/PHQS-based)
+- Comprehensive 27-item rating instrument (OHQS/PHQS-based) plus 5 ancillary survey questions (32 total)
 - **Evidence-based weighted scoring** with health/safety factors
 - Review moderation system (admin dashboard)
 - Score breakdowns by category (Unit, Building, Landlord)
@@ -339,7 +339,7 @@ RateMyPlace uses an **evidence-based weighted scoring system** grounded in peer-
 
 ### Survey Instrument Foundation
 
-The 27-item survey is adapted from validated housing quality assessment instruments:
+The 27-item rating instrument is adapted from validated housing quality assessment instruments. The full review form also asks 5 ancillary questions (recommendation, tenure, move-out year, voucher acceptance, street-lighting) for context — these are not scored.
 
 | Instrument | Source | Domain |
 |------------|--------|--------|
@@ -470,7 +470,7 @@ Contains all scoring logic - this is the heart of the evidence-based methodology
 - `getRecencyWeight()` - Time-based weighting function
 
 ### `surveyItems.ts`
-Survey question definitions with help text for each of the 27 items. Includes:
+Survey question definitions with help text for all 32 items: 27 scored rating items (1-5 scale, fed into the weighted score) plus 5 ancillary items (would_recommend, tenure_months, move_out_year, accepts_housing_vouchers, safely_lit_at_night). Includes:
 - Question text
 - Help text explaining what the question means
 - Domain mapping (unit/building/landlord)

@@ -134,7 +134,7 @@ ratemyplace-boston/
 
 **Core Logic:**
 
-- `src/lib/scoring.ts` - Review score calculations (27-item survey)
+- `src/lib/scoring.ts` - Review score calculations (27 scored rating items; 5 ancillary survey items not scored)
 - `src/lib/surveyItems.ts` - Survey question definitions
 - `src/lib/validation.ts` - Input validation rules
 - `src/lib/api.ts` - Response utilities

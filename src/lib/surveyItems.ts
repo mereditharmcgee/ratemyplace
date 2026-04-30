@@ -1,5 +1,10 @@
 // Survey items based on OHQS/PHQS research (v2.0 specification)
-// 27 items across three domains: Unit (10), Building (9), Landlord (8)
+//
+// Total: 32 reviewer-facing questions
+//   • 27 scored rating items (1-5 scale, OHQS/PHQS-adapted, fed into weighted score):
+//       Unit (10) + Building (9) + Landlord (8) — see scoring.ts ALL_SCORE_FIELDS
+//   • 5 ancillary items (not scored):
+//       would_recommend, tenure_months, move_out_year, accepts_housing_vouchers, safely_lit_at_night
 
 export interface SurveyItemHelp {
   description: string;

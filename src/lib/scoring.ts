@@ -10,7 +10,9 @@
  * documented associations with health outcomes.
  */
 
-// Field definitions for the 27-item survey
+// Field definitions for the 27 scored rating items (OHQS/PHQS-adapted, fed into the weighted score).
+// The full review form also includes 5 ancillary items (would_recommend, tenure_months, move_out_year,
+// accepts_housing_vouchers, safely_lit_at_night) that are NOT scored — see surveyItems.ts.
 export const UNIT_FIELDS = [
   'unit_structural',
   'unit_plumbing',

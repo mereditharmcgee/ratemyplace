@@ -59,7 +59,7 @@ git worktree add ../.claude-worktrees/ratemyplace-boston/<name> -b <branch-name>
 RateMyPlace uses an **evidence-based weighted scoring system** grounded in peer-reviewed public health research. This is a key differentiator from other review platforms.
 
 ### Survey Instrument Foundation
-The 27-item survey is adapted from validated housing quality assessment instruments:
+The 27-item rating instrument is adapted from validated housing quality assessment instruments. The full review form also asks 5 ancillary questions (would_recommend, tenure_months, move_out_year, accepts_housing_vouchers, safely_lit_at_night) for context — those 5 are not scored. Total: 32 reviewer-facing questions.
 
 | Instrument | Source | Domain |
 |------------|--------|--------|
@@ -140,7 +140,7 @@ Aggregate scores apply gentle recency weighting (Hu, Pavlou & Zhang 2017):
 ratemyplace/
 ├── migrations/                    # Database migrations (run manually)
 │   ├── 0001_initial.sql          # Core tables
-│   ├── 0004_survey_scores.sql    # 27-item survey fields
+│   ├── 0004_survey_scores.sql    # 27 scored rating fields (Unit 10 + Building 9 + Landlord 8)
 │   ├── 0005_missing_columns.sql  # Additional fields
 │   ├── 0006_property_managers.sql # Property manager system
 │   ├── 0008_laundry_fields.sql   # Laundry cost tracking
@@ -242,7 +242,7 @@ unit_count INTEGER
 building_type TEXT
 ```
 
-#### `reviews` (27-item survey)
+#### `reviews` (27 scored rating items + 5 ancillary items)
 ```sql
 id TEXT PRIMARY KEY
 user_id TEXT REFERENCES users(id)
@@ -327,7 +327,7 @@ status TEXT DEFAULT 'pending'  -- 'pending', 'approved', 'rejected'
 Displays a single review with:
 - **Overall score** with star rating
 - **Domain sub-scores** (Unit, Building, Landlord) as colored badges
-- **Score breakdown grid** showing all 27 items organized by domain
+- **Score breakdown grid** showing all 27 scored rating items organized by domain
 - **Health/safety indicators** - asterisk (*) marks weighted items
 - All imported from `scoring.ts` for consistency
 
@@ -335,7 +335,7 @@ Displays a single review with:
 Multi-step form for submitting reviews:
 1. Building selection (Google Places autocomplete)
 2. Unit details (type, number, rent, sqft)
-3. Survey questions (27 items with 1-5 scale + help tooltips)
+3. Survey questions (27 scored rating items with 1-5 scale + 5 ancillary questions, all with help tooltips)
 4. Additional details (amenities, utilities, comments)
 
 Uses `HelpTooltip.tsx` to show contextual help for each question.

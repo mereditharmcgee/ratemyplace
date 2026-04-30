@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A public health-focused tenant housing review platform for Boston renters (expanding to additional cities). Tenants rate their apartment unit, building, and landlord using a 29-item structured survey grounded in validated housing quality research (OHQS, PHQS, WHO LARES). Addresses information asymmetry in rental markets by giving tenants a way to research landlords before signing a lease. Includes tenant dashboard with review management, account settings, saved buildings, and in-app notifications.
+A public health-focused tenant housing review platform for Boston renters (expanding to additional cities). Tenants rate their apartment unit, building, and landlord using a 32-item structured survey: 27 scored rating items grounded in validated housing quality research (OHQS, PHQS, WHO LARES) plus 5 ancillary context questions (recommendation, tenure, move-out year, voucher acceptance, street-lighting). Addresses information asymmetry in rental markets by giving tenants a way to research landlords before signing a lease. Includes tenant dashboard with review management, account settings, saved buildings, and in-app notifications.
 
 ## Core Value
 
@@ -12,7 +12,7 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 
 ### Validated
 
-- ✓ 27-item survey form across three dimensions (unit, building, landlord) — v1.1.0
+- ✓ 27-item rating instrument across three dimensions (unit, building, landlord) — v1.1.0
 - ✓ Evidence-based weighted scoring with health/safety factors — v1.1.0
 - ✓ Privacy-preserving score aggregation (precise collection, fuzzy display) — v1.1.0
 - ✓ Building and landlord profile pages with aggregate scores — v1.1.0
@@ -81,7 +81,7 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 - **Database tables**: 14 (users, sessions, reviews, buildings, landlords, property_managers, email_verification_tokens, rate_limits, disputes, audit_logs, contact_messages, notifications, saved_buildings, bug_reports)
 - **Migrations**: 24 (most recent: 0024_perf_indexes.sql for hot-path index)
 - **Admin pages**: Dashboard, Users, Reviews, Buildings, Landlords, Managers, Verification, Disputes, Audit Log, Contact
-- **Survey items**: 29 (27 original + Section 8 acceptance + safely lit at night)
+- **Survey items**: 32 total — 27 scored rating items (Unit 10 + Building 9 + Landlord 8, OHQS/PHQS-adapted) + 5 ancillary items (would_recommend, tenure_months, move_out_year, accepts_housing_vouchers, safely_lit_at_night)
 - **Runtime typing**: All Cloudflare Pages secrets declared in `App.Platform.env`; zero `(context.locals as any).runtime` casts in `src/`
 
 ## Constraints

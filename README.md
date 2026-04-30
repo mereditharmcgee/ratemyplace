@@ -4,11 +4,11 @@ A public health-focused tenant housing review platform for Boston renters.
 
 ## About
 
-Tenants rate their apartment unit, building, and landlord using a 27-item structured survey grounded in validated housing quality research (OHQS, PHQS, WHO LARES). The platform addresses information asymmetry in rental markets by giving tenants a way to research landlords before signing a lease.
+Tenants rate their apartment unit, building, and landlord using a structured survey: a 27-item rating instrument grounded in validated housing quality research (OHQS, PHQS, WHO LARES) plus 5 ancillary context questions (32 total). The platform addresses information asymmetry in rental markets by giving tenants a way to research landlords before signing a lease.
 
 ## Features
 
-- 27-item evidence-based housing quality survey
+- 27-item evidence-based rating instrument plus 5 ancillary survey questions (32 total)
 - Weighted scoring with health/safety priority factors
 - Building and landlord profile pages with aggregate scores
 - Privacy-preserving score aggregation
@@ -43,7 +43,7 @@ npm run build
 
 ## Links
 
-- **Production**: https://ratemyplace.boston
+- **Production**: https://ratemyplace.org
 - **Methodology**: /methodology (citations and scoring approach)
 
 ## License

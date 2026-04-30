@@ -87,7 +87,7 @@ Phase doing CSRF audit. Start with the audit conclusion: is the current `SameSit
 **What goes wrong:**
 `validation.ts` validates `ReviewFormData` but the review submission endpoint (`/api/reviews.ts`) parses `FormData` independently — it does not call `validateReviewForm()`. The validation function checks a `scores` subobject, but the API endpoint reads scores individually from formdata (`formData.get('unit_pests')`). They are not wired together. Adding strict validation to the API endpoints risks rejecting reviews that the current frontend submits successfully, if the validation logic diverges from what the form actually sends.
 
-Specific known gap: `validation.ts` has a legacy `scoreFields` list (12 v1 fields: `building_quality`, `maintenance`, etc.) that does not match the 27-item v2 survey fields now used. If a validation retrofit copies this list, it will not validate any of the real 29 survey items in production.
+Specific known gap: `validation.ts` has a legacy `scoreFields` list (12 v1 fields: `building_quality`, `maintenance`, etc.) that does not match the 27 v2 scored rating fields now used. If a validation retrofit copies this list, it will not validate any of the real 32 survey items in production (27 scored + 5 ancillary).
 
 **Why it happens:**
 Validation logic in `validation.ts` was written to validate a `ReviewFormData` interface that was kept synchronized with an earlier version of the form. The API endpoint grew independently. There is no compile-time enforcement that the validator and the API handler agree on field names.
@@ -267,7 +267,7 @@ Component refactor phase. Mandatory: run the full E2E suite after each file's sp
 - [ ] **Typed runtime wrapper**: all 71 `(context.locals as any).runtime` casts replaced, but `env.d.ts` still missing Pages secrets — verify `App.Platform.env` lists every env var accessed at runtime, not just wrangler.jsonc bindings
 - [ ] **D1 index migrations**: `CREATE INDEX` statements added to migration file, but never verified against actual query execution plan — verify `EXPLAIN QUERY PLAN` on search queries shows index scan, not full table scan
 - [ ] **Component split complete**: large component extracted into sub-components, but the Astro page still uses `client:load` on a now-deleted component name — verify the import path in every `.astro` page that uses the split component
-- [ ] **Input validation retrofit**: validation added to API endpoints, but `validation.ts` still references the 12 legacy v1 score fields instead of `ALL_SCORE_FIELDS` — verify the validator uses the current 29-item field list
+- [ ] **Input validation retrofit**: validation added to API endpoints, but `validation.ts` still references the 12 legacy v1 score fields instead of `ALL_SCORE_FIELDS` — verify the validator uses the current 32-item field list (27 scored + 5 ancillary)
 - [ ] **Error format consistency**: validation now returns `{ error, details }` but frontend `fetch` handlers in React components only read `data.error` — verify every form component surfaces field-level validation errors from `details`
 
 ---
