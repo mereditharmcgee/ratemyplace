@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { getScoreColor, getScoreHex } from '../lib/scoring-colors';
 
 interface Building {
   id: string;
@@ -17,19 +18,15 @@ interface Props {
   initialZoom?: number;
 }
 
-// Score color mapping based on brand guidelines
-function getScoreColor(score: number | null): string {
-  if (score === null) return '#6B7280'; // Gray for no reviews
-  if (score >= 4) return '#2D9B83';     // Good (teal-ish green)
-  if (score >= 3) return '#E8B44A';     // Mixed (amber)
-  return '#D97356';                      // Concerning (coral)
+// Marker hex + label come from the canonical brand system in src/lib/scoring-colors.ts.
+// Local getMarkerHex / getMarkerLabel exist only because Google Maps takes hex strings, not Tailwind classes.
+function getMarkerHex(score: number | null): string {
+  return getScoreHex(score);
 }
 
-function getScoreLabel(score: number | null): string {
+function getMarkerLabel(score: number | null): string {
   if (score === null) return 'No reviews';
-  if (score >= 4) return 'Good';
-  if (score >= 3) return 'Mixed';
-  return 'Concerning';
+  return getScoreColor(score).label;
 }
 
 export default function BuildingMap({
@@ -122,7 +119,7 @@ export default function BuildingMap({
 
   // Create custom marker element
   const createMarkerElement = useCallback((building: Building): HTMLElement => {
-    const color = getScoreColor(building.avgScore);
+    const color = getMarkerHex(building.avgScore);
 
     const container = document.createElement('div');
     container.className = 'building-marker';
@@ -216,8 +213,8 @@ export default function BuildingMap({
       marker.addListener('click', () => {
         setSelectedBuilding(building);
 
-        const scoreLabel = getScoreLabel(building.avgScore);
-        const scoreColor = getScoreColor(building.avgScore);
+        const scoreLabel = getMarkerLabel(building.avgScore);
+        const scoreColor = getMarkerHex(building.avgScore);
 
         const content = `
           <div style="padding: 8px; max-width: 250px;">

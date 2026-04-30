@@ -5,7 +5,7 @@ import EmailVerifiedBadge from '../ui/EmailVerifiedBadge.astro';
 import SeasonChip from '../ui/SeasonChip.astro';
 import { formatRecency } from '../../lib/privacy';
 import { calculateDomainScores, ITEM_WEIGHTS } from '../../lib/scoring';
-import { getScoreTextColor } from '../../lib/scoring-colors';
+import { getScoreTextColor, getScoreColor } from '../../lib/scoring-colors';
 
 interface Props {
   review: any;
@@ -81,10 +81,14 @@ const hasDepositScore = review.landlord_deposit != null;
 const hasDepositIssues = review.had_security_deposit_issues === 1;
 const showDepositSection = hasDepositScore || hasDepositIssues;
 
+// Deposit handling is rated on the standard 1–5 scale; reuse the canonical band system.
+// The container uses a soft tint + matching border that visually pairs with the band color.
 function getDepositStatus(score: number): { label: string; color: string; bgColor: string } {
-  if (score >= 4) return { label: 'Good', color: 'text-green-700', bgColor: 'bg-green-50 border-green-200' };
-  if (score >= 3) return { label: 'Fair', color: 'text-yellow-700', bgColor: 'bg-yellow-50 border-yellow-200' };
-  return { label: 'Concerning', color: 'text-red-700', bgColor: 'bg-red-50 border-red-200' };
+  const { label } = getScoreColor(score);
+  if (score >= 4) return { label, color: 'text-emerald-700', bgColor: 'bg-emerald-50 border-emerald-200' };
+  if (score >= 3) return { label, color: 'text-amber-700',   bgColor: 'bg-amber-50 border-amber-200' };
+  if (score >= 2) return { label, color: 'text-amber-700',   bgColor: 'bg-amber-100 border-amber-300' };
+  return            { label, color: 'text-red-700',     bgColor: 'bg-red-50 border-red-200' };
 }
 
 const depositStatus = hasDepositScore ? getDepositStatus(review.landlord_deposit) : null;

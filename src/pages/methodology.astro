@@ -1,5 +1,16 @@
 ---
 import BaseLayout from '../components/layout/BaseLayout.astro';
+import { getScoreColor, getScoreTextColor, getScoreBgTint } from '../lib/scoring-colors';
+
+// Drive the four-card legend from the canonical helper so any future band-name
+// or color change propagates here automatically. Range and qualifier text stay
+// static — they're descriptive copy, not part of the band system.
+const bands = [
+  { range: '4.0-5.0', sample: 4.5, qualifier: 'Few or no issues' },
+  { range: '3.0-3.9', sample: 3.5, qualifier: 'Some minor issues' },
+  { range: '2.0-2.9', sample: 2.5, qualifier: 'Notable problems' },
+  { range: '1.0-1.9', sample: 1.5, qualifier: 'Serious concerns' },
+];
 ---
 
 <BaseLayout title="Scoring Methodology" description="How RateMyPlace calculates building and landlord ratings using evidence-based weighting">
@@ -312,26 +323,18 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
       <h2 class="text-2xl font-semibold text-gray-900 mb-4">Interpreting scores</h2>
       <div class="bg-white border border-gray-200 rounded-[6px] p-6">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div class="text-center p-4 bg-emerald-50 rounded-[6px]">
-            <div class="text-2xl font-bold text-emerald-600">4.0-5.0</div>
-            <div class="text-sm text-emerald-700 font-medium">Excellent</div>
-            <div class="text-xs text-emerald-700 mt-1">Few or no issues</div>
-          </div>
-          <div class="text-center p-4 bg-amber-50 rounded-[6px]">
-            <div class="text-2xl font-bold text-amber-600">3.0-3.9</div>
-            <div class="text-sm text-amber-700 font-medium">Average</div>
-            <div class="text-xs text-amber-700 mt-1">Some minor issues</div>
-          </div>
-          <div class="text-center p-4 bg-orange-50 rounded-[6px]">
-            <div class="text-2xl font-bold text-orange-600">2.0-2.9</div>
-            <div class="text-sm text-orange-700 font-medium">Below average</div>
-            <div class="text-xs text-orange-600 mt-1">Notable problems</div>
-          </div>
-          <div class="text-center p-4 bg-red-50 rounded-[6px]">
-            <div class="text-2xl font-bold text-red-600">1.0-1.9</div>
-            <div class="text-sm text-red-700 font-medium">Poor</div>
-            <div class="text-xs text-red-700 mt-1">Serious concerns</div>
-          </div>
+          {bands.map(({ range, sample, qualifier }) => {
+            const { label } = getScoreColor(sample);
+            const textClass = getScoreTextColor(sample);
+            const bgClass = getScoreBgTint(sample);
+            return (
+              <div class={`text-center p-4 rounded-[6px] ${bgClass}`}>
+                <div class={`text-2xl font-bold ${textClass}`}>{range}</div>
+                <div class={`text-sm font-medium ${textClass}`}>{label}</div>
+                <div class={`text-xs mt-1 ${textClass}`}>{qualifier}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>

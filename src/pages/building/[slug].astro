@@ -8,6 +8,7 @@ import BookmarkButton from '../../components/ui/BookmarkButton';
 import PostSubmitVerification from '../../components/profile/PostSubmitVerification';
 import EmptyState from '../../components/ui/EmptyState.astro';
 import { calculateBuildingAverages, calculateDomainScores } from '../../lib/scoring';
+import { getScoreTextColor } from '../../lib/scoring-colors';
 
 const { slug } = Astro.params;
 const submitted = Astro.url.searchParams.get('submitted') === 'true';
@@ -247,7 +248,7 @@ const sortedUnits = Array.from(reviewsByUnit.values())
         <div class="flex flex-col items-end">
           {scores?.avg_overall ? (
             <div class="text-right">
-              <div class="text-4xl font-bold text-teal-600">{scores.avg_overall.toFixed(1)}</div>
+              <div class={`text-4xl font-bold ${getScoreTextColor(scores.avg_overall)}`}>{scores.avg_overall.toFixed(1)}</div>
               <StarRating rating={scores.avg_overall} />
               <p class="text-sm text-gray-500 mt-1">
                 {scores.review_count} review{scores.review_count !== 1 ? 's' : ''}
@@ -343,7 +344,7 @@ const sortedUnits = Array.from(reviewsByUnit.values())
 
                         <div class="text-right">
                           <div class="flex items-center gap-1">
-                            <span class="text-lg font-bold text-teal-600">{unitStats.avgScore.toFixed(1)}</span>
+                            <span class={`text-lg font-bold ${getScoreTextColor(unitStats.avgScore)}`}>{unitStats.avgScore.toFixed(1)}</span>
                             <StarRating rating={unitStats.avgScore} size="sm" />
                           </div>
                           <p class="text-xs text-gray-500">

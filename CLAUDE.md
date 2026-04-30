@@ -155,15 +155,25 @@ await createAuditLog(db, {
 ## Styling
 
 ### Score Colors
-```typescript
-// Use these Tailwind classes for score display
-const getScoreColor = (score: number) => {
-  if (score >= 4) return 'bg-emerald-500 text-white';
-  if (score >= 3) return 'bg-amber-500 text-white';
-  if (score >= 2) return 'bg-orange-500 text-white';
-  return 'bg-red-500 text-white';
-};
-```
+
+**Single source of truth: [`src/lib/scoring-colors.ts`](src/lib/scoring-colors.ts).** Always import from there. Do not roll your own thresholds or labels.
+
+Canonical four-band system (mirrors `brand.md` §4.2):
+
+| Band | Range | Label | Fill | Text | Hex |
+|------|-------|-------|------|------|-----|
+| Good | 4.0–5.0 | `Good` | `bg-emerald-600` | `text-emerald-700` | `#059669` |
+| Mixed | 3.0–3.9 | `Mixed` | `bg-amber-500` | `text-amber-700` | `#F59E0B` |
+| Concerning | 2.0–2.9 | `Concerning` | `bg-amber-700` | `text-red-700` | `#A16207` |
+| Poor | 1.0–1.9 | `Poor` | `bg-red-700` | `text-red-700` | `#B91C1C` |
+
+Available helpers:
+- `getScoreColor(score)` → `{ bg, text, label }` for filled badges/pills
+- `getScoreTextColor(score)` → Tailwind class for colored score numbers
+- `getScoreBgTint(score)` → soft-tinted background class for score detail tiles
+- `getScoreHex(score)` / `SCORE_HEX` → hex strings for non-Tailwind contexts (Google Maps markers, OG images, PDF exports)
+
+If you're adding a new surface that displays a score, reach for one of these. Never hardcode `text-teal-600` or `bg-orange-500` for score-band display.
 
 ### Brand Colors
 - **Primary**: `text-teal-600` / `bg-teal-600`

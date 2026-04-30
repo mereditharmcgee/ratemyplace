@@ -1,5 +1,5 @@
 ---
-import { getScoreColor, getScoreTextColor } from '../../lib/scoring-colors';
+import { getScoreColor, getScoreTextColor, getScoreBgTint } from '../../lib/scoring-colors';
 
 interface Props {
   scores: any;
@@ -65,7 +65,7 @@ const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.k
           {availableDomains.map((domain) => {
             const score = scores[domain.key];
             return (
-              <div class={`text-center p-3 rounded-[6px] ${score >= 4 ? 'bg-emerald-50' : score >= 3 ? 'bg-amber-50' : 'bg-red-50'}`}>
+              <div class={`text-center p-3 rounded-[6px] ${getScoreBgTint(score)}`}>
                 <div class={`text-2xl font-bold ${getScoreTextColor(score)}`}>
                   {score.toFixed(1)}
                 </div>

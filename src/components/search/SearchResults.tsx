@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getScoreTextColor } from '../../lib/scoring-colors';
 
 interface Building {
   slug: string;
@@ -49,7 +50,7 @@ function BuildingCard({ building }: { building: Building }) {
         <div className="text-right">
           {building.avg_overall ? (
             <div>
-              <div className="text-2xl font-bold text-teal-600">{Number(building.avg_overall).toFixed(1)}</div>
+              <div className={`text-2xl font-bold ${getScoreTextColor(Number(building.avg_overall))}`}>{Number(building.avg_overall).toFixed(1)}</div>
               <div className="text-sm text-gray-500">{building.review_count} review{building.review_count !== 1 ? 's' : ''}</div>
             </div>
           ) : (
@@ -77,7 +78,7 @@ function LandlordCard({ landlord }: { landlord: Landlord }) {
         <div className="text-right">
           {landlord.avg_overall ? (
             <div>
-              <div className="text-2xl font-bold text-teal-600">{Number(landlord.avg_overall).toFixed(1)}</div>
+              <div className={`text-2xl font-bold ${getScoreTextColor(Number(landlord.avg_overall))}`}>{Number(landlord.avg_overall).toFixed(1)}</div>
               <div className="text-sm text-gray-500">{landlord.review_count} review{landlord.review_count !== 1 ? 's' : ''}</div>
             </div>
           ) : (

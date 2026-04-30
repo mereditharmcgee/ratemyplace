@@ -4,6 +4,7 @@ import StarRating from '../../components/ratings/StarRating.astro';
 import ScoreCard from '../../components/ratings/ScoreCard.astro';
 import ReviewCard from '../../components/reviews/ReviewCard.astro';
 import UGCDisclaimer from '../../components/reviews/UGCDisclaimer.astro';
+import { getScoreTextColor } from '../../lib/scoring-colors';
 
 const { slug } = Astro.params;
 
@@ -131,7 +132,7 @@ if (!propertyManager) {
         <div class="text-right">
           {scores?.avg_overall ? (
             <div>
-              <div class="text-4xl font-bold text-teal-600">{scores.avg_overall.toFixed(1)}</div>
+              <div class={`text-4xl font-bold ${getScoreTextColor(scores.avg_overall)}`}>{scores.avg_overall.toFixed(1)}</div>
               <StarRating rating={scores.avg_overall} />
               <p class="text-sm text-gray-500 mt-1">
                 {scores.review_count} review{scores.review_count !== 1 ? 's' : ''} across {scores.building_count} building{scores.building_count !== 1 ? 's' : ''}
@@ -175,7 +176,7 @@ if (!propertyManager) {
                     <div class="text-right">
                       {building.avg_overall ? (
                         <div>
-                          <div class="text-2xl font-bold text-teal-600">{building.avg_overall.toFixed(1)}</div>
+                          <div class={`text-2xl font-bold ${getScoreTextColor(building.avg_overall)}`}>{building.avg_overall.toFixed(1)}</div>
                           <div class="text-sm text-gray-500">
                             {building.review_count} review{building.review_count !== 1 ? 's' : ''}
                           </div>

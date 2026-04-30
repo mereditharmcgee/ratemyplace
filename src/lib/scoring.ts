@@ -347,17 +347,6 @@ export function calculateLandlordAverages(reviews: any[]): Record<string, number
 }
 
 /**
- * Get score color class based on value
- */
-export function getScoreColorClass(score: number | null): string {
-  if (score === null) return 'bg-gray-200 text-gray-600';
-  if (score >= 4) return 'bg-emerald-100 text-emerald-800';
-  if (score >= 3) return 'bg-amber-100 text-amber-800';
-  if (score >= 2) return 'bg-orange-100 text-orange-800';
-  return 'bg-red-100 text-red-800';
-}
-
-/**
  * Format score for display
  */
 export function formatScore(score: number | null): string {

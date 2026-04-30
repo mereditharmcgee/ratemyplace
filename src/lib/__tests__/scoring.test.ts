@@ -6,7 +6,6 @@ import {
   calculateAggregatedScores,
   calculateBuildingAverages,
   calculateLandlordAverages,
-  getScoreColorClass,
   formatScore,
   ITEM_WEIGHTS,
   ALL_SCORE_FIELDS,
@@ -367,37 +366,6 @@ describe('calculateLandlordAverages', () => {
     expect(result.review_count).toBe(0);
     expect(result.avg_overall).toBeNull();
     expect(result.pct_deposit_issues).toBeNull();
-  });
-});
-
-// ═══════════════════════════════════════════════════
-// getScoreColorClass
-// ═══════════════════════════════════════════════════
-
-describe('getScoreColorClass', () => {
-  it('returns gray for null', () => {
-    expect(getScoreColorClass(null)).toContain('gray');
-  });
-
-  it('returns green for 4+', () => {
-    expect(getScoreColorClass(4)).toContain('emerald');
-    expect(getScoreColorClass(5)).toContain('emerald');
-    expect(getScoreColorClass(4.5)).toContain('emerald');
-  });
-
-  it('returns amber for 3-3.9', () => {
-    expect(getScoreColorClass(3)).toContain('amber');
-    expect(getScoreColorClass(3.9)).toContain('amber');
-  });
-
-  it('returns orange for 2-2.9', () => {
-    expect(getScoreColorClass(2)).toContain('orange');
-    expect(getScoreColorClass(2.9)).toContain('orange');
-  });
-
-  it('returns red for below 2', () => {
-    expect(getScoreColorClass(1)).toContain('red');
-    expect(getScoreColorClass(1.5)).toContain('red');
   });
 });
 
