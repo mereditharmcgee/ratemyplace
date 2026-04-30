@@ -25,6 +25,7 @@ export interface PlaceData extends PlaceDetails {
 }
 
 export interface UnitDetails {
+  unitNumber: string;
   bedrooms: string;
   bathrooms: string;
   squareFootage: string;

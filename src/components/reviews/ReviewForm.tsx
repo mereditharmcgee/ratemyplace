@@ -31,6 +31,7 @@ export default function ReviewForm({ building }: Props) {
 
   // Unit details
   const [unitDetails, setUnitDetails] = useState<UnitDetails>({
+    unitNumber: '',
     bedrooms: '1',
     bathrooms: '1',
     squareFootage: '',
@@ -167,7 +168,8 @@ export default function ReviewForm({ building }: Props) {
       const formData = new FormData();
       formData.append('building_id', selectedBuilding.id);
 
-      // Unit details — unit numbers are intentionally never collected (privacy)
+      // Unit details — unit_number is collected for moderation only and is never displayed on public pages.
+      if (unitDetails.unitNumber) formData.append('unit_number', unitDetails.unitNumber);
       formData.append('bedrooms', unitDetails.bedrooms);
       formData.append('bathrooms', unitDetails.bathrooms);
       if (unitDetails.squareFootage) formData.append('square_footage', unitDetails.squareFootage);
