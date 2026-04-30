@@ -6,46 +6,45 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
   <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
     <!-- Header -->
     <div class="mb-12">
-      <h1 class="text-3xl font-bold text-gray-900 mb-4">Our Scoring Methodology</h1>
+      <h1 class="text-3xl font-bold text-gray-900 mb-4">How we score</h1>
       <p class="text-lg text-gray-600">
-        RateMyPlace uses an evidence-based scoring system grounded in public health research.
-        Our methodology prioritizes health and safety factors that have documented associations
-        with tenant wellbeing.
+        Reviews are weighted by what research shows actually affects tenant health. Conditions with documented health impacts count more than cosmetic complaints. The methodology is adapted from three validated public health instruments and the weights come from peer-reviewed evidence.
       </p>
     </div>
 
     <!-- Survey Instrument Foundation -->
     <section class="mb-12">
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">Foundation</p>
-      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Research-based survey items</h2>
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Where the items come from.</h2>
       <div class="bg-white border border-gray-200 rounded-[6px] p-6">
         <p class="text-gray-600 mb-4">
-          Our 27-item rating instrument is adapted from validated housing quality assessment instruments
-          used in public health research:
+          Our 27-item assessment is adapted from three validated public health instruments:
         </p>
         <div class="space-y-4 mb-6">
           <div class="bg-blue-50 border-l-4 border-blue-500 p-4">
             <h3 class="font-semibold text-blue-900">Observational Housing Quality Scale (OHQS)</h3>
             <p class="text-sm text-blue-800 mt-1">
-              Developed by Krieger & Higgins for systematic housing condition assessment. The OHQS provides
-              a standardized method for evaluating physical housing deficiencies linked to health outcomes,
-              including structural problems, pest infestation, and moisture issues.
+              Developed by Krieger and Higgins to systematically assess housing conditions linked to health outcomes. We use it for the unit-level items: structural problems, pest infestation, moisture issues.
             </p>
             <p class="text-xs text-blue-600 mt-2">Krieger & Higgins (2002), American Journal of Public Health</p>
           </div>
           <div class="bg-green-50 border-l-4 border-green-500 p-4">
             <h3 class="font-semibold text-green-900">Physical Housing Quality Scale (PHQS)</h3>
             <p class="text-sm text-green-800 mt-1">
-              A comprehensive instrument for assessing housing quality dimensions including building systems,
-              safety features, and environmental conditions. The PHQS has been validated across diverse
-              housing types and urban contexts.
+              A comprehensive instrument for building-level housing quality, validated across diverse housing types and urban contexts. We use it for the building-level items: common areas, security, exterior, noise, mail, trash.
             </p>
             <p class="text-xs text-green-600 mt-2">Jacobs et al. (2009), Environmental Health Perspectives</p>
           </div>
+          <div class="bg-purple-50 border-l-4 border-purple-500 p-4">
+            <h3 class="font-semibold text-purple-900">WHO LARES Study</h3>
+            <p class="text-sm text-purple-800 mt-1">
+              A pan-European housing-and-health study, validated for evaluating landlord and management factors that affect tenant wellbeing. We use it for the landlord-level items: maintenance response, communication, professionalism, and rental practices.
+            </p>
+            <p class="text-xs text-purple-600 mt-2">Bonnefoy et al. (2003), American Journal of Public Health</p>
+          </div>
         </div>
         <p class="text-gray-600 text-sm">
-          By drawing from these established instruments, RateMyPlace captures the housing conditions that
-          research has shown to matter most for tenant health and wellbeing.
+          Each of our 27 items traces to one of these three instruments.
         </p>
       </div>
     </section>
@@ -60,7 +59,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
         </p>
         <div class="grid md:grid-cols-3 gap-4 mb-6">
           <div class="bg-teal-50 rounded-[6px] p-4">
-            <h3 class="font-semibold text-teal-800 mb-2">Unit Quality</h3>
+            <h3 class="font-semibold text-teal-800 mb-2">Unit quality</h3>
             <p class="text-sm text-teal-700">10 items covering structural integrity, systems, and livability</p>
             <p class="text-xs text-teal-700 mt-2">Based on OHQS interior assessment domains</p>
           </div>
@@ -76,8 +75,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
           </div>
         </div>
         <p class="text-gray-600">
-          Rather than treating all items equally, we apply <strong>health/safety weighting</strong> to
-          items with documented impacts on tenant health outcomes.
+          We don't treat every item equally. Items with documented health impacts carry more weight in the score.
         </p>
       </div>
     </section>
@@ -85,10 +83,9 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
     <!-- Health/Safety Weighting -->
     <section class="mb-12">
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">Why some items count more</p>
-      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Health &amp; safety weighting</h2>
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Health and safety weighting</h2>
       <p class="text-gray-600 mb-6">
-        Based on epidemiological research, certain housing conditions have stronger associations with
-        health outcomes. We weight these items more heavily in our overall scores:
+        Some housing conditions have stronger associations with health outcomes than others. The weights below come from epidemiological research:
       </p>
 
       <div class="space-y-4">
@@ -98,7 +95,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
             <div>
               <div class="flex items-center gap-2 mb-2">
                 <span class="px-2 py-1 bg-red-100 text-red-700 text-sm font-bold rounded">1.5x Weight</span>
-                <h3 class="font-semibold text-gray-900">Pest Control</h3>
+                <h3 class="font-semibold text-gray-900">Pest control</h3>
               </div>
               <p class="text-gray-600 text-sm">
                 Pest infestations (cockroaches, rodents, bed bugs) are strongly associated with asthma,
@@ -118,7 +115,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
             <div>
               <div class="flex items-center gap-2 mb-2">
                 <span class="px-2 py-1 bg-red-100 text-red-700 text-sm font-bold rounded">1.5x Weight</span>
-                <h3 class="font-semibold text-gray-900">Mold & Moisture</h3>
+                <h3 class="font-semibold text-gray-900">Mold and moisture</h3>
               </div>
               <p class="text-gray-600 text-sm">
                 Visible mold and dampness are associated with a 1.5-3.5x increased odds ratio for
@@ -138,7 +135,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
             <div>
               <div class="flex items-center gap-2 mb-2">
                 <span class="px-2 py-1 bg-orange-100 text-orange-700 text-sm font-bold rounded">1.3x Weight</span>
-                <h3 class="font-semibold text-gray-900">Structural Integrity</h3>
+                <h3 class="font-semibold text-gray-900">Structural integrity</h3>
               </div>
               <p class="text-gray-600 text-sm">
                 Structural deficiencies including damaged floors, walls, and ceilings pose direct
@@ -158,7 +155,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
             <div>
               <div class="flex items-center gap-2 mb-2">
                 <span class="px-2 py-1 bg-orange-100 text-orange-700 text-sm font-bold rounded">1.3x Weight</span>
-                <h3 class="font-semibold text-gray-900">Climate Control (Heating/Cooling)</h3>
+                <h3 class="font-semibold text-gray-900">Climate control (heating and cooling)</h3>
               </div>
               <p class="text-gray-600 text-sm">
                 Inadequate heating is associated with cardiovascular stress, hypothermia risk, and
@@ -219,62 +216,62 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">What we ask</p>
       <h2 class="text-2xl font-semibold text-gray-900 mb-4">The 27 rating items</h2>
       <p class="text-gray-600 mb-6">
-        Each item below is drawn from validated housing assessment instruments. Items marked with
-        <span class="text-red-500 font-bold">*</span> receive additional health/safety weighting.
-        The full review form also includes 5 ancillary questions (recommendation, tenure, move-out year,
-        voucher acceptance, and street-lighting context) that are not scored.
+        Each item traces to one of the three instruments above. Items marked with
+        <span class="text-red-500 font-bold">*</span> carry health and safety weighting.
+        The review form also includes 5 questions that aren't scored: recommendation, tenure,
+        move-out year, voucher acceptance, and street-lighting context.
       </p>
 
       <div class="grid md:grid-cols-3 gap-6">
         <!-- Unit Quality Items -->
         <div class="bg-white border border-gray-200 rounded-[6px] p-5">
-          <h3 class="font-semibold text-teal-800 mb-3 pb-2 border-b border-teal-100">Unit Quality (10 items)</h3>
+          <h3 class="font-semibold text-teal-800 mb-3 pb-2 border-b border-teal-100">Unit quality (10 items)</h3>
           <ul class="space-y-2 text-sm text-gray-700">
-            <li><span class="text-red-500">*</span> Structural Integrity</li>
-            <li><span class="text-red-500">*</span> Plumbing Systems</li>
-            <li>Electrical Systems</li>
-            <li><span class="text-red-500">*</span> Climate Control (Heat/AC)</li>
+            <li><span class="text-red-500">*</span> Structural integrity</li>
+            <li><span class="text-red-500">*</span> Plumbing systems</li>
+            <li>Electrical systems</li>
+            <li><span class="text-red-500">*</span> Climate control (heat and AC)</li>
             <li>Ventilation</li>
-            <li><span class="text-red-500">*</span> Pest Control</li>
-            <li><span class="text-red-500">*</span> Mold/Moisture</li>
+            <li><span class="text-red-500">*</span> Pest control</li>
+            <li><span class="text-red-500">*</span> Mold and moisture</li>
             <li>Appliances</li>
-            <li>Layout & Space</li>
-            <li>Accuracy to Listing</li>
+            <li>Layout and space</li>
+            <li>Accuracy to listing</li>
           </ul>
-          <p class="text-xs text-gray-500 mt-3">Source: OHQS interior domains</p>
+          <p class="text-xs text-gray-500 mt-3">Source: OHQS</p>
         </div>
 
         <!-- Building Items -->
         <div class="bg-white border border-gray-200 rounded-[6px] p-5">
           <h3 class="font-semibold text-blue-800 mb-3 pb-2 border-b border-blue-100">Building (9 items)</h3>
           <ul class="space-y-2 text-sm text-gray-700">
-            <li>Common Areas</li>
-            <li><span class="text-red-500">*</span> Security Features</li>
-            <li>Exterior Condition</li>
-            <li>Neighbor Noise</li>
-            <li>External Noise</li>
-            <li>Mail/Package Handling</li>
-            <li>Laundry Facilities</li>
+            <li>Common areas</li>
+            <li><span class="text-red-500">*</span> Security features</li>
+            <li>Exterior condition</li>
+            <li>Neighbor noise</li>
+            <li>External noise</li>
+            <li>Mail and package handling</li>
+            <li>Laundry facilities</li>
             <li>Parking</li>
-            <li>Trash/Recycling</li>
+            <li>Trash and recycling</li>
           </ul>
-          <p class="text-xs text-gray-500 mt-3">Source: PHQS building indicators</p>
+          <p class="text-xs text-gray-500 mt-3">Source: PHQS</p>
         </div>
 
         <!-- Landlord Items -->
         <div class="bg-white border border-gray-200 rounded-[6px] p-5">
           <h3 class="font-semibold text-purple-800 mb-3 pb-2 border-b border-purple-100">Landlord (8 items)</h3>
           <ul class="space-y-2 text-sm text-gray-700">
-            <li>Maintenance Response</li>
+            <li>Maintenance response</li>
             <li>Communication</li>
             <li>Professionalism</li>
-            <li>Lease Clarity</li>
-            <li>Privacy Respect</li>
-            <li>Deposit Handling</li>
-            <li>Rent Practices</li>
-            <li>Non-Retaliation</li>
+            <li>Lease clarity</li>
+            <li>Privacy respect</li>
+            <li>Deposit handling</li>
+            <li>Rent practices</li>
+            <li>Non-retaliation</li>
           </ul>
-          <p class="text-xs text-gray-500 mt-3">Source: WHO LARES management factors</p>
+          <p class="text-xs text-gray-500 mt-3">Source: WHO LARES</p>
         </div>
       </div>
     </section>
@@ -285,9 +282,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
       <h2 class="text-2xl font-semibold text-gray-900 mb-4">Recency weighting</h2>
       <div class="bg-white border border-gray-200 rounded-[6px] p-6">
         <p class="text-gray-600 mb-4">
-          When calculating aggregate scores for buildings and landlords, we apply a gentle recency
-          weight. This reflects that housing conditions and management practices can change over time,
-          while still valuing historical reviews.
+          Aggregate scores apply recency weighting because buildings and management change over time. Newer reviews count more than older ones, but historical reviews still count.
         </p>
         <div class="bg-gray-50 rounded-[6px] p-4">
           <table class="w-full text-sm">
@@ -306,7 +301,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
           </table>
         </div>
         <div class="mt-4 text-xs text-gray-500">
-          Reference: Hu, Pavlou & Zhang (2017), MIS Quarterly - Research on review recency effects
+          Reference: Hu, Pavlou, and Zhang (2017), MIS Quarterly.
         </div>
       </div>
     </section>
@@ -329,7 +324,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
           </div>
           <div class="text-center p-4 bg-orange-50 rounded-[6px]">
             <div class="text-2xl font-bold text-orange-600">2.0-2.9</div>
-            <div class="text-sm text-orange-700 font-medium">Below Average</div>
+            <div class="text-sm text-orange-700 font-medium">Below average</div>
             <div class="text-xs text-orange-600 mt-1">Notable problems</div>
           </div>
           <div class="text-center p-4 bg-red-50 rounded-[6px]">
@@ -346,7 +341,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">Sources</p>
       <h2 class="text-2xl font-semibold text-gray-900 mb-4">References</h2>
       <div class="bg-gray-50 border border-gray-200 rounded-[6px] p-6">
-        <h3 class="font-semibold text-gray-800 mb-3">Survey Instrument Sources</h3>
+        <h3 class="font-semibold text-gray-800 mb-3">Survey instrument sources</h3>
         <ol class="space-y-4 text-sm text-gray-700 mb-6">
           <li>
             <strong>Krieger, J., & Higgins, D. L. (2002).</strong> Housing and health: Time again for public health action.
@@ -376,7 +371,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
           </li>
         </ol>
 
-        <h3 class="font-semibold text-gray-800 mb-3">Health/Safety Weighting Evidence</h3>
+        <h3 class="font-semibold text-gray-800 mb-3">Health and safety weighting evidence</h3>
         <ol class="space-y-4 text-sm text-gray-700 mb-6">
           <li>
             <strong>Krieger, J. (2010).</strong> Home is where the triggers are: Increasing asthma control by improving
@@ -406,7 +401,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
           </li>
         </ol>
 
-        <h3 class="font-semibold text-gray-800 mb-3">Methodology References</h3>
+        <h3 class="font-semibold text-gray-800 mb-3">Methodology references</h3>
         <ol class="space-y-4 text-sm text-gray-700">
           <li>
             <strong>Hu, N., Pavlou, P. A., & Zhang, J. (2017).</strong> On self-selection biases in online product reviews.
@@ -423,16 +418,12 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
     <!-- Transparency Note -->
     <section class="mb-12">
       <div class="bg-teal-50 border border-teal-200 rounded-[6px] p-6">
-        <h2 class="text-lg font-semibold text-teal-900 mb-2">Our Commitment to Transparency</h2>
+        <h2 class="text-lg font-semibold text-teal-900 mb-2">Our commitment to transparency.</h2>
         <p class="text-teal-800 text-sm">
-          We believe tenants deserve access to reliable information about housing quality. By grounding
-          our methodology in peer-reviewed public health research, we aim to provide scores that reflect
-          what matters most for your health and safety. All reviews display both raw scores and weighted
-          domain scores so you can see exactly how ratings are calculated.
+          Tenants are the experts on their own housing. The methodology is public so you can see exactly how scores are calculated. Every review displays both raw scores and weighted domain scores.
         </p>
         <p class="text-teal-700 text-sm mt-3">
-          Items marked with <span class="text-red-500">*</span> in review breakdowns indicate health/safety
-          weighted categories.
+          Items marked with <span class="text-red-500">*</span> indicate health and safety weighted categories.
         </p>
       </div>
     </section>
@@ -442,7 +433,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
       <div class="text-center">
         <p class="text-gray-600 mb-4">Have questions about our methodology?</p>
         <a href="/contact" class="inline-block bg-teal-700 text-white font-semibold px-6 py-2 rounded-[4px] hover:bg-teal-800 transition-colors">
-          Contact Us
+          Contact us
         </a>
       </div>
     </section>
