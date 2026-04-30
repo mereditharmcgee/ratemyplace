@@ -8,13 +8,20 @@ import HomeSearch from '../components/HomeSearch';
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
       <div class="text-center">
         <h1 class="font-display text-5xl sm:text-6xl md:text-7xl font-normal tracking-tight leading-[1.05] mb-6">
-          Know before you sign.
+          Know before <em class="italic">you</em> sign.
         </h1>
         <p class="text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
-          Real reviews from real tenants. Search apartments and landlords to make an informed decision about your next rental.
+          A public record of rental housing, from the people who know it best. Verified reviews, evidence-based scoring.
         </p>
 
         <HomeSearch client:load />
+
+        <a
+          href="/review/new"
+          class="inline-block mt-6 border border-white text-white font-semibold rounded-[4px] px-5 py-2.5 hover:bg-white hover:text-slate-900 transition-colors"
+        >
+          Write a review
+        </a>
       </div>
     </div>
   </div>
@@ -32,7 +39,7 @@ import HomeSearch from '../components/HomeSearch';
         </div>
         <h3 class="text-lg font-semibold text-gray-900 mb-2">Search</h3>
         <p class="text-gray-600">
-          Look up any address, neighborhood, or landlord to see what tenants have experienced.
+          Search by address, neighborhood, or landlord. See what tenants who lived there have written.
         </p>
       </div>
 
@@ -42,9 +49,9 @@ import HomeSearch from '../components/HomeSearch';
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <h3 class="text-lg font-semibold text-gray-900 mb-2">Read Reviews</h3>
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">Read reviews</h3>
         <p class="text-gray-600">
-          See detailed ratings on unit quality, landlord responsiveness, maintenance, and more.
+          Read what tenants reported about conditions, management, and the issues research shows actually affect health.
         </p>
       </div>
 
@@ -54,9 +61,9 @@ import HomeSearch from '../components/HomeSearch';
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
         </div>
-        <h3 class="text-lg font-semibold text-gray-900 mb-2">Share Your Experience</h3>
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">Write a review</h3>
         <p class="text-gray-600">
-          Help other tenants by leaving an honest review of your rental experience.
+          Write a review. The next tenant will read it.
         </p>
       </div>
     </div>
@@ -65,39 +72,39 @@ import HomeSearch from '../components/HomeSearch';
   <div class="bg-paper">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
       <div class="text-center mb-12">
-        <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">A public record for renters</p>
-        <h2 class="text-2xl font-bold text-gray-900 mb-4">Why trust RateMyPlace?</h2>
+        <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">Evidence, not vibes</p>
+        <h2 class="text-2xl font-bold text-gray-900 mb-4">Why this record is trustworthy.</h2>
         <p class="text-gray-600 max-w-2xl mx-auto">
-          We're committed to providing accurate, helpful information for renters.
+          Verified reviewers, anonymous reviews, methodology you can read.
         </p>
       </div>
 
       <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div class="bg-white p-6 rounded-[6px] border border-slate-200 hover:shadow-sm transition-shadow">
-          <h3 class="font-semibold text-gray-900 mb-2">Verified Tenants</h3>
+          <h3 class="font-semibold text-gray-900 mb-2">Verified tenants</h3>
           <p class="text-sm text-gray-600">
-            All reviewers must create an account and confirm they lived at the property.
+            Reviewers create an account and confirm they lived at the property before posting.
           </p>
         </div>
 
         <div class="bg-white p-6 rounded-[6px] border border-slate-200 hover:shadow-sm transition-shadow">
-          <h3 class="font-semibold text-gray-900 mb-2">Privacy Protected</h3>
+          <h3 class="font-semibold text-gray-900 mb-2">Privacy protected</h3>
           <p class="text-sm text-gray-600">
-            Move dates are displayed as seasons, not exact dates, to protect reviewer identity.
+            Move dates display as seasons, not exact dates. Reviewers stay anonymous.
           </p>
         </div>
 
         <div class="bg-white p-6 rounded-[6px] border border-slate-200 hover:shadow-sm transition-shadow">
-          <h3 class="font-semibold text-gray-900 mb-2">Moderated Content</h3>
+          <h3 class="font-semibold text-gray-900 mb-2">Moderated content</h3>
           <p class="text-sm text-gray-600">
             Reviews are checked for guideline compliance before publishing.
           </p>
         </div>
 
         <div class="bg-white p-6 rounded-[6px] border border-slate-200 hover:shadow-sm transition-shadow">
-          <h3 class="font-semibold text-gray-900 mb-2">Evidence-Based Scoring</h3>
+          <h3 class="font-semibold text-gray-900 mb-2">Evidence-based scoring</h3>
           <p class="text-sm text-gray-600">
-            Our scoring methodology is grounded in peer-reviewed housing quality research.
+            Scores are weighted by peer-reviewed housing health research. The methodology is documented.
           </p>
         </div>
       </div>
@@ -106,15 +113,15 @@ import HomeSearch from '../components/HomeSearch';
 
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
     <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">The next tenant will read it</p>
-    <h2 class="text-2xl font-bold text-gray-900 mb-4">Ready to share your experience?</h2>
+    <h2 class="text-2xl font-bold text-gray-900 mb-4">Add to the record.</h2>
     <p class="text-gray-600 mb-8">
-      Your experience helps the next tenant. Leave an honest review of your rental.
+      Your review helps the next tenant. The record gets stronger every time someone contributes.
     </p>
     <a
       href="/review/new"
       class="inline-block bg-teal-700 text-white px-8 py-3 rounded-[4px] font-semibold hover:bg-teal-800 transition-colors"
     >
-      Write a Review
+      Write a review
     </a>
   </div>
 </BaseLayout>
