@@ -8,32 +8,27 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
 
     <div class="prose prose-lg max-w-none">
       <p class="text-xl text-gray-600 mb-8">
-        RateMyPlace is a tenant-focused platform that helps renters make informed decisions
-        about their next home by providing honest, verified reviews from real tenants.
+        RateMyPlace is a public record of rental housing, from the people who know it best. Tenants share verified reviews of apartments, buildings, and landlords. Anyone considering a lease can search before they sign.
       </p>
 
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mt-12 mb-3">Why we exist</p>
       <h2 class="text-2xl font-bold text-gray-900 mb-4">Our mission</h2>
       <p class="text-gray-600 mb-6">
-        Finding a good apartment is challenging. Beyond high rents and competitive markets,
-        tenants often don't know what they're getting into until they've signed a lease. We believe
-        every renter deserves access to honest information about buildings and landlords before making
-        one of their biggest financial decisions.
+        The rental market runs on information asymmetry. Landlords run credit checks, use tenant blacklists, and know exactly who's renting from them. Tenants get listing photos and a viewing. We collect what tenants know and make it public, so the next renter has something to work with before they sign.
       </p>
 
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mt-12 mb-3">Methodology</p>
       <h2 class="text-2xl font-bold text-gray-900 mb-4">How we rate</h2>
       <p class="text-gray-600 mb-3">
-        These scores are calculated from tenant-submitted ratings. RateMyPlace does not independently evaluate properties.
+        Scores come from tenants who lived in the building. We don't inspect properties ourselves. The record is built from what tenants reported.
       </p>
       <p class="text-gray-600 mb-6">
-        Our scoring framework is based on housing quality research and covers 27 aspects
-        of the rental experience — organized into three categories based on what tenants reported:
+        Our 27-item assessment is adapted from three validated public health instruments: the Observational Housing Quality Scale (Krieger and Higgins, 2002), the Physical Housing Quality Scale (Jacobs et al., 2009), and the WHO LARES study (Bonnefoy et al., 2003). Items fall into three categories:
       </p>
 
       <div class="grid md:grid-cols-3 gap-6 my-8">
         <div class="bg-teal-50 p-6 rounded-[6px]">
-          <h3 class="font-semibold text-teal-900 mb-3">Unit Quality (10 items)</h3>
+          <h3 class="font-semibold text-teal-900 mb-3">Unit quality (10 items)</h3>
           <ul class="text-sm text-teal-800 space-y-1">
             <li>Structural integrity</li>
             <li>Plumbing & water</li>
@@ -49,7 +44,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
         </div>
 
         <div class="bg-blue-50 p-6 rounded-[6px]">
-          <h3 class="font-semibold text-blue-900 mb-3">Building Quality (9 items)</h3>
+          <h3 class="font-semibold text-blue-900 mb-3">Building quality (9 items)</h3>
           <ul class="text-sm text-blue-800 space-y-1">
             <li>Common areas</li>
             <li>Building security</li>
@@ -64,7 +59,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
         </div>
 
         <div class="bg-green-50 p-6 rounded-[6px]">
-          <h3 class="font-semibold text-green-900 mb-3">Landlord Experience (8 items)</h3>
+          <h3 class="font-semibold text-green-900 mb-3">Landlord experience (8 items)</h3>
           <ul class="text-sm text-green-800 space-y-1">
             <li>Maintenance response</li>
             <li>Communication</li>
@@ -79,17 +74,12 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
       </div>
 
       <div class="bg-paper border border-slate-200 rounded-[6px] p-6 my-8">
-        <h3 class="text-lg font-semibold text-gray-900 mb-3">Scoring Transparency</h3>
+        <h3 class="text-lg font-semibold text-gray-900 mb-3">Scoring transparency</h3>
         <p class="text-gray-600 mb-4">
-          Scores aren't simple averages of what tenants reported. Health and safety factors like pest control, mold,
-          structural integrity, and temperature control receive additional weight in the scoring algorithm,
-          based on peer-reviewed public health research from the WHO, EPA, and leading housing quality studies.
-          This means a building where tenants reported serious health hazards will score lower than one where
-          tenants reported only cosmetic issues, even if both have the same number of reviews.
+          Scores aren't simple averages. Conditions with documented health impacts carry more weight than cosmetic complaints. Pest control and mold are weighted 1.5×. Structural integrity and temperature control are weighted 1.3×. Plumbing and security are weighted 1.2×. The weights come from peer-reviewed public health research.
         </p>
         <p class="text-gray-600 mb-4">
-          We also apply recency weighting so that newer tenant-submitted reviews have more influence than older ones, ensuring
-          scores reflect the current state of a property as reported by recent tenants.
+          Scores apply recency weighting, because housing conditions change over time. Newer reviews count more than older ones (Hu, Pavlou, and Zhang, 2017).
         </p>
         <a
           href="/methodology"
@@ -105,45 +95,37 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mt-12 mb-3">Privacy as identity</p>
       <h2 class="text-2xl font-bold text-gray-900 mb-4">Privacy protection</h2>
       <p class="text-gray-600 mb-6">
-        We take reviewer privacy seriously. To protect tenants from potential retaliation:
+        Anonymity is the foundation, not a footnote. Landlord retaliation against tenant reviewers is illegal under federal fair housing law and most state law. To make sure no review can be traced back to a specific tenant:
       </p>
       <ul class="list-disc list-inside text-gray-600 mb-6 space-y-2">
         <li>Move-in and move-out dates are displayed as seasons (e.g., "Fall 2023") rather than exact dates</li>
         <li>No personally identifiable information is displayed on reviews</li>
-        <li>All reviews are moderated by our team before being published</li>
-        <li>Users can delete their reviews at any time</li>
+        <li>Reviews are checked for guideline compliance before publishing.</li>
+        <li>Reviewers can delete their reviews at any time.</li>
       </ul>
 
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mt-12 mb-3">Standards</p>
       <h2 class="text-2xl font-bold text-gray-900 mb-4">Review guidelines</h2>
       <p class="text-gray-600 mb-6">
-        To maintain the quality and trustworthiness of reviews, we require that all reviews:
+        All reviews must:
       </p>
       <ul class="list-disc list-inside text-gray-600 mb-6 space-y-2">
-        <li>Come from verified tenants who lived at the property</li>
+        <li>Be written by someone who actually lived at the property.</li>
         <li>Focus on factual experiences rather than personal attacks</li>
         <li>Don't contain discriminatory language or threats</li>
         <li>Don't include personally identifiable information about landlords or staff</li>
       </ul>
 
-      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mt-12 mb-3">Disputes &amp; corrections</p>
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Fairness for landlords</h2>
+      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mt-12 mb-3">Disputes</p>
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Handling disputes.</h2>
       <p class="text-gray-600 mb-6">
-        We believe in fairness for all parties. If a landlord or property manager believes a review
-        is inaccurate or violates our guidelines, they can <a href="/dispute" class="text-teal-700 hover:underline">submit a dispute</a>
-        for our team to investigate. They can also reach us at
-        <a href="mailto:landlords@ratemyplace.org" class="text-teal-700 hover:underline">landlords@ratemyplace.org</a>.
+        Landlords can't respond publicly to reviews. They can <a href="/dispute" class="text-teal-700 hover:underline">submit a dispute</a> if they believe a review violates our guidelines. Our team investigates, and if the review breaks a guideline, we act on it. We don't remove negative reviews because a landlord disagrees. Submit a dispute or email <a href="mailto:landlords@ratemyplace.org" class="text-teal-700 hover:underline">landlords@ratemyplace.org</a>.
       </p>
 
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mt-12 mb-3">Behind the work</p>
       <h2 class="text-2xl font-bold text-gray-900 mb-4">Who's behind this</h2>
       <p class="text-gray-600 mb-6">
-        RateMyPlace was created by <a href="https://meredithmcgee.org" target="_blank" rel="noopener noreferrer" class="text-teal-700 hover:text-teal-800">Meredith McGee</a>,
-        a Boston-based public health professional, researcher, and developer who saw firsthand how difficult
-        it can be for tenants to find reliable information about apartments and landlords before signing a lease.
-        Drawing on her background in public health research, Meredith designed RateMyPlace's evidence-based
-        scoring system to prioritize the health and safety factors that matter most to tenants. What started
-        as a personal frustration turned into a mission to give renters the transparency they deserve.
+        RateMyPlace was created by <a href="https://meredithmcgee.org" target="_blank" rel="noopener noreferrer" class="text-teal-700 hover:text-teal-800">Meredith McGee</a>, a public health researcher and grant writer based in Boston. The methodology is adapted from three validated housing quality instruments and weighted by what peer-reviewed research shows actually affects tenant health. The platform exists because tenants are the experts on their own housing, and that knowledge belongs in public.
       </p>
       <p class="text-gray-600 mb-6">
         You can learn more about Meredith and her other work at{' '}
