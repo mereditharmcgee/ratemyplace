@@ -122,7 +122,7 @@ const totalReviews = buildings.reduce((sum, b) => sum + (b.review_count || 0), 0
             </div>
             <div class="min-w-0">
               <h1 class="text-2xl md:text-3xl font-bold text-gray-900 break-words">{landlord.name}</h1>
-              <p class="text-sm text-gray-500">Landlord / Property Owner</p>
+              <p class="text-sm text-gray-500">Landlord</p>
             </div>
           </div>
           {landlord.description && (
@@ -178,7 +178,7 @@ const totalReviews = buildings.reduce((sum, b) => sum + (b.review_count || 0), 0
         <!-- Properties Section -->
         <div class="mb-8">
           <h2 class="text-xl font-semibold text-gray-900 mb-4">
-            Properties ({buildings.length})
+            Buildings ({buildings.length})
           </h2>
 
           {buildings.length > 0 ? (
@@ -218,11 +218,11 @@ const totalReviews = buildings.reduce((sum, b) => sum + (b.review_count || 0), 0
           )}
         </div>
 
-        <!-- Recent Reviews Section -->
+        <!-- Recent reviews Section -->
         {recentReviews.length > 0 && (
           <div>
             <h2 class="text-xl font-semibold text-gray-900 mb-4">
-              Recent Reviews
+              Recent reviews
             </h2>
             <div class="space-y-4">
               {recentReviews.map((review) => (
@@ -248,7 +248,7 @@ const totalReviews = buildings.reduce((sum, b) => sum + (b.review_count || 0), 0
 
         {scores && scores.pct_would_recommend !== null && (
           <div class="bg-white rounded-lg border border-gray-200 p-6 mt-6">
-            <h3 class="font-semibold text-gray-900 mb-4">Recommendation Rate</h3>
+            <h3 class="font-semibold text-gray-900 mb-4">Recommendation rate</h3>
             <div class="text-center">
               <div class="text-3xl font-bold text-teal-600">
                 {Math.round(scores.pct_would_recommend)}%
