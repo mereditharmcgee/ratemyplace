@@ -1,6 +1,6 @@
 # RateMyPlace Boston - Coding Conventions
 
-> For project context, architecture, and scoring methodology, see `CLAUDE_CONTEXT.md`.
+> **Doc map:** [`MASTER.md`](MASTER.md) is the canonical product spec (mission, ethics, rating instrument, privacy, schema). [`ARCHITECTURE.md`](ARCHITECTURE.md) is the technical architecture reference. [`brand.md`](brand.md) is the voice and visual brand bible. [`CLAUDE_CONTEXT.md`](CLAUDE_CONTEXT.md) is the orientation doc for Claude Code agents. This file is coding conventions only.
 
 ## Quick Reference
 
