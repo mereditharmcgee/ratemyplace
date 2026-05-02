@@ -209,14 +209,14 @@ export default function LandlordsTable() {
           onClick={() => setShowAddForm(!showAddForm)}
           className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800"
         >
-          + Add Landlord
+          + Add landlord
         </button>
       </div>
 
       {/* Add Landlord Form */}
       {showAddForm && (
         <div className="bg-white rounded-xl shadow-sm border border-teal-200 p-4 space-y-4">
-          <h3 className="font-semibold text-gray-900">Add New Landlord</h3>
+          <h3 className="font-semibold text-gray-900">Add landlord</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
@@ -272,7 +272,7 @@ export default function LandlordsTable() {
               disabled={adding}
               className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
             >
-              {adding ? 'Creating...' : 'Create Landlord'}
+              {adding ? 'Creating...' : 'Create landlord'}
             </button>
             <button
               onClick={() => setShowAddForm(false)}
@@ -288,25 +288,25 @@ export default function LandlordsTable() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">{landlords.length}</div>
-          <div className="text-sm text-gray-500">Total Landlords</div>
+          <div className="text-sm text-gray-500">Total landlords</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {landlords.reduce((sum, l) => sum + l.building_count, 0)}
           </div>
-          <div className="text-sm text-gray-500">Total Buildings</div>
+          <div className="text-sm text-gray-500">Total buildings</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {landlords.reduce((sum, l) => sum + l.review_count, 0)}
           </div>
-          <div className="text-sm text-gray-500">Total Reviews</div>
+          <div className="text-sm text-gray-500">Total reviews</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {landlords.filter((l) => l.avg_score && l.avg_score >= 4).length}
           </div>
-          <div className="text-sm text-gray-500">High Rated (4+)</div>
+          <div className="text-sm text-gray-500">High rated (4+)</div>
         </div>
       </div>
 
@@ -431,7 +431,7 @@ export default function LandlordsTable() {
                         disabled={saving}
                         className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
                       >
-                        {saving ? 'Saving...' : 'Save Changes'}
+                        {saving ? 'Saving...' : 'Save changes'}
                       </button>
                       <button
                         onClick={cancelEditing}
@@ -446,7 +446,7 @@ export default function LandlordsTable() {
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
-                        <h4 className="text-sm font-medium text-gray-500 mb-2">Contact Info</h4>
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">Contact info</h4>
                         <dl className="space-y-1 text-sm">
                           <div className="flex justify-between">
                             <dt className="text-gray-500">Email:</dt>
@@ -487,19 +487,19 @@ export default function LandlordsTable() {
                         onClick={() => startEditing(landlord)}
                         className="px-4 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 text-sm font-semibold"
                       >
-                        Edit Landlord
+                        Edit landlord
                       </button>
                       <a
                         href={`/landlord/${landlord.slug}`}
                         className="px-4 py-2 bg-slate-600 text-white rounded-[6px] hover:bg-slate-700 text-sm font-medium"
                       >
-                        View Page
+                        View page
                       </a>
                       <a
                         href={`/admin/buildings?landlord=${landlord.id}`}
                         className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300 text-sm font-medium"
                       >
-                        View Buildings ({landlord.building_count})
+                        View buildings ({landlord.building_count})
                       </a>
                       <button
                         onClick={() => deleteLandlord(landlord)}

@@ -194,16 +194,16 @@ export default function UsersTable({ currentUserId }: Props) {
                     <div className="flex flex-wrap gap-1">
                       {user.is_admin ? (
                         <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
-                          Admin
+                          admin
                         </span>
                       ) : null}
                       {user.email_verified ? (
                         <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                          Verified
+                          verified
                         </span>
                       ) : (
                         <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
-                          Unverified
+                          unverified
                         </span>
                       )}
                     </div>
@@ -229,8 +229,8 @@ export default function UsersTable({ currentUserId }: Props) {
                       {processing === user.id
                         ? '...'
                         : user.is_admin
-                        ? 'Remove Admin'
-                        : 'Make Admin'}
+                        ? 'Remove admin'
+                        : 'Make admin'}
                     </button>
                   </td>
                 </tr>

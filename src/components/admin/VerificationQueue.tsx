@@ -114,7 +114,7 @@ export default function VerificationQueue() {
         <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">All caught up!</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">All caught up</h3>
         <p className="text-gray-600">No pending verifications to review.</p>
       </div>
     );
@@ -124,7 +124,7 @@ export default function VerificationQueue() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-900">
-          Pending Verifications ({verifications.length})
+          Pending verifications ({verifications.length})
         </h2>
         <button
           onClick={fetchVerifications}

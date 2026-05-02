@@ -181,14 +181,14 @@ export default function ManagersTable() {
           onClick={() => setShowAddForm(!showAddForm)}
           className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800"
         >
-          + Add Manager
+          + Add manager
         </button>
       </div>
 
       {/* Add Manager Form */}
       {showAddForm && (
         <div className="bg-white rounded-xl shadow-sm border border-teal-200 p-4 space-y-4">
-          <h3 className="font-semibold text-gray-900">Add New Property Manager</h3>
+          <h3 className="font-semibold text-gray-900">Add property manager</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
@@ -201,7 +201,7 @@ export default function ManagersTable() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Company name</label>
               <input
                 type="text"
                 value={addForm.company_name}
@@ -254,7 +254,7 @@ export default function ManagersTable() {
               disabled={adding}
               className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
             >
-              {adding ? 'Creating...' : 'Create Manager'}
+              {adding ? 'Creating...' : 'Create manager'}
             </button>
             <button
               onClick={() => setShowAddForm(false)}
@@ -270,25 +270,25 @@ export default function ManagersTable() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">{managers.length}</div>
-          <div className="text-sm text-gray-500">Total Managers</div>
+          <div className="text-sm text-gray-500">Total managers</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {managers.reduce((sum, m) => sum + m.building_count, 0)}
           </div>
-          <div className="text-sm text-gray-500">Total Buildings</div>
+          <div className="text-sm text-gray-500">Total buildings</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {managers.reduce((sum, m) => sum + m.review_count, 0)}
           </div>
-          <div className="text-sm text-gray-500">Total Reviews</div>
+          <div className="text-sm text-gray-500">Total reviews</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {managers.filter((m) => m.avg_score && m.avg_score >= 4).length}
           </div>
-          <div className="text-sm text-gray-500">High Rated (4+)</div>
+          <div className="text-sm text-gray-500">High rated (4+)</div>
         </div>
       </div>
 
@@ -426,7 +426,7 @@ export default function ManagersTable() {
                         disabled={saving}
                         className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
                       >
-                        {saving ? 'Saving...' : 'Save Changes'}
+                        {saving ? 'Saving...' : 'Save changes'}
                       </button>
                       <button
                         onClick={cancelEditing}
@@ -441,7 +441,7 @@ export default function ManagersTable() {
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
-                        <h4 className="text-sm font-medium text-gray-500 mb-2">Contact Info</h4>
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">Contact info</h4>
                         <dl className="space-y-1 text-sm">
                           <div className="flex justify-between">
                             <dt className="text-gray-500">Email:</dt>
@@ -482,19 +482,19 @@ export default function ManagersTable() {
                         onClick={() => startEditing(manager)}
                         className="px-4 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 text-sm font-semibold"
                       >
-                        Edit Manager
+                        Edit manager
                       </button>
                       <a
                         href={`/property-manager/${manager.slug}`}
                         className="px-4 py-2 bg-slate-600 text-white rounded-[6px] hover:bg-slate-700 text-sm font-medium"
                       >
-                        View Page
+                        View page
                       </a>
                       <a
                         href={`/admin/buildings?manager=${manager.id}`}
                         className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300 text-sm font-medium"
                       >
-                        View Buildings ({manager.building_count})
+                        View buildings ({manager.building_count})
                       </a>
                     </div>
                   </>

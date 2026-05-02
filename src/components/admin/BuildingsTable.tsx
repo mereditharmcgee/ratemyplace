@@ -315,25 +315,25 @@ export default function BuildingsTable() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">{buildings.length}</div>
-          <div className="text-sm text-gray-500">Total Buildings</div>
+          <div className="text-sm text-gray-500">Total buildings</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {buildings.filter((b) => b.review_count > 0).length}
           </div>
-          <div className="text-sm text-gray-500">With Reviews</div>
+          <div className="text-sm text-gray-500">With reviews</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {buildings.filter((b) => b.landlord_id).length}
           </div>
-          <div className="text-sm text-gray-500">With Landlords</div>
+          <div className="text-sm text-gray-500">With landlords</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
             {buildings.reduce((sum, b) => sum + b.review_count, 0)}
           </div>
-          <div className="text-sm text-gray-500">Total Reviews</div>
+          <div className="text-sm text-gray-500">Total reviews</div>
         </div>
       </div>
 
@@ -498,7 +498,7 @@ export default function BuildingsTable() {
 
                     {/* Landlord & Property Manager */}
                     <div className="mt-4 pt-4 border-t border-gray-200">
-                      <h4 className="text-sm font-medium text-gray-700 mb-3">Landlord & Property Manager</h4>
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">Landlord and property manager</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -535,7 +535,7 @@ export default function BuildingsTable() {
 
                     {/* Admin Info Section */}
                     <div className="mt-4 pt-4 border-t border-gray-200">
-                      <h4 className="text-sm font-medium text-gray-700 mb-3">Ownership & Admin Info</h4>
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">Ownership and admin info</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -601,7 +601,7 @@ export default function BuildingsTable() {
                         disabled={saving}
                         className="px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
                       >
-                        {saving ? 'Saving...' : 'Save Changes'}
+                        {saving ? 'Saving...' : 'Save changes'}
                       </button>
                       <button
                         onClick={cancelEditing}
@@ -633,10 +633,10 @@ export default function BuildingsTable() {
                         </dl>
                       </div>
                       <div>
-                        <h4 className="text-sm font-medium text-gray-500 mb-2">Building Info</h4>
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">Building info</h4>
                         <dl className="space-y-1 text-sm">
                           <div className="flex justify-between">
-                            <dt className="text-gray-500">Year Built:</dt>
+                            <dt className="text-gray-500">Year built:</dt>
                             <dd className="text-gray-900">{building.year_built || 'N/A'}</dd>
                           </div>
                           <div className="flex justify-between">
@@ -673,7 +673,7 @@ export default function BuildingsTable() {
                     {/* Admin Info Display */}
                     {(building.owner_name || building.owner_entity || building.admin_notes) && (
                       <div className="mt-4 pt-4 border-t border-gray-200">
-                        <h4 className="text-sm font-medium text-gray-500 mb-2">Admin Info</h4>
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">Admin info</h4>
                         <dl className="space-y-1 text-sm">
                           {building.owner_name && (
                             <div className="flex justify-between">
@@ -683,7 +683,7 @@ export default function BuildingsTable() {
                           )}
                           {building.owner_entity && (
                             <div className="flex justify-between">
-                              <dt className="text-gray-500">Entity Type:</dt>
+                              <dt className="text-gray-500">Entity type:</dt>
                               <dd className="text-gray-900 capitalize">{building.owner_entity}</dd>
                             </div>
                           )}
@@ -731,7 +731,7 @@ export default function BuildingsTable() {
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-xs">
                                 <div><span className="text-gray-500">Owner:</span> <span className="text-gray-900">{r.owner}</span></div>
                                 <div><span className="text-gray-500">Entity:</span> <span className="text-gray-900 capitalize">{r.ownerEntityInferred}</span></div>
-                                <div><span className="text-gray-500">Year Built:</span> <span className="text-gray-900">{r.yearBuilt || 'N/A'}</span></div>
+                                <div><span className="text-gray-500">Year built:</span> <span className="text-gray-900">{r.yearBuilt || 'N/A'}</span></div>
                                 <div><span className="text-gray-500">Units:</span> <span className="text-gray-900">{r.unitCount || 'N/A'} ({r.residentialUnits || 0} res / {r.commercialUnits || 0} com)</span></div>
                                 <div><span className="text-gray-500">Type:</span> <span className="text-gray-900">{r.buildingType}</span></div>
                                 <div><span className="text-gray-500">Property:</span> <span className="text-gray-900">{r.propertyType}</span></div>
@@ -791,27 +791,27 @@ export default function BuildingsTable() {
                         onClick={() => startEditing(building)}
                         className="px-4 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 text-sm font-semibold"
                       >
-                        Edit Building
+                        Edit building
                       </button>
                       <button
                         onClick={() => enrichBuilding(building.id)}
                         disabled={enriching === building.id}
                         className="px-4 py-2 bg-indigo-600 text-white rounded-[6px] hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
                       >
-                        {enriching === building.id ? 'Researching...' : 'Auto-Research'}
+                        {enriching === building.id ? 'Researching...' : 'Auto-research'}
                       </button>
                       <a
                         href={`/building/${building.slug}`}
                         className="px-4 py-2 bg-slate-600 text-white rounded-[6px] hover:bg-slate-700 text-sm font-medium"
                       >
-                        View Page
+                        View page
                       </a>
                       {building.landlord_id && (
                         <a
                           href={`/admin/landlords?id=${building.landlord_id}`}
                           className="px-4 py-2 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300 text-sm font-medium"
                         >
-                          View Landlord
+                          View landlord
                         </a>
                       )}
                       <button
@@ -819,7 +819,7 @@ export default function BuildingsTable() {
                         disabled={deleting === building.id}
                         className="px-4 py-2 bg-red-600 text-white rounded-[6px] hover:bg-red-700 disabled:opacity-50 text-sm font-medium ml-auto"
                       >
-                        {deleting === building.id ? 'Deleting...' : 'Delete Building'}
+                        {deleting === building.id ? 'Deleting...' : 'Delete building'}
                       </button>
                     </div>
                   </>

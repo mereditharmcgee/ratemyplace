@@ -265,7 +265,7 @@ export default function DisputesQueue() {
                     {/* LEFT: Dispute details */}
                     <div className="space-y-4">
                       <div>
-                        <h4 className="text-sm font-medium text-gray-500 mb-2">Landlord Information</h4>
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">Landlord information</h4>
                         <dl className="space-y-1 text-sm">
                           <div className="flex justify-between">
                             <dt className="text-gray-500">Name:</dt>
@@ -283,7 +283,7 @@ export default function DisputesQueue() {
                       </div>
 
                       <div>
-                        <h4 className="text-sm font-medium text-gray-500 mb-2">Dispute Reasons</h4>
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">Dispute reasons</h4>
                         <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
                           {reasons.map((reason, idx) => (
                             <li key={idx}>{reason}</li>
@@ -329,7 +329,7 @@ export default function DisputesQueue() {
                     {/* RIGHT: Review details */}
                     <div className="space-y-4 lg:border-l lg:pl-6 border-gray-200">
                       <div>
-                        <h4 className="text-sm font-medium text-gray-500 mb-2">Original Review</h4>
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">Original review</h4>
                         <div className="space-y-2">
                           <div>
                             <div className="text-sm font-medium text-gray-700">Building</div>
@@ -338,7 +338,7 @@ export default function DisputesQueue() {
 
                           {dispute.review_overall_score !== null && (
                             <div>
-                              <div className="text-sm font-medium text-gray-700">Overall Score</div>
+                              <div className="text-sm font-medium text-gray-700">Overall score</div>
                               <div className="text-2xl font-bold text-teal-600">
                                 {dispute.review_overall_score.toFixed(1)}
                               </div>
@@ -354,7 +354,7 @@ export default function DisputesQueue() {
 
                           {dispute.review_text && (
                             <div>
-                              <div className="text-sm font-medium text-gray-700">Review Text</div>
+                              <div className="text-sm font-medium text-gray-700">Review text</div>
                               <p className="text-sm text-gray-700">{dispute.review_text}</p>
                             </div>
                           )}
@@ -378,7 +378,7 @@ export default function DisputesQueue() {
                   {/* Resolution form (only for pending disputes) */}
                   {dispute.status === 'pending' && resolutionForm && (
                     <div className="pt-4 border-t border-gray-200 space-y-4">
-                      <h4 className="text-sm font-medium text-gray-700">Resolve Dispute</h4>
+                      <h4 className="text-sm font-medium text-gray-700">Resolve dispute</h4>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -393,13 +393,13 @@ export default function DisputesQueue() {
                         >
                           <option value="dismiss">Dismiss</option>
                           <option value="uphold">Uphold</option>
-                          <option value="partially_valid">Partially Valid</option>
+                          <option value="partially_valid">Partially valid</option>
                         </select>
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Resolution Notes * (required)
+                          Resolution notes * (required)
                         </label>
                         <textarea
                           value={resolutionForm.notes}
@@ -417,7 +417,7 @@ export default function DisputesQueue() {
                         disabled={!resolutionForm.notes.trim() || processing === dispute.id}
                         className="px-6 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold"
                       >
-                        {processing === dispute.id ? 'Resolving...' : 'Resolve Dispute'}
+                        {processing === dispute.id ? 'Resolving...' : 'Resolve dispute'}
                       </button>
                     </div>
                   )}

@@ -112,13 +112,13 @@ export default function AuditLogTable() {
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Action type filter */}
         <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Action Type</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Action type</label>
           <select
             value={actionFilter}
             onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
-            <option value="all">All Actions</option>
+            <option value="all">All actions</option>
             {filterOptions.actionTypes.map(type => (
               <option key={type} value={type}>{formatActionType(type)}</option>
             ))}
@@ -127,13 +127,13 @@ export default function AuditLogTable() {
 
         {/* Admin user filter */}
         <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Admin User</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Admin user</label>
           <select
             value={adminFilter}
             onChange={(e) => { setAdminFilter(e.target.value); setPage(1); }}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
-            <option value="all">All Admins</option>
+            <option value="all">All admins</option>
             {filterOptions.adminUsers.map(admin => (
               <option key={admin.id} value={admin.id}>{admin.email || admin.id}</option>
             ))}

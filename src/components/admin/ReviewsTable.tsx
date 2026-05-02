@@ -457,7 +457,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
 
                       {/* Written Content */}
                       <div className="mb-4 p-3 bg-white rounded-[6px] border border-gray-200">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Review Content</h4>
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Review content</h4>
                         {detail.review_title && (
                           <p className="font-semibold text-gray-900 mb-1">"{detail.review_title}"</p>
                         )}
@@ -466,7 +466,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                         </p>
                         {detail.review_text && detail.comments && detail.review_text !== detail.comments && (
                           <div className="mt-2 pt-2 border-t border-gray-100">
-                            <p className="text-xs font-medium text-gray-500 mb-1">Additional Comments</p>
+                            <p className="text-xs font-medium text-gray-500 mb-1">Additional comments</p>
                             <p className="text-sm text-gray-700 whitespace-pre-line">{detail.comments}</p>
                           </div>
                         )}
@@ -703,14 +703,14 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                     className="px-4 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 text-sm font-semibold"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    Edit Review
+                    Edit review
                   </a>
                   <a
                     href={`/building/${review.building_slug}`}
                     className="px-4 py-2 bg-slate-600 text-white rounded-[6px] hover:bg-slate-700 text-sm font-medium"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    View Building
+                    View building
                   </a>
                 </div>
               </div>

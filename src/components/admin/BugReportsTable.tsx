@@ -162,7 +162,7 @@ export default function BugReportsTable() {
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            {status === 'wont_fix' ? "Won't Fix" : status === 'in_progress' ? 'In Progress' : status.charAt(0).toUpperCase() + status.slice(1)} ({statusCounts[status]})
+            {status === 'wont_fix' ? "Won't fix" : status === 'in_progress' ? 'In progress' : status.charAt(0).toUpperCase() + status.slice(1)} ({statusCounts[status]})
           </button>
         ))}
       </div>
@@ -198,7 +198,7 @@ export default function BugReportsTable() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(bug.status)}`}>
-                    {bug.status === 'wont_fix' ? "Won't Fix" : bug.status === 'in_progress' ? 'In Progress' : bug.status}
+                    {bug.status === 'wont_fix' ? "won't fix" : bug.status === 'in_progress' ? 'in progress' : bug.status}
                   </span>
                   <svg
                     className={`w-5 h-5 text-gray-400 transition-transform ${expandedBug === bug.id ? 'rotate-180' : ''}`}
@@ -216,7 +216,7 @@ export default function BugReportsTable() {
             {expandedBug === bug.id && (
               <div className="border-t border-gray-200 p-4 bg-gray-50 space-y-4">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-1">Full Description</h4>
+                  <h4 className="text-sm font-medium text-gray-500 mb-1">Full description</h4>
                   <p className="text-sm text-gray-900 whitespace-pre-wrap">{bug.description}</p>
                 </div>
 
@@ -263,7 +263,7 @@ export default function BugReportsTable() {
                 {/* Admin notes + actions */}
                 <div className="pt-4 border-t border-gray-200 space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Admin Notes</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Admin notes</label>
                     <textarea
                       value={adminNotes}
                       onChange={(e) => setAdminNotes(e.target.value)}
@@ -280,7 +280,7 @@ export default function BugReportsTable() {
                         disabled={processing === bug.id}
                         className="px-4 py-2 bg-amber-500 text-white rounded-[6px] text-sm font-medium hover:bg-amber-600 disabled:opacity-50"
                       >
-                        {processing === bug.id ? 'Updating...' : 'Mark In Progress'}
+                        {processing === bug.id ? 'Updating...' : 'Mark in progress'}
                       </button>
                     )}
                     {(bug.status === 'new' || bug.status === 'in_progress') && (
@@ -297,7 +297,7 @@ export default function BugReportsTable() {
                           disabled={processing === bug.id}
                           className="px-4 py-2 bg-gray-500 text-white rounded-[6px] text-sm font-medium hover:bg-gray-600 disabled:opacity-50"
                         >
-                          {processing === bug.id ? 'Updating...' : "Won't Fix"}
+                          {processing === bug.id ? 'Updating...' : "Won't fix"}
                         </button>
                       </>
                     )}
@@ -307,7 +307,7 @@ export default function BugReportsTable() {
                         disabled={processing === bug.id}
                         className="px-4 py-2 bg-teal-700 text-white rounded-[4px] text-sm font-semibold hover:bg-teal-800 disabled:opacity-50"
                       >
-                        Save Notes
+                        Save notes
                       </button>
                     )}
                   </div>
