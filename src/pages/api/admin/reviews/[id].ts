@@ -1,8 +1,10 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
+import { getEnv } from '../../../../lib/runtime';
 import { createAuditLog } from '../../../../lib/audit';
 import { getClientIP } from '../../../../lib/rateLimit';
 import { createNotification } from '../../../../lib/notifications';
+import { sendReviewRejectedEmail } from '../../../../lib/email';
 
 export async function PATCH(context: APIContext): Promise<Response> {
   // Require authentication
@@ -90,11 +92,16 @@ export async function PATCH(context: APIContext): Promise<Response> {
         notes: moderation_notes || undefined
       });
 
-      // Notify the review author when their review is approved or rejected
+      // Notify the review author when their review is approved or rejected.
+      // Approved: in-app notification only (low urgency, they'll see it next visit).
+      // Rejected: in-app notification + email — a tenant who put real time into
+      // a review and gets it rejected may not log back in to find out, so the
+      // email is the load-bearing channel for telling them what happened and
+      // pointing them at edit-and-resubmit (audit CG2).
       if (status === 'approved' || status === 'rejected') {
         const reviewWithBuilding = await db.prepare(
-          'SELECT r.user_id, b.address FROM reviews r JOIN buildings b ON r.building_id = b.id WHERE r.id = ?'
-        ).bind(reviewId).first<{ user_id: string; address: string }>();
+          'SELECT r.user_id, b.address, u.email FROM reviews r JOIN buildings b ON r.building_id = b.id JOIN users u ON r.user_id = u.id WHERE r.id = ?'
+        ).bind(reviewId).first<{ user_id: string; address: string; email: string }>();
 
         if (reviewWithBuilding) {
           await createNotification(db, {
@@ -103,6 +110,28 @@ export async function PATCH(context: APIContext): Promise<Response> {
             reviewId,
             buildingAddress: reviewWithBuilding.address,
           });
+
+          if (status === 'rejected') {
+            const env = getEnv(context);
+            const apiKey = env.RESEND_API_KEY;
+            const siteUrl = env.SITE_URL || 'https://ratemyplace.org';
+            if (apiKey) {
+              try {
+                await sendReviewRejectedEmail(
+                  apiKey,
+                  siteUrl,
+                  reviewWithBuilding.email,
+                  reviewWithBuilding.address,
+                  moderation_notes ?? null
+                );
+              } catch (emailError) {
+                console.error('Failed to send review rejected email:', emailError);
+                // Don't fail the moderator's action if email fails
+              }
+            } else {
+              console.warn('RESEND_API_KEY not configured - skipping review rejected email');
+            }
+          }
         }
       }
     }

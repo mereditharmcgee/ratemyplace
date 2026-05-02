@@ -481,3 +481,86 @@ export async function sendDisputeResolutionEmail(
     return { success: false, error: 'Failed to send email' };
   }
 }
+
+
+/**
+ * Send review-rejected email to the reviewer. Sent in addition to the in-app
+ * notification — a tenant who put real time into a review and gets it rejected
+ * may not log back in to find out, so the email surface is the load-bearing
+ * channel for telling them what happened and what to do next.
+ *
+ * @param apiKey - Resend API key from environment
+ * @param siteUrl - Base URL for profile/edit links
+ * @param toEmail - Reviewer's email address
+ * @param buildingAddress - Address of the reviewed building (for context)
+ * @param rejectionReason - Moderator's notes on why the review was rejected
+ *                          (may be null/empty if moderator didn't supply one)
+ */
+export async function sendReviewRejectedEmail(
+  apiKey: string,
+  siteUrl: string,
+  toEmail: string,
+  buildingAddress: string,
+  rejectionReason: string | null
+): Promise<EmailResult> {
+  if (!apiKey) {
+    console.error('RESEND_API_KEY not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  const resend = new Resend(apiKey);
+  const profileUrl = `${siteUrl}/profile`;
+  const guidelinesUrl = `${siteUrl}/guidelines`;
+
+  // The reason block only renders when the moderator supplied notes. If they
+  // didn't, the email still ships — silence on rejection is worse than a
+  // generic "see guidelines" pointer.
+  const reasonBlock = rejectionReason && rejectionReason.trim()
+    ? `
+  <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 10px 0;"><strong>What we noted:</strong></p>
+    <p style="margin: 0; color: #666;">${rejectionReason}</p>
+  </div>
+`
+    : '';
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+      to: toEmail,
+      subject: 'Your review wasn\'t published',
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">Your review wasn't published</h2>
+
+  <p>We didn't publish your review of <strong>${buildingAddress}</strong>. It didn't meet our <a href="${guidelinesUrl}" style="color: #0d9488;">content guidelines</a>.</p>
+${reasonBlock}
+  <p>You can edit and resubmit from your <a href="${profileUrl}" style="color: #0d9488;">profile</a>. Most rejections are about specific fixes (removing names, dates, or other identifying details), not the substance of what you experienced.</p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a> if you think this was a mistake.
+  </p>
+</body>
+</html>
+      `,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err) {
+    console.error('Email send exception:', err);
+    return { success: false, error: 'Failed to send email' };
+  }
+}
