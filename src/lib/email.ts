@@ -32,7 +32,7 @@ export async function sendVerificationEmail(
     const { data, error } = await resend.emails.send({
       from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
       to: toEmail,
-      subject: 'Verify your email address',
+      subject: 'Verify your email',
       html: `
 <!DOCTYPE html>
 <html>
@@ -41,14 +41,14 @@ export async function sendVerificationEmail(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <h2 style="color: #0d9488;">Welcome to RateMyPlace Boston!</h2>
+  <h2 style="color: #0d9488;">Verify your email</h2>
 
-  <p>Please verify your email address to get the verified badge on your reviews.</p>
+  <p>Confirm your email so you can post reviews. The next tenant is reading.</p>
 
   <p style="margin: 30px 0;">
     <a href="${verificationUrl}"
        style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-      Verify Email Address
+      Verify email
     </a>
   </p>
 
@@ -273,9 +273,13 @@ export async function sendContactConfirmationEmail(
 
   try {
     const { data, error } = await resend.emails.send({
-      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+      // Sent from support@ so replies land in a real inbox (Cloudflare Email Routing
+      // catch-all forwards all @ratemyplace.org addresses). This makes the "reply or
+      // use the form" footer below honest.
+      from: 'RateMyPlace Boston <support@ratemyplace.org>',
       to: toEmail,
-      subject: 'We received your message - RateMyPlace Boston',
+      replyTo: 'support@ratemyplace.org',
+      subject: 'We received your message',
       html: `
 <!DOCTYPE html>
 <html>
@@ -288,16 +292,12 @@ export async function sendContactConfirmationEmail(
 
   <p>Hi ${toName},</p>
 
-  <p>Thank you for reaching out. We've received your ${categoryLabel} and will get back to you as soon as possible.</p>
-
-  <p>Our team typically responds within 2-3 business days. If your matter is urgent, please reply to this email and include "URGENT" in the subject line.</p>
-
-  <p style="color: #666; font-size: 14px;">Thank you for helping us make RateMyPlace Boston better for everyone.</p>
+  <p>We've got your ${categoryLabel} and will reply within 2-3 business days.</p>
 
   <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
 
   <p style="color: #999; font-size: 12px;">
-    This is a confirmation that we received your message. Please do not reply to this automated email — use the contact form at ratemyplace.org/contact to send additional messages.
+    Sent automatically. Reply to this email or use <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>. Both reach us.
   </p>
 </body>
 </html>
