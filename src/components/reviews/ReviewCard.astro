@@ -71,10 +71,13 @@ const landlordScores = [
   { key: 'landlord_non_retaliation', label: 'Non-retaliation', weighted: ITEM_WEIGHTS.landlord_non_retaliation > 1 },
 ];
 
-// Filter to only scores that exist
-const availableUnitScores = unitScores.filter(s => review[s.key] != null);
-const availableBuildingScores = buildingScores.filter(s => review[s.key] != null);
-const availableLandlordScores = landlordScores.filter(s => review[s.key] != null);
+// Render all 27 items in every breakdown — skipped items show as muted
+// "Not rated" rows so readers can distinguish a low score from a skip.
+// (Domain averages above the table still come from non-null items only via
+// calculateDomainScores, which already filters internally.)
+const allUnitScores = unitScores;
+const allBuildingScores = buildingScores;
+const allLandlordScores = landlordScores;
 
 // Security deposit display helpers
 const hasDepositScore = review.landlord_deposit != null;
@@ -249,88 +252,104 @@ const pestLabels: Record<string, string> = {
     </div>
   )}
 
-  <!-- Score Breakdown Grid -->
-  {(availableUnitScores.length > 0 || availableBuildingScores.length > 0 || availableLandlordScores.length > 0) && (
-    <div class="bg-gray-50 rounded-[6px] p-4 mb-4">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <!-- Unit Scores -->
-        {availableUnitScores.length > 0 && (
-          <div>
-            <div class="flex items-center gap-2 mb-2">
-              <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Unit Condition</h4>
-              {domainScores.unit && (
-                <span class={`text-xs font-bold ${getScoreTextColor(domainScores.unit)}`}>
-                  {domainScores.unit.toFixed(1)}
+  <!-- Score Breakdown Grid (always renders all 27 items; skipped items show as 'Not rated') -->
+  <div class="bg-gray-50 rounded-[6px] p-4 mb-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Unit Scores -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Unit Condition</h4>
+          {domainScores.unit && (
+            <span class={`text-xs font-bold ${getScoreTextColor(domainScores.unit)}`}>
+              {domainScores.unit.toFixed(1)}
+            </span>
+          )}
+        </div>
+        <div class="space-y-1">
+          {allUnitScores.map(({ key, label, weighted }) => {
+            const value = review[key];
+            const isRated = value != null;
+            return (
+              <div class="flex justify-between text-sm">
+                <span class={isRated ? 'text-gray-600' : 'text-slate-500'}>
+                  {label}
+                  {isRated && weighted && <span class="text-red-400 ml-0.5" title="Health/Safety weighted">*</span>}
                 </span>
-              )}
-            </div>
-            <div class="space-y-1">
-              {availableUnitScores.map(({ key, label, weighted }) => (
-                <div class="flex justify-between text-sm">
-                  <span class="text-gray-600">
-                    {label}
-                    {weighted && <span class="text-red-400 ml-0.5" title="Health/Safety weighted">*</span>}
-                  </span>
-                  <span class={`font-medium ${getScoreTextColor(review[key])}`}>{review[key]}/5</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <!-- Building Scores -->
-        {availableBuildingScores.length > 0 && (
-          <div>
-            <div class="flex items-center gap-2 mb-2">
-              <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Building</h4>
-              {domainScores.building && (
-                <span class={`text-xs font-bold ${getScoreTextColor(domainScores.building)}`}>
-                  {domainScores.building.toFixed(1)}
-                </span>
-              )}
-            </div>
-            <div class="space-y-1">
-              {availableBuildingScores.map(({ key, label, weighted }) => (
-                <div class="flex justify-between text-sm">
-                  <span class="text-gray-600">
-                    {label}
-                    {weighted && <span class="text-red-400 ml-0.5" title="Health/Safety weighted">*</span>}
-                  </span>
-                  <span class={`font-medium ${getScoreTextColor(review[key])}`}>{review[key]}/5</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <!-- Landlord Scores -->
-        {availableLandlordScores.length > 0 && (
-          <div>
-            <div class="flex items-center gap-2 mb-2">
-              <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Landlord</h4>
-              {domainScores.landlord && (
-                <span class={`text-xs font-bold ${getScoreTextColor(domainScores.landlord)}`}>
-                  {domainScores.landlord.toFixed(1)}
-                </span>
-              )}
-            </div>
-            <div class="space-y-1">
-              {availableLandlordScores.map(({ key, label, weighted }) => (
-                <div class="flex justify-between text-sm">
-                  <span class="text-gray-600">
-                    {label}
-                    {weighted && <span class="text-red-400 ml-0.5" title="Health/Safety weighted">*</span>}
-                  </span>
-                  <span class={`font-medium ${getScoreTextColor(review[key])}`}>{review[key]}/5</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                {isRated ? (
+                  <span class={`font-medium ${getScoreTextColor(value)}`}>{value}/5</span>
+                ) : (
+                  <span class="text-slate-400 text-xs italic">Not rated</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
-      <p class="text-xs text-gray-400 mt-3"><span class="text-red-400">*</span> Health and safety weighted. These factors count more in the overall score. <a href="/methodology" class="text-teal-500 hover:text-teal-700">Learn more</a></p>
+
+      <!-- Building Scores -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Building</h4>
+          {domainScores.building && (
+            <span class={`text-xs font-bold ${getScoreTextColor(domainScores.building)}`}>
+              {domainScores.building.toFixed(1)}
+            </span>
+          )}
+        </div>
+        <div class="space-y-1">
+          {allBuildingScores.map(({ key, label, weighted }) => {
+            const value = review[key];
+            const isRated = value != null;
+            return (
+              <div class="flex justify-between text-sm">
+                <span class={isRated ? 'text-gray-600' : 'text-slate-500'}>
+                  {label}
+                  {isRated && weighted && <span class="text-red-400 ml-0.5" title="Health/Safety weighted">*</span>}
+                </span>
+                {isRated ? (
+                  <span class={`font-medium ${getScoreTextColor(value)}`}>{value}/5</span>
+                ) : (
+                  <span class="text-slate-400 text-xs italic">Not rated</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <!-- Landlord Scores -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Landlord</h4>
+          {domainScores.landlord && (
+            <span class={`text-xs font-bold ${getScoreTextColor(domainScores.landlord)}`}>
+              {domainScores.landlord.toFixed(1)}
+            </span>
+          )}
+        </div>
+        <div class="space-y-1">
+          {allLandlordScores.map(({ key, label, weighted }) => {
+            const value = review[key];
+            const isRated = value != null;
+            return (
+              <div class="flex justify-between text-sm">
+                <span class={isRated ? 'text-gray-600' : 'text-slate-500'}>
+                  {label}
+                  {isRated && weighted && <span class="text-red-400 ml-0.5" title="Health/Safety weighted">*</span>}
+                </span>
+                {isRated ? (
+                  <span class={`font-medium ${getScoreTextColor(value)}`}>{value}/5</span>
+                ) : (
+                  <span class="text-slate-400 text-xs italic">Not rated</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
-  )}
+    <p class="text-xs text-gray-400 mt-3"><span class="text-red-400">*</span> Health and safety weighted. These factors count more in the overall score. <a href="/methodology" class="text-teal-500 hover:text-teal-700">Learn more</a></p>
+  </div>
 
   <!-- Security Deposit Highlight -->
   {showDepositSection && (
