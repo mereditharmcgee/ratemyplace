@@ -190,7 +190,7 @@ export async function sendDisputeConfirmationEmail(
     const { data, error } = await resend.emails.send({
       from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
       to: toEmail,
-      subject: 'Dispute Submitted - RateMyPlace Boston',
+      subject: 'We received your dispute',
       html: `
 <!DOCTYPE html>
 <html>
@@ -199,31 +199,29 @@ export async function sendDisputeConfirmationEmail(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <h2 style="color: #0d9488;">Thank you for submitting your dispute</h2>
+  <h2 style="color: #0d9488;">We received your dispute</h2>
 
-  <p>Dear ${disputeDetails.landlordName},</p>
+  <p>Hi ${disputeDetails.landlordName},</p>
 
-  <p>We have received your dispute for the review at <strong>${disputeDetails.buildingAddress}</strong>.</p>
+  <p>Your dispute about the review at <strong>${disputeDetails.buildingAddress}</strong> is in our queue.</p>
 
   <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
-    <p style="margin: 0 0 10px 0;"><strong>Dispute Reasons:</strong></p>
+    <p style="margin: 0 0 10px 0;"><strong>Reasons cited:</strong></p>
     <ul style="margin: 0; padding-left: 20px;">
       ${reasonsList}
     </ul>
     ${disputeDetails.disputeExplanation ? `
-    <p style="margin: 16px 0 0 0;"><strong>Additional Explanation:</strong></p>
+    <p style="margin: 16px 0 0 0;"><strong>Your explanation:</strong></p>
     <p style="margin: 8px 0 0 0; color: #666;">${disputeDetails.disputeExplanation}</p>
     ` : ''}
   </div>
 
-  <p>Our admin team will carefully review your dispute. If the dispute is upheld, you will receive a notification email with the resolution details.</p>
-
-  <p style="color: #666; font-size: 14px;">Thank you for helping us maintain accurate information on RateMyPlace Boston.</p>
+  <p>We'll review and follow up by email with the outcome, whether we uphold, partially uphold, or dismiss the dispute.</p>
 
   <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
 
   <p style="color: #999; font-size: 12px;">
-    This is a confirmation of your dispute submission. For questions, please contact us through the website.
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a> for follow-ups.
   </p>
 </body>
 </html>
@@ -387,17 +385,47 @@ export async function sendContactNotificationEmail(
 }
 
 /**
- * Send dispute upheld notification to landlord
+ * Send dispute resolution email to landlord. Handles all three resolution
+ * outcomes (upheld, dismissed, partially upheld) so a landlord always hears
+ * back, regardless of which way the dispute lands.
  *
  * @param apiKey - Resend API key from environment
  * @param toEmail - Landlord's email address
  * @param landlordName - Landlord's name
- * @param resolutionNotes - Admin's resolution notes
+ * @param outcome - Resolution outcome ('uphold' | 'dismiss' | 'partially_valid')
+ * @param resolutionNotes - Admin's resolution notes (shown verbatim)
  */
-export async function sendDisputeUpheldEmail(
+export type DisputeResolutionOutcome = 'uphold' | 'dismiss' | 'partially_valid';
+
+interface DisputeOutcomeCopy {
+  subject: string;
+  heading: string;
+  lede: string;
+}
+
+const DISPUTE_OUTCOME_COPY: Record<DisputeResolutionOutcome, DisputeOutcomeCopy> = {
+  uphold: {
+    subject: 'We upheld your dispute',
+    heading: 'We upheld your dispute',
+    lede: 'We\'ve upheld your dispute. The review has been updated according to our <a href="https://ratemyplace.org/guidelines" style="color: #0d9488;">content guidelines</a>.',
+  },
+  dismiss: {
+    subject: 'We did not uphold your dispute',
+    heading: 'We did not uphold your dispute',
+    lede: 'We reviewed your dispute and decided not to act on it. The review stands. Reviews can be valid even when a landlord disagrees, so long as they meet our <a href="https://ratemyplace.org/guidelines" style="color: #0d9488;">content guidelines</a>.',
+  },
+  partially_valid: {
+    subject: 'We partially upheld your dispute',
+    heading: 'We partially upheld your dispute',
+    lede: 'We found some of your concerns valid and addressed them. Other parts of the review stand. Specifics are in the resolution notes below.',
+  },
+};
+
+export async function sendDisputeResolutionEmail(
   apiKey: string,
   toEmail: string,
   landlordName: string,
+  outcome: DisputeResolutionOutcome,
   resolutionNotes: string
 ): Promise<EmailResult> {
   if (!apiKey) {
@@ -406,12 +434,13 @@ export async function sendDisputeUpheldEmail(
   }
 
   const resend = new Resend(apiKey);
+  const copy = DISPUTE_OUTCOME_COPY[outcome];
 
   try {
     const { data, error } = await resend.emails.send({
       from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
       to: toEmail,
-      subject: 'Dispute Resolution - RateMyPlace Boston',
+      subject: copy.subject,
       html: `
 <!DOCTYPE html>
 <html>
@@ -420,25 +449,21 @@ export async function sendDisputeUpheldEmail(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <h2 style="color: #0d9488;">Your dispute has been reviewed</h2>
+  <h2 style="color: #0d9488;">${copy.heading}</h2>
 
-  <p>Dear ${landlordName},</p>
+  <p>Hi ${landlordName},</p>
 
-  <p>After careful review, we have <strong>upheld your dispute</strong>. The review in question has been addressed according to our policies.</p>
+  <p>${copy.lede}</p>
 
   <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
-    <p style="margin: 0 0 10px 0;"><strong>Resolution Notes:</strong></p>
+    <p style="margin: 0 0 10px 0;"><strong>Resolution notes:</strong></p>
     <p style="margin: 0; color: #666;">${resolutionNotes}</p>
   </div>
-
-  <p>The appropriate action has been taken based on our review of your dispute.</p>
-
-  <p style="color: #666; font-size: 14px;">Thank you for bringing this to our attention and helping us maintain the integrity of RateMyPlace Boston.</p>
 
   <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
 
   <p style="color: #999; font-size: 12px;">
-    This is a resolution notification for your dispute. For questions, please contact us through the website.
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>.
   </p>
 </body>
 </html>
