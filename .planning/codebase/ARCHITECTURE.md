@@ -1,284 +1,221 @@
 # Architecture
 
-**Analysis Date:** 2026-04-26
+**Analysis Date:** 2026-05-02
 
 ## Pattern Overview
 
-**Overall:** Astro 5 Server-Side Rendering (SSR) with React islands and D1 (SQLite) database.
+**Overall:** Astro 5.x SSR with React islands for interactive components, server-backed by Cloudflare D1 (SQLite) and Lucia v3 authentication.
 
 **Key Characteristics:**
-- Full-stack TypeScript with strict mode enabled
-- Server-rendered Astro pages for SEO and static content
-- React components as client-side islands for interactive features
-- Cloudflare Workers runtime for middleware and API routes
-- SQLite D1 database with Lucia v3 for authentication
-- Middleware-based auth context injection for all requests
+- Server-side rendering by default, minimal JavaScript on client
+- React islands (`client:load`) only where immediate interactivity required
+- Middleware-based auth flow with session management
+- Database-driven with parameterized queries throughout
+- Multi-tier access control (public, authenticated, admin)
+- Observable/audit-driven for compliance
 
 ## Layers
 
-**Presentation (Pages & Components):**
-- Purpose: User-facing pages and interactive components
-- Location: `src/pages/` (Astro pages) and `src/components/` (React + Astro)
-- Contains: Page routes, form components, display components
-- Depends on: Library functions, API routes, layout components
-- Used by: Browser clients
+**Presentation (Astro Pages):**
+- Purpose: Render server-side HTML, hydrate React islands
+- Location: `src/pages/`
+- Contains: Astro page components (`.astro`), dynamic routes with `Astro.params`
+- Depends on: Components, lib utilities, database for SSR data fetching
+- Used by: Browser requests via Cloudflare Pages
 
-**API Routes:**
-- Purpose: HTTP endpoints for data operations (CRUD, auth, search)
-- Location: `src/pages/api/`
-- Contains: RESTful endpoints organized by resource
-- Depends on: Database functions, library utilities, auth checks
-- Used by: Frontend pages, external services
+**Interactive Components (React Islands):**
+- Purpose: Client-side interactivity—forms, maps, tables, real-time UI updates
+- Location: `src/components/**/*.tsx`
+- Contains: React functional components, hooks, form state management
+- Depends on: API routes, types, validation utilities
+- Used by: Astro pages with `client:load` directive
 
-**Business Logic & Utilities:**
-- Purpose: Shared, single-responsibility functions
+**Static Components (Astro):**
+- Purpose: Layout, content display, markup composition
+- Location: `src/components/**/*.astro`
+- Contains: Reusable layouts, card components, headers/footers
+- Depends on: Types, formatting utilities
+- Used by: Astro pages and other Astro components
+
+**API Layer:**
+- Purpose: RESTful endpoints for data mutations and admin operations
+- Location: `src/pages/api/**/*.ts`
+- Contains: POST/GET handlers, auth/validation checks, database operations
+- Depends on: Database, auth, validation, audit logging
+- Used by: React components via fetch, admin React tables
+
+**Business Logic & Data (Library):**
+- Purpose: Core algorithms, validation, formatting, database access
 - Location: `src/lib/`
-- Contains: Scoring algorithms, validation, formatting, audit logging, email
-- Depends on: Database and types only
-- Used by: API routes and components
+- Contains: Scoring system, survey configuration, auth, enrichment, validation
+- Depends on: Database, types, external APIs (Google Maps, Cloudflare Turnstile)
+- Used by: API routes, pages, components
 
-**Database Layer:**
-- Purpose: SQLite D1 data persistence
-- Location: `migrations/` (schema) and accessed via `getDB()` function
-- Contains: 27 survey questions, buildings, reviews, users, landlords, property managers
-- Depends on: None
-- Used by: API routes and some Astro pages
-
-**Authentication:**
-- Purpose: Session management and user context
+**Middleware & Auth:**
+- Purpose: Session management, auth state injection, security headers
 - Location: `src/middleware.ts`, `src/lib/auth.ts`
-- Contains: Lucia v3 session validation, user attribute mapping
-- Depends on: Database
-- Used by: All routes via `context.locals.user`
+- Contains: Lucia session validation, cookie management, CSP/security headers
+- Depends on: Database, Lucia v3
+- Used by: All routes (runs before every request)
+
+**Database & Storage:**
+- Purpose: Data persistence via Cloudflare D1 (SQLite)
+- Location: `src/lib/db.ts`, migrations in `migrations/`
+- Contains: D1 client initialization, query builders (prepared statements)
+- Depends on: Cloudflare Workers runtime
+- Used by: All business logic layers
 
 ## Data Flow
 
-**Public Page View (e.g., Search Results):**
+**Public Review Submission:**
 
-1. User navigates to `search.astro`
-2. Astro middleware validates session (runs `middleware.ts`)
-3. Page component queries database directly via `getDB()`
-4. Database returns buildings and landlords matching search query
-5. Astro renders HTML server-side with search results
-6. SearchResults React component mounts client-side for interactivity
-7. User sees fully-rendered page with no Flash of Unstyled Content
+1. User navigates to `/review/new`
+2. `ReviewForm.tsx` (React island) collects multi-step form data
+3. User submits → POST to `/api/reviews`
+4. `/api/reviews.ts` validates input via `validation.ts`
+5. Scores calculated via `calculateDomainScores()` from `scoring.ts`
+6. Review inserted into database with status='pending'
+7. Audit log created via `createAuditLog()` in `audit.ts`
+8. Cloudflare Turnstile verification on submit (CSRF protection)
+9. Success response redirects to profile page
+10. Admin sees pending review in `/admin/reviews` table
 
-**Review Submission Flow:**
+**Search & Display:**
 
-1. User fills out ReviewForm (React island) on `/review/new`
-2. Form validates address via AddressAutocomplete → Google Places API
-3. User completes multi-step form and clicks "Submit"
-4. Form POSTs JSON to `/api/reviews/[id]` endpoint
-5. API route validates auth, input, and checks rate limits
-6. API inserts review into database with `status: 'pending'`
-7. API logs to audit table and creates notification
-8. Page redirects to building detail page with `?submitted=true`
-9. Building page displays "Review submitted" message
-10. Admin receives notification and can approve/reject from admin panel
+1. User searches on `/` via `HomeSearch` component
+2. Query sent to `/search?q=...` (SSR page)
+3. `search.astro` queries database for buildings and landlords
+4. Results grouped by type, paginated (PAGE_SIZE=10)
+5. Building detail page (`[slug].astro`) shows:
+   - Review count and average scores
+   - Individual approved reviews via `ReviewCard.astro`
+   - Map via `BuildingMap.tsx` React island
+6. All displayed scores derived from database `overall_score` column
 
-**Admin Action (Approve Review):**
+**Admin Operations:**
 
-1. Admin navigates to `/admin/reviews`
-2. Page queries database for pending reviews
-3. Admin clicks "Approve" button
-4. Button POSTs to `/api/admin/reviews/[id]` with status change
-5. API validates admin role via `context.locals.user?.isAdmin`
-6. API updates review status and moderation_notes
-7. API calls `createAuditLog()` with admin ID and IP
-8. API calls `createNotification()` to notify review author
-9. Response includes new review data for optimistic UI update
-10. Building's aggregate scores recalculate on next request
+1. Admin user logs in, sees `/admin` dashboard
+2. Navigates to `/admin/reviews` → React table loads
+3. Table fetches data via `/api/admin/reviews?status=pending`
+4. Admin approves/rejects review in UI
+5. POST to `/api/admin/reviews/[id]` with action
+6. Endpoint validates `context.locals.user?.isAdmin`
+7. Update executed, audit log created with old/new values
+8. Table refreshes (client-side pagination)
 
-**Search & Filtering:**
+**Scoring Recalculation:**
 
-1. User submits search query on home page
-2. HomeSearch component POSTs to `/api/search/buildings`
-3. API queries database with LIKE filters on address/neighborhood/landlord name
-4. API returns buildings with review counts and avg scores
-5. Client-side SearchResults component renders results
-6. User can filter by type (buildings/landlords) or sort
-7. Pagination handled server-side (PAGE_SIZE = 10 per query)
-
-**State Management:**
-
-- Authentication state: Session cookies + middleware context (`context.locals.user`)
-- Form state: React component local state (ReviewForm, ReviewEditForm)
-- Page state: URL query parameters (`?submitted=true`, `?page=2`)
-- Database state: D1 SQLite tables with timestamps (unixepoch)
-- Admin state: No client-side state — all loaded from database per request
+1. Building has N approved reviews
+2. Each review has 27 scored fields (10 unit, 9 building, 8 landlord)
+3. `calculateDomainScores()` weights scores and handles nulls
+4. `calculateOverallScore()` combines domain scores with recency decay
+5. Result stored in review `overall_score` column at creation
+6. Search page aggregates via SQL: `AVG(r.overall_score)`
+7. Methodology page (`methodology.astro`) documents weight justification
 
 ## Key Abstractions
 
-**Review Scoring:**
-- Purpose: Calculate weighted scores from the 27-item rating instrument (5 ancillary survey items are not scored)
-- Location: `src/lib/scoring.ts`
-- Pattern: Pure functions that aggregate review scores by domain
-  - `calculateOverallScore(review)` - Weighted average of all 27 scored rating items
-  - `calculateBuildingAverages(reviews)` - Compute avg scores across 3 domains (unit, building, landlord)
-  - `calculateDomainScores(reviews)` - Per-category analysis
-  - Domain weights: Health/safety items (pests, mold, structural) weighted 1.3-1.5x, others 1.0x
-  - Recency factor: 5% reduction per year after 2 years (floor at 85%)
+**SurveyItems (27-field system):**
+- Purpose: Define all ratable dimensions with help text, required flags, display order
+- Examples: `src/lib/surveyItems.ts` contains 27 items (unit_structural, landlord_maintenance, etc.)
+- Pattern: Each item has `code`, `dimension`, `text`, `help`, `required`, `allowNA`, maps to database column
 
-**Survey Definitions:**
-- Purpose: Single source of truth for survey questions and help text
-- Location: `src/lib/surveyItems.ts`
-- Pattern: Arrays of question objects with text, help text, and field names
-  - `unitItems` (10 questions), `buildingItems` (9), `landlordItems` (8)
-  - Each item maps to database column via `field` property
-  - Help text displayed in tooltips during form submission
+**Scoring System:**
+- Purpose: Weighted average calculation with health/safety emphasis
+- Examples: `src/lib/scoring.ts` defines ITEM_WEIGHTS (1.3x for structural, 1.5x for pests)
+- Pattern: Separate domain calculations (unit, building, landlord) → overall with recency decay
 
-**API Response Utilities:**
-- Purpose: Consistent response format across all endpoints
-- Location: `src/lib/api.ts`
-- Pattern: Functions that wrap data or errors in standard JSON format
-  - `jsonResponse(data, status)` - Success responses
-  - `errorResponse(message, status)` - Error responses
-  - `ApiErrors` object with predefined error types (UNAUTHORIZED, FORBIDDEN, NOT_FOUND)
+**Enrichment Adapters:**
+- Purpose: Multi-city building data enrichment (Boston Assessing API, CT CAMA)
+- Examples: `src/lib/enrichment/adapters/boston.ts`, `new-haven.ts`, `null.ts`
+- Pattern: City-specific adapter implements CityAdapter interface, dispatcher routes based on city
 
-**Audit Logging:**
-- Purpose: Track all admin actions for compliance
-- Location: `src/lib/audit.ts`
-- Pattern: Best-effort logging that doesn't block main request
-  - `createAuditLog(db, { adminUserId, actionType, entityType, entityId, oldValue, newValue })`
-  - Captures before/after values for all status changes
-  - Includes admin IP address and timestamp
-
-**Email Notifications:**
-- Purpose: Notify users of review moderation decisions
-- Location: `src/lib/email.ts`
-- Pattern: Resend API integration for transactional emails
-  - Templates for verification, review approved, review rejected, password reset
-  - Sent asynchronously without blocking request
-
-**Data Enrichment:**
-- Purpose: Auto-populate building data from government APIs
-- Location: `src/lib/enrichment/`
-- Pattern: Adapter pattern for different city data sources
-  - `boston.ts` - Boston Assessing API (FY2026 dataset)
-  - `new-haven.ts` - Connecticut CAMA API (Socrata)
-  - `dispatcher.ts` - Routes enrichment requests to correct adapter
-  - Used by `/api/admin/buildings/[id]/enrich` endpoint
-
-**Privacy Handling:**
-- Purpose: Mask personally identifiable information
-- Location: `src/lib/privacy.ts`
-- Pattern: Functions that transform sensitive data before display
-  - Move dates displayed as season+year, not exact dates
-  - User email not exposed in public views
-  - Review text doesn't expose unit number or lease terms
+**Validation:**
+- Purpose: Input sanitization and error reporting
+- Examples: `validateReviewForm()` in `src/lib/validation.ts` returns ValidationError[]
+- Pattern: Field-level checks, cross-field validation (move-out > move-in), range bounds
 
 **Rate Limiting:**
-- Purpose: Prevent abuse of review submission and auth endpoints
-- Location: `src/lib/rateLimit.ts`
-- Pattern: In-memory tracking by client IP with sliding window
-  - Review submission: 5 per hour per IP
-  - Auth attempts: 10 per hour per IP
-  - Tracked via Redis-equivalent Cloudflare KV (when available)
+- Purpose: Abuse prevention without external service
+- Examples: `checkRateLimit()` in `src/lib/rateLimit.ts`
+- Pattern: Tracks IP + action + time window in database, returns allowed/reset headers
+
+**Audit Logging:**
+- Purpose: Track admin actions for compliance and debugging
+- Examples: `createAuditLog()` in `src/lib/audit.ts` inserts to audit_logs table
+- Pattern: Best-effort (failures don't block action), stores admin ID, entity type/ID, old/new values
 
 ## Entry Points
 
-**Web Pages:**
-- Location: `src/pages/*.astro` (public), `src/pages/admin/*.astro` (admin-only)
-- Triggers: User navigation or direct URL access
-- Responsibilities: Query database, check auth, render HTML server-side
+**Web (Astro SSR):**
+- Location: `src/pages/`
+- Triggers: HTTP GET/POST to domain
+- Responsibilities: Render HTML, validate auth before serving protected pages, fetch data for SSR
 
-**API Routes:**
-- Location: `src/pages/api/**/*.ts` (188 total endpoints)
-- Triggers: Fetch requests from frontend or external services
-- Responsibilities: Validate request, check auth/admin, modify data, audit log, return JSON
-
-**OAuth Callback:**
-- Location: `src/pages/api/auth/google/callback.ts`
-- Triggers: Redirect from Google after user approval
-- Responsibilities: Exchange auth code for token, create or update user, set session cookie
+**API (REST endpoints):**
+- Location: `src/pages/api/**/*.ts`
+- Triggers: Fetch from React components or forms
+- Responsibilities: Auth/validation, database mutations, response serialization
 
 **Middleware:**
 - Location: `src/middleware.ts`
-- Triggers: Every request before pages/API routes
-- Responsibilities: Validate session cookie, set `context.locals.user`, add security headers
+- Triggers: Every request (before pages/API handlers)
+- Responsibilities: Session validation, user injection to context, security headers
+
+**Database Migrations:**
+- Location: `migrations/XXXX_description.sql`
+- Triggers: Manual `npm run db:migrate:local` or `wrangler d1 migrations apply`
+- Responsibilities: Schema changes, data transformations
 
 ## Error Handling
 
-**Strategy:** Consistent HTTP status codes with descriptive JSON error messages.
+**Strategy:** Validation-first (prevent invalid data upstream), graceful degradation (optional fields), audit-logged failures (admin actions).
 
 **Patterns:**
 
-- **Auth Errors:** Return 401 (Unauthorized) when `context.locals.user` is null
-  ```typescript
-  if (!context.locals.user) {
-    return new Response(JSON.stringify({ error: 'Authentication required' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-  ```
+- **Form Validation:** Errors collected in array, returned to client with field names via `ValidationError[]`
+- **API Error Responses:** JSON with `{ error: string }` and appropriate HTTP status (400, 401, 403, 500)
+- **Database Errors:** Caught, logged, generic message returned to client (security—no SQL leaks)
+- **Auth Failures:** Turnstile verification failures → 400; missing auth → 401; non-admin → 403
+- **Rate Limiting:** 429 on exceed, custom retry headers (X-RateLimit-Reset-After)
+- **Optional Data:** Null checks throughout, survey items with `allowNA` flag, fall through to legacy columns
 
-- **Permission Errors:** Return 403 (Forbidden) when user is not admin
-  ```typescript
-  if (!context.locals.user?.isAdmin) {
-    return new Response(JSON.stringify({ error: 'Admin access required' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-  ```
-
-- **Validation Errors:** Return 400 (Bad Request) with `details` field listing invalid fields
-  ```typescript
-  return new Response(JSON.stringify({ 
-    error: 'Validation failed', 
-    details: { email: 'Invalid format', password: 'Too short' } 
-  }), {
-    status: 400,
-    headers: { 'Content-Type': 'application/json' }
-  });
-  ```
-
-- **Not Found:** Return 404 with resource name
-  ```typescript
-  return new Response(JSON.stringify({ error: 'Review not found' }), {
-    status: 404,
-    headers: { 'Content-Type': 'application/json' }
-  });
-  ```
-
-- **Server Errors:** Return 500 without exposing stack traces
-  ```typescript
-  return new Response(JSON.stringify({ error: 'An error occurred' }), {
-    status: 500,
-    headers: { 'Content-Type': 'application/json' }
-  });
-  ```
+**Example from `src/pages/api/reviews.ts`:**
+- Turnstile token verified before processing
+- Building ID required, returns 400 if missing
+- Rent amount must be 0–50,000, validates before insert
+- Missing auth check: `if (!context.locals.user)` returns 401
 
 ## Cross-Cutting Concerns
 
-**Logging:**
-- Approach: Console logs in development, silent in production
-- Used in: Middleware, auth, database errors
-- Example: `console.error('Auth middleware error:', error)` in `middleware.ts`
+**Logging:** 
+- Console logs in try/catch blocks
+- Error logger `logError()` in `src/lib/logger.ts` for system issues
+- Best-effort (errors logged but don't break flow)
 
-**Validation:**
-- Approach: Input validation before database operations
-- Location: `src/lib/validation.ts`
-- Pattern: Reusable validation functions for email, password, address, score ranges
-- Applied in: All POST/PATCH API routes
+**Validation:** 
+- Front-end: React component state validation (values 1–5 for ratings)
+- Back-end: `validateReviewForm()` for all required fields before insert
+- Database constraints: NOT NULL on id, status; UNIQUE on certain fields
 
-**Authentication:**
-- Approach: Lucia v3 with D1 SQLite adapter
-- Location: `src/lib/auth.ts` and `src/middleware.ts`
-- Pattern: Session cookie validated on every request
-- User attributes: email, emailVerified, name, avatarUrl, googleId, isAdmin
+**Authentication:** 
+- Lucia v3 with D1 adapter
+- Session cookie set by middleware on fresh session
+- `context.locals.user` available in all routes
+- OAuth (Google) + password-based signin, email verification required
 
-**Database Access:**
-- Approach: Parameterized queries only (no string interpolation)
-- Pattern: `db.prepare(sql).bind(params).first()` or `.all()`
-- Never: `db.prepare(\`WHERE id = ${id}\`)`
+**Privacy:**
+- Unit numbers collected (moderation only) but never displayed publicly
+- Timestamps rounded to season (not exact month) in public reviews
+- Email addresses obscured unless user is logged in
+- DELETE review cascades through related audit logs
 
-**Timestamps:**
-- Approach: Unix epoch (seconds since 1970-01-01 UTC)
-- Pattern: `unixepoch()` function in SQL, stored as INTEGER
-- Never: `datetime('now')` or JavaScript timestamps (milliseconds)
+**CSRF Protection:**
+- SameSite=Lax session cookies (middleware sets this)
+- Cloudflare Turnstile on all public forms (signup, forgot-password, contact, disputes, reviews)
+- Astro `checkOrigin` default (true for SSR) — rejects cross-origin form submissions
+- **Note:** `application/json` endpoints (disputes API) use Turnstile + rate limit, not checkOrigin
 
 ---
 
-*Architecture analysis: 2026-04-26*
+*Architecture analysis: 2026-05-02*

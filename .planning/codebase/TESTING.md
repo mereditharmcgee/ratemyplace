@@ -1,105 +1,121 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-04-26
+**Analysis Date:** 2026-05-02
 
 ## Test Framework
 
-**Runner:**
-- Vitest 4.0.18
-- Config: `vitest.config.ts`
-- Environment: `happy-dom` (lightweight DOM implementation for component testing)
+**Unit Tests:**
+- Framework: Vitest 4.0.18
+- Runner: `npm test` or `npm test:watch`
+- Environment: happy-dom (lightweight DOM simulation)
+- Config: `vitest.config.ts` at project root
+
+**Integration/E2E Tests:**
+- Framework: Playwright 1.58.2
+- Runner: `npm run e2e` (builds first) or `npm run e2e:headed` (visual)
+- Config: `playwright.config.ts` at project root
+- Test files: `e2e/*.spec.ts`
+- Fixtures: `e2e/fixtures.ts` — custom fixtures for authenticated pages
 
 **Assertion Library:**
-- Vitest built-in expect() (compatible with Jest API)
-
-**E2E Framework:**
-- Playwright 1.58.2
-- Config: `playwright.config.ts`
+- Vitest: built-in `expect()`
+- Playwright: `expect()` imported from `@playwright/test`
 
 **Run Commands:**
 ```bash
-npm test              # Run all unit tests
-npm test -- scoring   # Filter tests by name pattern
-npm test:watch        # Watch mode (rerun on file changes)
-npm e2e               # Run E2E tests (requires build + fresh DB)
-npm e2e:headed        # E2E tests in headed browser (visible)
+npm test                    # Run all unit tests
+npm test:watch             # Watch mode for unit tests
+npm test -- scoring        # Filter tests by name
+npm run e2e                # Run all e2e tests (with build)
+npm run e2e:headed         # Run e2e with headed browser (visual)
+npm run db:setup           # Fresh DB + seed (run before e2e)
 ```
 
 ## Test File Organization
 
 **Location:**
-- Unit tests: `src/lib/__tests__/[name].test.ts` (co-located with implementation)
-- Component tests: Same directory pattern (planned, not yet in use for React components)
-- E2E tests: `e2e/[feature].spec.ts`
+- Unit tests co-located with source: `src/lib/__tests__/` directory
+- E2E tests: `e2e/` directory at project root
+- React component tests: `src/lib/__tests__/ComponentName.test.tsx`
 
 **Naming:**
-- Test files: `[module].test.ts` (e.g., `scoring.test.ts`, `validation.test.ts`, `notifications.test.ts`)
-- E2E test files: `[feature].spec.ts` (e.g., `review.spec.ts`, `auth.spec.ts`, `admin-actions.spec.ts`)
+- Unit tests: `[name].test.ts` or `[name].test.tsx`
+- E2E tests: `[scenario].spec.ts`
+- Test files live in `__tests__/` subdirectory
 
 **Structure:**
 ```
-src/lib/__tests__/
-├── audit.test.ts
-├── disputes.test.ts
-├── enrichment.test.ts
-├── format.test.ts
-├── notifications.test.ts
-├── scoring.test.ts
-└── [15+ more test files]
+src/lib/
+├── scoring.ts              # Source
+├── __tests__/
+│   └── scoring.test.ts     # Unit tests
+src/pages/api/
+├── reviews/create.ts       # Source
+└── (no co-located tests; e2e covers API)
 
 e2e/
-├── fixtures.ts           # Custom Playwright fixtures
-├── global.setup.ts       # Auth setup before tests
-├── admin-actions.spec.ts
-├── review.spec.ts
-└── [7 more spec files]
+├── auth.spec.ts            # Signup, signin, signout flows
+├── review.spec.ts          # Review submission, editing
+├── critical-flows.spec.ts   # Cross-view consistency, audit logging
+├── fixtures.ts             # Custom fixtures (authedPage, adminPage)
+├── global.setup.ts         # Seed users before all tests
+└── playwright/.auth/       # Session storage (user.json, admin.json)
 ```
 
 ## Test Structure
 
-**Suite Organization:**
-
-Unit test example from `src/lib/__tests__/scoring.test.ts`:
+**Unit Test Suite Pattern:**
 ```typescript
 import { describe, it, expect } from 'vitest';
-import { calculateDomainScores, getRecencyWeight, ITEM_WEIGHTS } from '../scoring';
+import { calculateDomainScores, UNIT_FIELDS } from '../scoring';
 
-describe('Field definitions', () => {
-  it('has 10 unit fields', () => {
-    expect(UNIT_FIELDS).toHaveLength(10);
+describe('calculateDomainScores', () => {
+  it('returns all nulls for empty scores', () => {
+    const result = calculateDomainScores({});
+    expect(result.unit).toBeNull();
   });
 
-  it('has weights defined for every field', () => {
-    for (const field of ALL_SCORE_FIELDS) {
-      expect(ITEM_WEIGHTS[field]).toBeDefined();
-      expect(ITEM_WEIGHTS[field]).toBeGreaterThanOrEqual(1.0);
-    }
-  });
-});
-
-describe('Health/safety weights', () => {
-  it('pests have 1.5x weight', () => {
-    expect(ITEM_WEIGHTS.unit_pests).toBe(1.5);
+  it('calculates correct score when all fields are the same value', () => {
+    // When all fields = 3, weighted average should still be 3.0
+    const result = calculateDomainScores(allScores(3));
+    expect(result.overall).toBe(3.0);
   });
 });
 ```
 
 **Patterns:**
-- Setup: Helper functions at file top (e.g., `function allScores(value: number)`, `function domainScores(...)`)
-- Test groups: Nested `describe()` blocks with section headers
-- Section separators: Visual ASCII dividers (e.g., `// ═══════════════════════════════════════════════════`)
-- Assertions: Direct expect() chains, multiple assertions per test when logically related
-- Snapshot testing: Not used; prefer explicit assertions
+- Use `describe()` to group related tests
+- Each `it()` is a single assertion or logical check
+- Comments explain *why*, not *what*
+- Section headings with visual separators (═══════) for clarity
+
+**Setup/Teardown:**
+```typescript
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
+describe('Database operations', () => {
+  let db: MockDatabase;
+
+  beforeEach(() => {
+    db = setupMockDB();
+  });
+
+  afterEach(() => {
+    cleanup(db);
+  });
+
+  it('inserts record', async () => {
+    await db.insert(...);
+  });
+});
+```
 
 ## Mocking
 
-**Framework:** Vitest's `vi` (vi.fn(), vi.spyOn())
+**Framework:** `vi` from Vitest
 
-**Patterns from `src/lib/__tests__/notifications.test.ts`:**
+**Database Mocking Pattern:**
 ```typescript
-import { vi } from 'vitest';
-
-// Mock object factory
 function mockDB(shouldError: boolean = false) {
   const runFn = shouldError
     ? vi.fn().mockRejectedValue(new Error('DB error'))
@@ -111,42 +127,38 @@ function mockDB(shouldError: boolean = false) {
         run: runFn,
       }),
     }),
-    _runFn: runFn,  // Expose for assertions
+    _runFn: runFn,  // Expose for assertion
   };
 }
-
-// Usage in test
-it('inserts a row into notifications table', async () => {
-  const db = mockDB();
-  await createNotification(db, { userId: 'user-123', ... });
-  expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO'));
-});
-
-// Spy on console
-const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-expect(consoleSpy).toHaveBeenCalled();
-consoleSpy.mockRestore();
 ```
 
 **What to Mock:**
-- Database connections (always mocked in unit tests)
-- Console methods when testing error handling
-- Exported functions when testing integration (e.g., `validateDisputeForm` mocked when testing API that uses it)
-- Never mock: core business logic (scoring, calculations), validation functions
+- External services: Resend email API, D1 database, Google Places API
+- Time-dependent operations: `Date.now()`, `unixepoch()`
+- Async functions: use `vi.fn().mockResolvedValue()` or `.mockRejectedValue()`
 
 **What NOT to Mock:**
-- Core utility functions like `calculateDomainScores`, `validateReviewForm`
-- Type/interface definitions
-- Pure calculations
-- For these, call the real function and assert on output
+- Pure functions: scoring, validation, formatting — always test real implementation
+- TypeScript type checking: types are compile-time only, no runtime mocks needed
+- Utility functions within same module: test against real implementation
+
+**Assertion on Mocks:**
+```typescript
+// Verify function was called with correct parameters
+expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT'));
+
+// Verify error was logged (spy on console)
+const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+// ... code that should log error ...
+expect(consoleSpy).toHaveBeenCalledWith('Failed to create audit log:', expect.any(Error));
+consoleSpy.mockRestore();
+```
 
 ## Fixtures and Factories
 
-**Test Data:**
-
-Example helper from `src/lib/__tests__/scoring.test.ts`:
+**Test Data Helpers:**
 ```typescript
-// Helper: create a scores object with all fields set to a value
+// src/lib/__tests__/scoring.test.ts
 function allScores(value: number): Record<string, number> {
   const scores: Record<string, number> = {};
   for (const field of ALL_SCORE_FIELDS) {
@@ -155,7 +167,6 @@ function allScores(value: number): Record<string, number> {
   return scores;
 }
 
-// Helper: create a scores object for one domain only
 function domainScores(fields: readonly string[], value: number): Record<string, number | null> {
   const scores: Record<string, number | null> = {};
   for (const field of ALL_SCORE_FIELDS) {
@@ -167,12 +178,16 @@ function domainScores(fields: readonly string[], value: number): Record<string, 
   return scores;
 }
 
-// Usage
-const result = calculateDomainScores(allScores(3));
-expect(result.overall).toBe(3.0);
+// Usage in tests
+it('calculates unit score only', () => {
+  const result = calculateDomainScores(domainScores(UNIT_FIELDS, 4));
+  expect(result.unit).toBe(4.0);
+});
 ```
 
-**E2E Fixtures from `e2e/fixtures.ts`:**
+**E2E Fixtures (Custom Playwright Fixtures):**
+Located in `e2e/fixtures.ts`:
+
 ```typescript
 import { test as base, expect } from '@playwright/test';
 
@@ -184,15 +199,7 @@ type CustomFixtures = {
 export const test = base.extend<CustomFixtures>({
   authedPage: async ({ browser }, use) => {
     const context = await browser.newContext({
-      storageState: USER_AUTH_FILE,  // Pre-authenticated session
-    });
-    const page = await context.newPage();
-    await use(page);
-    await context.close();
-  },
-  adminPage: async ({ browser }, use) => {
-    const context = await browser.newContext({
-      storageState: ADMIN_AUTH_FILE,
+      storageState: USER_AUTH_FILE,  // Load saved session
     });
     const page = await context.newPage();
     await use(page);
@@ -201,149 +208,204 @@ export const test = base.extend<CustomFixtures>({
 });
 ```
 
-**Location:**
-- Test helpers: Defined at top of `.test.ts` file (no separate factory files)
-- E2E fixtures: `e2e/fixtures.ts` (extended Playwright test object)
-- Auth state: `playwright/.auth/user.json`, `playwright/.auth/admin.json` (created by `e2e/global.setup.ts`)
+**Global Setup:**
+- File: `e2e/global.setup.ts`
+- Runs once before all e2e tests
+- Creates test users in seeded database
+- Saves session storage to `.auth/user.json` and `.auth/admin.json`
+
+**Database Helpers in E2E:**
+```typescript
+// e2e/critical-flows.spec.ts
+function cleanupPhase20Reviews(): void {
+  execSync(
+    `npx wrangler d1 execute ratemyplace-db --local --command "DELETE FROM reviews WHERE building_id = 'building-e2e-01'"`,
+    { cwd: PROJECT_ROOT, stdio: 'pipe' }
+  );
+}
+
+// Called in beforeEach and afterEach for test isolation
+```
 
 ## Coverage
 
-**Requirements:** No coverage enforcement
+**Requirements:** None enforced (no coverage threshold in config)
 
-**View Coverage:**
-- Vitest coverage not configured in `vitest.config.ts`
-- To enable: Add `coverage: { provider: 'v8' }` to vitest config
-- Currently no coverage thresholds or reports
+**View Coverage:** Not configured (would require adding coverage reporter to vitest.config.ts)
 
-**Current State:**
-- 171 unit tests passing (from git status memory)
-- 15+ E2E tests defined
-- No automated coverage reporting
+**Current Coverage:**
+- Unit tests: 19 test files, ~3000 lines of test code
+- Critical library functions heavily tested: scoring, validation, password, audit
+- E2E tests: 8 spec files, ~1800 lines, covering main user flows
+- Admin features covered in e2e: audit logs, disputes, bug reports, verification
 
 ## Test Types
 
 **Unit Tests:**
-- Scope: Individual functions and utilities (non-React)
-- Approach: Direct function calls with mocked dependencies
-- Examples: `scoring.test.ts`, `validation.test.ts`, `disputes.test.ts`
-- Pattern: Create test data → call function → assert output
-- Database: Always mocked (no real DB connections in unit tests)
+- Scope: Single function or module
+- Speed: Fast (ms)
+- Location: `src/lib/__tests__/*.test.ts(x)`
+- Examples:
+  - `scoring.test.ts` — weight calculation, domain averaging, recency weighting
+  - `validation.test.ts` — form validation, email format, zip codes
+  - `password.test.ts` — hash generation, password verification
+  - `audit.test.ts` — database operations, error handling
 
 **Integration Tests:**
-- E2E tests act as integration tests (real database, real Astro runtime)
-- Scope: Full user workflows across multiple components/APIs
-- Approach: Browser automation via Playwright
-- Examples: `review.spec.ts` (complete review submission), `auth.spec.ts` (login flows)
+- Scope: Function + dependencies (e.g., function + mocked database)
+- Speed: Fast to moderate
+- Examples:
+  - `formatScore()` + score rounding
+  - `calculateAggregatedScores()` + recency weight application
 
 **E2E Tests:**
-- Framework: Playwright 1.58.2
-- Config: `playwright.config.ts` with setup phase
-- Run with: `npm e2e` (requires build + fresh database via `npm run db:setup`)
-- Browser: Chromium (single worker for serial execution)
-- Auth: Pre-authenticated sessions via fixtures
-- Timeouts: 30s per test, first-failure trace collection
-- Database: Fresh seed before E2E run (`npm run db:fresh && npm run db:seed`)
-
-**E2E Test Structure from `e2e/review.spec.ts`:**
-```typescript
-import { test, expect } from './fixtures';
-
-// Helper: rate all visible items with given score
-async function rateAllItemsInStep(page: Page, score: number) {
-  const scoreButtons = page.locator('button[type="button"]').filter({ hasText: new RegExp(`^${score}$`) });
-  const count = await scoreButtons.count();
-  for (let i = 0; i < count; i++) {
-    await scoreButtons.nth(i).click();
-  }
-  return count;
-}
-
-test.describe('Review Form', () => {
-  test('complete review submission happy path', async ({ authedPage }) => {
-    test.setTimeout(90000);
-
-    // Step 1: Navigate
-    await authedPage.goto('/review/new?building=building-30');
-    await authedPage.waitForLoadState('networkidle');
-
-    // Step 2: Interact
-    await authedPage.fill('input[placeholder*="2A"]', '4B');
-    await authedPage.locator('button', { hasText: 'Continue' }).click();
-
-    // Step 3: Verify
-    await expect(authedPage.locator('text=Rate Your Unit')).toBeVisible();
-  });
-});
-```
+- Scope: Full user flows through browser
+- Speed: Slow (multiple seconds per test)
+- Location: `e2e/*.spec.ts`
+- Setup: Database fresh from seed, page navigates to URL
+- Verification: DOM content, form submission, page redirects
+- Examples:
+  - Auth flow: signup → signin → signout
+  - Review submission: form fill → validation → success
+  - Admin actions: filter → update → audit log recorded
 
 ## Common Patterns
 
-**Async Testing:**
-
-Unit test with async/await:
+**Async Testing (Vitest):**
 ```typescript
-it('swallows errors and does not throw when DB call fails', async () => {
-  const db = mockDB(true);  // Mock that rejects
-  const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-  await expect(
-    createNotification(db, { userId: 'user-123', ... })
-  ).resolves.toBeUndefined();  // Should NOT throw
-
-  expect(consoleSpy).toHaveBeenCalled();
-  consoleSpy.mockRestore();
-});
-```
-
-E2E with async/await:
-```typescript
-test('complete review submission happy path', async ({ authedPage }) => {
-  await authedPage.goto('/review/new?building=building-30');
-  await authedPage.waitForLoadState('networkidle');
-  await authedPage.fill('input[placeholder*="2A"]', '4B');
-  await expect(authedPage.locator('text=Rate Your Unit')).toBeVisible();
+it('returns true for correct password', async () => {
+  const hash = await hashPassword('mypassword123');
+  const result = await verifyPassword('mypassword123', hash);
+  expect(result).toBe(true);
 });
 ```
 
 **Error Testing:**
-
 ```typescript
-describe('Error handling', () => {
-  it('returns error message on invalid data', () => {
-    const errors = validateDisputeForm({ landlordEmail: 'invalid-email' });
-    expect(errors.some(e => e.field === 'landlordEmail')).toBe(true);
-  });
+it('returns false for wrong password', async () => {
+  const hash = await hashPassword('mypassword123');
+  const result = await verifyPassword('wrongpassword', hash);
+  expect(result).toBe(false);
+});
 
-  it('catches and logs DB errors without throwing', async () => {
-    const db = mockDB(true);  // Rejects
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    await expect(createAuditLog(db, { ... })).resolves.toBeUndefined();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringMatching(/Failed to create audit log/)
-    );
-    consoleSpy.mockRestore();
-  });
+it('handles empty password', async () => {
+  const hash = await hashPassword('');
+  const result = await verifyPassword('', hash);
+  expect(result).toBe(true);
 });
 ```
 
-**Setup/Teardown:**
-- Setup: Done per-test via test helpers and fixtures (e.g., `mockDB()`)
-- Teardown: Via `mockRestore()` for spies, Playwright context cleanup handled by fixtures
-- Global setup: `e2e/global.setup.ts` authenticates users before E2E tests run
-- No beforeEach/afterEach blocks in unit tests (each test is self-contained)
+**E2E Form Submission:**
+```typescript
+test('user can sign up with email and password', async ({ page }) => {
+  const uniqueEmail = `signup-${Date.now()}@test.local`;
 
-## Best Practices Observed
+  await page.goto('/auth/signup');
+  await page.fill('input[name="email"]', uniqueEmail);
+  await page.fill('input[name="password"]', 'TestPassword123!');
+  await page.fill('input[name="confirmPassword"]', 'TestPassword123!');
+  await page.click('button[type="submit"]');
 
-1. **Test isolation:** Each test is independent; no shared state between tests
-2. **Descriptive names:** Test names match the behavior being tested (e.g., `'returns 1.0 for current year'`)
-3. **Arrange-Act-Assert:** Clear separation in test structure
-4. **No magic:** Helper functions named semantically (e.g., `allScores()` not `createScores()`)
-5. **Realistic data:** E2E tests use real database snapshots; unit tests use simple fixtures
-6. **Single assertion focus:** Most tests assert one behavior (some multi-assert when logically grouped)
-7. **Error path coverage:** Both happy path and error cases tested (e.g., DB error handling)
-8. **No test interdependencies:** Tests can run in any order
+  // Verify redirect
+  await page.waitForURL('/');
+
+  // Verify signed-in state
+  await expect(page.locator('form[action="/api/auth/signout"]').first()).toBeVisible();
+});
+```
+
+**E2E API Submission (Using authedPage Fixture):**
+```typescript
+async function submitReviewAsAuthedUser(
+  authedPage: import('@playwright/test').Page,
+  buildingId: string
+): Promise<string> {
+  const formFields: Record<string, string> = {
+    'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX',
+    building_id: buildingId,
+    // ... all 27 score fields + metadata
+  };
+
+  const res = await authedPage.request.post('/api/reviews', {
+    multipart: formFields,
+    headers: { Origin: BASE_URL },
+  });
+
+  expect(res.status()).toBe(200);
+  const body = await res.json();
+  return body.reviewId as string;
+}
+```
+
+**React Component Testing:**
+```typescript
+import { render, cleanup } from '@testing-library/react';
+
+afterEach(() => {
+  cleanup();
+});
+
+it('renders title inside an h3 with correct classes', () => {
+  const { container } = render(
+    <EmptyState title="Nothing here" description="Try again later." />
+  );
+  const h = container.querySelector('h3');
+  expect(h!.textContent).toBe('Nothing here');
+  expect(h!.className).toContain('text-lg');
+});
+```
+
+## Test Isolation
+
+**Unit Tests:**
+- Each test function is independent
+- Use helpers to create consistent test data (`allScores()`, `domainScores()`)
+- Mock external dependencies (database, API)
+
+**E2E Tests:**
+- Database reset before suite: `npm run db:setup`
+- Per-test cleanup: `beforeEach()` and `afterEach()` clear test-specific data
+- Test buildings isolated: use dedicated `building-e2e-01` for Phase 20 tests, never touch seed data
+- Session persistence: authenticated pages use `.auth/*.json` fixtures, reused across tests
+
+**Cleanup Strategy:**
+```typescript
+// e2e/critical-flows.spec.ts
+function cleanupPhase20Reviews(): void {
+  // Find reviews for test building and delete audit_logs first
+  execSync(
+    `npx wrangler d1 execute ratemyplace-db --local --command "DELETE FROM audit_logs WHERE entity_id IN (SELECT id FROM reviews WHERE building_id = 'building-e2e-01')"`
+  );
+  // Then delete reviews
+  execSync(
+    `npx wrangler d1 execute ratemyplace-db --local --command "DELETE FROM reviews WHERE building_id = 'building-e2e-01'"`
+  );
+}
+
+test.beforeEach(() => cleanupPhase20Reviews());
+test.afterEach(() => cleanupPhase20Reviews());
+```
+
+## When to Write Tests
+
+**Write unit tests for:**
+- Pure functions: scoring, validation, formatting
+- Business logic: weighted averages, recency decay, aggregate calculations
+- Edge cases: empty inputs, boundary values, special characters
+- Error paths: invalid input, database failures, missing data
+
+**Write e2e tests for:**
+- Full user flows: signup → review → view results
+- Form submission with validation
+- Authentication flows
+- Admin actions with audit logging
+- Cross-view consistency: verify same data displays correctly on multiple pages
+
+**Skip tests for:**
+- Trivial getters/setters
+- Type definitions (compile-time only)
+- UI layout (visual regression testing out of scope)
 
 ---
 
-*Testing analysis: 2026-04-26*
+*Testing analysis: 2026-05-02*

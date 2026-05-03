@@ -1,251 +1,522 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-04-26
+**Analysis Date:** 2026-05-02
 
 ## Tech Debt
 
-### Dual Legacy Pest Columns
-- **Issue:** Two overlapping columns exist for pest reporting: `had_pests` (migration 0004) and `had_pest_issues` (migration 0001).
-- **Files:** `migrations/0001_initial.sql`, `migrations/0004_survey_scores.sql`, `src/lib/types.ts` (line 75), `src/pages/api/reviews/[id].ts` (line 76)
-- **Impact:** Code uses fallback logic to normalize the mismatch; no data loss but creates type/semantic confusion. Adds maintenance burden when displaying pest data across UI.
-- **Fix approach:** 
-  1. Migrate all `had_pests=1` rows to `had_pest_issues=1` 
-  2. Drop `had_pests` column in new migration
-  3. Update all code references to use `had_pest_issues` consistently
-  4. Cost: Low (fallback pattern works, migration is straightforward)
+### DEBT-01: Large Component Files (>700 LOC)
 
-### Legacy v1 Score Columns (12 columns)
-- **Issue:** Redundant old scoring columns kept for backward compatibility: `score_building_quality`, `score_maintenance`, `score_pest_control`, `score_safety`, `score_noise`, `score_landlord_responsiveness`, `score_landlord_communication`, `score_landlord_fairness`, `score_lease_clarity`, `score_deposit_handling`, `score_rent_value`, `score_amenities`.
-- **Files:** `migrations/0001_initial.sql` (lines 82-94), `src/lib/types.ts` (lines 57-68), `src/pages/api/reviews/[id].ts` (lines 59-71)
-- **Impact:** New reviews use the 27-item rating instrument (v2); legacy columns are never written. No runtime impact but clutters schema and API responses. Database footprint cost is minimal.
-- **Fix approach:** 
-  1. Keep columns for backward-compatible data reads (safe for historical data)
-  2. If ever removing: requires audit of any external consumers, then safe migration
-  3. Current strategy (keep) is appropriate; migration to remove is deferred until dataset reaches significant scale
-- **Priority:** Low (non-blocking, actively managed via code comments)
+**Area:** React Components
 
-### Type Coercion Pattern: `(context.locals as any).runtime`
-- **Issue:** 71 instances across API routes and library files cast `context.locals` to `any` to access Cloudflare runtime object due to incomplete Astro type definitions.
-- **Files:** `src/pages/api/**/*.ts`, `src/lib/db.ts` (line 3), `src/lib/audit.ts` (line 22), `src/lib/rateLimit.ts` (line 23), `src/lib/notifications.ts` (line 37), and 67 more API routes
-- **Impact:** Bypasses TypeScript type safety for Cloudflare-specific properties. Not a security risk (Cloudflare runtime is legitimate); but reduces IDE assistance and makes refactoring harder.
-- **Fix approach:**
-  1. Create a typed wrapper for Cloudflare runtime:
-     ```typescript
-     // src/lib/types.ts - add
-     export interface CloudflareContext {
-       runtime?: {
-         env?: Record<string, string | D1Database>;
-         context?: ExecutionContext;
-       };
-     }
-     ```
-  2. Replace `(context.locals as any).runtime` with typed access throughout
-  3. Cost: Medium (repetitive but straightforward refactoring, can be done incrementally)
-  4. Timeline: Acceptable as future tech debt cleanup
+**Issue:** Three components exceed 700 lines and contain mixed concerns (form logic, state management, API calls, display). These files are difficult to test in isolation, slow to navigate, and at high risk of introducing bugs during modification.
 
-### Over-Permissive `any` Types in Scoring Functions
-- **Issue:** Core scoring functions accept `any[]` for review data instead of typed `Review` objects.
-- **Files:** `src/lib/scoring.ts` (lines 209, 295, 330) - `calculateAggregatedScores()`, `calculateBuildingAverages()`, `calculateLandlordAverages()`
-- **Impact:** Type safety lost for critical business logic. Makes it harder to verify correctness of calculations. Not a bug (functions work correctly) but increases maintenance risk.
-- **Fix approach:**
-  1. Define `ReviewScoreData` interface with required score fields
-  2. Update function signatures to accept `ReviewScoreData[]`
-  3. Update call sites to pass properly typed data
-  4. Cost: Low (functions are well-tested, isolated from other code)
+**Files:**
+- `src/components/reviews/ReviewEditForm.tsx` (910 LOC) — Form validation, state synchronization with existing review data, multi-step transitions
+- `src/components/admin/BuildingsTable.tsx` (844 LOC) — Table rendering, inline editing, search filtering, admin actions
+- `src/components/admin/ReviewsTable.tsx` (733 LOC) — Table rendering, moderation queue, review detail expansion, approval/rejection workflow
 
-## Scaling Limits
+**Impact:**
+- Increased cognitive load during code review and modification
+- Higher defect likelihood when adding features (e.g., new form field additions span multiple state sections)
+- Slow development velocity for small changes
+- Hard to unit test (components bundled with API calls and validation)
 
-### Database Query Performance at Scale
-- **Problem:** No query optimization for aggregate calculations. `building_scores` and `landlord_scores` are materialized tables but update strategy is not formalized.
-- **Files:** `src/lib/scoring.ts` (aggregation functions), no dedicated update/invalidation trigger visible
-- **Current capacity:** Works fine for current dataset (single city, < 1000 buildings); scaling concern only relevant if:
-  - Expanding to 5+ cities
-  - Each city has 100+ buildings with 50+ reviews each
-- **Scaling path:**
-  1. Implement background job to recalculate scores on schedule (daily vs real-time trade-off)
-  2. Add indexes on `building_scores.updated_at` and `landlord_scores.updated_at`
-  3. Consider database views instead of materialized tables if write frequency increases
-  4. Timeline: Defer until load testing shows >1s response times
+**Fix approach:**
+- Extract form step components into separate files (ReviewEditForm → ReviewEditFormBasics, ReviewEditFormRatings, ReviewEditFormConfirm, etc.)
+- Extract table columns into separate components (BuildingsTable → BuildingAddressCell, BuildingActionsCell, etc.)
+- Move complex state logic into custom hooks (useReviewEditState, useBuildingsTableState)
+- Extract validation and API calls into pure functions in `src/lib/`
+- Carry over to v1.6.0 planning with detailed component split specs
 
-### Component Size Growing
-- **Problem:** Two React components exceed 700 lines, making them harder to test and modify.
-- **Files:** 
-  - `src/components/reviews/ReviewEditForm.tsx` (907 lines)
-  - `src/components/admin/BuildingsTable.tsx` (844 lines)
-  - `src/components/admin/ReviewsTable.tsx` (733 lines)
-- **Impact:** Difficult to reuse, test in isolation, or debug. Not broken, but increasing complexity debt.
-- **Fix approach:**
-  1. Extract form steps into separate components (ReviewEditForm already uses sub-steps pattern, could go further)
-  2. Split admin tables into smaller components: `TableHeader`, `TableRow`, `TableFilters`, `TablePagination`
-  3. Move filtering/sorting logic to custom hooks
-  4. Cost: Medium (structured refactoring over 2-3 PRs)
-  5. Timeline: Next "cleanup" phase
-
-## Missing Critical Features
-
-### Rate Limiting Coverage Gap
-- **Problem:** Rate limiting only applies to `/api/auth/signin` endpoint. Public-facing endpoints lack protection.
-- **Files:** `src/lib/rateLimit.ts` (implemented), `src/pages/api/**` (mostly not using it)
-- **Unprotected endpoints:** `/api/search`, `/api/buildings/[id]`, `/api/reviews` (GET), `/api/contacts` (POST - especially needed)
-- **Risk:** Brute-force attacks on search, contact form spam, DoS on building details
-- **Recommendations:**
-  1. Apply rate limiting to all public POST endpoints (contacts, bug reports, disputes)
-  2. Apply moderate rate limiting to search (per-IP 100 req/min)
-  3. Add rate limit headers to responses for client awareness
-  4. Files to update: `src/pages/api/search.ts`, `src/pages/api/contacts.ts`, `src/pages/api/bug-reports.ts`, `src/pages/api/disputes.ts`
-
-## Fragile Areas
-
-### Survey Field Mapping Complexity
-- **Files:** `src/lib/surveyItems.ts` (579 lines), `src/components/reviews/ReviewForm.tsx`, `src/components/reviews/ReviewEditForm.tsx`
-- **Why fragile:** 27 survey fields spread across 3 domain arrays (UNIT_FIELDS, BUILDING_FIELDS, LANDLORD_FIELDS) in `src/lib/scoring.ts`. Adding a field requires coordinated changes in 4+ places:
-  1. Migration to add column
-  2. `surveyItems.ts` - add to correct domain array and question text
-  3. `scoring.ts` - add to domain array AND set weight in ITEM_WEIGHTS
-  4. ReviewForm component - add input step
-  5. ReviewEditForm component - add input step
-  6. ReviewCard - if displayed
-- **Safe modification:**
-  - Always verify field added to `ALL_SCORE_FIELDS` in scoring.ts before deployment
-  - Add a compile-time check: ensure every field in UNIT_FIELDS/BUILDING_FIELDS/LANDLORD_FIELDS exists in ITEM_WEIGHTS
-  - Create a pre-deploy checklist for survey field additions
-- **Test coverage:** Scoring tests (421 lines) cover weights but not form UI coverage
-
-### Auth Session Management
-- **Files:** `src/pages/api/auth/signin.ts`, `src/pages/auth/logout.astro`, `src/lib/**` (Lucia auth)
-- **Why fragile:** OAuth flow has known production issue (Google logins blocked by Cloudflare bot detection). Session invalidation on logout works but edge cases possible with:
-  - Multiple browser tabs with stale sessions
-  - Manual Lucia session table deletes (e.g., admin cleanup)
-  - Clock skew between Cloudflare and browser
-- **Safe modification:**
-  - Always test session invalidation in headless browser (Playwright)
-  - Verify OAuth redirect flow with production credentials before pushing
-  - Add explicit session token validation on protected endpoints (currently relies on Lucia middleware)
-- **Test coverage:** E2E tests in `e2e/` cover happy path; session edge cases not covered
-
-## Test Coverage Gaps
-
-### Admin Panel Actions
-- **What's not tested:** Admin approval/rejection workflow, moderation notes, audit log entries
-- **Files:** `src/pages/admin/reviews.astro`, `src/components/admin/ReviewsTable.tsx`, `src/pages/api/admin/reviews/[id].ts`
-- **Risk:** Admin actions could silently fail (e.g., audit log create fails but approval succeeds)
-- **Priority:** High (affects core moderation flow)
-
-### Data Consistency Across Views
-- **What's not tested:** Same review appears in multiple places (dashboard, search results, building detail page) — no automated check that scores match
-- **Files:** `src/pages/search.astro`, `src/pages/buildings/[slug].astro`, `src/pages/profile.astro`, `src/components/profile/ProfileDashboard.tsx`
-- **Risk:** Cache staleness or aggregation bugs could cause score mismatches visible to users
-- **Priority:** High (data integrity concern)
-- **Approach:** Add E2E test that creates review, checks score on all 3 views, then edits review and verifies all 3 views update
-
-### Edge Cases in Scoring
-- **What's not tested:** 
-  - Review with all null scores
-  - Review with mix of null and valid scores
-  - Score calculation for building with 0 or 1 review (edge cases in averaging)
-- **Files:** `src/lib/scoring.ts`, test file `src/lib/__tests__/scoring.test.ts` (422 lines)
-- **Risk:** Aggregation functions could return NaN or Infinity
-- **Priority:** Medium (low probability but high impact if occurs)
-
-### Search & Autocomplete Reliability
-- **What's not tested:** 
-  - Search with special characters (quotes, SQL-like strings)
-  - Autocomplete with building names > 100 chars
-  - Pagination with filters applied
-- **Files:** `src/pages/api/search.ts`, `src/components/AddressAutocomplete.tsx`, `e2e/`
-- **Risk:** Search could fail silently or return incorrect results
-- **Priority:** Medium (user-facing feature)
-
-## Performance Bottlenecks
-
-### Building Detail Page Rendering
-- **Problem:** When a building has 20+ reviews, the page calculates scores in-component rather than using pre-calculated aggregate.
-- **Files:** `src/pages/buildings/[slug].astro`, `src/components/reviews/ReviewCard.astro`
-- **Cause:** `ReviewCard` component calculates category scores from raw item scores on every render
-- **Impact:** Acceptable for current scale (< 100 reviews per building) but O(n) recalculation waste
-- **Improvement path:**
-  1. Fetch pre-calculated `building_scores` aggregate from API
-  2. Use aggregate scores in ReviewCard instead of per-review calculation
-  3. Cost: Low (aggregate already calculated, just need to pass it)
-
-### Search Filtering Without Database Index
-- **Problem:** Search filters on `neighborhood`, `city`, `building_type` but unclear if these columns are indexed
-- **Files:** `migrations/0001_initial.sql` (lines 40-42 show some indexes), `src/pages/api/search.ts`
-- **Impact:** Full table scans possible on large datasets
-- **Verification needed:** Check production database index coverage on filter columns
-- **Improvement:** Add missing indexes on frequently filtered columns
-
-### Email Sending Synchronously in API Routes
-- **Problem:** Email sends (verify, reset, notifications) block API response in `src/lib/email.ts` (458 lines)
-- **Files:** `src/lib/email.ts`, `src/pages/api/auth/verify.ts`, `src/pages/api/auth/forgot-password.ts`
-- **Impact:** API response time = email send time. Resend API latency (200-500ms) adds to every email route.
-- **Improvement path:**
-  1. Switch to fire-and-forget pattern with best-effort retry
-  2. Log email failures separately; don't block user-facing response
-  3. Cost: Medium (requires error handling strategy for failed emails)
-
-## Known Bugs
-
-### OAuth Redirect Issue in Production
-- **Symptoms:** Google OAuth logins fail on ratemyplace.org; work locally
-- **Files:** `src/pages/api/auth/google-callback.ts`, Cloudflare Workers middleware
-- **Trigger:** User clicks "Sign in with Google" on production
-- **Cause:** Cloudflare bot detection (BotManagement) blocks OAuth redirect verification
-- **Current mitigation:** Workaround uses SITE_URL env var; not fully reliable
-- **Recommendations:**
-  1. Update Cloudflare WAF rules to whitelist OAuth callback paths
-  2. Implement fallback to email-only auth path if OAuth fails
-  3. Add explicit OAuth error logging to diagnose other similar issues
-  4. Test OAuth with production credentials in staging environment before rolling out
-- **Workaround:** Email signup/login works (63 lines in `src/pages/api/auth/signin.ts`)
-
-### Empty State Handling Inconsistency
-- **Problem:** Different empty state messages across pages (search returns "No results", building with 0 reviews shows "Be the first to review")
-- **Files:** `src/pages/search.astro`, `src/pages/buildings/[slug].astro`
-- **Impact:** Minor UX inconsistency, not a bug
-- **Fix:** Create shared empty state component `src/components/EmptyState.tsx` with consistent messaging
-
-## Security Considerations
-
-### API Response Data Leakage
-- **Risk:** Admin-only fields in API responses could expose information if authorization checks are incomplete
-- **Files:** `src/pages/api/reviews/[id].ts`, `src/pages/api/admin/**/*.ts`
-- **Current mitigation:** All API routes check `context.locals.user` before returning data; admin routes check `context.locals.user?.isAdmin`
-- **Verification:** Code review shows all checks in place (lines 94-98 in [id].ts); no leakage detected
-- **Recommendations:**
-  1. Audit all admin endpoints on next security review
-  2. Add explicit allowlist of fields returned in public vs admin responses
-  3. Document which fields are admin-only (inline comments in API routes)
-
-### SQL Injection Prevention
-- **Current status:** All queries use parameterized bindings (`.bind()` pattern)
-- **Files:** Every file in `src/pages/api/` uses D1 parameterized API
-- **Verification:** No string interpolation in SQL queries found; pattern is consistent
-- **Recommendation:** Maintain this pattern (documented in CLAUDE.md)
-
-### CSRF Protection
-- **Current status:** No explicit CSRF token implementation visible
-- **Files:** `src/pages/api/**/*.ts`
-- **Risk:** Form submissions (review create, edit, delete) could be vulnerable to CSRF if user is logged in elsewhere
-- **Verification needed:** Check if Astro or Lucia includes built-in CSRF protection
-- **Recommendation:**
-  1. Audit CSRF protection status (may be built into Lucia/Astro)
-  2. If not present, add CSRF token generation/validation to all state-changing endpoints
-  3. Use SameSite cookie attribute (Lucia may already do this)
-
-### Input Validation Coverage
-- **Risk:** Some endpoints may accept invalid input
-- **Files:** `src/lib/validation.ts` (imported but extent of coverage unknown), `src/pages/api/**/*.ts`
-- **Verification:** Need comprehensive audit of all endpoints for:
-  - Missing length limits (e.g., review text could be >1MB)
-  - Missing type checks (e.g., rent_amount accepts non-numeric)
-  - Missing format validation (e.g., email, zip code)
-- **Recommendation:**
-  1. Create validation test suite
-  2. Add max length constraints on all text fields
-  3. Validate rent_amount/laundry_cost as integers only
-  4. Validate emails with regex or library
+**Priority:** Medium (deferred from v1.5.0, affects code maintainability but not functionality)
 
 ---
 
-*Concerns audit: 2026-04-26*
+### DEBT-02: Legacy Pest-Issue Fallback Columns
+
+**Area:** Database Schema
+
+**Issue:** Two database columns represent the same semantic concept: `had_pests` (v1.0 name) and `had_pest_issues` (v1.1+ name). The scoring logic contains a fallback to handle both columns:
+
+```typescript
+// src/lib/scoring.ts:307
+if (review.had_pest_issues || review.had_pests) pestCount++;
+```
+
+This works but adds unnecessary type narrowing complexity and makes the schema harder to understand.
+
+**Files:** `src/lib/scoring.ts` (line 307)
+
+**Impact:**
+- Schema documentation confusion (why two columns for one concept?)
+- Type casting burden in ReviewEditForm (16 `as any` casts in ReviewEditForm.tsx are partly due to optional/legacy fields)
+- Slight performance penalty on pest-issue scoring (two column reads)
+
+**Fix approach:**
+- Verify all existing reviews have been migrated to use `had_pest_issues`
+- Run a cleanup migration to drop `had_pests` column (can use db-reset script to verify against live data first)
+- Remove fallback logic in scoring.ts
+- Update ReviewEditForm.tsx type casting when form field extraction is refactored
+
+**Priority:** Low (cosmetic; zero functional risk, backward-compatible fallback ensures data integrity)
+
+---
+
+### DEBT-03: Type Casting Debt (`as any`)
+
+**Area:** Type Safety
+
+**Issue:** 42 instances of `as any` type casts exist across the codebase, primarily in `ReviewEditForm.tsx` (16 instances) and scattered error handlers. While none are security-critical, they indicate missing or incomplete type definitions. ReviewEditForm casts are largely due to DEBT-02 (legacy column handling).
+
+**Files:**
+- `src/components/reviews/ReviewEditForm.tsx` (16 casts) — accessing optional review fields that may not exist in ReviewDetail type
+- `src/components/profile/ProfileDashboard.tsx` (2 casts) — error response type narrowing
+- `src/components/reviews/form-steps/UnitDetailsStep.tsx` (1 cast) — enum narrowing
+- Various API handlers (scattered) — error response handling
+
+**Impact:**
+- Potential for silent type errors at runtime if field shapes change
+- IDE autocomplete less helpful (once cast to `any`, type info is lost)
+- Reduces confidence during refactoring (cannot rely on TS strict mode to catch breaking changes)
+
+**Fix approach:**
+- Extract detailed ReviewDetail type from `src/pages/api/reviews/[id].ts` into `src/lib/api-types.ts` for reuse
+- Add optional field types to ReviewDetail for legacy columns and survey responses
+- Create error response types (ApiError interface) and use instead of `any` in error handlers
+- Replace enum casts with type guards or zod validation
+- Run `npm test` after each fix to ensure no regression
+
+**Priority:** Low-to-Medium (improves code safety and DX but does not fix bugs)
+
+---
+
+## Known Issues & Blocked Work Items
+
+### ISSUE-01: Admin Review Rejection Email Still Uses `await`
+
+**Area:** Email sending
+
+**Issue:** Two admin endpoints still use `await` for email sends instead of the `fireAndForget` pattern established in v1.5.0:
+
+1. `/api/admin/reviews/[id].ts` line 120 — `await sendReviewRejectedEmail(...)` when rejecting a review
+2. `/api/disputes/[id].ts` line 138 — `await sendDisputeResolutionEmail(...)` when resolving a dispute
+
+This means if Resend is slow or fails, the admin's action is delayed or blocked. The pattern should be non-blocking (fire-and-forget with `context.waitUntil`).
+
+**Files:**
+- `src/pages/api/admin/reviews/[id].ts` (lines 114-134)
+- `src/pages/api/disputes/[id].ts` (lines 131-152)
+
+**Impact:**
+- Admin operations (review approval/rejection, dispute resolution) are slower than they need to be
+- Poor UX if Resend is experiencing latency (admin sees a delay in their action completing)
+- Inconsistent with v1.5.0 pattern (other endpoints use fireAndForget, these don't)
+
+**Fix approach:**
+- Import `fireAndForget` helper from `src/lib/email.ts`
+- Wrap email send in `fireAndForget(context, sendXxxEmail(...))`
+- Wrap email error handler in try/catch inside the promise (not outside, since now non-blocking)
+- Verify in e2e tests that admin endpoint returns immediately (not waiting for email)
+- Add to v1.6.0 planning as quick fix (1-2 plans)
+
+**Priority:** Medium (inconsistent pattern, poor UX for admins, but not a correctness issue)
+
+---
+
+### ISSUE-02: Signup Email Validation Inconsistency
+
+**Area:** Input Validation
+
+**Issue:** The `signup.ts` endpoint performs its own email validation:
+
+```typescript
+// src/pages/api/auth/signup.ts (roughly)
+if (!email || !email.includes('@')) { ... error ... }
+```
+
+But `src/lib/validation.ts` exports an `isValidEmail` helper (VAL-05, introduced in v1.5.0) that should be used instead:
+
+```typescript
+// src/lib/validation.ts
+export function isValidEmail(email: string): boolean { ... }
+```
+
+**Files:**
+- `src/pages/api/auth/signup.ts` — uses inline validation
+- `src/lib/validation.ts` — contains canonical validator
+
+**Impact:**
+- Two sources of truth for email validation (if one is updated, the other may fall out of sync)
+- Inconsistent error messages across signup and other endpoints
+- Harder to test validation in one place (must test both endpoints)
+
+**Fix approach:**
+- Import `isValidEmail` in signup.ts
+- Replace inline validation with `isValidEmail(email)` call
+- Add unit test to verify signup uses the same validator as other endpoints
+- Carry forward to v1.6.0 as consistency follow-up
+
+**Priority:** Low (low-risk consistency issue, inline validation is adequate but not canonical)
+
+---
+
+## Security Considerations
+
+### SEC-01: CSRF Protection on JSON Endpoints
+
+**Area:** Cross-Site Request Forgery
+
+**Risk:** `/api/disputes` accepts `application/json` requests. Astro's `checkOrigin` middleware does NOT apply to JSON content-type (by design), so the endpoint is NOT protected by that layer. Instead, protection comes from:
+
+1. **Cloudflare Turnstile** on the frontend form
+2. **Per-IP rate limits** (5 per hour per IP)
+3. **Content-Type guard** (rejects non-JSON requests)
+
+If an attacker bypasses Turnstile, they could submit disputes from a different origin.
+
+**Files:**
+- `src/pages/api/disputes.ts` (lines 1-80, request validation)
+- `.planning/audits/csrf-2026-04.md` (full audit rationale)
+
+**Current mitigation:**
+- Turnstile: Human-interactive challenge prevents automated attacks
+- Rate limit: Caps damage to 5 requests/hour/attacker-IP
+- Content-type guard: Prevents form-based attack vector
+
+**Recommendations:**
+- **No action needed** — current mitigation is sufficient per audit ratified in v1.5.0
+- If Turnstile were to be replaced, re-audit this endpoint (audit trigger: "new auth method")
+- Document the JSON content-type gap in CLAUDE.md alongside CSRF checklist (already done)
+
+**Priority:** Closed (audited and ratified 2026-04-28)
+
+---
+
+### SEC-02: Sensitive Field Leakage Vectors
+
+**Area:** Information Disclosure
+
+**Risk:** Database field names are sometimes exposed in API responses or frontend HTML. Examples:
+- API error messages may return database column names (e.g., `Column hashed_password not found`)
+- Admin table components display database field names in headers (e.g., "moderation_notes" instead of "Admin Notes")
+
+**Files:** Various API handlers and admin components
+
+**Current state:**
+- Field names are not leaking in recent code (v1.5.0+ review responses use camelCase mappings)
+- Admin components use descriptive labels (not raw column names)
+- Error messages are generic ("Failed to update review" not "UPDATE query failed")
+
+**Recommendations:**
+- Continue to use generic error messages in API responses (current practice)
+- Keep admin table headers as user-friendly labels (current practice)
+- Add pre-commit lint rule to catch raw database column names in error messages (future improvement)
+
+**Priority:** Low (no active leakage detected; preventive measure)
+
+---
+
+## Performance Bottlenecks
+
+### PERF-01: Slow Admin Table Loads (Large Building/Review Lists)
+
+**Area:** Query Performance
+
+**Issue:** Large admin tables (`BuildingsTable`, `ReviewsTable`, `LandlordsTable`) load all matching records at once without pagination. A landlord with 1000+ buildings or hundreds of reviews would cause:
+
+1. Large JSON response payload
+2. Long rendering time in React
+3. Possible browser unresponsiveness during large DOM insertions
+
+**Files:**
+- `src/pages/api/admin/buildings/index.ts` — no pagination
+- `src/pages/api/admin/reviews/index.ts` — no pagination  
+- `src/pages/api/admin/landlords/index.ts` — no pagination
+
+**Current capacity:** Works smoothly up to ~100-200 records per table. Beyond that, noticeable lag.
+
+**Scaling path:**
+1. Add `offset` and `limit` query parameters to admin API endpoints
+2. Implement cursor-based pagination in admin table components
+3. Query EXPLAIN PLAN to verify indexes are being used (especially composite indexes on (building_id, status))
+4. Consider materialized counts for "total records" badges
+
+**Priority:** Medium (not an immediate issue, but important before dataset grows >500 records per table)
+
+---
+
+### PERF-02: Search Query Performance on Address Field
+
+**Area:** Database Indexing
+
+**Issue:** Search endpoint queries the `address` field with a LIKE pattern. Current indexes exist on `address` column but may not support fuzzy matching efficiently (e.g., searching "mass ave" should find "Massachusetts Avenue").
+
+**Files:**
+- `src/pages/api/search.ts` — uses `WHERE address LIKE ?` with ESCAPE
+- `migrations/0024_perf_indexes.sql` — index audit notes which indexes were added
+
+**Current performance:** Acceptable up to ~100 buildings. Beyond that, searches may show latency.
+
+**Improvement path:**
+- Benchmark current query with EXPLAIN QUERY PLAN
+- Consider prefix index on address (if searching by zipcode or street prefix)
+- Consider full-text search extension (SQLite FTS5) if dataset grows large
+- Add search result count capping to prevent runaway queries
+
+**Priority:** Low (current performance is acceptable; defer until dataset scales)
+
+---
+
+## Fragile Areas
+
+### FRAG-01: Review Scoring Logic (Complex, Minimal Unit Tests)
+
+**Area:** Scoring Algorithm
+
+**Files:**
+- `src/lib/scoring.ts` (355 LOC) — contains all scoring weight definitions and calculation logic
+- `src/lib/__tests__/scoring.test.ts` (390 LOC) — unit tests, but coverage is basic
+
+**Why fragile:**
+- Scoring weights are used to compute building and landlord aggregate scores
+- Any change to weights requires updating BOTH the weight definition AND the methodology documentation page
+- The calculation spans three domain arrays (UNIT_FIELDS, BUILDING_FIELDS, LANDLORD_FIELDS) — a field added to one must be reflected in the corresponding form and survey items
+- Test coverage is high, but tests use synthetic data that may not catch edge cases in the live dataset
+
+**Safe modification:**
+1. All weight changes MUST include academic citation in code comments
+2. Update `src/pages/methodology.astro` in the same PR
+3. Run all tests: `npm test -- scoring`
+4. Run `/qa` checklist focusing on score consistency across search / detail / profile pages
+5. Spot-check 3 live buildings to verify scores are mathematically correct after change
+
+**Test coverage gaps:**
+- No test for fallback behavior (when legacy `had_pests` column is used)
+- No test for edge case: a review with ALL survey items answered (should still produce valid 1-5 score)
+- No test for boundary: reviews with ONLY unit items answered (BUILDING and LANDLORD_FIELDS empty)
+
+**Priority:** Medium (core logic, but not actively changing; revisit when adding new survey items)
+
+---
+
+### FRAG-02: Email Template Synchronization
+
+**Area:** Email Communication
+
+**Issue:** Email templates are HTML strings embedded in `src/lib/email.ts` (566 LOC). If branding colors, URLs, or copy is updated in one template, the other templates may become inconsistent.
+
+**Files:**
+- `src/lib/email.ts` — 5 email templates (signup verification, password reset, dispute confirmation, dispute resolution, review rejected)
+
+**Why fragile:**
+- All templates are in one large file (hard to see all at once)
+- No single source of truth for brand colors, footer copy, or unsubscribe link
+- Audit CG1 discovered that dismissed disputes had silent failure (no email) — templates should always confirm action to the user
+
+**Safe modification:**
+- When changing a template, verify the updated template renders correctly by testing in a real email client (Gmail, Outlook) not just in browser
+- Update ALL templates if changing brand colors or footer copy
+- Add comment above each template summarizing its use case and triggers
+- Consider extracting brand colors and footer into shared constants
+
+**Priority:** Low (templates are working; fragile mainly in future-maintenance sense)
+
+---
+
+## Missing Critical Features
+
+### FEATURE-01: Email Unsubscribe Management
+
+**Area:** Email Communication / Compliance
+
+**Issue:** The system now sends multiple types of emails (verification, password reset, dispute notifications, review rejection, dispute resolution). There is no way for users to unsubscribe from non-critical emails.
+
+**What's missing:**
+- Unsubscribe links in email templates (except verification emails, which are transactional)
+- User preference table or column to opt-out of notification emails
+- Admin UI to manage user notification preferences
+- Logic to skip sending emails if user has opted out
+
+**Problem:** As the email volume scales (e.g., daily digest of review disputes), users may mark emails as spam if they can't unsubscribe. This damages sender reputation and reduces email deliverability.
+
+**Files affected:**
+- `src/lib/email.ts` — would need unsubscribe link injection
+- `src/pages/api/profile/settings.ts` — would need notification preferences endpoint
+- `src/pages/admin/account-settings.astro` or `src/components/profile/SettingsTab.tsx` — user-facing UI for preferences
+
+**Fix approach:**
+- Add `notification_preferences` column to users table (JSON: {disputes: bool, reviews: bool, marketing: bool})
+- Add unsubscribe link to all non-transactional emails (`${SITE_URL}/api/auth/unsubscribe?token=<signed-token>`)
+- Implement `/api/auth/unsubscribe` endpoint (token-based, no auth required)
+- Add notification preference checkboxes to SettingsTab.tsx
+- Update sendXxxEmail functions to check preferences before sending
+
+**Blocking:** Not explicitly blocking any feature, but should be implemented before scaling email volume (v1.6.0 or v1.7.0)
+
+**Priority:** Low (deferred from v1.5.0, low risk but good practice before scaling)
+
+---
+
+## Test Coverage Gaps
+
+### TEST-01: End-to-End Coverage for Admin Review Actions
+
+**Area:** Testing
+
+**What's not tested:** The full flow of an admin rejecting a review and the tenant receiving the rejection email is not covered by E2E tests with assertions on both sides. Current tests verify the database is updated but don't assert that the email was sent (Resend is mocked in test env).
+
+**Files:**
+- `e2e/admin-actions.spec.ts` — tests admin approval/rejection but doesn't capture email state
+- `src/pages/api/admin/reviews/[id].ts` — the endpoint itself lacks integration testing with Resend
+
+**Risk:** If email sending logic is broken, E2E tests would not catch it. A tenant's review could be rejected but they might not receive the notification.
+
+**Improvement:**
+- Add E2E test that calls the admin endpoint, then queries a mock-Resend log to verify email was sent
+- Or capture email in a test database table that E2E tests can query
+- Current workaround: manual QA for rejection flow (documented in CLAUDE.md `/qa` checklist)
+
+**Priority:** Medium (manual QA exists, but E2E coverage would be better)
+
+---
+
+### TEST-02: Scoring Edge Cases
+
+**Area:** Testing
+
+**What's not tested:**
+- Review with zero responses (all fields null) — should still produce a valid score or graceful null
+- Review with partial responses (only unit items filled, no building/landlord items)
+- Review with boundary values (all scores = 1 or all = 5)
+- Fallback logic when legacy `had_pests` is the only pest-related field set
+
+**Files:**
+- `src/lib/__tests__/scoring.test.ts` — tests happy path and some edge cases, but gaps remain
+
+**Risk:** Score calculation could produce NaN or incorrect aggregates if dataset has reviews with unexpected null/partial data patterns.
+
+**Improvement:**
+- Add test cases for the above edge cases
+- Run scoring tests with live production review data (subset) to ensure real-world compat
+- Add property-based tests using test data generation (QuickCheck-style)
+
+**Priority:** Low (scoring logic is well-tested for known patterns; edge cases are theoretical)
+
+---
+
+## Scaling Limits
+
+### SCALE-01: D1 SQLite Single-Region Constraint
+
+**Area:** Database
+
+**Current capacity:**
+- Single-region SQLite (Cloudflare D1) can handle up to ~10,000 concurrent connections but in practice Workers are stateless and each request gets a new connection
+- Write concurrency is limited by SQLite's locking (one writer at a time)
+- Read-heavy workloads scale well; write-heavy workloads will bottleneck
+
+**Limit trigger:** When simultaneous review submissions exceed ~100/second (very high), SQLite lock contention will cause request queueing and increased latency.
+
+**Scaling path:**
+1. Monitor D1 query latencies in Cloudflare dashboard
+2. If write latency > 1s, consider batching writes (e.g., queue review submissions, process in batches)
+3. If read latency > 500ms with large result sets, add indexes and optimize queries
+4. For multi-region deployment, would need to migrate to PostgreSQL (out of scope for now)
+
+**Current state:** Well below scaling limits. Live site has ~30 buildings, ~100 reviews. No urgent concern.
+
+**Priority:** Very Low (theoretical; revisit when approaching 1000+ reviews)
+
+---
+
+### SCALE-02: Rate Limiter Accuracy Degradation with High Traffic
+
+**Area:** Rate Limiting
+
+**Issue:** Rate limits are stored in a D1 table (`rate_limits`) with per-IP request counts and timestamps. During very high traffic, writes to this table could contend with other writes (SQLite lock), causing some rate-limit checks to be slightly inaccurate.
+
+**Files:**
+- `src/lib/rateLimit.ts` — implements rate limit checks
+- `migrations/0010_rate_limits.sql` — creates rate_limits table
+
+**Current behavior:** Fail-closed (on DB error, returns 503), so inaccuracy is safe.
+
+**Scaling path:**
+- Monitor rate-limit table write latency
+- If > 500ms, consider using in-memory rate limiter with periodic sync to DB (higher complexity)
+- Or switch to Cloudflare's native rate-limit support (Durable Objects or Workers KV)
+
+**Priority:** Very Low (current setup handles ~10k requests/day easily; no immediate concern)
+
+---
+
+## Dependencies at Risk
+
+### DEP-01: Cloudflare D1 Beta Status
+
+**Area:** Database Platform
+
+**Risk:** D1 is still in open beta (as of 2026). Features or behavior could change, and breaking changes are theoretically possible (though unlikely to be made without migration path).
+
+**Impact:** If D1 breaking changes occur, the application would need migration to PostgreSQL or other SQL database.
+
+**Mitigation:**
+- Monitor Cloudflare announcements for D1 status updates
+- Keep backups of database schema and test data
+- Version-control all migrations (already done: `migrations/` directory)
+
+**Migration plan:** If needed, export D1 data to CSV, ingest into PostgreSQL. Application code requires minimal changes (switch to different D1/postgres driver).
+
+**Priority:** Low (Cloudflare has strong incentive to stabilize D1; risk is theoretical)
+
+---
+
+### DEP-02: Resend Email Service Availability
+
+**Area:** Email Communication
+
+**Risk:** All email sending depends on Resend API. If Resend becomes unavailable or changes pricing/features, signups and notifications could fail.
+
+**Mitigation:**
+- Emails are best-effort (failures don't block primary actions, per v1.5.0 pattern)
+- Error handling logs failures for admin review
+
+**Migration plan:** If needed, switch to SendGrid, AWS SES, or other email provider. Requires updating email templates and API calls in `src/lib/email.ts`.
+
+**Priority:** Low (Resend is well-funded and stable; low switching cost if needed)
+
+---
+
+## Known Divergences & Workarounds
+
+### DIVER-01: Search vs Detail Page Scoring Divergence (Acceptable)
+
+**Area:** Data Consistency
+
+**Issue:** Search results page displays aggregate scores calculated at query-time, while the property detail page sometimes recalculates scores from recent reviews. If a new review is submitted between search query and detail page load, the scores might differ slightly.
+
+**Files:**
+- `src/pages/api/search.ts` — queries pre-calculated aggregate scores from `building_scores` table
+- `src/pages/buildings/[slug].astro` — recalculates scores from live reviews
+
+**Status:** Documented in project memory as acceptable. Dataset is still small enough that exact consistency is not critical. As dataset grows, consider triggering immediate aggregate recalculation on review approval.
+
+**Priority:** Very Low (known and acceptable divergence; revisit at 1000+ reviews)
+
+---
+
+## Recommendations Summary
+
+| Area | Priority | Recommendation |
+|------|----------|-----------------|
+| Component size (DEBT-01) | Medium | Split ReviewEditForm, BuildingsTable, ReviewsTable in v1.6.0 |
+| Email blocking on admin actions (ISSUE-01) | Medium | Convert admin email sends to fireAndForget pattern |
+| Email unsubscribe (FEATURE-01) | Low | Implement before scaling notification emails (v1.6.0+) |
+| Test coverage gaps (TEST-01, TEST-02) | Low | Add E2E tests for email flows and scoring edge cases |
+| Validation consistency (ISSUE-02) | Low | Apply isValidEmail validator to signup.ts |
+| Legacy column cleanup (DEBT-02) | Low | Drop `had_pests` column and fallback logic |
+| Type safety (DEBT-03) | Low | Replace `as any` casts with proper type definitions |
+
+---
+
+*Concerns audit: 2026-05-02*

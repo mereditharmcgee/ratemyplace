@@ -1,177 +1,190 @@
 # External Integrations
 
-**Analysis Date:** 2026-04-26
+**Analysis Date:** 2026-05-02
 
 ## APIs & External Services
 
-**Google Services:**
-- **Google OAuth 2.0** - User authentication via OAuth
-  - SDK/Client: Native `fetch` with Google token endpoint
+**Authentication & Identity:**
+- **Google OAuth 2.0** - User signup/signin with Google accounts
+  - Endpoints: `https://accounts.google.com/o/oauth2/v2/auth`, `https://oauth2.googleapis.com/token`, `https://www.googleapis.com/oauth2/v3/userinfo`
   - Implementation: `src/pages/api/auth/google.ts`, `src/pages/api/auth/google/callback.ts`
-  - Auth: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
-  - Token exchange: `https://oauth2.googleapis.com/token`
-  - User info: `https://www.googleapis.com/oauth2/v3/userinfo`
+  - Credentials: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (Cloudflare Pages secrets)
+  - Scope: `openid email profile`
+  - CSRF: State parameter stored in SameSite=Lax cookie (10-minute expiry)
 
+**Maps & Location:**
 - **Google Places API (New)** - Address autocomplete and place details
-  - SDK/Client: REST API via `fetch`
+  - Endpoints: `https://places.googleapis.com/v1/places:autocomplete`, `https://places.googleapis.com/v1/places/{placeId}`
   - Implementation: `src/pages/api/places/autocomplete.ts`, `src/pages/api/places/details.ts`
-  - Auth: `GOOGLE_PLACES_API_KEY` or fallback to `GOOGLE_MAPS_API_KEY`
-  - Endpoint: `https://places.googleapis.com/v1/places:autocomplete`
-  - Header requirement: Must include `Referer: https://ratemyplace.org/` for server-side calls
-  - Component integration: `src/components/AddressAutocomplete.tsx` (React island)
+  - Credentials: `GOOGLE_PLACES_API_KEY` (preferred) or fallback `GOOGLE_MAPS_API_KEY`
+  - Headers: Requires `Referer: https://ratemyplace.org/` for server-side calls
+  - Features: Autocomplete (US addresses, street_address/subpremise/premise types), place details with structured address components
 
-- **Google Maps Display** - Building location map visualization
-  - SDK/Client: Google Maps JavaScript API v=weekly
-  - Implementation: `src/components/BuildingMap.tsx` (React island)
-  - Auth: `GOOGLE_MAPS_API_KEY` embedded in script tag
-  - API Call: `https://maps.googleapis.com/maps/api/js?key={apiKey}&libraries=marker&v=weekly`
-  - Features: Advanced Marker Elements, Info Windows
+**Security & Bot Prevention:**
+- **Cloudflare Turnstile** - CAPTCHA verification
+  - Endpoint: `https://challenges.cloudflare.com/turnstile/v0/siteverify` (verification)
+  - Implementation: `src/lib/turnstile.ts`
+  - Credentials: `TURNSTILE_SECRET_KEY` (Cloudflare Pages secret)
+  - Usage: Required on all unauthenticated POST forms (contact, signup, disputes, bug reports, review creation)
+  - Sitekey: `0x4AAAAAACo4KpkxsacPhM2r` (hardcoded in frontend components)
+  - Client-side: Rendered via Cloudflare's iframe (`cf-turnstile` element)
 
-**Email Service:**
-- **Resend** - Transactional email delivery
-  - SDK/Client: `resend@6.9.2` package
-  - Implementation: `src/lib/email.ts` (7 email functions)
-  - Auth: `RESEND_API_KEY`
-  - From address: `noreply@ratemyplace.org`
-  - Email types:
-    - Verification email: `sendVerificationEmail()`
-    - Password reset: `sendPasswordResetEmail()`
-    - Dispute confirmation: `sendDisputeConfirmationEmail()`
-    - Dispute upheld notification: `sendDisputeUpheldEmail()`
-    - Contact form confirmation: `sendContactConfirmationEmail()`
-    - Contact form admin notification: `sendContactNotificationEmail()`
-  - Used in: `src/pages/api/auth/signup.ts`, `src/pages/api/auth/forgot-password.ts`, `src/pages/api/auth/resend-verification.ts`, `src/pages/api/contact.ts`, `src/pages/api/disputes/*.ts`
+**Email Delivery:**
+- **Resend** - Transactional email service
+  - Implementation: `src/lib/email.ts` (7 email templates)
+  - Credentials: `RESEND_API_KEY`
+  - Sender: `noreply@ratemyplace.org`, `support@ratemyplace.org`
+  - Emails:
+    - Verification email (signup, resend verification)
+    - Password reset email
+    - Dispute confirmation (to landlord)
+    - Dispute resolution outcomes (uphold/dismiss/partially_valid)
+    - Contact form confirmation (to submitter)
+    - Contact form notification (to admin at contact@ratemyplace.org)
+    - Review rejection notification (to reviewer)
 
-**City/Municipal Data APIs:**
-- **Boston Assessing API** - Property enrichment for Boston properties
-  - Provider: City of Boston (data.boston.gov)
-  - API Type: CKAN DataStore (not Socrata)
-  - Resource ID: `ee73430d-96c0-423e-ad21-c4cfb54c8961` (FY2026)
+**Property Data Enrichment:**
+- **Boston Assessing API** - Property records for Boston buildings
   - Endpoint: `https://data.boston.gov/api/3/action/datastore_search`
+  - Resource ID: `ee73430d-96c0-423e-ad21-c4cfb54c8961` (FY2026 data)
   - Implementation: `src/lib/enrichment/adapters/boston.ts`
-  - Data returned: Owner, year built, units, building type, condition, values, dimensions
-  - Used by: Admin endpoint `/api/admin/buildings/[id]/enrich` (human-in-the-loop, not auto-saved)
+  - Data: Owner name, year built, residential/commercial units, property type, structure class, overall condition, total value, gross/living area
+  - Method: No API key required; CKAN datastore search with JSON filter params
+  - Human-in-loop: Data retrieved but never auto-saved (admin review required)
 
-- **CT CAMA API** - Property enrichment for New Haven properties
-  - Provider: State of Connecticut (data.ct.gov)
-  - API Type: Socrata (no API key required)
-  - Resource ID: `pqrn-qghw`
+- **CT CAMA API (New Haven)** - Property records for Connecticut buildings
   - Endpoint: `https://data.ct.gov/resource/pqrn-qghw.json`
   - Implementation: `src/lib/enrichment/adapters/new-haven.ts`
-  - Used by: Admin endpoint `/api/admin/buildings/[id]/enrich`
+  - Data: Owner, year built, property use, gross area, appraised value, condition
+  - Method: Socrata API, no API key required
+  - Query: Filters by address number and street name
+  - Human-in-loop: Data retrieved but never auto-saved (admin review required)
 
 ## Data Storage
 
 **Databases:**
-- **Cloudflare D1 (SQLite)**
-  - Binding name: `DB`
-  - Database ID: `7dd2a722-fdd3-4986-b2f7-6d61d069438e`
+- **Cloudflare D1 (SQLite)** - Primary database
+  - Binding: `DB` (type `D1Database`)
   - Database name: `ratemyplace-db`
-  - Client: D1 adapter from `@cloudflare/workers-types`
-  - Access pattern: `getDB()` helper in `src/lib/db.ts`
-  - Connection via Cloudflare runtime: `(context.locals as any).runtime?.env?.DB`
-  - Tables: users, sessions, reviews, buildings, disputes, audit_logs, rate_limits, landlords, property_managers, verification_tokens, password_reset_tokens, contact_messages, bug_reports
-  - Timestamps: Use `unixepoch()` for SQLite (not `datetime('now')`)
+  - Client: D1 adapter for Lucia auth (`@lucia-auth/adapter-sqlite`)
+  - Access pattern: `getDB(context)` returns D1Database instance
+  - Timestamps: `unixepoch()` for SQLite (not `datetime('now')`)
+  - Connection: Via `context.locals.runtime.env.DB` (set up in middleware)
 
 **File Storage:**
-- **Cloudflare R2**
-  - Bucket name: `ratemyplace-verification`
-  - Binding name: `VERIFICATION_BUCKET`
-  - Purpose: Store verification images (rent receipt, lease, ID)
-  - Client: R2 API via `@cloudflare/workers-types`
-  - Access pattern: `src/lib/storage.ts` functions
+- **Cloudflare R2** - Object storage for verification documents
+  - Binding: `VERIFICATION_BUCKET` (type `R2Bucket`)
+  - Purpose: Store user-submitted verification images and PDFs
   - Key format: `users/{userId}/verifications/{reviewId}/{timestamp}.{ext}`
   - Allowed types: JPEG, PNG, HEIC, HEIF, PDF
-  - Max file size: 10MB
-  - Implementation: `uploadVerificationImage()`, `getVerificationImage()`, `deleteVerificationImage()`
+  - Max file size: 10 MB
+  - Implementation: `src/lib/storage.ts` (upload, get, delete operations)
 
 **Caching:**
-- Not explicitly configured (Cloudflare Cache API available via Workers runtime, but not actively used in current codebase)
+- Not detected - No Redis or in-memory cache configured
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- **Custom implementation with Lucia v3**
-  - Session storage: D1 database (`users` and `sessions` tables)
-  - Session adapter: `@lucia-auth/adapter-sqlite`
-  - User attributes: email, emailVerified, name, avatarUrl, googleId, isAdmin
-  - Session cookie: Secure in production, configurable
+- **Custom + Google OAuth** hybrid approach
+  - Primary: Google OAuth 2.0 (signup/signin with Google)
+  - Secondary: Custom email/password authentication (signup, signin, password reset)
+  - Session management: Lucia v3 with D1 adapter
+  - Session storage: `users` and `sessions` tables in D1
+  - Session cookie: `auth_session` (HttpOnly, SameSite=Lax, Secure in production)
+  - User attributes: Email, email_verified flag, name, avatar_url, google_id, is_admin flag
 
-- **Google OAuth Integration**
-  - Implicit flow via redirect to Google auth endpoint
-  - Token exchange and user info retrieval via server-side `fetch`
-  - User lookup/creation on first login via `google_id` field in users table
+**Email Verification:**
+- Token-based verification with 24-hour expiry
+- Implementation: `src/pages/api/auth/verify-email`
+- Storage: Tokens in D1 `email_verification_codes` table
 
-- **Email/Password Auth**
-  - Password hashing: Via Lucia/oslo crypto
-  - Nullable `hashed_password` (users can sign up via Google only)
-  - Password reset flow: Token-based via email link
-
-## Bot Protection
-
-**Cloudflare Turnstile:**
-- Purpose: CAPTCHA alternative on contact form and review submission
-- Sitekey: `0x4AAAAAACo4KpkxsacPhM2r` (public key)
-- Secret key: `TURNSTILE_SECRET_KEY` (environment variable)
-- Verification endpoint: `https://challenges.cloudflare.com/turnstile/v0/siteverify`
-- Implementation: `src/lib/turnstile.ts` function `verifyTurnstile()`
-- Frontend: `src/components/contact/ContactForm.tsx`, `src/components/reviews/form-steps/ConfirmStep.tsx`
+**Password Reset:**
+- Token-based password reset with 1-hour expiry
+- Implementation: `src/pages/api/auth/forgot-password`
+- Storage: Tokens in D1 `password_reset_codes` table
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- Not detected (no Sentry, Rollbar, or similar integration)
+- Not detected - No Sentry, DataDog, or similar configured
 
 **Logs:**
-- Console logging throughout codebase (`console.error()`, `console.log()`, `console.warn()`)
-- Cloudflare Workers runtime logs (available via `wrangler tail`)
-- Custom audit logging: `src/lib/audit.ts` for admin action tracking (best-effort, non-blocking)
+- Console logging via `console.error()`, `console.warn()`
+- Structured logging in `src/lib/logger.ts` (error handler)
+- Email recipient hashing: Privacy-preserving log correlation using SHA256 (first 8 hex chars)
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Cloudflare Pages (production deployment)
-- Auto-deploys from `main` branch to https://ratemyplace.org
-- Preview URLs: `*.ratemyplace-64y.pages.dev`
+- **Cloudflare Pages** - Git-based deployment
+  - Project name: `ratemyplace`
+  - Build output: `dist/` directory
+  - Auto-deploy: On push to main branch
+  - Preview URLs: `*.ratemyplace-64y.pages.dev`
+  - Custom domain: `ratemyplace.org` (DNS CNAME to Cloudflare)
 
 **CI Pipeline:**
-- Not detected (no GitHub Actions, GitLab CI, or equivalent configured)
-- Manual deployment via git push to main branch
-
-## Rate Limiting
-
-**Implementation:**
-- Custom rate limiter in `src/lib/rateLimit.ts`
-- Stored in D1 database (`rate_limits` table)
-- Tracks by client IP address
-- Used for: password reset (3 per hour), email verification resend (3 per hour), other endpoints as configured
+- Not detected - No GitHub Actions, GitLab CI, or other CI service configured
+- Local npm scripts for build/test: `npm run build`, `npm test`, `npm run e2e`
 
 ## Environment Configuration
 
-**Required env vars:**
-- `GOOGLE_CLIENT_ID` - OAuth
-- `GOOGLE_CLIENT_SECRET` - OAuth
-- `GOOGLE_MAPS_API_KEY` - Maps and fallback for Places API
-- `GOOGLE_PLACES_API_KEY` - Address autocomplete (preferred over GOOGLE_MAPS_API_KEY)
-- `RESEND_API_KEY` - Email delivery
-- `SITE_URL` - Canonical site URL (optional, falls back to request origin)
-- `TURNSTILE_SECRET_KEY` - Bot verification (optional, skipped if not set)
+**Required env vars (Cloudflare Pages Secrets):**
+- `GOOGLE_CLIENT_ID` - OAuth client ID from Google Cloud Console
+- `GOOGLE_CLIENT_SECRET` - OAuth client secret
+- `GOOGLE_MAPS_API_KEY` or `GOOGLE_PLACES_API_KEY` - Maps/Places API key
+- `RESEND_API_KEY` - Email service API key
+- `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile secret
+- `SITE_URL` - Base URL for email links (e.g., `https://ratemyplace.org`)
 
-**Secrets location:**
-- Cloudflare Pages environment variables
-- Configured in Cloudflare dashboard or via `wrangler secret`
-- Never committed to repository
+**D1 Binding:**
+- `DB` - Automatically bound via `wrangler.jsonc` configuration
+
+**R2 Binding:**
+- `VERIFICATION_BUCKET` - Automatically bound via `wrangler.jsonc` configuration
+
+**Secrets Location:**
+- Cloudflare Pages project settings → Environment Variables section
+- Also available as Wrangler secrets for local development: `wrangler secret put <KEY>`
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- `/api/auth/google/callback` - Google OAuth callback handler
-- `/api/admin/buildings/[id]/enrich` - Admin-triggered property enrichment (no webhook, manual trigger)
+- `/api/auth/google/callback` - Google OAuth callback endpoint (handles code exchange, user creation/update)
+- `/api/contact` - Contact form submission (public POST, requires Turnstile token)
+- `/api/disputes` - Dispute submission (public POST, requires Turnstile token)
+- `/api/bug-reports` - Bug report submission (public POST, requires Turnstile token)
+- `/api/reviews` - Review submission (public POST, requires Turnstile token)
+- `/api/verification/upload` - Verification image upload (authenticated)
 
 **Outgoing:**
-- Email notifications via Resend (transactional)
-- Google OAuth token exchange (OAuth 2.0 token endpoint)
+- **Cloudflare Email Routing** - Catch-all forwarding sends all @ratemyplace.org addresses to personal email
+- **Resend** - Outbound transactional emails (verification, password reset, dispute notifications, contact confirmations, review rejections)
+- **Google Places API** - Autocomplete/details queries from review form
+- **Data enrichment APIs** - Boston Assessing and CT CAMA queries (admin-only, human-in-loop)
+
+## Cross-Domain Security
+
+**CORS:**
+- Not explicitly configured (Astro security handled via middleware)
+
+**Content Security Policy:**
+Defined in `src/middleware.ts`:
+- **default-src:** `'self'`
+- **script-src:** `'self' 'unsafe-inline' https://challenges.cloudflare.com https://maps.googleapis.com https://static.cloudflareinsights.com`
+- **style-src:** `'self' 'unsafe-inline' https://fonts.googleapis.com`
+- **font-src:** `'self' https://fonts.gstatic.com`
+- **img-src:** `'self' data: https://*.googleapis.com https://*.gstatic.com`
+- **frame-src:** `https://challenges.cloudflare.com` (Turnstile iframes)
+- **connect-src:** `'self' https://maps.googleapis.com https://places.googleapis.com https://challenges.cloudflare.com https://static.cloudflareinsights.com`
+
+**CSRF Protection:**
+- **SameSite=Lax** on session cookies and OAuth state cookie (cross-site POSTs don't carry cookies)
+- **Cloudflare Turnstile** on all unauthenticated POST forms
+- **Astro checkOrigin** (default enabled for SSR) for form-content-type requests
+- Note: `application/json` endpoints (`/api/disputes`) rely on Turnstile + rate limiting + content-type validation
 
 ---
 
-*Integration audit: 2026-04-26*
+*Integration audit: 2026-05-02*
