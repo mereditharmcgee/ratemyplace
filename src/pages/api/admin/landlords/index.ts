@@ -2,6 +2,9 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
 import { generateIdFromEntropySize } from 'lucia';
 
+const DEFAULT_LIMIT = 100;
+const MAX_LIMIT = 500;
+
 export async function GET(context: APIContext): Promise<Response> {
   // Require authentication
   if (!context.locals.user) {
@@ -19,8 +22,34 @@ export async function GET(context: APIContext): Promise<Response> {
     });
   }
 
+  // Pagination params
+  const url = new URL(context.request.url);
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
+  const requestedLimit = parseInt(url.searchParams.get('limit') || String(DEFAULT_LIMIT), 10) || DEFAULT_LIMIT;
+  const limit = Math.min(MAX_LIMIT, Math.max(1, requestedLimit));
+
   try {
     const db = getDB(context);
+
+    // Aggregate stats across the WHOLE dataset (not the paginated slice) so the
+    // four stat cards stay accurate when the user has only loaded the first page.
+    const statsRow = await db.prepare(`
+      SELECT
+        COUNT(DISTINCT l.id) as total_landlords,
+        COUNT(DISTINCT b.id) as total_buildings,
+        COUNT(DISTINCT r.id) as total_reviews,
+        COUNT(DISTINCT CASE WHEN per_landlord.avg_score >= 4 THEN per_landlord.id END) as high_rated
+      FROM landlords l
+      LEFT JOIN buildings b ON l.id = b.landlord_id
+      LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
+      LEFT JOIN (
+        SELECT l2.id, AVG(r2.overall_score) as avg_score
+        FROM landlords l2
+        LEFT JOIN buildings b2 ON l2.id = b2.landlord_id
+        LEFT JOIN reviews r2 ON b2.id = r2.building_id AND r2.status = 'approved'
+        GROUP BY l2.id
+      ) per_landlord ON per_landlord.id = l.id
+    `).first<{ total_landlords: number; total_buildings: number; total_reviews: number; high_rated: number }>();
 
     const landlords = await db.prepare(`
       SELECT
@@ -40,10 +69,20 @@ export async function GET(context: APIContext): Promise<Response> {
       LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
       GROUP BY l.id
       ORDER BY l.name ASC
-    `).all();
+      LIMIT ? OFFSET ?
+    `).bind(limit, offset).all();
 
     return new Response(JSON.stringify({
-      landlords: landlords.results
+      landlords: landlords.results,
+      total: statsRow?.total_landlords ?? 0,
+      offset,
+      limit,
+      stats: {
+        total_landlords: statsRow?.total_landlords ?? 0,
+        total_buildings: statsRow?.total_buildings ?? 0,
+        total_reviews: statsRow?.total_reviews ?? 0,
+        high_rated: statsRow?.high_rated ?? 0,
+      }
     }), {
       headers: { 'Content-Type': 'application/json' }
     });

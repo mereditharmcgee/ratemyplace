@@ -33,9 +33,21 @@ interface Building {
   owner_website: string | null;
 }
 
+interface BuildingsStats {
+  total_buildings: number;
+  with_reviews: number;
+  with_landlords: number;
+  total_reviews: number;
+}
+
+const PAGE_SIZE = 100;
+
 export default function BuildingsTable() {
   const [buildings, setBuildings] = useState<Building[]>([]);
+  const [stats, setStats] = useState<BuildingsStats>({ total_buildings: 0, with_reviews: 0, with_landlords: 0, total_reviews: 0 });
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(null);
@@ -50,19 +62,23 @@ export default function BuildingsTable() {
   const [enrichResult, setEnrichResult] = useState<any>(null);
 
   useEffect(() => {
-    fetchBuildings();
+    fetchBuildings(0, true);
     fetchLandlords();
     fetchManagers();
   }, []);
 
-  const fetchBuildings = async () => {
+  // replace=true on initial load; replace=false appends the next page.
+  const fetchBuildings = async (offset: number, replace: boolean) => {
     try {
-      setLoading(true);
-      const response = await fetch('/api/admin/buildings');
+      if (replace) setLoading(true);
+      else setLoadingMore(true);
+      const response = await fetch(`/api/admin/buildings?limit=${PAGE_SIZE}&offset=${offset}`);
       const data = await response.json();
 
       if (response.ok) {
-        setBuildings(data.buildings);
+        setBuildings((prev) => (replace ? data.buildings : [...prev, ...data.buildings]));
+        setStats(data.stats);
+        setTotal(data.total);
       } else {
         setError(data.error || 'Failed to load buildings');
       }
@@ -70,12 +86,16 @@ export default function BuildingsTable() {
       setError('Failed to load buildings');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
+  const loadMore = () => fetchBuildings(buildings.length, false);
+
   const fetchLandlords = async () => {
     try {
-      const response = await fetch('/api/admin/landlords');
+      // limit=500 so the assign-landlord dropdown shows all options, not just the default page
+      const response = await fetch('/api/admin/landlords?limit=500');
       const data = await response.json();
       if (response.ok) setLandlords(data.landlords);
     } catch {}
@@ -83,6 +103,7 @@ export default function BuildingsTable() {
 
   const fetchManagers = async () => {
     try {
+      // /api/admin/managers is not yet paginated; if it ever is, add limit=500 here too
       const response = await fetch('/api/admin/managers');
       const data = await response.json();
       if (response.ok) setManagers(data.managers);
@@ -203,7 +224,7 @@ export default function BuildingsTable() {
 
       if (response.ok) {
         alert(data.message);
-        fetchBuildings();
+        fetchBuildings(0, true);
       } else {
         alert(data.error || 'Cleanup failed');
       }
@@ -297,7 +318,7 @@ export default function BuildingsTable() {
           />
         </div>
         <button
-          onClick={fetchBuildings}
+          onClick={() => fetchBuildings(0, true)}
           className="px-4 py-2 bg-gray-100 text-gray-700 rounded-[6px] hover:bg-gray-200"
         >
           Refresh
@@ -312,27 +333,22 @@ export default function BuildingsTable() {
       </div>
 
       {/* Stats */}
+      {/* Stats — values come from the API so they reflect ALL buildings, not the loaded slice */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
-          <div className="text-2xl font-bold text-gray-900">{buildings.length}</div>
+          <div className="text-2xl font-bold text-gray-900">{stats.total_buildings}</div>
           <div className="text-sm text-gray-500">Total buildings</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
-          <div className="text-2xl font-bold text-gray-900">
-            {buildings.filter((b) => b.review_count > 0).length}
-          </div>
+          <div className="text-2xl font-bold text-gray-900">{stats.with_reviews}</div>
           <div className="text-sm text-gray-500">With reviews</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
-          <div className="text-2xl font-bold text-gray-900">
-            {buildings.filter((b) => b.landlord_id).length}
-          </div>
+          <div className="text-2xl font-bold text-gray-900">{stats.with_landlords}</div>
           <div className="text-sm text-gray-500">With landlords</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
-          <div className="text-2xl font-bold text-gray-900">
-            {buildings.reduce((sum, b) => sum + b.review_count, 0)}
-          </div>
+          <div className="text-2xl font-bold text-gray-900">{stats.total_reviews}</div>
           <div className="text-sm text-gray-500">Total reviews</div>
         </div>
       </div>
@@ -836,8 +852,21 @@ export default function BuildingsTable() {
         </div>
       )}
 
-      <div className="text-sm text-gray-500">
-        Showing {filteredBuildings.length} of {buildings.length} buildings
+      {/* Pagination footer — search filters are client-side and only see the loaded slice */}
+      <div className="flex items-center justify-between text-sm text-gray-500">
+        <span>
+          Showing {filteredBuildings.length}
+          {search ? ` of ${buildings.length} loaded` : ''} ({total} total)
+        </span>
+        {buildings.length < total && (
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="px-4 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 disabled:opacity-50 text-sm font-semibold"
+          >
+            {loadingMore ? 'Loading...' : `Load more (${total - buildings.length} remaining)`}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,9 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
 
+const DEFAULT_LIMIT = 100;
+const MAX_LIMIT = 500;
+
 export async function GET(context: APIContext): Promise<Response> {
   // Require authentication
   if (!context.locals.user) {
@@ -18,8 +21,26 @@ export async function GET(context: APIContext): Promise<Response> {
     });
   }
 
+  // Pagination params (clamped — see DEFAULT_LIMIT/MAX_LIMIT)
+  const url = new URL(context.request.url);
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
+  const requestedLimit = parseInt(url.searchParams.get('limit') || String(DEFAULT_LIMIT), 10) || DEFAULT_LIMIT;
+  const limit = Math.min(MAX_LIMIT, Math.max(1, requestedLimit));
+
   try {
     const db = getDB(context);
+
+    // Status counts across the WHOLE dataset (not the paginated slice) so the
+    // filter-badge totals stay accurate when the user has only loaded the first page.
+    const statusCountsRow = await db.prepare(`
+      SELECT
+        COUNT(*) as all_count,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved,
+        SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected,
+        SUM(CASE WHEN status = 'flagged' THEN 1 ELSE 0 END) as flagged
+      FROM reviews
+    `).first<{ all_count: number; pending: number; approved: number; rejected: number; flagged: number }>();
 
     const reviews = await db.prepare(`
       SELECT
@@ -51,10 +72,21 @@ export async function GET(context: APIContext): Promise<Response> {
       JOIN buildings b ON r.building_id = b.id
       LEFT JOIN landlords l ON b.landlord_id = l.id
       ORDER BY r.created_at DESC
-    `).all();
+      LIMIT ? OFFSET ?
+    `).bind(limit, offset).all();
 
     return new Response(JSON.stringify({
-      reviews: reviews.results
+      reviews: reviews.results,
+      total: statusCountsRow?.all_count ?? 0,
+      offset,
+      limit,
+      statusCounts: {
+        all: statusCountsRow?.all_count ?? 0,
+        pending: statusCountsRow?.pending ?? 0,
+        approved: statusCountsRow?.approved ?? 0,
+        rejected: statusCountsRow?.rejected ?? 0,
+        flagged: statusCountsRow?.flagged ?? 0,
+      }
     }), {
       headers: { 'Content-Type': 'application/json' }
     });

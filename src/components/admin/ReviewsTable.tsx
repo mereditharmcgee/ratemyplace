@@ -36,9 +36,14 @@ interface Props {
   initialStatus?: string;
 }
 
+const PAGE_SIZE = 100;
+
 export default function ReviewsTable({ initialStatus = 'all' }: Props) {
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [statusCountsState, setStatusCountsState] = useState({ all: 0, pending: 0, approved: 0, rejected: 0, flagged: 0 });
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialStatus);
@@ -56,18 +61,22 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
   const [linkProcessing, setLinkProcessing] = useState(false);
 
   useEffect(() => {
-    fetchReviews();
+    fetchReviews(0, true);
     fetchLandlords();
   }, []);
 
-  const fetchReviews = async () => {
+  // replace=true on initial load; replace=false appends the next page.
+  const fetchReviews = async (offset: number, replace: boolean) => {
     try {
-      setLoading(true);
-      const response = await fetch('/api/admin/reviews');
+      if (replace) setLoading(true);
+      else setLoadingMore(true);
+      const response = await fetch(`/api/admin/reviews?limit=${PAGE_SIZE}&offset=${offset}`);
       const data = await response.json();
 
       if (response.ok) {
-        setReviews(data.reviews);
+        setReviews((prev) => (replace ? data.reviews : [...prev, ...data.reviews]));
+        setStatusCountsState(data.statusCounts);
+        setTotal(data.total);
       } else {
         setError(data.error || 'Failed to load reviews');
       }
@@ -75,12 +84,16 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
       setError('Failed to load reviews');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
+  const loadMore = () => fetchReviews(reviews.length, false);
+
   const fetchLandlords = async () => {
     try {
-      const response = await fetch('/api/admin/landlords');
+      // limit=500 so the link-landlord dropdown shows all options, not just the default page
+      const response = await fetch('/api/admin/landlords?limit=500');
       const data = await response.json();
       if (response.ok) setLandlords(data.landlords);
     } catch {}
@@ -251,13 +264,8 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
     return matchesSearch && matchesStatus;
   });
 
-  const statusCounts = {
-    all: reviews.length,
-    pending: reviews.filter((r) => r.status === 'pending').length,
-    approved: reviews.filter((r) => r.status === 'approved').length,
-    rejected: reviews.filter((r) => r.status === 'rejected').length,
-    flagged: reviews.filter((r) => r.status === 'flagged').length,
-  };
+  // Server-computed counts so the filter badges reflect ALL reviews, not just the loaded slice.
+  const statusCounts = statusCountsState;
 
   if (loading) {
     return (
@@ -725,8 +733,21 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
         </div>
       )}
 
-      <div className="text-sm text-gray-500">
-        Showing {filteredReviews.length} of {reviews.length} reviews
+      {/* Pagination footer — search + status filters are client-side and only see the loaded slice */}
+      <div className="flex items-center justify-between text-sm text-gray-500">
+        <span>
+          Showing {filteredReviews.length}
+          {(search || statusFilter !== 'all') ? ` of ${reviews.length} loaded` : ''} ({total} total)
+        </span>
+        {reviews.length < total && (
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="px-4 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 disabled:opacity-50 text-sm font-semibold"
+          >
+            {loadingMore ? 'Loading...' : `Load more (${total - reviews.length} remaining)`}
+          </button>
+        )}
       </div>
     </div>
   );

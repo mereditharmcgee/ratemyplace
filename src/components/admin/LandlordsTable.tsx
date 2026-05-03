@@ -15,9 +15,21 @@ interface Landlord {
   created_at: number;
 }
 
+interface LandlordsStats {
+  total_landlords: number;
+  total_buildings: number;
+  total_reviews: number;
+  high_rated: number;
+}
+
+const PAGE_SIZE = 100;
+
 export default function LandlordsTable() {
   const [landlords, setLandlords] = useState<Landlord[]>([]);
+  const [stats, setStats] = useState<LandlordsStats>({ total_landlords: 0, total_buildings: 0, total_reviews: 0, high_rated: 0 });
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [expandedLandlord, setExpandedLandlord] = useState<string | null>(null);
@@ -30,17 +42,21 @@ export default function LandlordsTable() {
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
-    fetchLandlords();
+    fetchLandlords(0, true);
   }, []);
 
-  const fetchLandlords = async () => {
+  // append=false replaces the list (initial load); append=true adds the new page.
+  const fetchLandlords = async (offset: number, replace: boolean) => {
     try {
-      setLoading(true);
-      const response = await fetch('/api/admin/landlords');
+      if (replace) setLoading(true);
+      else setLoadingMore(true);
+      const response = await fetch(`/api/admin/landlords?limit=${PAGE_SIZE}&offset=${offset}`);
       const data = await response.json();
 
       if (response.ok) {
-        setLandlords(data.landlords);
+        setLandlords((prev) => (replace ? data.landlords : [...prev, ...data.landlords]));
+        setStats(data.stats);
+        setTotal(data.total);
       } else {
         setError(data.error || 'Failed to load landlords');
       }
@@ -48,8 +64,11 @@ export default function LandlordsTable() {
       setError('Failed to load landlords');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
+
+  const loadMore = () => fetchLandlords(landlords.length, false);
 
   const startEditing = (landlord: Landlord) => {
     setEditingLandlord(landlord.id);
@@ -139,7 +158,7 @@ export default function LandlordsTable() {
       if (response.ok) {
         setShowAddForm(false);
         setAddForm({ name: '', email: '', phone: '', website: '', description: '' });
-        fetchLandlords();
+        fetchLandlords(0, true);
       } else {
         alert(data.error || 'Failed to create landlord');
       }
@@ -200,7 +219,7 @@ export default function LandlordsTable() {
           />
         </div>
         <button
-          onClick={fetchLandlords}
+          onClick={() => fetchLandlords(0, true)}
           className="px-4 py-2 bg-gray-100 text-gray-700 rounded-[6px] hover:bg-gray-200"
         >
           Refresh
@@ -284,28 +303,22 @@ export default function LandlordsTable() {
         </div>
       )}
 
-      {/* Stats */}
+      {/* Stats — values come from the API so they reflect ALL landlords, not the loaded slice */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
-          <div className="text-2xl font-bold text-gray-900">{landlords.length}</div>
+          <div className="text-2xl font-bold text-gray-900">{stats.total_landlords}</div>
           <div className="text-sm text-gray-500">Total landlords</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
-          <div className="text-2xl font-bold text-gray-900">
-            {landlords.reduce((sum, l) => sum + l.building_count, 0)}
-          </div>
+          <div className="text-2xl font-bold text-gray-900">{stats.total_buildings}</div>
           <div className="text-sm text-gray-500">Total buildings</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
-          <div className="text-2xl font-bold text-gray-900">
-            {landlords.reduce((sum, l) => sum + l.review_count, 0)}
-          </div>
+          <div className="text-2xl font-bold text-gray-900">{stats.total_reviews}</div>
           <div className="text-sm text-gray-500">Total reviews</div>
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
-          <div className="text-2xl font-bold text-gray-900">
-            {landlords.filter((l) => l.avg_score && l.avg_score >= 4).length}
-          </div>
+          <div className="text-2xl font-bold text-gray-900">{stats.high_rated}</div>
           <div className="text-sm text-gray-500">High rated (4+)</div>
         </div>
       </div>
@@ -524,8 +537,21 @@ export default function LandlordsTable() {
         </div>
       )}
 
-      <div className="text-sm text-gray-500">
-        Showing {filteredLandlords.length} of {landlords.length} landlords
+      {/* Pagination footer — search filters are client-side and only see the loaded slice */}
+      <div className="flex items-center justify-between text-sm text-gray-500">
+        <span>
+          Showing {filteredLandlords.length}
+          {search ? ` of ${landlords.length} loaded` : ''} ({total} total)
+        </span>
+        {landlords.length < total && (
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="px-4 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 disabled:opacity-50 text-sm font-semibold"
+          >
+            {loadingMore ? 'Loading...' : `Load more (${total - landlords.length} remaining)`}
+          </button>
+        )}
       </div>
     </div>
   );
