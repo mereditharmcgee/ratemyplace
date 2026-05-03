@@ -40,11 +40,12 @@ describe('sendVerificationEmail', () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
-  it('sends from noreply@ to the user with sentence-case subject and accurate badge framing', async () => {
+  it('sends from noreply@ (transactional auth — replies not expected) with sentence-case subject and accurate badge framing', async () => {
     await sendVerificationEmail('test_key', 'https://ratemyplace.org', 'user@example.com', 'tok-123');
 
     expect(mockSend).toHaveBeenCalledOnce();
     const args = mockSend.mock.calls[0][0];
+    // Verification + password reset stay on noreply@ — see email.ts comments.
     expect(args.from).toBe('RateMyPlace Boston <noreply@ratemyplace.org>');
     expect(args.to).toBe('user@example.com');
     expect(args.subject).toBe('Verify your email');
@@ -101,6 +102,8 @@ describe('sendDisputeConfirmationEmail', () => {
     );
 
     const args = mockSend.mock.calls[0][0];
+    // Sent from meredith@ so landlord replies land in the Workspace inbox.
+    expect(args.from).toBe('RateMyPlace Boston <meredith@ratemyplace.org>');
     expect(args.subject).toBe('We received your dispute');
     expect(args.to).toBe('landlord@example.com');
 
@@ -157,6 +160,9 @@ describe('sendDisputeResolutionEmail', () => {
     );
 
     const args = mockSend.mock.calls[0][0];
+    // Sent from meredith@ so landlord replies (appeals, follow-ups) land in
+    // the Workspace inbox. This applies to all three resolution outcomes.
+    expect(args.from).toBe('RateMyPlace Boston <meredith@ratemyplace.org>');
     expect(args.subject).toBe('We upheld your dispute');
     expect(args.html).toContain('We upheld your dispute');
     expect(args.html).toContain("We've upheld your dispute");
@@ -225,6 +231,9 @@ describe('sendReviewRejectedEmail', () => {
     );
 
     const args = mockSend.mock.calls[0][0];
+    // Sent from meredith@ — review rejection is the most relationship-sensitive
+    // surface, replies should land in a real inbox.
+    expect(args.from).toBe('RateMyPlace Boston <meredith@ratemyplace.org>');
     expect(args.subject).toBe("Your review wasn't published");
     expect(args.to).toBe('reviewer@example.com');
   });
@@ -292,14 +301,15 @@ describe('sendReviewRejectedEmail', () => {
 describe('sendContactConfirmationEmail', () => {
   // Resolves V7 contradiction: this email used to send from noreply@ while
   // telling users "reply to this email" — replies would have bounced. Per
-  // d8f7b89, sender is now support@ and footer is honest about the path.
+  // d8f7b89, sender was support@; now meredith@ (Google Workspace) so replies
+  // land in a real person's inbox.
 
-  it('sends from support@ with explicit replyTo so replies actually reach the inbox', async () => {
+  it('sends from meredith@ with explicit replyTo so replies actually reach the Workspace inbox', async () => {
     await sendContactConfirmationEmail('test_key', 'user@example.com', 'Alice', 'general');
 
     const args = mockSend.mock.calls[0][0];
-    expect(args.from).toBe('RateMyPlace Boston <support@ratemyplace.org>');
-    expect(args.replyTo).toBe('support@ratemyplace.org');
+    expect(args.from).toBe('RateMyPlace Boston <meredith@ratemyplace.org>');
+    expect(args.replyTo).toBe('meredith@ratemyplace.org');
     expect(args.subject).toBe('We received your message');
   });
 
@@ -321,7 +331,7 @@ describe('sendContactConfirmationEmail', () => {
 });
 
 describe('sendContactNotificationEmail', () => {
-  it('sends to the contact@ admin inbox with category and submitter in subject', async () => {
+  it('sends to the meredith@ Workspace inbox with category and submitter in subject', async () => {
     await sendContactNotificationEmail(
       'test_key',
       'Alice',
@@ -331,7 +341,10 @@ describe('sendContactNotificationEmail', () => {
     );
 
     const args = mockSend.mock.calls[0][0];
-    expect(args.to).toBe('contact@ratemyplace.org');
+    // System-to-admin alert: keeps noreply@ as sender (avoids self-email
+    // pattern), recipient is meredith@ Workspace inbox.
+    expect(args.from).toBe('RateMyPlace Boston <noreply@ratemyplace.org>');
+    expect(args.to).toBe('meredith@ratemyplace.org');
     expect(args.subject).toBe('New contact: support from Alice');
     expect(args.html).toContain('user@example.com');
     expect(args.html).toContain('Help me with my account please');

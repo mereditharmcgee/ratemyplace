@@ -188,7 +188,9 @@ export async function sendDisputeConfirmationEmail(
 
   try {
     const { data, error } = await resend.emails.send({
-      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+      // Sent from meredith@ so landlord replies (questions, supplementary
+      // evidence, follow-ups) land in the Workspace inbox.
+      from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
       to: toEmail,
       subject: 'We received your dispute',
       html: `
@@ -271,12 +273,11 @@ export async function sendContactConfirmationEmail(
 
   try {
     const { data, error } = await resend.emails.send({
-      // Sent from support@ so replies land in a real inbox (Cloudflare Email Routing
-      // catch-all forwards all @ratemyplace.org addresses). This makes the "reply or
-      // use the form" footer below honest.
-      from: 'RateMyPlace Boston <support@ratemyplace.org>',
+      // Sent from meredith@ (Google Workspace inbox) so replies land in a real
+      // person's inbox. This makes the "reply or use the form" footer below honest.
+      from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
       to: toEmail,
-      replyTo: 'support@ratemyplace.org',
+      replyTo: 'meredith@ratemyplace.org',
       subject: 'We received your message',
       html: `
 <!DOCTYPE html>
@@ -339,8 +340,11 @@ export async function sendContactNotificationEmail(
 
   try {
     const { data, error } = await resend.emails.send({
+      // System-to-admin alert: keep noreply@ as sender (avoids meredith@→meredith@
+      // self-email pattern that Gmail sometimes filters as noise). Recipient is
+      // meredith@ (Workspace inbox).
       from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
-      to: 'contact@ratemyplace.org',
+      to: 'meredith@ratemyplace.org',
       subject: `New contact: ${category} from ${submitterName}`,
       html: `
 <!DOCTYPE html>
@@ -438,7 +442,9 @@ export async function sendDisputeResolutionEmail(
 
   try {
     const { data, error } = await resend.emails.send({
-      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+      // Sent from meredith@ so landlord replies (questions about the outcome,
+      // appeals, follow-ups) land in the Workspace inbox.
+      from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
       to: toEmail,
       subject: copy.subject,
       html: `
@@ -526,7 +532,10 @@ export async function sendReviewRejectedEmail(
 
   try {
     const { data, error } = await resend.emails.send({
-      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+      // Sent from meredith@ so reviewers can reply with questions about why their
+      // review was rejected (the most relationship-sensitive email surface). Replies
+      // land in the Workspace inbox.
+      from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
       to: toEmail,
       subject: 'Your review wasn\'t published',
       html: `
