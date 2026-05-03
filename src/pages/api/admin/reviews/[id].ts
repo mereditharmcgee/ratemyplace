@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
-import { getEnv } from '../../../../lib/runtime';
+import { getEnv, fireAndForget } from '../../../../lib/runtime';
 import { createAuditLog } from '../../../../lib/audit';
 import { getClientIP } from '../../../../lib/rateLimit';
 import { createNotification } from '../../../../lib/notifications';
@@ -116,18 +116,19 @@ export async function PATCH(context: APIContext): Promise<Response> {
             const apiKey = env.RESEND_API_KEY;
             const siteUrl = env.SITE_URL || 'https://ratemyplace.org';
             if (apiKey) {
-              try {
-                await sendReviewRejectedEmail(
+              // fireAndForget so the moderator's PATCH returns immediately
+              // instead of blocking on Resend's response time. Errors are
+              // logged structurally inside the helper.
+              fireAndForget(
+                context,
+                sendReviewRejectedEmail(
                   apiKey,
                   siteUrl,
                   reviewWithBuilding.email,
                   reviewWithBuilding.address,
                   moderation_notes ?? null
-                );
-              } catch (emailError) {
-                console.error('Failed to send review rejected email:', emailError);
-                // Don't fail the moderator's action if email fails
-              }
+                )
+              );
             } else {
               console.warn('RESEND_API_KEY not configured - skipping review rejected email');
             }

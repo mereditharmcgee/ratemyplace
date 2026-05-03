@@ -9,6 +9,7 @@ import { createVerificationToken } from '../../../lib/tokens';
 import { sendVerificationEmail } from '../../../lib/email';
 import { logError } from '../../../lib/logger';
 import { verifyTurnstile } from '../../../lib/turnstile';
+import { isValidEmail } from '../../../lib/validation';
 
 export async function POST(context: APIContext): Promise<Response> {
   const formData = await context.request.formData();
@@ -23,7 +24,9 @@ export async function POST(context: APIContext): Promise<Response> {
     });
   }
 
-  if (email.length < 3 || email.length > 255 || !email.includes('@')) {
+  // Use the canonical isValidEmail helper so signup applies the same format check
+  // as the rest of the system (disputes, bug reports, contact form).
+  if (email.length < 3 || email.length > 255 || !isValidEmail(email)) {
     return new Response(JSON.stringify({ error: 'Invalid email address' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' }

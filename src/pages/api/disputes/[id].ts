@@ -1,6 +1,6 @@
 import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../../lib/db';
-import { getEnv } from '../../../lib/runtime';
+import { getEnv, fireAndForget } from '../../../lib/runtime';
 import { sendDisputeResolutionEmail } from '../../../lib/email';
 import { createAuditLog } from '../../../lib/audit';
 import { getClientIP } from '../../../lib/rateLimit';
@@ -131,21 +131,23 @@ export const PATCH: APIRoute = async (context: APIContext) => {
     // Send resolution email to landlord regardless of outcome — silence on
     // dismissed or partially-upheld disputes used to read as the system being
     // unresponsive (audit CG1).
+    //
+    // fireAndForget so the admin's PATCH returns immediately instead of
+    // blocking on Resend's response time. Errors are logged structurally
+    // inside the helper.
     if (resolutionOutcome === 'uphold' || resolutionOutcome === 'dismiss' || resolutionOutcome === 'partially_valid') {
       const apiKey = getEnv(context).RESEND_API_KEY;
       if (apiKey) {
-        try {
-          await sendDisputeResolutionEmail(
+        fireAndForget(
+          context,
+          sendDisputeResolutionEmail(
             apiKey,
             dispute.landlord_email as string,
             dispute.landlord_name as string,
             resolutionOutcome,
             resolutionNotes
-          );
-        } catch (emailError) {
-          console.error('Failed to send dispute resolution email:', emailError);
-          // Don't fail the request if email fails
-        }
+          )
+        );
       } else {
         console.warn('RESEND_API_KEY not configured - skipping dispute resolution email');
       }
