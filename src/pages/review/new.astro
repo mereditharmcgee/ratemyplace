@@ -1,21 +1,119 @@
 ---
 import BaseLayout from '../../components/layout/BaseLayout.astro';
 import ReviewForm from '../../components/reviews/ReviewForm';
+import { generateIdFromEntropySize } from 'lucia';
 
-// Require authentication
+// Require authentication. Preserve the full query string so users sent
+// here from the homepage with ?placeId=... land back on the same page
+// after signing in.
 if (!Astro.locals.user) {
-  return Astro.redirect('/auth/signin?redirect=/review/new');
+  const returnTo = Astro.url.pathname + Astro.url.search;
+  return Astro.redirect('/auth/signin?redirect=' + encodeURIComponent(returnTo));
 }
 
-const buildingId = Astro.url.searchParams.get('building');
+const buildingIdParam = Astro.url.searchParams.get('building');
+const placeIdParam = Astro.url.searchParams.get('placeId');
 let building: any = null;
+let resolveError: string | null = null;
 
-if (buildingId) {
+const db = Astro.locals.runtime.env.DB;
+
+if (buildingIdParam) {
   try {
-    const db = Astro.locals.runtime.env.DB;
-    building = await db.prepare('SELECT * FROM buildings WHERE id = ?').bind(buildingId).first();
+    building = await db.prepare('SELECT * FROM buildings WHERE id = ?').bind(buildingIdParam).first();
   } catch (error) {
     console.error('Error loading building:', error);
+  }
+} else if (placeIdParam) {
+  // ?placeId=... handoff from the homepage "Add a review for this address" path.
+  // Resolve the Google place to a buildings row (existing or freshly created)
+  // so the form opens directly at the unit-details step. No retyping.
+  try {
+    const existing = await db
+      .prepare('SELECT * FROM buildings WHERE google_place_id = ?')
+      .bind(placeIdParam)
+      .first();
+
+    if (existing) {
+      building = existing;
+    } else {
+      const env = Astro.locals.runtime.env;
+      const apiKey = env.GOOGLE_PLACES_API_KEY || env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        resolveError = 'Address lookup is temporarily unavailable. Please search for your address below.';
+      } else {
+        const response = await fetch(`https://places.googleapis.com/v1/places/${placeIdParam}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask': 'id,formattedAddress,addressComponents,location,displayName',
+            'Referer': 'https://ratemyplace.org/',
+          },
+        });
+        const data: any = await response.json();
+        if (data.error || !data.addressComponents) {
+          console.error('Place Details API error on /review/new handoff:', data.error || 'no addressComponents');
+          resolveError = 'We could not look up that address. Please search for it below.';
+        } else {
+          const components = data.addressComponents;
+          const getComponent = (type: string): string => {
+            const comp = components.find((c: any) => c.types.includes(type));
+            return comp?.longText || '';
+          };
+          const getComponentShort = (type: string): string => {
+            const comp = components.find((c: any) => c.types.includes(type));
+            return comp?.shortText || '';
+          };
+
+          const streetNumber = getComponent('street_number');
+          const streetName = getComponent('route');
+          const streetAddress = streetNumber ? `${streetNumber} ${streetName}` : streetName;
+          const city = getComponent('locality') || getComponent('sublocality');
+          const state = getComponentShort('administrative_area_level_1');
+          const zipCode = getComponent('postal_code');
+          const neighborhood = getComponent('neighborhood') || getComponent('sublocality_level_1');
+          const latitude = data.location?.latitude;
+          const longitude = data.location?.longitude;
+
+          if (!streetAddress || !city) {
+            resolveError = 'That address came back incomplete. Please enter it manually below.';
+          } else {
+            const safeAddress = streetAddress.slice(0, 500);
+            let slug =
+              safeAddress.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') +
+              '-' +
+              city.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            const slugCheck = await db.prepare('SELECT id FROM buildings WHERE slug = ?').bind(slug).first();
+            if (slugCheck) {
+              slug = slug + '-' + Date.now().toString(36);
+            }
+            const newId = generateIdFromEntropySize(10);
+            await db
+              .prepare(
+                `INSERT INTO buildings (id, address, slug, neighborhood, city, state, zip_code, latitude, longitude, google_place_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+              )
+              .bind(
+                newId,
+                safeAddress,
+                slug,
+                neighborhood || null,
+                city,
+                state || null,
+                zipCode || null,
+                latitude || null,
+                longitude || null,
+                data.id || placeIdParam
+              )
+              .run();
+            building = { id: newId, address: safeAddress, slug, neighborhood: neighborhood || null, city };
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error resolving building from placeId:', error);
+    resolveError = 'Something went wrong loading that address. Please search for it below.';
   }
 }
 ---
@@ -26,6 +124,12 @@ if (buildingId) {
     <p class="text-gray-600 mb-8">
       Share your experience to help other tenants make informed decisions.
     </p>
+
+    {resolveError && (
+      <div class="bg-amber-50 border border-amber-200 rounded-[6px] p-4 mb-6 text-amber-800 text-sm">
+        {resolveError}
+      </div>
+    )}
 
     <div class="bg-yellow-50 border border-yellow-200 rounded-[6px] p-4 mb-8">
       <h2 class="font-semibold text-yellow-800 mb-2">Privacy Notice</h2>
