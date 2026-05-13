@@ -14,6 +14,7 @@ import {
   type Tenancy,
   type ReviewData,
   type Step,
+  type ManualAddress,
 } from './form-steps';
 
 interface Props {
@@ -28,6 +29,16 @@ export default function ReviewForm({ building }: Props) {
   // Form state
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(building || null);
   const [selectedPlace, setSelectedPlace] = useState<PlaceData | null>(null);
+
+  // Manual address entry (fallback when Google Places autocomplete fails or
+  // the user's address isn't found)
+  const [manualMode, setManualMode] = useState(false);
+  const [manualAddress, setManualAddress] = useState<ManualAddress>({
+    streetAddress: '',
+    city: '',
+    state: 'MA',
+    zipCode: '',
+  });
 
   // Unit details
   const [unitDetails, setUnitDetails] = useState<UnitDetails>({
@@ -104,6 +115,62 @@ export default function ReviewForm({ building }: Props) {
     } catch (err) {
       console.error('Building lookup error:', err);
       setError('Failed to verify address. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEnterManual = () => {
+    setManualMode(true);
+    setSelectedPlace(null);
+    setSelectedBuilding(null);
+    setError(null);
+  };
+
+  const handleBackToSearch = () => {
+    setManualMode(false);
+    setError(null);
+  };
+
+  const handleManualConfirm = async () => {
+    const street = manualAddress.streetAddress.trim();
+    const city = manualAddress.city.trim();
+    if (!street || !city) {
+      setError('Street address and city are required');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/buildings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          streetAddress: street,
+          city,
+          state: manualAddress.state.trim() || null,
+          zipCode: manualAddress.zipCode.trim() || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.building) {
+        setSelectedBuilding({
+          id: data.building.id,
+          address: street,
+          neighborhood: undefined,
+          city,
+        });
+        setStep('unit-details');
+      } else {
+        setError(data.error || 'Failed to add building');
+      }
+    } catch (err) {
+      console.error('Manual building creation error:', err);
+      setError('Failed to add building. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -253,8 +320,14 @@ export default function ReviewForm({ building }: Props) {
           selectedPlace={selectedPlace}
           loading={loading}
           error={error}
+          manualMode={manualMode}
+          manualAddress={manualAddress}
           onPlaceSelect={handlePlaceSelect}
           onConfirm={handleAddressConfirm}
+          onEnterManual={handleEnterManual}
+          onManualAddressChange={setManualAddress}
+          onManualConfirm={handleManualConfirm}
+          onBackToSearch={handleBackToSearch}
         />
       )}
 

@@ -3,6 +3,7 @@ import { getEnv } from '../../../lib/runtime';
 
 export async function GET(context: APIContext): Promise<Response> {
   const placeId = context.url.searchParams.get('placeId') || '';
+  const sessionToken = context.url.searchParams.get('sessionToken') || '';
 
   if (!placeId) {
     return new Response(JSON.stringify({ error: 'placeId required' }), {
@@ -22,9 +23,16 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
+    // Pass the same sessionToken used in autocomplete so Google bills
+    // Autocomplete-as-You-Type + Details as a single $0.005 session instead
+    // of charging Autocomplete per keystroke. Big cost reduction.
+    const detailsUrl = sessionToken
+      ? `https://places.googleapis.com/v1/places/${placeId}?sessionToken=${encodeURIComponent(sessionToken)}`
+      : `https://places.googleapis.com/v1/places/${placeId}`;
+
     // Use Places API (New) - Place Details
     const response = await fetch(
-      `https://places.googleapis.com/v1/places/${placeId}`, {
+      detailsUrl, {
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': apiKey,

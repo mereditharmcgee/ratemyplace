@@ -11,3 +11,4 @@ export { default as RatingItem, RatingScale } from './RatingItem';
 
 // Types
 export * from './types';
+export type { ManualAddress } from './AddressStep';

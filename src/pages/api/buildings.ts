@@ -80,8 +80,10 @@ export async function POST(context: APIContext): Promise<Response> {
       longitude
     } = body;
 
-    if (!placeId || !streetAddress || !city) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+    // placeId is optional — manual address entries (fallback when Google
+    // Places fails or the user's address isn't found) are accepted without one.
+    if (!streetAddress || !city) {
+      return new Response(JSON.stringify({ error: 'Street address and city are required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
@@ -89,18 +91,34 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const db = getDB(context);
 
-    // Check if building already exists with this place ID
-    const existing = await db.prepare(
-      'SELECT id, slug FROM buildings WHERE google_place_id = ?'
-    ).bind(placeId).first<{ id: string; slug: string }>();
+    // For Google-sourced submissions, dedupe by place ID
+    if (placeId) {
+      const existing = await db.prepare(
+        'SELECT id, slug FROM buildings WHERE google_place_id = ?'
+      ).bind(placeId).first<{ id: string; slug: string }>();
 
-    if (existing) {
-      return new Response(JSON.stringify({
-        building: existing,
-        created: false
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      if (existing) {
+        return new Response(JSON.stringify({
+          building: existing,
+          created: false
+        }), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    } else {
+      // Manual entry: dedupe by exact (address, city) match — case-insensitive
+      const existing = await db.prepare(
+        'SELECT id, slug FROM buildings WHERE LOWER(address) = LOWER(?) AND LOWER(city) = LOWER(?) LIMIT 1'
+      ).bind(streetAddress, city).first<{ id: string; slug: string }>();
+
+      if (existing) {
+        return new Response(JSON.stringify({
+          building: existing,
+          created: false
+        }), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     // Truncate address to prevent excessively long values
@@ -138,7 +156,7 @@ export async function POST(context: APIContext): Promise<Response> {
       zipCode || null,
       latitude || null,
       longitude || null,
-      placeId
+      placeId || null
     ).run();
 
     return new Response(JSON.stringify({

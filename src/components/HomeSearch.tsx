@@ -10,69 +10,19 @@ interface DbResult {
   avgScore: number | null;
 }
 
-interface GooglePrediction {
-  placeId: string;
-  description: string;
-  mainText: string;
-  secondaryText: string;
-}
-
-type DropdownItem =
-  | { source: 'local'; data: DbResult }
-  | { source: 'google'; data: GooglePrediction };
-
-function generateSessionToken(): string {
-  return crypto.randomUUID();
-}
-
 export default function HomeSearch() {
   const [inputValue, setInputValue] = useState('');
   const [dbResults, setDbResults] = useState<DbResult[]>([]);
-  const [googleResults, setGoogleResults] = useState<GooglePrediction[]>([]);
   const [isLoadingDb, setIsLoadingDb] = useState(false);
-  const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const [sessionToken] = useState(() => generateSessionToken());
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dbDebounceRef = useRef<NodeJS.Timeout>();
 
-  // Build the merged dropdown items list
-  const items: DropdownItem[] = [
-    ...dbResults.map((r): DropdownItem => ({ source: 'local', data: r })),
-    ...googleResults
-      // Filter out Google results that match a DB result by address
-      .filter(g => !dbResults.some(d =>
-        d.type === 'building' && d.title.toLowerCase() === g.mainText.toLowerCase()
-      ))
-      .map((g): DropdownItem => ({ source: 'google', data: g })),
-  ];
-
-  // Google Places fetch (only called as fallback)
-  const fetchGoogleResults = useCallback(async (input: string) => {
-    if (input.length < 3) {
-      setGoogleResults([]);
-      return;
-    }
-
-    setIsLoadingGoogle(true);
-    try {
-      const params = new URLSearchParams({ input, sessionToken });
-      const response = await fetch(`/api/places/autocomplete?${params}`);
-      const data = await response.json();
-      setGoogleResults(data.predictions || []);
-      setShowDropdown(true);
-    } catch {
-      setGoogleResults([]);
-    } finally {
-      setIsLoadingGoogle(false);
-    }
-  }, [sessionToken]);
-
-  // DB search — fires first. If < 3 results, triggers Google fallback.
-  // No race condition: Google is called from the DB response callback, not a separate timer.
+  // DB-only search. Homepage no longer calls Google Places —
+  // free-text queries fall through to /search?q= on submit.
   const fetchDbResults = useCallback(async (input: string) => {
     if (input.length < 2) {
       setDbResults([]);
@@ -84,24 +34,14 @@ export default function HomeSearch() {
       const params = new URLSearchParams({ q: input });
       const response = await fetch(`/api/search/autocomplete?${params}`);
       const data = await response.json();
-      const results = data.results || [];
-      setDbResults(results);
+      setDbResults(data.results || []);
       setShowDropdown(true);
-
-      // If DB returned fewer than 3 results, fire Google fallback
-      if (results.length < 3 && input.length >= 3) {
-        fetchGoogleResults(input);
-      }
     } catch {
       setDbResults([]);
-      // DB failed — try Google as fallback
-      if (input.length >= 3) {
-        fetchGoogleResults(input);
-      }
     } finally {
       setIsLoadingDb(false);
     }
-  }, [fetchGoogleResults]);
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -112,61 +52,40 @@ export default function HomeSearch() {
 
     if (!value.trim()) {
       setDbResults([]);
-      setGoogleResults([]);
       setShowDropdown(false);
       return;
     }
 
-    // Single debounce: DB fires at 150ms, triggers Google fallback if needed
     dbDebounceRef.current = setTimeout(() => fetchDbResults(value), 150);
   };
 
-  const handleSelectItem = async (item: DropdownItem) => {
+  const handleSelectItem = (item: DbResult) => {
     setShowDropdown(false);
     setDbResults([]);
-    setGoogleResults([]);
-
-    if (item.source === 'local') {
-      const { type, slug } = item.data;
-      window.location.href = `/${type === 'building' ? 'building' : 'landlord'}/${slug}`;
-    } else {
-      // Google result — check if building exists in DB, otherwise go to search
-      setInputValue(item.data.description);
-      try {
-        const params = new URLSearchParams({ placeId: item.data.placeId });
-        const response = await fetch(`/api/buildings?${params}`);
-        const data = await response.json();
-        if (data.building?.slug) {
-          window.location.href = `/building/${data.building.slug}`;
-          return;
-        }
-      } catch {
-        // Fall through to search
-      }
-      window.location.href = `/search?q=${encodeURIComponent(item.data.mainText)}`;
-    }
+    const { type, slug } = item;
+    window.location.href = `/${type === 'building' ? 'building' : 'landlord'}/${slug}`;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (highlightedIndex >= 0 && highlightedIndex < items.length) {
-      handleSelectItem(items[highlightedIndex]);
+    if (highlightedIndex >= 0 && highlightedIndex < dbResults.length) {
+      handleSelectItem(dbResults[highlightedIndex]);
     } else if (inputValue.trim()) {
       window.location.href = `/search?q=${encodeURIComponent(inputValue.trim())}`;
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!showDropdown || items.length === 0) return;
+    if (!showDropdown || dbResults.length === 0) return;
 
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setHighlightedIndex(prev => prev < items.length - 1 ? prev + 1 : 0);
+        setHighlightedIndex(prev => prev < dbResults.length - 1 ? prev + 1 : 0);
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setHighlightedIndex(prev => prev > 0 ? prev - 1 : items.length - 1);
+        setHighlightedIndex(prev => prev > 0 ? prev - 1 : dbResults.length - 1);
         break;
       case 'Escape':
         setShowDropdown(false);
@@ -192,8 +111,6 @@ export default function HomeSearch() {
     return () => { if (dbDebounceRef.current) clearTimeout(dbDebounceRef.current); };
   }, []);
 
-  const isLoading = isLoadingDb || isLoadingGoogle;
-
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
       <div className="flex flex-col sm:flex-row gap-4">
@@ -204,12 +121,12 @@ export default function HomeSearch() {
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            onFocus={() => items.length > 0 && setShowDropdown(true)}
+            onFocus={() => dbResults.length > 0 && setShowDropdown(true)}
             placeholder="Search by address, neighborhood, or landlord..."
             className="w-full px-6 py-4 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-teal-300"
             autoComplete="off"
           />
-          {isLoading && (
+          {isLoadingDb && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
               <svg className="animate-spin h-5 w-5 text-teal-700" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -218,14 +135,14 @@ export default function HomeSearch() {
             </div>
           )}
 
-          {showDropdown && items.length > 0 && (
+          {showDropdown && dbResults.length > 0 && (
             <div
               ref={dropdownRef}
               className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto"
             >
-              {items.map((item, index) => (
+              {dbResults.map((item, index) => (
                 <button
-                  key={item.source === 'local' ? `db-${item.data.id}` : `g-${item.data.placeId}`}
+                  key={`db-${item.id}`}
                   type="button"
                   onClick={() => handleSelectItem(item)}
                   onMouseEnter={() => setHighlightedIndex(index)}
@@ -233,53 +150,33 @@ export default function HomeSearch() {
                     highlightedIndex === index ? 'bg-teal-50' : 'hover:bg-gray-50'
                   }`}
                 >
-                  {item.source === 'local' ? (
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium text-gray-900 truncate">{item.data.title}</div>
-                        <div className="text-sm text-gray-500 truncate">{item.data.subtitle}</div>
-                      </div>
-                      <div className="flex-shrink-0 flex items-center gap-2">
-                        {item.data.avgScore !== null && (
-                          <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                            item.data.avgScore >= 4 ? 'bg-emerald-100 text-emerald-700' :
-                            item.data.avgScore >= 3 ? 'bg-amber-100 text-amber-700' :
-                            'bg-red-100 text-red-700'
-                          }`}>
-                            {item.data.avgScore.toFixed(1)}
-                          </span>
-                        )}
-                        {item.data.reviewCount > 0 && (
-                          <span className="text-xs text-gray-400">
-                            {item.data.reviewCount} review{item.data.reviewCount !== 1 ? 's' : ''}
-                          </span>
-                        )}
-                        {item.data.type === 'landlord' && (
-                          <span className="text-xs text-purple-500 font-medium">Landlord</span>
-                        )}
-                      </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-gray-900 truncate">{item.title}</div>
+                      <div className="text-sm text-gray-500 truncate">{item.subtitle}</div>
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium text-gray-900 truncate">{item.data.mainText}</div>
-                        <div className="text-sm text-gray-500 truncate">{item.data.secondaryText}</div>
-                      </div>
-                      <span className="flex-shrink-0 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-                        New address
-                      </span>
+                    <div className="flex-shrink-0 flex items-center gap-2">
+                      {item.avgScore !== null && (
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                          item.avgScore >= 4 ? 'bg-emerald-100 text-emerald-700' :
+                          item.avgScore >= 3 ? 'bg-amber-100 text-amber-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {item.avgScore.toFixed(1)}
+                        </span>
+                      )}
+                      {item.reviewCount > 0 && (
+                        <span className="text-xs text-gray-400">
+                          {item.reviewCount} review{item.reviewCount !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {item.type === 'landlord' && (
+                        <span className="text-xs text-purple-500 font-medium">Landlord</span>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </button>
               ))}
-              {googleResults.length > 0 && (
-                <div className="px-4 py-2 text-xs text-gray-400 bg-gray-50 flex items-center gap-1">
-                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                  </svg>
-                  Powered by Google
-                </div>
-              )}
             </div>
           )}
         </div>
