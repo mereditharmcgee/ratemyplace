@@ -30,6 +30,7 @@ interface DbMatch {
 interface Props {
   onPlaceSelect: (place: PlaceDetails) => void;
   onExistingBuildingSelect?: (buildingId: string, slug: string) => void;
+  onManualEntry?: () => void;
   placeholder?: string;
   initialValue?: string;
 }
@@ -41,6 +42,7 @@ function generateSessionToken(): string {
 export default function AddressAutocomplete({
   onPlaceSelect,
   onExistingBuildingSelect,
+  onManualEntry,
   placeholder = "Start typing your address...",
   initialValue = ""
 }: Props) {
@@ -50,6 +52,7 @@ export default function AddressAutocomplete({
   const [isLoading, setIsLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [apiError, setApiError] = useState(false);
   const [sessionToken] = useState(() => generateSessionToken());
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -87,9 +90,12 @@ export default function AddressAutocomplete({
     }
   }, []);
 
-  // Google Places for structured address data — 300ms
+  // Google Places for structured address data.
+  // Min 5 chars + 600ms debounce keeps the request count low so we don't
+  // burn the daily Places quota on incidental typing (a user typing "100 B"
+  // shouldn't trigger Google; "100 Beacon" should).
   const fetchPredictions = useCallback(async (input: string) => {
-    if (input.length < 3) {
+    if (input.length < 5) {
       setPredictions([]);
       return;
     }
@@ -99,10 +105,17 @@ export default function AddressAutocomplete({
       const params = new URLSearchParams({ input, sessionToken });
       const response = await fetch(`/api/places/autocomplete?${params}`);
       const data = await response.json();
-      setPredictions(data.predictions || []);
+      if (!response.ok || data.error) {
+        setPredictions([]);
+        setApiError(true);
+      } else {
+        setPredictions(data.predictions || []);
+        setApiError(false);
+      }
       setShowDropdown(true);
     } catch {
       setPredictions([]);
+      setApiError(true);
     } finally {
       setIsLoading(false);
     }
@@ -120,6 +133,7 @@ export default function AddressAutocomplete({
       setDbMatches([]);
       setPredictions([]);
       setShowDropdown(false);
+      setApiError(false);
       return;
     }
 
@@ -129,8 +143,9 @@ export default function AddressAutocomplete({
       setShowDropdown(true);
     }, 150);
 
-    // Google Places — 300ms (needs structured data, always fires)
-    googleDebounceRef.current = setTimeout(() => fetchPredictions(value), 300);
+    // Google Places — 600ms (longer debounce reduces request count;
+    // fires only at 5+ chars per fetchPredictions guard above)
+    googleDebounceRef.current = setTimeout(() => fetchPredictions(value), 600);
   };
 
   const handleSelectDbMatch = (match: DbMatch) => {
@@ -258,11 +273,17 @@ export default function AddressAutocomplete({
         )}
       </div>
 
-      {showDropdown && totalItems > 0 && (
+      {showDropdown && (totalItems > 0 || apiError || (onManualEntry && inputValue.length >= 3)) && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+          className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto"
         >
+          {apiError && (
+            <div className="px-4 py-2 text-xs text-amber-800 bg-amber-50 border-b border-amber-100">
+              Address search is temporarily unavailable. You can still enter your address manually below.
+            </div>
+          )}
+
           {/* Existing buildings from our DB */}
           {dbMatches.length > 0 && (
             <>
@@ -323,7 +344,20 @@ export default function AddressAutocomplete({
             </>
           )}
 
-          {(predictions.length > 0 || dbMatches.length === 0) && (
+          {onManualEntry && inputValue.length >= 3 && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowDropdown(false);
+                onManualEntry();
+              }}
+              className="w-full text-left px-4 py-3 border-t border-gray-100 text-sm font-medium text-teal-700 hover:bg-teal-50 transition-colors"
+            >
+              Can't find your address? Enter it manually
+            </button>
+          )}
+
+          {predictions.length > 0 && (
             <div className="px-4 py-2 text-xs text-gray-400 bg-gray-50 flex items-center gap-1">
               <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
