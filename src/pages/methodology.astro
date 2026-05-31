@@ -6,10 +6,60 @@ import { getScoreColor, getScoreTextColor, getScoreBgTint } from '../lib/scoring
 // or color change propagates here automatically. Range and qualifier text stay
 // static — they're descriptive copy, not part of the band system.
 const bands = [
-  { range: '4.0-5.0', sample: 4.5, qualifier: 'Few or no issues' },
-  { range: '3.0-3.9', sample: 3.5, qualifier: 'Some minor issues' },
-  { range: '2.0-2.9', sample: 2.5, qualifier: 'Notable problems' },
-  { range: '1.0-1.9', sample: 1.5, qualifier: 'Serious concerns' },
+  { range: '4.0 - 5.0', sample: 4.5, qualifier: 'Few or no issues' },
+  { range: '3.0 - 3.9', sample: 3.5, qualifier: 'Some minor issues' },
+  { range: '2.0 - 2.9', sample: 2.5, qualifier: 'Notable problems' },
+  { range: '1.0 - 1.9', sample: 1.5, qualifier: 'Serious concerns' },
+];
+
+// A made-up unit used to show the formula step by step. The averages are computed
+// from this data so the table, the totals, and the result tiles can never drift
+// apart. The weighted formula mirrors calculateWeightedScore in src/lib/scoring.ts.
+const madeUpUnit = [
+  { label: 'Mold and moisture', rating: 1, weight: 1.5 },
+  { label: 'Pest control', rating: 1, weight: 1.5 },
+  { label: 'Structural integrity', rating: 5, weight: 1.3 },
+  { label: 'Climate control', rating: 2, weight: 1.3 },
+  { label: 'Plumbing', rating: 5, weight: 1.2 },
+  { label: 'Electrical systems', rating: 5, weight: 1.0 },
+  { label: 'Appliances', rating: 5, weight: 1.0 },
+  { label: 'Accuracy to listing', rating: 5, weight: 1.0 },
+];
+const muCount = madeUpUnit.length;
+const muRatingSum = madeUpUnit.reduce((s, i) => s + i.rating, 0);
+const muWeightSum = madeUpUnit.reduce((s, i) => s + i.weight, 0);
+const muWeightedSum = madeUpUnit.reduce((s, i) => s + i.rating * i.weight, 0);
+const muFlat = Math.round((muRatingSum / muCount) * 10) / 10;
+const muWeighted = Math.round((muWeightedSum / muWeightSum) * 10) / 10;
+
+// Worked example: two real reviews scored as a flat (unweighted) average vs the
+// live weighted algorithm. Every number is verified against calculateDomainScores
+// in src/lib/scoring.ts. Both reviews have their addresses changed for privacy
+// (the ratings are real); the second is the site owner's own review, used with
+// consent.
+const realExamples = [
+  {
+    address: '38 Edgemere Road',
+    meta: '2 bedrooms · real review, address changed for privacy',
+    why: "This unit rates well on the visible things. Plumbing, appliances, and layout were all 5 stars. But pests and mold were both rated 1, and those count 1.5x. The weighting pulls the unit score from 3.3 to 3.1 and the overall from 3.8 to 3.7, so an apartment that shows well on a tour doesn't get to hide its health problems.",
+    rows: [
+      { label: 'Overall', flat: 3.8, weighted: 3.7 },
+      { label: 'Unit', flat: 3.3, weighted: 3.1 },
+      { label: 'Building', flat: 4.1, weighted: 4.1 },
+      { label: 'Landlord', flat: 4.1, weighted: 4.1 },
+    ],
+  },
+  {
+    address: '70 Brookvale Road',
+    meta: '2 bedrooms · real review, address changed for privacy',
+    why: "This one goes the other way. Here pests and mold were both 5 stars, so the items that count most are the strong ones. The weighting nudges the unit score up from 3.8 to 3.9. It rewards a place that's solid where it matters; it doesn't only mark places down.",
+    rows: [
+      { label: 'Overall', flat: 3.9, weighted: 3.9 },
+      { label: 'Unit', flat: 3.8, weighted: 3.9 },
+      { label: 'Building', flat: 4.1, weighted: 4.1 },
+      { label: 'Landlord', flat: 3.7, weighted: 3.7 },
+    ],
+  },
 ];
 ---
 
@@ -88,6 +138,71 @@ const bands = [
         <p class="text-gray-600">
           We don't treat every item equally. Items with documented health impacts carry more weight in the score.
         </p>
+      </div>
+    </section>
+
+    <!-- Survey Items Detail -->
+    <section class="mb-12">
+      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">What we ask</p>
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4">The 27 rating items</h2>
+      <p class="text-gray-600 mb-6">
+        Each item traces to one of the three instruments above. Items marked with
+        <span class="text-red-500 font-bold">*</span> carry health and safety weighting.
+        The review form also includes 5 questions that aren't scored: recommendation, tenure,
+        move-out year, voucher acceptance, and street-lighting context.
+      </p>
+
+      <div class="grid md:grid-cols-3 gap-6">
+        <!-- Unit Quality Items -->
+        <div class="bg-white border border-gray-200 rounded-[6px] p-5">
+          <h3 class="font-semibold text-teal-800 mb-3 pb-2 border-b border-teal-100">Unit quality (10 items)</h3>
+          <ul class="space-y-2 text-sm text-gray-700">
+            <li><span class="text-red-500">*</span> Structural integrity</li>
+            <li><span class="text-red-500">*</span> Plumbing systems</li>
+            <li>Electrical systems</li>
+            <li><span class="text-red-500">*</span> Climate control (heat and AC)</li>
+            <li>Ventilation</li>
+            <li><span class="text-red-500">*</span> Pest control</li>
+            <li><span class="text-red-500">*</span> Mold and moisture</li>
+            <li>Appliances</li>
+            <li>Layout and space</li>
+            <li>Accuracy to listing</li>
+          </ul>
+          <p class="text-xs text-gray-500 mt-3">Source: OHQS</p>
+        </div>
+
+        <!-- Building Items -->
+        <div class="bg-white border border-gray-200 rounded-[6px] p-5">
+          <h3 class="font-semibold text-blue-800 mb-3 pb-2 border-b border-blue-100">Building (9 items)</h3>
+          <ul class="space-y-2 text-sm text-gray-700">
+            <li>Common areas</li>
+            <li><span class="text-red-500">*</span> Security features</li>
+            <li>Exterior condition</li>
+            <li>Neighbor noise</li>
+            <li>External noise</li>
+            <li>Mail and package handling</li>
+            <li>Laundry facilities</li>
+            <li>Parking</li>
+            <li>Trash and recycling</li>
+          </ul>
+          <p class="text-xs text-gray-500 mt-3">Source: PHQS</p>
+        </div>
+
+        <!-- Landlord Items -->
+        <div class="bg-white border border-gray-200 rounded-[6px] p-5">
+          <h3 class="font-semibold text-purple-800 mb-3 pb-2 border-b border-purple-100">Landlord (8 items)</h3>
+          <ul class="space-y-2 text-sm text-gray-700">
+            <li>Maintenance response</li>
+            <li>Communication</li>
+            <li>Professionalism</li>
+            <li>Lease clarity</li>
+            <li>Privacy respect</li>
+            <li>Deposit handling</li>
+            <li>Rent practices</li>
+            <li>Non-retaliation</li>
+          </ul>
+          <p class="text-xs text-gray-500 mt-3">Source: WHO LARES</p>
+        </div>
       </div>
     </section>
 
@@ -222,68 +337,162 @@ const bands = [
       </div>
     </section>
 
-    <!-- Survey Items Detail -->
+    <!-- Worked Example -->
     <section class="mb-12">
-      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">What we ask</p>
-      <h2 class="text-2xl font-semibold text-gray-900 mb-4">The 27 rating items</h2>
+      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">A worked example</p>
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4">How weighting changes a score</h2>
       <p class="text-gray-600 mb-6">
-        Each item traces to one of the three instruments above. Items marked with
-        <span class="text-red-500 font-bold">*</span> carry health and safety weighting.
-        The review form also includes 5 questions that aren't scored: recommendation, tenure,
-        move-out year, voucher acceptance, and street-lighting context.
+        The weights only matter if you can see what they do. We'll start with a made-up unit to show the formula, then run the exact same math on two real reviews.
       </p>
 
-      <div class="grid md:grid-cols-3 gap-6">
-        <!-- Unit Quality Items -->
-        <div class="bg-white border border-gray-200 rounded-[6px] p-5">
-          <h3 class="font-semibold text-teal-800 mb-3 pb-2 border-b border-teal-100">Unit quality (10 items)</h3>
-          <ul class="space-y-2 text-sm text-gray-700">
-            <li><span class="text-red-500">*</span> Structural integrity</li>
-            <li><span class="text-red-500">*</span> Plumbing systems</li>
-            <li>Electrical systems</li>
-            <li><span class="text-red-500">*</span> Climate control (heat and AC)</li>
-            <li>Ventilation</li>
-            <li><span class="text-red-500">*</span> Pest control</li>
-            <li><span class="text-red-500">*</span> Mold and moisture</li>
-            <li>Appliances</li>
-            <li>Layout and space</li>
-            <li>Accuracy to listing</li>
-          </ul>
-          <p class="text-xs text-gray-500 mt-3">Source: OHQS</p>
+      <div class="bg-white border border-gray-200 rounded-[6px] p-6">
+        <h3 class="font-semibold text-gray-900 mb-2">A made-up unit</h3>
+        <p class="text-gray-600 text-sm mb-4">
+          Picture a place that looks fine on a tour but hides real problems. Here are eight of its unit-level items, each rated 1 to 5. The health and safety items carry extra weight, so the last column shows each rating multiplied by its weight.
+        </p>
+
+        <div class="bg-gray-50 rounded-[6px] p-4 mb-6 overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-gray-500 border-b border-gray-200">
+                <th class="pb-2 font-medium">Item</th>
+                <th class="pb-2 font-medium text-center">Rating</th>
+                <th class="pb-2 font-medium text-center">Weight</th>
+                <th class="pb-2 font-medium text-right">Rating × weight</th>
+              </tr>
+            </thead>
+            <tbody>
+              {madeUpUnit.map((item) => {
+                const weighted = item.weight > 1;
+                return (
+                  <tr>
+                    <td class="py-1.5 text-gray-700">{item.label}</td>
+                    <td class={`py-1.5 text-center font-semibold ${getScoreTextColor(item.rating)}`}>{item.rating}/5</td>
+                    <td class={`py-1.5 text-center ${weighted ? 'text-gray-900 font-semibold' : 'text-gray-400'}`}>{item.weight.toFixed(1)}×</td>
+                    <td class="py-1.5 text-right tabular-nums text-gray-700">{(item.rating * item.weight).toFixed(1)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr class="border-t border-gray-300 font-semibold text-gray-900">
+                <td class="pt-2">Totals</td>
+                <td class="pt-2 text-center">{muRatingSum}</td>
+                <td class="pt-2 text-center">{muWeightSum.toFixed(1)}</td>
+                <td class="pt-2 text-right tabular-nums">{muWeightedSum.toFixed(1)}</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
 
-        <!-- Building Items -->
-        <div class="bg-white border border-gray-200 rounded-[6px] p-5">
-          <h3 class="font-semibold text-blue-800 mb-3 pb-2 border-b border-blue-100">Building (9 items)</h3>
-          <ul class="space-y-2 text-sm text-gray-700">
-            <li>Common areas</li>
-            <li><span class="text-red-500">*</span> Security features</li>
-            <li>Exterior condition</li>
-            <li>Neighbor noise</li>
-            <li>External noise</li>
-            <li>Mail and package handling</li>
-            <li>Laundry facilities</li>
-            <li>Parking</li>
-            <li>Trash and recycling</li>
-          </ul>
-          <p class="text-xs text-gray-500 mt-3">Source: PHQS</p>
+        <p class="text-sm text-gray-600 mb-4">Same eight ratings, averaged two ways using the totals from the table:</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5 mb-6 text-sm">
+          <div>
+            <p class="font-semibold text-gray-900">Standard</p>
+            <p class="text-gray-600 mt-1.5">sum of the ratings ÷ number of items</p>
+            <p class="text-gray-500 mt-1.5 tabular-nums">{muRatingSum} ÷ {muCount}</p>
+          </div>
+          <div class="sm:border-l sm:border-gray-200 sm:pl-8">
+            <p class="font-semibold text-gray-900">Health-weighted</p>
+            <p class="text-gray-600 mt-1.5">sum of (rating × weight) ÷ total weight</p>
+            <p class="text-gray-500 mt-1.5 tabular-nums">{muWeightedSum.toFixed(1)} ÷ {muWeightSum.toFixed(1)}</p>
+          </div>
         </div>
 
-        <!-- Landlord Items -->
-        <div class="bg-white border border-gray-200 rounded-[6px] p-5">
-          <h3 class="font-semibold text-purple-800 mb-3 pb-2 border-b border-purple-100">Landlord (8 items)</h3>
-          <ul class="space-y-2 text-sm text-gray-700">
-            <li>Maintenance response</li>
-            <li>Communication</li>
-            <li>Professionalism</li>
-            <li>Lease clarity</li>
-            <li>Privacy respect</li>
-            <li>Deposit handling</li>
-            <li>Rent practices</li>
-            <li>Non-retaliation</li>
-          </ul>
-          <p class="text-xs text-gray-500 mt-3">Source: WHO LARES</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 items-stretch">
+          <div class="bg-gray-50 rounded-[6px] p-5">
+            <p class="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 mb-2">Standard average</p>
+            <div class={`text-4xl font-bold leading-none ${getScoreTextColor(muFlat)}`}>{muFlat.toFixed(1)}</div>
+            <p class="text-xs text-gray-500 mt-3">Every item counts the same.</p>
+          </div>
+          <div class="bg-teal-50 rounded-[6px] p-5 ring-1 ring-teal-300">
+            <p class="text-xs font-bold uppercase tracking-[0.12em] text-teal-700 mb-2">Our health-weighted score</p>
+            <div class={`text-4xl font-bold leading-none ${getScoreTextColor(muWeighted)}`}>{muWeighted.toFixed(1)}</div>
+            <p class="text-xs text-teal-700 mt-3">Health and safety items count for more.</p>
+          </div>
         </div>
+
+        <h3 class="font-semibold text-gray-900 mb-2">What the shift means</h3>
+        <p class="text-gray-600 text-sm">
+          Flat, this unit scores {muFlat.toFixed(1)}. The way we score it, {muWeighted.toFixed(1)}. That {(muFlat - muWeighted).toFixed(1)}-star difference sits right on the mold, pest, and climate problems. The weighting leans the score toward the conditions that affect a tenant's health.
+        </p>
+      </div>
+
+      <h3 class="text-lg font-semibold text-gray-900 mt-10 mb-2">The same math on real reviews</h3>
+      <p class="text-gray-600 mb-6">
+        That unit is made up, and made-up numbers are easy to rig. So here's the same calculation on two real reviews, scored both ways. The per-item ratings don't change between the columns; only the way they're combined does.
+      </p>
+
+      {realExamples.map((ex) => (
+        <div class="bg-white border border-gray-200 rounded-[6px] p-6 mb-4">
+          <div class="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3 mb-4">
+            <h4 class="text-base font-semibold text-gray-900">{ex.address}</h4>
+            <span class="text-xs text-gray-500 sm:text-right">{ex.meta}</span>
+          </div>
+          <div class="bg-gray-50 rounded-[6px] p-4 overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-gray-500">
+                  <th class="text-left pb-2 font-medium">Domain</th>
+                  <th class="text-center pb-2 font-medium">Flat average</th>
+                  <th class="text-center pb-2 font-medium">How we score it</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ex.rows.map((row) => {
+                  const changed = row.flat !== row.weighted;
+                  const isOverall = row.label === 'Overall';
+                  const size = isOverall ? 'text-base' : 'text-sm';
+                  return (
+                    <tr class={isOverall ? 'border-b border-gray-200' : ''}>
+                      <td class={`py-1.5 text-left ${size} ${isOverall ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>{row.label}</td>
+                      <td class={`py-1.5 text-center tabular-nums ${size} ${isOverall ? 'font-bold' : 'font-medium'} ${getScoreTextColor(row.flat)}`}>{row.flat.toFixed(1)}</td>
+                      <td class={`py-1.5 text-center tabular-nums ${size} ${(isOverall || changed) ? 'font-bold' : 'font-medium'} ${getScoreTextColor(row.weighted)}`}>
+                        <span class="relative inline-block">
+                          {row.weighted.toFixed(1)}
+                          {changed && <span class={`absolute left-full ml-1 text-xs font-normal ${row.weighted < row.flat ? 'text-red-600' : 'text-emerald-600'}`}>{row.weighted < row.flat ? '▼' : '▲'}</span>}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p class="text-sm text-gray-600 mt-3">{ex.why}</p>
+        </div>
+      ))}
+
+      <p class="text-xs text-gray-500 mt-2">
+        On a full review the shift is usually a fraction of a star, and that's deliberate. Only the health and safety items carry extra weight, and they're averaged in with everything else. The weighting leans a score toward what affects your health; it doesn't override the rest.
+      </p>
+    </section>
+
+    <!-- Score Interpretation -->
+    <section class="mb-12">
+      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">Reading the numbers</p>
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Interpreting scores</h2>
+      <p class="text-gray-600 mb-6">
+        The color-coded scores in the examples above all come from the same four-band scale. Here's what each band means at a glance:
+      </p>
+      <div class="bg-white border border-gray-200 rounded-[6px] p-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {bands.map(({ range, sample, qualifier }) => {
+            const { label } = getScoreColor(sample);
+            const textClass = getScoreTextColor(sample);
+            const bgClass = getScoreBgTint(sample);
+            return (
+              <div class={`flex flex-col items-center justify-center text-center px-3 py-5 rounded-[6px] ${bgClass}`}>
+                <div class={`text-2xl font-bold leading-none ${textClass}`}>{range}</div>
+                <div class={`text-sm font-semibold mt-2 ${textClass}`}>{label}</div>
+                <div class={`text-xs mt-1.5 ${textClass}`}>{qualifier}</div>
+              </div>
+            );
+          })}
+        </div>
+        <p class="text-sm text-gray-600 mt-5 pt-5 border-t border-gray-100">
+          Treat a score as a starting point, not a verdict. Every review comes from a tenant's own experience, and we can't independently verify each one, so use your own judgment. The written reviews matter as much as the number, so read them alongside it; they carry the context a score can't.
+        </p>
       </div>
     </section>
 
@@ -298,43 +507,21 @@ const bands = [
         <div class="bg-gray-50 rounded-[6px] p-4">
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-left text-gray-500">
-                <th class="pb-2">Review Age</th>
-                <th class="pb-2">Weight Applied</th>
+              <tr class="text-gray-500">
+                <th class="text-center pb-2">Review Age</th>
+                <th class="text-center pb-2">Weight Applied</th>
               </tr>
             </thead>
             <tbody class="text-gray-700">
-              <tr><td class="py-1">0-2 years</td><td>100%</td></tr>
-              <tr><td class="py-1">3 years</td><td>95%</td></tr>
-              <tr><td class="py-1">4 years</td><td>90%</td></tr>
-              <tr><td class="py-1">5+ years</td><td>85% (floor)</td></tr>
+              <tr><td class="py-1 text-center tabular-nums">0-2 years</td><td class="py-1 text-center tabular-nums">100%</td></tr>
+              <tr><td class="py-1 text-center tabular-nums">3 years</td><td class="py-1 text-center tabular-nums">95%</td></tr>
+              <tr><td class="py-1 text-center tabular-nums">4 years</td><td class="py-1 text-center tabular-nums">90%</td></tr>
+              <tr><td class="py-1 text-center tabular-nums">5+ years</td><td class="py-1 text-center tabular-nums">85% (floor)</td></tr>
             </tbody>
           </table>
         </div>
         <div class="mt-4 text-xs text-gray-500">
           Reference: Hu, Pavlou, and Zhang (2017), MIS Quarterly.
-        </div>
-      </div>
-    </section>
-
-    <!-- Score Interpretation -->
-    <section class="mb-12">
-      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">Reading the numbers</p>
-      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Interpreting scores</h2>
-      <div class="bg-white border border-gray-200 rounded-[6px] p-6">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {bands.map(({ range, sample, qualifier }) => {
-            const { label } = getScoreColor(sample);
-            const textClass = getScoreTextColor(sample);
-            const bgClass = getScoreBgTint(sample);
-            return (
-              <div class={`text-center p-4 rounded-[6px] ${bgClass}`}>
-                <div class={`text-2xl font-bold ${textClass}`}>{range}</div>
-                <div class={`text-sm font-medium ${textClass}`}>{label}</div>
-                <div class={`text-xs mt-1 ${textClass}`}>{qualifier}</div>
-              </div>
-            );
-          })}
         </div>
       </div>
     </section>
@@ -421,12 +608,9 @@ const bands = [
     <!-- Transparency Note -->
     <section class="mb-12">
       <div class="bg-teal-50 border border-teal-200 rounded-[6px] p-6">
-        <h2 class="text-lg font-semibold text-teal-900 mb-2">Our commitment to transparency</h2>
+        <h2 class="text-lg font-semibold text-teal-900 mb-2">Tenants are the experts</h2>
         <p class="text-teal-800 text-sm">
-          Tenants are the experts on their own housing. The methodology is public so you can see exactly how scores are calculated. Every review displays both raw scores and weighted domain scores.
-        </p>
-        <p class="text-teal-700 text-sm mt-3">
-          Items marked with <span class="text-red-500">*</span> indicate health and safety weighted categories.
+          You know your home better than anyone who tours it for ten minutes. The full methodology is public, the weights come from cited research, and every review shows both its raw item ratings and its weighted scores. You can always check our work.
         </p>
       </div>
     </section>
