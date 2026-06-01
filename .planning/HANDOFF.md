@@ -1,102 +1,66 @@
 # Handoff: RateMyPlace Boston
 
-**Created:** 2026-02-27
-**Context:** Post-refactor, pre-launch UX audit
+**Updated:** 2026-05-31
+**Status:** Live at ratemyplace.org. Last formal milestone v1.5.0 "Closed Loops" shipped 2026-04-29; ad-hoc work has continued since (see below).
 
-## What Just Happened
+## Current State
 
-- Created CLAUDE.md with coding conventions
-- Added centralized API types (`src/lib/api-types.ts`)
-- Refactored ReviewForm.tsx from 916 → 287 lines (extracted into `form-steps/`)
-- All changes pushed to main
+- Live at ratemyplace.org (Cloudflare Pages, auto-deploys from `main`).
+- Last GSD milestone: **v1.5.0 "Closed Loops"** — shipped 2026-04-29 (24/24 requirements, 6 phases, 15 plans). A hardening pass: security, validation, performance, and quality-debt gaps.
+- **No active milestone.** Next GSD step: `/gsd:new-milestone` to scope v1.6.0.
+- Production DB now holds ~43 approved reviews across real Boston + New Haven addresses. (The old "DB cleared of seed data" note is obsolete.)
 
-## Current Concern
+## Shipped since v1.5.0 (ad-hoc, not milestone-tracked)
 
-**User-facing experience needs audit before launch:**
-1. UI consistency - are styles/components consistent across pages?
-2. Bug check - are there broken flows or edge cases?
-3. Language/copy - is text updated to match current features?
+From `git log` (2026-04 → 2026-05):
+- Places API resilience: reduced burn rate + manual address fallback
+- Homepage "new address" rows hand off to /review/new with one click (PRs #5, #6)
+- Email senders route human-facing mail to meredith@ratemyplace.org (Workspace inbox)
+- Admin tables: server-side pagination + stats (PERF-01)
+- Email helper unit tests with Resend mock (TEST-01)
+- **Methodology worked example** (commit 6db2a7e, 2026-05-31, live): /methodology now shows the health-weighting formula on a made-up unit + two anonymized real reviews scored flat vs weighted, displayed like the site's review cards. Built to back an Instagram "We show our work" highlight.
 
-## Recommended Audit Plan
+## What's Next
 
-### Phase 1: Page-by-Page UX Audit
+No active milestone. To scope v1.6.0: `/gsd:new-milestone` (or `/gsd:progress` to re-sync first).
 
-Review each user-facing page for:
-- [ ] Consistent styling (buttons, forms, colors)
-- [ ] Clear language (no placeholder text, outdated copy)
-- [ ] Working links and navigation
-- [ ] Mobile responsiveness
+Carry-over deferred to v1.6.0 (from STATE.md — verify which the May work already closed):
+- **DEBT-01..04** — split components >700 LOC
+- **STRESS-01..04** — stress testing / UI at scale (deferred since v1.3.0, still not done)
+- **Email unsubscribe management** — before scaling notification emails
+- `disputes/[id].ts` — convert blocking `await sendDisputeUpheldEmail` to fireAndForget
+- `signup.ts` — adopt `isValidEmail` (VAL-05 consistency follow-up)
 
-**Pages to audit:**
+Product question surfaced 2026-05-31: the health-weighting moves real review scores very little (theoretical max ~0.2; usually <0.1, rounds away at the overall level). If the weighting should visibly matter more, that's a scoring change (more weighted items / stronger multipliers / different overall formula) and it retroactively shifts every score in the DB — needs explicit sign-off. Detail in Claude memory `project_weighting_real_world_effect.md`.
+
+## Known Issues (verify before relying on)
+
+- **Google OAuth on production** — historically failed (Cloudflare Workers bot detection blocked logins; worked locally). Status unverified as of 2026-05-31; see `GOOGLE_OAUTH_TROUBLESHOOTING.md`. Confirm before assuming fixed.
+- Dual `had_pests`/`had_pest_issues` columns (cosmetic; works via fallback)
+- 12 legacy v1 score columns (dead for new reviews, safe to keep)
+
+## Quick Start
+
 ```
-Public:
-- / (home)
-- /search
-- /map
-- /building/[slug]
-- /landlord/[slug]
-- /methodology
-- /guidelines
-- /privacy
-- /terms
-- /contact
-- /about
-- /dispute
+# Scope the next milestone
+/gsd:new-milestone
 
-Auth:
-- /auth/signin
-- /auth/signup
-
-Authenticated:
-- /review/new (ReviewForm - just refactored)
-- /profile
-
-Admin:
-- /admin/* (lower priority for launch)
+# Or check progress / re-sync state
+/gsd:progress
 ```
 
-### Phase 2: Flow Testing
-
-Test complete user journeys:
-1. **New user signup → submit review → view on building page**
-2. **Search for building → view details → see reviews**
-3. **Landlord dispute submission flow**
-4. **Email verification flow**
-
-### Phase 3: Copy Review
-
-Check for:
-- "Coming Soon" placeholders
-- Lorem ipsum or test text
-- Outdated feature descriptions
-- Consistent terminology (landlord vs property owner, etc.)
-
-## Quick Start After Clear
-
-```bash
-# Resume this work
-/gsd:quick "Audit user-facing pages for consistency, bugs, and outdated copy"
-
-# Or explore manually
-# Read pages in src/pages/ and check for issues
-```
-
-## Key Files for UI Audit
+## Key Architecture Reference
 
 | Area | Files |
-|------|-------|
-| Layout | `src/components/layout/` (Header, Footer, BaseLayout) |
-| Home | `src/pages/index.astro` |
-| Review Form | `src/components/reviews/ReviewForm.tsx`, `form-steps/` |
-| Building Page | `src/pages/building/[slug].astro` |
-| Profile | `src/components/profile/ProfileDashboard.tsx` |
-| Public Pages | `src/pages/*.astro` |
-
-## Known Issues from Previous Handoff
-
-- "Coming Soon" text on /about and /contact for landlord responses
-- Rate limiting only on signin (not signup, disputes, verification)
-- Google Maps API key needs HTTP referrer restrictions
+|------|------|
+| Layout | `src/components/layout/` |
+| Review forms | `src/components/reviews/ReviewForm.tsx`, `form-steps/` |
+| Admin panel | `src/pages/admin/`, `src/components/admin/` |
+| Scoring | `src/lib/scoring.ts` (weighted arithmetic mean; weights in `ITEM_WEIGHTS`) |
+| Methodology page | `src/pages/methodology.astro` |
+| API routes | `src/pages/api/` |
+| Migrations | `migrations/` |
+| Tests | `src/lib/__tests__/` (unit), `e2e/` (Playwright) |
 
 ---
-*Handoff created: 2026-02-27 after completing documentation improvements*
+*Hand-refreshed 2026-05-31 to reflect post-v1.5.0 state. STATE.md is the GSD source of truth; run `/gsd:progress` or `/gsd:new-milestone` to regenerate these docs properly.*
