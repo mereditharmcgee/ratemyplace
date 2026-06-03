@@ -2,7 +2,12 @@
 
 @theme {
   --color-paper: #F6F4EE;
+  --color-warm-lamp: #F5E6A8;   /* logo lit window ONLY, never elsewhere */
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Instrument Serif", Georgia, serif;
+
+  --radius-card: 0.375rem;      /* 6px */
+  --radius-input: 0.25rem;      /* 4px */
+  --radius-pill: 9999px;
 }
