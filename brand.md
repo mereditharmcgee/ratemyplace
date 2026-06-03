@@ -1,10 +1,10 @@
-# RateMyPlace — Brand Handbook
+# RateMyPlace Brand Handbook
 
-> **Status:** v1.3 · Living document
+> **Status:** v1.4 · Living document
 > **Repo path:** `/brand.md`
 > **Scope:** Codify the existing visual system with a small number of deliberate upgrades that shift the site from "AI-default" to "made by someone with a point of view." This is not a redesign. Every rule below is implementable against the current Astro + Tailwind 4 codebase without structural change.
 >
-> **Reconciliation with the brand bible (v0.4):** The canonical primary message is **"A public record of rental housing, from the people who know it best."** The shorter tenant-facing variant **"A public record for renters"** is retired as a primary line and remains only as a mid-sentence descriptor when the full message doesn't fit. All marketing surfaces should use the canonical line.
+> **Relationship to the brand bible (v1.0):** The brand bible is the canonical brand document, the source of truth for foundation, voice, visual identity, and platform application. This handbook is its code-level companion: the Tailwind tokens, component classes, and migration steps that turn the identity into shipped pages. Where the two disagree, the bible wins. The canonical primary message is **"A public record of rental housing, from the people who know it best."** The shorter tenant-facing variant **"A public record for renters"** is retired as a primary line and remains only as a mid-sentence descriptor when the full message doesn't fit.
 
 ---
 
@@ -12,7 +12,7 @@
 
 RateMyPlace is **a public record of rental housing, from the people who know it best.** We help tenants make informed decisions about where they live by publishing honest, verified reviews weighted by the health and safety factors that actually affect their lives.
 
-We are not Yelp for apartments. We are closer to **a public health department with a comment section.** (That line belongs in the bible's positioning section too — it does more work than a paragraph of hedging.)
+We are not Yelp for apartments. We are closer to **a public health department with a comment section.** (That line is now in the bible's positioning section too.)
 
 Our moat is our methodology. Our job, visually, is to make people trust it on first impression.
 
@@ -22,7 +22,7 @@ Our moat is our methodology. Our job, visually, is to make people trust it on fi
 
 ### The voice principles
 
-1. **First-person plural, tenant-side.** "We believe every renter deserves access to honest information." Not "we empower renters" — we don't empower anyone, we publish the record.
+1. **First-person plural, tenant-side.** "We believe every renter deserves access to honest information." Not "we empower renters", we don't empower anyone, we publish the record.
 2. **Short, declarative, unornamented.** "Renters can't afford to be picky. They can't get honest answers. And they have nowhere to check." Every clause a hammer.
 3. **Specific over sweeping.** "15 maintenance requests" not "lots of maintenance requests." "Fall 2023" not "a while back." Numbers and names build trust; vagueness erodes it.
 4. **Public-health cadence, not marketing cadence.** We cite sources in full (Joint Center for Housing Studies, Harvard; University of Kansas Housing Survey). We don't say "studies show."
@@ -50,7 +50,7 @@ It works on every surface: homepage hero, IG bio, OG image, business card. Do no
 
 Three, in priority order:
 
-1. **Tenant-side by default.** When a design decision could favor the reviewer or the reviewed, we favor the reviewer — except where fairness (verification, dispute, retaliation) requires otherwise.
+1. **Tenant-side by default.** When a design decision could favor the reviewer or the reviewed, we favor the reviewer, except where fairness (verification, dispute, retaliation) requires otherwise.
 2. **Privacy as identity.** Season dates not exact dates, no unit numbers displayed, no PII on reviews. Make the privacy design visible, not buried. The season chip is a brand element.
 3. **Evidence, not vibes.** Every score weight traces to a citation. Every stat we publish is sourced inline. If we can't source it, we don't say it.
 
@@ -58,7 +58,7 @@ Three, in priority order:
 
 ## 4. Color
 
-The current Tailwind palette is correct. The fix is not new colors — it is **one warmer surface color** that replaces `bg-slate-50` everywhere, and a documented small-text map that survives the warmer background.
+The current Tailwind palette is correct. The fix is not new colors, it is **one warmer surface color** that replaces `bg-slate-50` everywhere, and a documented small-text map that survives the warmer background.
 
 ### The single deliberate tweak
 
@@ -81,10 +81,10 @@ Names are for discussion and commit messages. Hex values are canonical.
 | Ink (secondary) | **Graphite** | `#334155` | `slate-700` |
 | Ink (tertiary / meta) | **Slate** | `#475569` | `slate-600` |
 | Muted text | **Mist** | `#64748B` | `slate-500` |
-| Page surface | **Paper** | `#F6F4EE` | *custom — see §4.1* |
+| Page surface | **Paper** | `#F6F4EE` | *custom, see §4.1* |
 | Card surface | **White** | `#FFFFFF` | `white` |
 | Hairline rule | **Rule** | `#E2E8F0` | `slate-200` |
-| Logo mark (lit window only) | **Warm Lamp** | `#F5E6A8` | *custom — icon-only, never elsewhere* |
+| Logo mark (lit window only) | **Warm Lamp** | `#F5E6A8` | *custom, icon-only, never elsewhere* |
 | Good / verified | **Signal Green** | `#047857` | `emerald-700` |
 | Good / fills | **Signal Green (surface)** | `#059669` | `emerald-600` |
 | Mixed / stars | **Signal Amber** | `#F59E0B` | `amber-500` |
@@ -123,9 +123,9 @@ All text colors are verified against Paper `#F6F4EE`. Do not deviate.
 | Link | `teal-700` | 5.0 : 1 | **Body-size links use teal-700, not teal-600** |
 | Button surface | `teal-700` bg, white text | 5.5 : 1 | **Primary buttons are teal-700, not teal-600** |
 | Good score text | `emerald-700` | 5.0 : 1 | Small text |
-| Good score fill (pill, bar, icon) | `emerald-600` | — | Used with white text or as graphic fill only |
+| Good score fill (pill, bar, icon) | `emerald-600` | n/a | Used with white text or as graphic fill only |
 | Mixed score text | `amber-700` | 4.5 : 1 | Small text |
-| Star icon | `amber-500` | — | Icon-as-data; contrast doesn't apply the same way |
+| Star icon | `amber-500` | n/a | Icon-as-data; contrast doesn't apply the same way |
 | Concerning / error text | `red-700` | 5.9 : 1 | |
 
 **Migration rules for Claude Code:**
@@ -134,7 +134,7 @@ All text colors are verified against Paper `#F6F4EE`. Do not deviate.
 - Find `text-amber-500` / `text-amber-600` on body text → change to `text-amber-700`
 - Find `text-emerald-600` on body text → change to `text-emerald-700`
 - Find `text-red-600` on body text → change to `text-red-700`
-- Leave star icons, progress bar fills, and large display text using the 500/600 variants where they are — they are graphics, not prose.
+- Leave star icons, progress bar fills, and large display text using the 500/600 variants where they are, they are graphics, not prose.
 
 ### 4.3 Score color function (canonical)
 
@@ -164,7 +164,7 @@ export function getScoreTextColor(score: number): string {
 
 > **Instrument Serif** (display only) + **Inter** (everything else)
 
-**Keep Inter** for body, nav, buttons, forms, labels, data, tables — all 95% of the site. It's what's there, it works, it's accessible, and replacing it site-wide is expensive change for no clear gain.
+**Keep Inter** for body, nav, buttons, forms, labels, data, tables, all 95% of the site. It's what's there, it works, it's accessible, and replacing it site-wide is expensive change for no clear gain.
 
 **Introduce Instrument Serif** for display only: the H1 on the homepage hero, the methodology page's section openers, the large numeric stats ("37%"), and pull quotes in reviews. Nowhere else.
 
@@ -173,8 +173,8 @@ export function getScoreTextColor(score: number): string {
 1. **It's not overused.** Fraunces, Playfair, PT Serif, Source Serif are all in every design system. Instrument Serif is rarer and has a recognizable personality.
 2. **It has warmth without being precious.** A slight calligraphic pull in the italic, a confident Roman upright. It reads "an editor picked this" not "a template used this."
 3. **It's free on Google Fonts and loads in a single weight** (400 regular + 400 italic). One additional font file, not a site-wide retype.
-4. **It holds up at display sizes.** Designed to be set large — 36px minimum, 48–96px sings.
-5. **The italic is the move.** Use Instrument Serif italic sparingly on a single word or phrase for emphasis inside a sans headline — that single flourish becomes a brand fingerprint.
+4. **It holds up at display sizes.** Designed to be set large, 36px minimum, 48–96px sings.
+5. **The italic is the move.** Use Instrument Serif italic sparingly on a single word or phrase for emphasis inside a sans headline, that single flourish becomes a brand fingerprint.
 
 ### Type scale
 
@@ -228,7 +228,7 @@ Then `font-display` is the opt-in class for display type. Default stays Inter.
 ### Rules
 
 - **Instrument Serif is earned, not defaulted.** If you're reaching for it on a form label, you're wrong.
-- The homepage H1 becomes `<h1 class="font-display text-6xl">Know before you sign.</h1>` — one line, one typeface, done.
+- The homepage H1 becomes `<h1 class="font-display text-6xl">Know before you sign.</h1>`, one line, one typeface, done.
 - Large stat numerals in display serif are a brand signature. Any page that publishes numbers (methodology, about, building score summary) should use them.
 - Italic word inside a sans headline: allowed once per page, zero times on app surfaces. Marketing pages only.
 
@@ -240,15 +240,19 @@ The mark is a hand-drawn vector silhouette of an urban apartment building: three
 
 ### The narrative
 
-The building is the city. The lit window is the tenant. The mark is about the specific person who's home right now, writing a review. Every design decision in the mark supports this — the flush-right door that reads as a walk-up entrance, the double-hung windows that read as real apartments, the single warm window at dead center that reads as one specific life.
+The building is the city. The lit window is the tenant. The mark is about the specific person who's home right now, writing a review. Every design decision in the mark supports this, the flush-right door that reads as a walk-up entrance, the double-hung windows that read as real apartments, the single warm window at dead center that reads as one specific life.
 
-### Three variants
+### Variants
 
 | Variant | When | File |
 |---|---|---|
-| **Full lockup** (mark + "RateMyPlace" wordmark in Instrument Serif) | Site nav, OG images, press kit, formal deliverables | `brand/logo-lockup.svg` |
+| **Full lockup** (mark + "RateMyPlace" wordmark in Instrument Serif) | Site nav, OG images, press kit, formal deliverables, light surfaces | `brand/logo-lockup.svg` |
+| **Reverse lockup** (silhouette mark + wordmark in white) | Dark surfaces: dark OG images, dark headers, dark email | `brand/logo-lockup-reverse.svg` |
+| **Reverse lockup, teal** (full-color building + white wordmark) | Dark surfaces where a colored building reads better than a silhouette | `brand/logo-lockup-reverse-teal.svg` |
 | **Mark only** | Favicon, IG PFP, app icon contexts, anywhere ≤ 40px | `brand/logo-mark.svg` |
 | **Utility lockup** (mark + "RateMyPlace" wordmark in Inter Bold) | Email signatures, small-format contexts where the serif feels too editorial | `brand/logo-lockup-utility.svg` |
+| **Ink only** (single color) | Print, fax, one-color email signatures | `brand/logo-mark-ink.svg` |
+| **Reverse mark** (silhouette with the lit window) | Dark backgrounds; the footer uses it | `brand/logo-mark-reverse.svg` |
 
 ### Committed colors
 
@@ -267,7 +271,7 @@ Three colors, no more. The amber lit window always appears as amber; it is never
 
 ### Clear space
 
-Around the full lockup: **half the mark's height** on all sides. Around the mark alone: **a quarter of its height** on all sides. No other element — text, rule, illustration — inside that zone.
+Around the full lockup: **half the mark's height** on all sides. Around the mark alone: **a quarter of its height** on all sides. No other element (text, rule, illustration) inside that zone.
 
 ### Don'ts
 
@@ -278,11 +282,11 @@ Around the full lockup: **half the mark's height** on all sides. Around the mark
 - **Never outline the mark**, add a drop shadow, or apply a gradient to any part.
 - **Never stretch or skew.**
 - **Never add filters**, textures, weathering, or distressed effects.
-- **Never place on busy photography or patterned backgrounds** where the windows lose legibility. If the mark needs to sit on a dark surface, use the reverse variant (paper building silhouette, ink window cutouts, amber lit window preserved) — note: reverse variant scheduled for production alongside Claude Design polish pass, not yet in `brand/`.
+- **Never place on busy photography or patterned backgrounds** where the windows lose legibility. If the mark needs to sit on a dark surface, use the reverse variant (paper building silhouette with the amber lit window preserved), which now ships as `brand/logo-mark-reverse.svg` for the mark and `brand/logo-lockup-reverse.svg` for the lockup.
 
 ### Refinement schedule
 
-The mark's geometry is considered final through end of year 2026. A polish pass is scheduled for H2 2026 once the platform has more surface area to evaluate against (the three treatments — ink-only, reverse, full-color — may receive subtle proportion adjustments; the silhouette, color system, and lit-window signature will not change).
+The mark's geometry is considered final through end of year 2026. A polish pass is scheduled for H2 2026 once the platform has more surface area to evaluate against (the three treatments, ink-only, reverse, and full-color, may receive subtle proportion adjustments; the silhouette, color system, and lit-window signature will not change).
 
 ---
 
@@ -319,7 +323,7 @@ Implementation:
 
 This is the single biggest feel-shift. AI-default cards float with `shadow-sm` and no border. That's the tell. Real editorial and civic sites almost always use borders.
 
-Implementation rule — replace this pattern:
+Implementation rule, replace this pattern:
 
 ```html
 <!-- before -->
@@ -379,17 +383,17 @@ Don't use on: app surfaces (the review form, admin pages, the tenant dashboard).
 
 > **Marketing sections use 80px vertical padding (`py-20`), not 64px (`py-16`). App surfaces use 48px (`py-12`).**
 
-The current site uses `py-16` everywhere. Pushing marketing to `py-20` gives it more breathing room and makes the app surfaces feel denser-by-contrast, which is correct — an app should feel efficient, a pitch page should feel considered.
+The current site uses `py-16` everywhere. Pushing marketing to `py-20` gives it more breathing room and makes the app surfaces feel denser-by-contrast, which is correct, an app should feel efficient, a pitch page should feel considered.
 
 ### 7.6 Stat treatment
 
-Any published number ≥36px is set in Instrument Serif, followed by a small all-caps mono-style citation in `slate-500`.
+Any published number ≥36px is set in Instrument Serif, followed by a small all-caps mono-style citation in `slate-600` (slate-500 fails WCAG AA at this size).
 
 ```html
 <div class="border-l-2 border-slate-900 pl-5">
   <p class="font-display text-6xl leading-none tracking-tight text-slate-900">37%</p>
   <p class="mt-2 text-sm text-slate-700 max-w-[26ch]">of renters sign a lease without seeing the apartment in person.</p>
-  <p class="mt-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Apartments.com, 2025</p>
+  <p class="mt-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-600">Apartments.com, 2024</p>
 </div>
 ```
 
@@ -415,10 +419,10 @@ Use wherever a move-in/move-out date is displayed.
 
 1. **We do not use stock photography of smiling people in apartments.** Ever. That's the single fastest way to look like every other rental site.
 2. **We prefer typography and data over imagery on marketing surfaces.** Stats, quotes, and lists do more work than photos.
-3. **When we use photographs, they are of buildings, not people.** Neutral, documentary, flat light. Think Zillow listing photo or a city assessor's database — not a real-estate brochure.
+3. **When we use photographs, they are of buildings, not people.** Neutral, documentary, flat light. Think Zillow listing photo or a city assessor's database, not a real-estate brochure.
 4. **No illustrations of houses, keys, or hands holding keys.** No abstract geometric "concept" art. The mark is the only illustration we have.
 5. **Icons are line icons at 1.5–2px stroke width, never filled.** Match the spirit of the logo mark. Use Heroicons or Lucide outline variants; do not invent new icons.
-6. **Data visualizations are the exception.** Score bars, maps, histograms — these are welcome and should be rendered with the documented palette.
+6. **Data visualizations are the exception.** Score bars, maps, histograms, these are welcome and should be rendered with the documented palette.
 
 ### When you need a visual and don't have a photo
 
@@ -450,7 +454,7 @@ Small rules, codified once.
 
 ### Accounts
 
-- **Instagram:** `@ratemyplace` (or the available handle — document actual on file)
+- **Instagram:** `@ratemyplace` (or the available handle, document actual on file)
 - **Bluesky / X / Threads:** same handle across all
 - **Bio (canonical copy):**
 
@@ -461,15 +465,15 @@ Small rules, codified once.
 
 ### Profile picture
 
-Mark on ink `#0F172A` background. Use `brand/social/ig-pfp.png` — 1080×1080 with the mark centered at ~60% of the frame. See §11 for generated asset.
+Mark on ink `#0F172A` background. Use `brand/social/ig-pfp.png`, 1080×1080 with the mark centered at ~60% of the frame. See §11 for generated asset.
 
 ### Post template (1080×1350)
 
 Single codified treatment. Works for three post types:
 
-1. **Stat post** — large Instrument Serif numeral + one-sentence context + source citation + logo.
-2. **Review pullquote post** — italic serif quote + attribution ("Verified tenant · Fall 2023") + logo.
-3. **Educational post** — uppercase eyebrow + sans headline + 2–3 bullet facts + logo.
+1. **Stat post**, large Instrument Serif numeral + one-sentence context + source citation + logo.
+2. **Review pullquote post**, italic serif quote + attribution ("Verified tenant · Fall 2023") + logo.
+3. **Educational post**, uppercase eyebrow + sans headline + 2–3 bullet facts + logo.
 
 All share: Paper background, slate-900 ink, one accent (teal-700), hairline rule above logo, eyebrow-style "ratemyplace.org" at bottom. See `brand/social/ig-post-template.html` for the editable source.
 
@@ -499,9 +503,11 @@ These files exist in the repo under `brand/` and are the canonical source for ev
 | `brand/logo-mark-reverse.svg` | **Final** | Paper `#F6F4EE` building silhouette with transparent window cutouts and preserved Warm Lamp `#F5E6A8` lit window. For dark surfaces. The brand's strongest dark-mode moment. |
 | `brand/logo-lockup.svg` | **Final** | Editorial lockup (mark + "RateMyPlace" in Instrument Serif Regular). For OG images, press kit, marketing-page nav. |
 | `brand/logo-lockup-utility.svg` | **Final** | Utility lockup (mark + "RateMyPlace" in Inter Bold). For email signatures, footers, and small-format contexts. |
-| `brand/social/ig-pfp.png` | Regenerate with final mark | Instagram profile picture (1080×1080). Recommended: reverse mark on Signal Teal background — the amber lit window pops most against teal. |
+| `brand/logo-lockup-reverse.svg` | **Final** | Reverse lockup (silhouette mark + "RateMyPlace" wordmark in white). Primary dark-surface lockup; matches the reverse mark. For dark OG images, dark headers, dark email. |
+| `brand/logo-lockup-reverse-teal.svg` | **Final** | Reverse lockup with full-color teal building and white wordmark. Alternate for dark surfaces where a colored building reads better than the silhouette; its teal building intentionally differs from the reverse mark. |
+| `brand/social/ig-pfp.png` | Regenerate with final mark | Instagram profile picture (1080×1080). Recommended: reverse mark on Signal Teal background, the amber lit window pops most against teal. |
 | `brand/social/ig-highlight.png` | Regenerate with final mark | Instagram highlight cover (1080×1920). |
-| `brand/social/ig-post-template.html` | Editable | Post template — three variants (stat, quote, educational). Logo slot now uses final mark. |
+| `brand/social/ig-post-template.html` | Editable | Post template, three variants (stat, quote, educational). Logo slot now uses final mark. |
 | `brand/social/ig-story-template.html` | Editable | Story / highlight cover template. |
 | `brand/social/og-default.png` | Regenerate with final mark | Default OG image (1200×630) with editorial lockup top-left. |
 | `brand/social/og-homepage.png` | Regenerate with final mark | Homepage OG image with tagline. |
@@ -521,18 +527,18 @@ These files exist in the repo under `brand/` and are the canonical source for ev
 
 When applying this handbook to the existing codebase, execute in this order. Each step is isolable and reviewable as its own PR.
 
-- [ ] **Fonts** — Add Inter + Instrument Serif `<link>` to `BaseLayout.astro`. Add `--font-sans` and `--font-display` to `@theme` in `src/styles/global.css`.
-- [ ] **Paper color** — Add `--color-paper: #F6F4EE` to `@theme`. Find-and-replace `bg-slate-50` → `bg-paper` across `src/pages/**` and `src/components/**`.
-- [ ] **Contrast migration** — Apply the small-text rules in §4.2: `text-teal-600` → `text-teal-700` on body text; `text-amber-500/600` → `text-amber-700` on body text; `text-emerald-600` → `text-emerald-700` on body text; `text-red-600` → `text-red-700`.
-- [ ] **Buttons** — Replace primary button color `bg-teal-600` → `bg-teal-700 hover:bg-teal-800`. Ensure `font-semibold` and `rounded-[4px]`.
-- [ ] **Card radius + borders** — Global replace `rounded-lg shadow-sm` (on non-floating surfaces) → `rounded-[6px] border border-slate-200 hover:shadow-sm transition-shadow`.
-- [ ] **Hero H1** — On `src/pages/index.astro`, change the H1 to `<h1 class="font-display text-5xl sm:text-6xl md:text-7xl font-normal tracking-tight leading-[1.05]">Know before you sign.</h1>`. Remove the `font-bold`.
-- [ ] **Eyebrows** — Add eyebrow `<p>` above each major marketing section H2. Copy already written in §7.4.
-- [ ] **Score color function** — Create `src/lib/scoring-colors.ts` per §4.3. Refactor `ReviewCard.astro` and any inline color logic to import from it.
-- [ ] **Season chip** — Extract into `src/components/ui/SeasonChip.astro`, apply on all review surfaces.
-- [ ] **Spacing** — Change `py-16` → `py-20` on marketing sections (homepage, about, methodology). Leave app surfaces at `py-12`.
-- [ ] **Logo** — Replace `public/favicon.svg` with `brand/logo-mark.svg` (the final three-color mark). Ensure `--color-warm-lamp: #F5E6A8` is added to `@theme` for any inline SVG needs. Mark-only and lockup variants go in `brand/` per the asset table in §11.
-- [ ] **OG image** — Replace existing OG image with `brand/social/og-default.png`. Ensure `BaseLayout.astro` references it with correct `og:image` tag.
+- [ ] **Fonts**. Add Inter + Instrument Serif `<link>` to `BaseLayout.astro`. Add `--font-sans` and `--font-display` to `@theme` in `src/styles/global.css`.
+- [ ] **Paper color**. Add `--color-paper: #F6F4EE` to `@theme`. Find-and-replace `bg-slate-50` → `bg-paper` across `src/pages/**` and `src/components/**`.
+- [ ] **Contrast migration**. Apply the small-text rules in §4.2: `text-teal-600` → `text-teal-700` on body text; `text-amber-500/600` → `text-amber-700` on body text; `text-emerald-600` → `text-emerald-700` on body text; `text-red-600` → `text-red-700`.
+- [ ] **Buttons**. Replace primary button color `bg-teal-600` → `bg-teal-700 hover:bg-teal-800`. Ensure `font-semibold` and `rounded-[4px]`.
+- [ ] **Card radius + borders**. Global replace `rounded-lg shadow-sm` (on non-floating surfaces) → `rounded-[6px] border border-slate-200 hover:shadow-sm transition-shadow`.
+- [ ] **Hero H1**. On `src/pages/index.astro`, change the H1 to `<h1 class="font-display text-5xl sm:text-6xl md:text-7xl font-normal tracking-tight leading-[1.05]">Know before you sign.</h1>`. Remove the `font-bold`.
+- [ ] **Eyebrows**. Add eyebrow `<p>` above each major marketing section H2. Copy already written in §7.4.
+- [ ] **Score color function**. Create `src/lib/scoring-colors.ts` per §4.3. Refactor `ReviewCard.astro` and any inline color logic to import from it.
+- [ ] **Season chip**. Extract into `src/components/ui/SeasonChip.astro`, apply on all review surfaces.
+- [ ] **Spacing**. Change `py-16` → `py-20` on marketing sections (homepage, about, methodology). Leave app surfaces at `py-12`.
+- [ ] **Logo**. Replace `public/favicon.svg` with `brand/logo-mark.svg` (the final three-color mark). Ensure `--color-warm-lamp: #F5E6A8` is added to `@theme` for any inline SVG needs. Mark-only and lockup variants go in `brand/` per the asset table in §11.
+- [ ] **OG image**. Replace existing OG image with `brand/social/og-default.png`. Ensure `BaseLayout.astro` references it with correct `og:image` tag.
 
 Estimated effort: one focused day of work by one engineer, or one Claude Code session.
 
@@ -543,9 +549,10 @@ Estimated effort: one focused day of work by one engineer, or one Claude Code se
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | April 2026 | Initial handbook. Codifies existing teal + slate palette, introduces Paper `#F6F4EE`, documents Inter + Instrument Serif pairing, locks contrast rules, specifies component fingerprint deviations from Tailwind defaults. |
-| 1.1 | April 19, 2026 | **Logo section overridden** — mark is in active redesign, see `icon-design-brief.md`; placeholder usage documented. **Primary message reconciled** to the canonical bible line, "A public record of rental housing, from the people who know it best." **Teal depth committed to teal-700** as brand primary for civic weight; teal-600 demoted to surface/graphic-fill role. **"Public health department with a comment section"** flagged for addition to the bible's positioning section. IG PFP and highlight cover flagged as placeholders pending new mark. |
+| 1.1 | April 19, 2026 | **Logo section overridden**, mark is in active redesign, see `icon-design-brief.md`; placeholder usage documented. **Primary message reconciled** to the canonical bible line, "A public record of rental housing, from the people who know it best." **Teal depth committed to teal-700** as brand primary for civic weight; teal-600 demoted to surface/graphic-fill role. **"Public health department with a comment section"** flagged for addition to the bible's positioning section. IG PFP and highlight cover flagged as placeholders pending new mark. |
 | 1.2 | April 20, 2026 | **Logo finalized.** Mark is now a hand-drawn vector urban apartment building with three floors, nine-window grid, flush-right door with two-step stoop, and amber lit window at dead center of the middle floor. Section 6 rewritten with full usage spec (variants, committed colors, minimum sizes, clear space, don'ts). **Warm Lamp `#F5E6A8` added to palette** as an icon-only restricted color. Assets table (§11) updated: `logo-mark.svg` is final; ink-only, reverse, and lockup variants scheduled for Claude Design polish pass. Placeholder asset flags removed. |
 | 1.3 | April 26, 2026 | **Logo asset set complete.** Claude Design polish pass delivered four final SVG variants: `logo-mark-ink.svg` (monochrome, transparent window cutouts), `logo-mark-reverse.svg` (paper silhouette on dark, amber lit window preserved), `logo-lockup.svg` (editorial, Instrument Serif), and `logo-lockup-utility.svg` (Inter Bold). All four marked Final in §11. Ready for site migration. |
+| 1.4 | June 2026 | **Synced to brand bible v1.0.** Added two reverse lockups, `logo-lockup-reverse.svg` (silhouette mark plus white wordmark) and `logo-lockup-reverse-teal.svg` (full-color teal building plus white wordmark), to the variants table in §6 and the assets registry in §11. Fixed the §7.6 stat citation from `slate-500` to `slate-600` so it clears WCAG AA at 11px. Updated §1 to name the brand bible v1.0 as the canonical brand document, with this handbook as its code-level companion. Refreshed the stale reverse-variant note in §6. Removed em dashes throughout for voice consistency with the bible. |
 
 ---
 
