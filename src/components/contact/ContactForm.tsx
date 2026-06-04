@@ -177,7 +177,7 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
       <button
         type="submit"
         disabled={loading}
-        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-[4px] shadow-sm text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-[4px] text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? 'Sending...' : 'Send Message'}
       </button>

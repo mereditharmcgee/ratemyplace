@@ -125,7 +125,7 @@ export default function UsersTable({ currentUserId }: Props) {
             onClick={() => setFilter('all')}
             className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               filter === 'all'
-                ? 'bg-teal-600 text-white'
+                ? 'bg-teal-700 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -135,7 +135,7 @@ export default function UsersTable({ currentUserId }: Props) {
             onClick={() => setFilter('admin')}
             className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               filter === 'admin'
-                ? 'bg-teal-600 text-white'
+                ? 'bg-teal-700 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -145,7 +145,7 @@ export default function UsersTable({ currentUserId }: Props) {
             onClick={() => setFilter('verified')}
             className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               filter === 'verified'
-                ? 'bg-teal-600 text-white'
+                ? 'bg-teal-700 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >

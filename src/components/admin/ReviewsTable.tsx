@@ -303,7 +303,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
               onClick={() => setStatusFilter(status)}
               className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
                 statusFilter === status
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-teal-700 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >

@@ -13,7 +13,7 @@ export default function StepIndicator({ currentStep }: Props) {
         <div key={s.id} className="flex items-center" title={s.title}>
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium shrink-0 ${
-              i <= currentStepIndex ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-500'
+              i <= currentStepIndex ? 'bg-teal-700 text-white' : 'bg-gray-200 text-gray-500'
             }`}
           >
             {i + 1}
