@@ -314,7 +314,7 @@ export default function BuildingsTable() {
             placeholder="Search by address, city, neighborhood, or landlord..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
         </div>
         <button
@@ -422,7 +422,7 @@ export default function BuildingsTable() {
                           type="text"
                           value={editForm.address || ''}
                           onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div>
@@ -433,7 +433,7 @@ export default function BuildingsTable() {
                           type="text"
                           value={editForm.neighborhood || ''}
                           onChange={(e) => setEditForm({ ...editForm, neighborhood: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div>
@@ -442,7 +442,7 @@ export default function BuildingsTable() {
                           type="text"
                           value={editForm.city || ''}
                           onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div>
@@ -451,7 +451,7 @@ export default function BuildingsTable() {
                           type="text"
                           value={editForm.state || ''}
                           onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div>
@@ -462,7 +462,7 @@ export default function BuildingsTable() {
                           type="text"
                           value={editForm.zip_code || ''}
                           onChange={(e) => setEditForm({ ...editForm, zip_code: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div>
@@ -478,7 +478,7 @@ export default function BuildingsTable() {
                               year_built: e.target.value ? parseInt(e.target.value) : null,
                             })
                           }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div>
@@ -494,7 +494,7 @@ export default function BuildingsTable() {
                               unit_count: e.target.value ? parseInt(e.target.value) : null,
                             })
                           }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div>
@@ -507,7 +507,7 @@ export default function BuildingsTable() {
                           onChange={(e) =>
                             setEditForm({ ...editForm, building_type: e.target.value })
                           }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                     </div>
@@ -523,7 +523,7 @@ export default function BuildingsTable() {
                           <select
                             value={editForm.landlord_id || ''}
                             onChange={(e) => setEditForm({ ...editForm, landlord_id: e.target.value || null })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                           >
                             <option value="">None</option>
                             {landlords.map((l) => (
@@ -538,7 +538,7 @@ export default function BuildingsTable() {
                           <select
                             value={editForm.property_manager_id || ''}
                             onChange={(e) => setEditForm({ ...editForm, property_manager_id: e.target.value || null })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                           >
                             <option value="">None</option>
                             {managers.map((m) => (
@@ -562,7 +562,7 @@ export default function BuildingsTable() {
                             value={editForm.owner_name || ''}
                             onChange={(e) => setEditForm({ ...editForm, owner_name: e.target.value })}
                             placeholder="e.g., John Smith, ABC Properties LLC"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                           />
                         </div>
                         <div>
@@ -572,7 +572,7 @@ export default function BuildingsTable() {
                           <select
                             value={editForm.owner_entity || ''}
                             onChange={(e) => setEditForm({ ...editForm, owner_entity: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                           >
                             <option value="">Select type...</option>
                             <option value="individual">Individual</option>
@@ -593,7 +593,7 @@ export default function BuildingsTable() {
                             value={editForm.owner_website || ''}
                             onChange={(e) => setEditForm({ ...editForm, owner_website: e.target.value })}
                             placeholder="https://..."
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                           />
                         </div>
                         <div className="md:col-span-2">
@@ -605,7 +605,7 @@ export default function BuildingsTable() {
                             onChange={(e) => setEditForm({ ...editForm, admin_notes: e.target.value })}
                             rows={3}
                             placeholder="Internal notes about this building..."
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                           />
                         </div>
                       </div>

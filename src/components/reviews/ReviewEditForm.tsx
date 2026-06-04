@@ -295,7 +295,7 @@ export default function ReviewEditForm({ review }: Props) {
               value={unitNumber}
               onChange={(e) => setUnitNumber(e.target.value)}
               placeholder="e.g., 2A, 301"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
             <p className="text-xs text-gray-500 mt-1">
               For our moderation team only. Never shown publicly.
@@ -311,7 +311,7 @@ export default function ReviewEditForm({ review }: Props) {
               value={squareFootage}
               onChange={(e) => setSquareFootage(e.target.value)}
               placeholder="e.g., 750"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
           </div>
 
@@ -320,7 +320,7 @@ export default function ReviewEditForm({ review }: Props) {
             <select
               value={bedrooms}
               onChange={(e) => setBedrooms(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
               {bedroomOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -335,7 +335,7 @@ export default function ReviewEditForm({ review }: Props) {
             <select
               value={bathrooms}
               onChange={(e) => setBathrooms(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
               {bathroomOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -356,7 +356,7 @@ export default function ReviewEditForm({ review }: Props) {
                 value={rentAmount}
                 onChange={(e) => setRentAmount(e.target.value)}
                 placeholder="e.g., 2500"
-                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -444,7 +444,7 @@ export default function ReviewEditForm({ review }: Props) {
                 value={estimatedMonthlyUtilities}
                 onChange={(e) => setEstimatedMonthlyUtilities(e.target.value)}
                 placeholder="e.g., 150"
-                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">
@@ -460,7 +460,7 @@ export default function ReviewEditForm({ review }: Props) {
             <select
               value={laundryType}
               onChange={(e) => setLaundryType(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
               {laundryTypeOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -483,7 +483,7 @@ export default function ReviewEditForm({ review }: Props) {
                   value={laundryCostPerLoad}
                   onChange={(e) => setLaundryCostPerLoad(e.target.value)}
                   placeholder="e.g., 3.50"
-                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">
@@ -502,7 +502,7 @@ export default function ReviewEditForm({ review }: Props) {
         <select
           value={parkingType}
           onChange={(e) => setParkingType(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         >
           <option value="">Select...</option>
           {parkingTypeOptions.map((opt) => (
@@ -582,7 +582,7 @@ export default function ReviewEditForm({ review }: Props) {
             onChange={(e) => setLandlordName(e.target.value)}
             placeholder="e.g. Samia Management, John Smith"
             maxLength={200}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
           <p className="text-sm text-gray-500 mt-1">This helps us link reviews to the right landlord. It won't be shown publicly on your review.</p>
 
@@ -610,7 +610,7 @@ export default function ReviewEditForm({ review }: Props) {
                 onChange={(e) => setPropertyManagerName(e.target.value)}
                 placeholder="e.g. ABC Property Management"
                 maxLength={200}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
               <p className="text-sm text-gray-500 mt-1">The company or person who handles day-to-day management (maintenance, rent collection, etc.)</p>
             </div>
@@ -706,7 +706,7 @@ export default function ReviewEditForm({ review }: Props) {
             <select
               value={moveInMonth}
               onChange={(e) => setMoveInMonth(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
               <option value="">Month</option>
               <option value="1">January</option>
@@ -725,7 +725,7 @@ export default function ReviewEditForm({ review }: Props) {
             <select
               value={moveInYear}
               onChange={(e) => setMoveInYear(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
               <option value="">Year</option>
               {Array.from({ length: new Date().getFullYear() - 1999 }, (_, i) => new Date().getFullYear() - i).map((year) => (
@@ -743,7 +743,7 @@ export default function ReviewEditForm({ review }: Props) {
             <select
               value={tenureMonths}
               onChange={(e) => setTenureMonths(parseInt(e.target.value))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
               {supplementaryItems.tenure.options.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -760,7 +760,7 @@ export default function ReviewEditForm({ review }: Props) {
             <select
               value={moveOutYear}
               onChange={(e) => setMoveOutYear(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
               {supplementaryItems.moveOutTiming.options.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -846,7 +846,7 @@ export default function ReviewEditForm({ review }: Props) {
             onChange={(e) => setReviewTitle(e.target.value)}
             placeholder="Summarize your experience"
             maxLength={100}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
         </div>
 
@@ -860,7 +860,7 @@ export default function ReviewEditForm({ review }: Props) {
             placeholder="Share any details that would help future tenants. Avoid including identifying information."
             rows={4}
             maxLength={1000}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
           <p className="text-sm text-gray-500 mt-1">{reviewText.length}/1000 characters</p>
         </div>

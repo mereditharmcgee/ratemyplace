@@ -28,7 +28,7 @@ export default function AdditionalStep({
         <select
           value={tenancy.tenure}
           onChange={(e) => onTenancyChange({ ...tenancy, tenure: parseInt(e.target.value) })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         >
           {supplementaryItems.tenure.options.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -45,7 +45,7 @@ export default function AdditionalStep({
         <select
           value={tenancy.moveOutYear}
           onChange={(e) => onTenancyChange({ ...tenancy, moveOutYear: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         >
           {supplementaryItems.moveOutTiming.options.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -65,7 +65,7 @@ export default function AdditionalStep({
           onChange={(e) => onReviewChange({ ...review, landlordName: e.target.value })}
           placeholder="e.g. Samia Management, John Smith"
           maxLength={200}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         />
         <p className="text-sm text-gray-500 mt-1">This helps us link reviews to the right landlord. It won't be shown publicly on your review.</p>
 
@@ -94,7 +94,7 @@ export default function AdditionalStep({
               onChange={(e) => onReviewChange({ ...review, propertyManagerName: e.target.value })}
               placeholder="e.g. ABC Property Management"
               maxLength={200}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
             <p className="text-sm text-gray-500 mt-1">The company or person who handles day-to-day management (maintenance, rent collection, etc.)</p>
           </div>
@@ -238,7 +238,7 @@ export default function AdditionalStep({
           onChange={(e) => onReviewChange({ ...review, reviewTitle: e.target.value })}
           placeholder="Summarize your experience in a few words"
           maxLength={100}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         />
         <p className="text-sm text-gray-500 mt-1">{review.reviewTitle.length}/100 characters</p>
       </div>
@@ -258,7 +258,7 @@ export default function AdditionalStep({
           placeholder="Share any details that would help future tenants. Avoid including identifying information."
           rows={4}
           maxLength={1000}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         />
         <p className="text-sm text-gray-500 mt-1">{review.comments.length}/1000 characters</p>
       </div>

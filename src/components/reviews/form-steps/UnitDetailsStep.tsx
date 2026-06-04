@@ -37,7 +37,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
           <select
             value={unitDetails.moveInMonth}
             onChange={(e) => onChange({ ...unitDetails, moveInMonth: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
             <option value="">Month</option>
             <option value="1">January</option>
@@ -56,7 +56,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
           <select
             value={unitDetails.moveInYear}
             onChange={(e) => onChange({ ...unitDetails, moveInYear: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
             <option value="">Year</option>
             {Array.from({ length: new Date().getFullYear() - 1999 }, (_, i) => new Date().getFullYear() - i).map((year) => (
@@ -76,7 +76,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
             value={unitDetails.unitNumber}
             onChange={(e) => onChange({ ...unitDetails, unitNumber: e.target.value })}
             placeholder="e.g., 2A, 301"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
           <p className="text-xs text-gray-500 mt-1">
             For our moderation team only. Never shown publicly.
@@ -92,7 +92,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
             value={unitDetails.squareFootage}
             onChange={(e) => onChange({ ...unitDetails, squareFootage: e.target.value })}
             placeholder="e.g., 750"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
         </div>
 
@@ -101,7 +101,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
           <select
             value={unitDetails.bedrooms}
             onChange={(e) => onChange({ ...unitDetails, bedrooms: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
             {bedroomOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -116,7 +116,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
           <select
             value={unitDetails.bathrooms}
             onChange={(e) => onChange({ ...unitDetails, bathrooms: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
             {bathroomOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -137,7 +137,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
               value={unitDetails.rentAmount}
               onChange={(e) => onChange({ ...unitDetails, rentAmount: e.target.value })}
               placeholder="e.g., 2500"
-              className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -228,7 +228,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
               value={unitDetails.estimatedMonthlyUtilities}
               onChange={(e) => onChange({ ...unitDetails, estimatedMonthlyUtilities: e.target.value })}
               placeholder="e.g., 150"
-              className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
           </div>
           <p className="text-xs text-gray-500 mt-1">
@@ -243,7 +243,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
           <select
             value={unitDetails.laundryType}
             onChange={(e) => onChange({ ...unitDetails, laundryType: e.target.value as any })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
             <option value="in_unit">In-unit washer/dryer</option>
             <option value="in_building">Building laundry (free)</option>
@@ -265,7 +265,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
                 value={unitDetails.laundryCostPerLoad}
                 onChange={(e) => onChange({ ...unitDetails, laundryCostPerLoad: e.target.value })}
                 placeholder="e.g., 3.50"
-                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">
@@ -282,7 +282,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
         <select
           value={unitDetails.parkingType}
           onChange={(e) => onChange({ ...unitDetails, parkingType: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         >
           <option value="">Select...</option>
           {parkingTypeOptions.map((opt) => (

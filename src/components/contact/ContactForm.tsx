@@ -90,8 +90,8 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
     );
   }
 
-  const inputClass = "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-teal-500 focus:border-teal-500";
-  const errorInputClass = "mt-1 block w-full px-3 py-2 border border-red-400 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500";
+  const inputClass = "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-400 focus:outline-none focus:ring-teal-500 focus:border-teal-500";
+  const errorInputClass = "mt-1 block w-full px-3 py-2 border border-red-400 rounded-[4px] shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

@@ -204,7 +204,7 @@ export default function VerificationQueue() {
                   [verification.id]: e.target.value,
                 }))}
                 placeholder="e.g., Document doesn't show property address"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent text-sm"
               />
             </div>
 

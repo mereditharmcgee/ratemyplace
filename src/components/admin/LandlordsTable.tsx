@@ -215,7 +215,7 @@ export default function LandlordsTable() {
             placeholder="Search by name or email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
         </div>
         <button
@@ -244,7 +244,7 @@ export default function LandlordsTable() {
                 value={addForm.name}
                 onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
                 placeholder="e.g. Samia Management"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
               />
             </div>
             <div>
@@ -253,7 +253,7 @@ export default function LandlordsTable() {
                 type="email"
                 value={addForm.email}
                 onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
               />
             </div>
             <div>
@@ -262,7 +262,7 @@ export default function LandlordsTable() {
                 type="tel"
                 value={addForm.phone}
                 onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
               />
             </div>
             <div>
@@ -272,7 +272,7 @@ export default function LandlordsTable() {
                 value={addForm.website}
                 onChange={(e) => setAddForm({ ...addForm, website: e.target.value })}
                 placeholder="https://..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
               />
             </div>
             <div className="md:col-span-2">
@@ -281,7 +281,7 @@ export default function LandlordsTable() {
                 value={addForm.description}
                 onChange={(e) => setAddForm({ ...addForm, description: e.target.value })}
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
               />
             </div>
           </div>
@@ -388,7 +388,7 @@ export default function LandlordsTable() {
                           type="text"
                           value={editForm.name || ''}
                           onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div>
@@ -399,7 +399,7 @@ export default function LandlordsTable() {
                           type="email"
                           value={editForm.email || ''}
                           onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div>
@@ -410,7 +410,7 @@ export default function LandlordsTable() {
                           type="tel"
                           value={editForm.phone || ''}
                           onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div>
@@ -421,7 +421,7 @@ export default function LandlordsTable() {
                           type="url"
                           value={editForm.website || ''}
                           onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -434,7 +434,7 @@ export default function LandlordsTable() {
                             setEditForm({ ...editForm, description: e.target.value })
                           }
                           rows={3}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                     </div>

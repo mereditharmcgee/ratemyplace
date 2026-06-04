@@ -269,7 +269,7 @@ export default function BugReportsTable() {
                       onChange={(e) => setAdminNotes(e.target.value)}
                       rows={3}
                       placeholder="Add notes about this bug..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     />
                   </div>
 

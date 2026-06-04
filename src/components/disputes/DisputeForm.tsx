@@ -180,7 +180,7 @@ export default function DisputeForm({ siteUrl }: Props) {
           value={reviewUrl}
           onChange={(e) => setReviewUrl(e.target.value)}
           placeholder="https://..."
-          className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
+          className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
             fieldErrors.reviewUrl ? 'border-red-300' : 'border-gray-300'
           }`}
         />
@@ -208,7 +208,7 @@ export default function DisputeForm({ siteUrl }: Props) {
               value={landlordName}
               onChange={(e) => setLandlordName(e.target.value)}
               placeholder="Your full name"
-              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
+              className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
                 fieldErrors.landlordName ? 'border-red-300' : 'border-gray-300'
               }`}
             />
@@ -228,7 +228,7 @@ export default function DisputeForm({ siteUrl }: Props) {
               value={landlordEmail}
               onChange={(e) => setLandlordEmail(e.target.value)}
               placeholder="your.email@example.com"
-              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
+              className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
                 fieldErrors.landlordEmail ? 'border-red-300' : 'border-gray-300'
               }`}
             />
@@ -248,7 +248,7 @@ export default function DisputeForm({ siteUrl }: Props) {
               value={landlordPhone}
               onChange={(e) => setLandlordPhone(e.target.value)}
               placeholder="(555) 123-4567"
-              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
+              className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
                 fieldErrors.landlordPhone ? 'border-red-300' : 'border-gray-300'
               }`}
             />
@@ -303,7 +303,7 @@ export default function DisputeForm({ siteUrl }: Props) {
           placeholder="Provide any additional context that supports your dispute..."
           rows={6}
           maxLength={2000}
-          className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
+          className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
             fieldErrors.disputeExplanation ? 'border-red-300' : 'border-gray-300'
           }`}
         />

@@ -168,7 +168,7 @@ export default function ManagersTable() {
             placeholder="Search by name, company, or email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
         </div>
         <button
@@ -197,7 +197,7 @@ export default function ManagersTable() {
                 value={addForm.name}
                 onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
                 placeholder="e.g. Jane Doe"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
               />
             </div>
             <div>
@@ -207,7 +207,7 @@ export default function ManagersTable() {
                 value={addForm.company_name}
                 onChange={(e) => setAddForm({ ...addForm, company_name: e.target.value })}
                 placeholder="e.g. ABC Property Management"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
               />
             </div>
             <div>
@@ -216,7 +216,7 @@ export default function ManagersTable() {
                 type="email"
                 value={addForm.email}
                 onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
               />
             </div>
             <div>
@@ -225,7 +225,7 @@ export default function ManagersTable() {
                 type="tel"
                 value={addForm.phone}
                 onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
               />
             </div>
             <div>
@@ -235,7 +235,7 @@ export default function ManagersTable() {
                 value={addForm.website}
                 onChange={(e) => setAddForm({ ...addForm, website: e.target.value })}
                 placeholder="https://..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
               />
             </div>
             <div className="md:col-span-2">
@@ -244,7 +244,7 @@ export default function ManagersTable() {
                 value={addForm.description}
                 onChange={(e) => setAddForm({ ...addForm, description: e.target.value })}
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
               />
             </div>
           </div>
@@ -357,7 +357,7 @@ export default function ManagersTable() {
                           type="text"
                           value={editForm.name || ''}
                           onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div>
@@ -370,7 +370,7 @@ export default function ManagersTable() {
                           onChange={(e) =>
                             setEditForm({ ...editForm, company_name: e.target.value })
                           }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div>
@@ -381,7 +381,7 @@ export default function ManagersTable() {
                           type="email"
                           value={editForm.email || ''}
                           onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div>
@@ -392,7 +392,7 @@ export default function ManagersTable() {
                           type="tel"
                           value={editForm.phone || ''}
                           onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div>
@@ -403,7 +403,7 @@ export default function ManagersTable() {
                           type="url"
                           value={editForm.website || ''}
                           onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -416,7 +416,7 @@ export default function ManagersTable() {
                             setEditForm({ ...editForm, description: e.target.value })
                           }
                           rows={3}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
                     </div>

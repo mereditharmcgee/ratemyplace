@@ -293,7 +293,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
             placeholder="Search by address, email, title, or landlord..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
         </div>
         <div className="flex flex-wrap gap-2">
@@ -615,7 +615,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                             <select
                               value={selectedLandlordId}
                               onChange={(e) => setSelectedLandlordId(e.target.value)}
-                              className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+                              className="w-full px-3 py-2 border border-purple-300 rounded-[4px] focus:ring-2 focus:ring-purple-500 text-sm"
                             >
                               <option value="">Select a landlord...</option>
                               {landlords.map((l) => (
@@ -630,7 +630,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                               value={newLandlordName}
                               onChange={(e) => setNewLandlordName(e.target.value)}
                               placeholder="New landlord name"
-                              className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+                              className="w-full px-3 py-2 border border-purple-300 rounded-[4px] focus:ring-2 focus:ring-purple-500 text-sm"
                             />
                             <p className="text-xs text-purple-600 mt-1">This will create a new landlord and assign them to this building.</p>
                           </div>

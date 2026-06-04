@@ -194,7 +194,7 @@ export default function HomeSearch() {
             onKeyDown={handleKeyDown}
             onFocus={() => items.length > 0 && setShowDropdown(true)}
             placeholder="Search by address, neighborhood, or landlord..."
-            className="w-full px-6 py-4 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-teal-300"
+            className="w-full px-6 py-4 rounded-[4px] bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-teal-300"
             autoComplete="off"
           />
           {isLoading && (

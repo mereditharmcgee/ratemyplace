@@ -172,7 +172,7 @@ export default function SettingsTab({
             onChange={(e) => setDisplayName(e.target.value)}
             maxLength={50}
             placeholder="Your name (optional)"
-            className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
           />
           <p className="mt-1 text-xs text-gray-500">Leave blank to remain anonymous on your reviews.</p>
           <button
@@ -243,7 +243,7 @@ export default function SettingsTab({
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               />
             </div>
           )}
@@ -258,7 +258,7 @@ export default function SettingsTab({
               onChange={(e) => setNewPassword(e.target.value)}
               required
               minLength={8}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
             />
             <p className="mt-1 text-xs text-gray-500">Minimum 8 characters.</p>
           </div>
@@ -299,7 +299,7 @@ export default function SettingsTab({
                 value={emailCurrentPassword}
                 onChange={(e) => setEmailCurrentPassword(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               />
             </div>
             <div>
@@ -312,7 +312,7 @@ export default function SettingsTab({
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               />
             </div>
             <button

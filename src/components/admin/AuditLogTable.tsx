@@ -116,7 +116,7 @@ export default function AuditLogTable() {
           <select
             value={actionFilter}
             onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
             <option value="all">All actions</option>
             {filterOptions.actionTypes.map(type => (
@@ -131,7 +131,7 @@ export default function AuditLogTable() {
           <select
             value={adminFilter}
             onChange={(e) => { setAdminFilter(e.target.value); setPage(1); }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
             <option value="all">All admins</option>
             {filterOptions.adminUsers.map(admin => (

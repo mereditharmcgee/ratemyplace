@@ -60,7 +60,7 @@ export default function AddressStep({
                 value={manualAddress.streetAddress}
                 onChange={(e) => onManualAddressChange({ ...manualAddress, streetAddress: e.target.value })}
                 placeholder="e.g. 100 Beacon St"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -71,7 +71,7 @@ export default function AddressStep({
                   value={manualAddress.city}
                   onChange={(e) => onManualAddressChange({ ...manualAddress, city: e.target.value })}
                   placeholder="e.g. Boston"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 />
               </div>
               <div>
@@ -82,7 +82,7 @@ export default function AddressStep({
                   onChange={(e) => onManualAddressChange({ ...manualAddress, state: e.target.value.toUpperCase().slice(0, 2) })}
                   placeholder="MA"
                   maxLength={2}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -94,7 +94,7 @@ export default function AddressStep({
                 onChange={(e) => onManualAddressChange({ ...manualAddress, zipCode: e.target.value })}
                 placeholder="02116"
                 maxLength={10}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
           </div>
