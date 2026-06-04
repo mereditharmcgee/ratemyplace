@@ -96,7 +96,7 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-md">
+        <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-[6px]">
           {error}
         </div>
       )}
