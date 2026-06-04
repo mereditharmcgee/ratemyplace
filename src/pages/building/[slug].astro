@@ -177,7 +177,7 @@ const sortedUnits = Array.from(reviewsByUnit.values())
 <BaseLayout title={building.address} description={`Reviews for ${building.address} in ${building.neighborhood || building.city}`}>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {submitted && (
-      <div class="mb-6 bg-teal-50 border border-teal-200 rounded-lg p-4" id="submitted-banner">
+      <div class="mb-6 bg-teal-50 border border-teal-200 rounded-[6px] p-4" id="submitted-banner">
         <div class="flex items-start gap-3">
           <svg class="w-5 h-5 text-teal-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -277,7 +277,7 @@ const sortedUnits = Array.from(reviewsByUnit.values())
       <!-- Main Content -->
       <div class="lg:col-span-2">
         <!-- Building Details -->
-        <div class="bg-white rounded-lg border border-gray-200 p-6 mb-8">
+        <div class="bg-white rounded-[6px] border border-gray-200 p-6 mb-8">
           <h2 class="text-xl font-semibold text-gray-900 mb-4">Building details</h2>
           <dl class="grid grid-cols-2 gap-4">
             {building.building_type && (
@@ -311,7 +311,7 @@ const sortedUnits = Array.from(reviewsByUnit.values())
               {sortedUnits.map((unitStats, index) => (
                 <div class="unit-section" data-unit-key={unitStats.unitKey}>
                   <div
-                    class="unit-card bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-teal-300 hover:shadow-sm transition-all"
+                    class="unit-card bg-white border border-gray-200 rounded-[6px] p-4 cursor-pointer hover:border-teal-300 hover:shadow-sm transition-all"
                     data-unit-key={unitStats.unitKey}
                     data-expanded={index === 0 ? "true" : "false"}
                   >
@@ -398,7 +398,7 @@ const sortedUnits = Array.from(reviewsByUnit.values())
         {scores && <ScoreCard scores={scores} type="building" />}
 
         {scores && scores.review_count > 0 && (
-          <div class="bg-white rounded-lg border border-gray-200 p-6 mt-6">
+          <div class="bg-white rounded-[6px] border border-gray-200 p-6 mt-6">
             <h3 class="font-semibold text-gray-900 mb-4">Common issues reported</h3>
             <ul class="space-y-2 text-sm">
               {scores.pct_pest_issues > 0 && (

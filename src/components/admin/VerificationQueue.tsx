@@ -138,7 +138,7 @@ export default function VerificationQueue() {
         {verifications.map((verification) => (
           <div
             key={verification.id}
-            className="bg-white border border-gray-200 rounded-[6px] p-6 shadow-sm"
+            className="bg-white border border-gray-200 rounded-[6px] p-6 hover:shadow-sm transition-shadow"
           >
             {/* Header */}
             <div className="flex justify-between items-start mb-4">

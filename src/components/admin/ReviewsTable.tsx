@@ -318,7 +318,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
         {filteredReviews.map((review) => (
           <div
             key={review.id}
-            className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
+            className="bg-white rounded-[6px] border border-gray-200 overflow-hidden hover:shadow-sm transition-shadow"
           >
             {/* Review Header */}
             <div
@@ -728,7 +728,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
       </div>
 
       {filteredReviews.length === 0 && (
-        <div className="text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-200">
+        <div className="text-center py-12 text-gray-500 bg-white rounded-[6px] border border-gray-200">
           No reviews found matching your criteria.
         </div>
       )}

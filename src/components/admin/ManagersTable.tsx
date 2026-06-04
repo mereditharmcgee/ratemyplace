@@ -187,7 +187,7 @@ export default function ManagersTable() {
 
       {/* Add Manager Form */}
       {showAddForm && (
-        <div className="bg-white rounded-xl shadow-sm border border-teal-200 p-4 space-y-4">
+        <div className="bg-white rounded-[6px] border border-teal-200 p-4 space-y-4 hover:shadow-sm transition-shadow">
           <h3 className="font-semibold text-gray-900">Add property manager</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -297,7 +297,7 @@ export default function ManagersTable() {
         {filteredManagers.map((manager) => (
           <div
             key={manager.id}
-            className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
+            className="bg-white rounded-[6px] border border-gray-200 overflow-hidden hover:shadow-sm transition-shadow"
           >
             {/* Manager Header */}
             <div
@@ -506,7 +506,7 @@ export default function ManagersTable() {
       </div>
 
       {filteredManagers.length === 0 && (
-        <div className="text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-200">
+        <div className="text-center py-12 text-gray-500 bg-white rounded-[6px] border border-gray-200">
           No property managers found matching your criteria.
         </div>
       )}

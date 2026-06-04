@@ -172,7 +172,7 @@ export default function BugReportsTable() {
         {filteredBugs.map((bug) => (
           <div
             key={bug.id}
-            className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
+            className="bg-white rounded-[6px] border border-gray-200 overflow-hidden hover:shadow-sm transition-shadow"
           >
             {/* Header row */}
             <div
@@ -319,7 +319,7 @@ export default function BugReportsTable() {
       </div>
 
       {filteredBugs.length === 0 && (
-        <div className="text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-200">
+        <div className="text-center py-12 text-gray-500 bg-white rounded-[6px] border border-gray-200">
           No bug reports found.
         </div>
       )}

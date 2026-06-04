@@ -358,7 +358,7 @@ export default function BuildingsTable() {
         {filteredBuildings.map((building) => (
           <div
             key={building.id}
-            className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
+            className="bg-white rounded-[6px] border border-gray-200 overflow-hidden hover:shadow-sm transition-shadow"
           >
             {/* Building Header */}
             <div
@@ -847,7 +847,7 @@ export default function BuildingsTable() {
       </div>
 
       {filteredBuildings.length === 0 && (
-        <div className="text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-200">
+        <div className="text-center py-12 text-gray-500 bg-white rounded-[6px] border border-gray-200">
           No buildings found matching your criteria.
         </div>
       )}

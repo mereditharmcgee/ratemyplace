@@ -210,7 +210,7 @@ export default function DisputesQueue() {
           return (
             <div
               key={dispute.id}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
+              className="bg-white rounded-[6px] border border-gray-200 overflow-hidden hover:shadow-sm transition-shadow"
             >
               {/* Dispute Header */}
               <div
@@ -429,7 +429,7 @@ export default function DisputesQueue() {
       </div>
 
       {sortedDisputes.length === 0 && (
-        <div className="text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-200">
+        <div className="text-center py-12 text-gray-500 bg-white rounded-[6px] border border-gray-200">
           No disputes found.
         </div>
       )}

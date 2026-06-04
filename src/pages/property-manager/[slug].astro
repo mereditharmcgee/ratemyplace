@@ -159,7 +159,7 @@ if (!propertyManager) {
               {buildings.map((building) => (
                 <a
                   href={`/building/${building.slug}`}
-                  class="block bg-white border border-gray-200 rounded-lg p-6 hover:border-teal-300 hover:shadow-md transition-all"
+                  class="block bg-white border border-gray-200 rounded-[6px] p-6 hover:border-teal-300 hover:shadow-md transition-all"
                 >
                   <div class="flex justify-between items-start gap-4">
                     <div class="min-w-0 flex-1">
@@ -190,7 +190,7 @@ if (!propertyManager) {
               ))}
             </div>
           ) : (
-            <div class="bg-gray-50 rounded-lg p-8 text-center">
+            <div class="bg-gray-50 rounded-[6px] p-8 text-center">
               <p class="text-gray-600">No properties listed for this property manager yet.</p>
             </div>
           )}
@@ -225,7 +225,7 @@ if (!propertyManager) {
         {scores && <ScoreCard scores={scores} type="landlord" />}
 
         {scores && scores.pct_would_recommend !== null && (
-          <div class="bg-white rounded-lg border border-gray-200 p-6 mt-6">
+          <div class="bg-white rounded-[6px] border border-gray-200 p-6 mt-6">
             <h3 class="font-semibold text-gray-900 mb-4">Recommendation Rate</h3>
             <div class="text-center">
               <div class="text-3xl font-bold text-teal-600">
@@ -237,7 +237,7 @@ if (!propertyManager) {
         )}
 
         {scores && scores.pct_deposit_issues > 0 && (
-          <div class="bg-white rounded-lg border border-gray-200 p-6 mt-6">
+          <div class="bg-white rounded-[6px] border border-gray-200 p-6 mt-6">
             <h3 class="font-semibold text-gray-900 mb-4">Common Issues</h3>
             <ul class="space-y-2 text-sm">
               <li class="flex justify-between">

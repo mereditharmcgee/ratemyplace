@@ -114,7 +114,7 @@ const getStatusColor = (status: string) => {
     <!-- Stats Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <!-- Users -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-white rounded-[6px] border border-gray-200 p-6 hover:shadow-sm transition-shadow">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-500">Total users</p>
@@ -133,7 +133,7 @@ const getStatusColor = (status: string) => {
       </div>
 
       <!-- Reviews -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-white rounded-[6px] border border-gray-200 p-6 hover:shadow-sm transition-shadow">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-500">Total reviews</p>
@@ -152,7 +152,7 @@ const getStatusColor = (status: string) => {
       </div>
 
       <!-- Buildings -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-white rounded-[6px] border border-gray-200 p-6 hover:shadow-sm transition-shadow">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-500">Buildings</p>
@@ -171,7 +171,7 @@ const getStatusColor = (status: string) => {
       </div>
 
       <!-- Verifications -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-white rounded-[6px] border border-gray-200 p-6 hover:shadow-sm transition-shadow">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-500">Verifications</p>
@@ -198,7 +198,7 @@ const getStatusColor = (status: string) => {
     <!-- Review Status Breakdown -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- Review Status -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-white rounded-[6px] border border-gray-200 p-6 hover:shadow-sm transition-shadow">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">Review status breakdown</h2>
         <div class="space-y-4">
           <div class="flex items-center justify-between">
@@ -231,7 +231,7 @@ const getStatusColor = (status: string) => {
       </div>
 
       <!-- Recent Activity -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-white rounded-[6px] border border-gray-200 p-6 hover:shadow-sm transition-shadow">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">Recent reviews</h2>
         {recentReviews.results.length > 0 ? (
           <div class="space-y-3">
@@ -263,7 +263,7 @@ const getStatusColor = (status: string) => {
     </div>
 
     <!-- Quick Actions -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <div class="bg-white rounded-[6px] border border-gray-200 p-6 hover:shadow-sm transition-shadow">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Quick actions</h2>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <a href="/admin/reviews?status=pending" class="flex flex-col items-center p-4 bg-gray-50 rounded-[6px] hover:bg-gray-100 transition-colors">
