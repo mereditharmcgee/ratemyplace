@@ -18,7 +18,15 @@ export default defineConfig({
   },
 
   vite: {
-    plugins: [tailwindcss()]
+    plugins: [tailwindcss()],
+    server: {
+      watch: {
+        // This repo lives in a Google Drive synced folder. Ignore Drive's
+        // temp-upload churn so the dev file watcher doesn't reload-loop.
+        // Dev-only; no effect on build or runtime.
+        ignored: ['**/.tmp.driveupload/**']
+      }
+    }
   },
 
   integrations: [react()]
