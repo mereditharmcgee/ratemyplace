@@ -271,14 +271,14 @@ const pestLabels: Record<string, string> = {
             const isRated = value != null;
             return (
               <div class="flex justify-between text-sm">
-                <span class={isRated ? 'text-gray-600' : 'text-slate-500'}>
+                <span class={isRated ? 'text-gray-600' : 'text-slate-600'}>
                   {label}
                   {isRated && weighted && <span class="text-red-400 ml-0.5" title="Health/Safety weighted">*</span>}
                 </span>
                 {isRated ? (
                   <span class={`font-medium ${getScoreTextColor(value)}`}>{value}/5</span>
                 ) : (
-                  <span class="text-slate-400 text-xs italic">Not rated</span>
+                  <span class="text-slate-600 text-xs italic">Not rated</span>
                 )}
               </div>
             );
@@ -302,14 +302,14 @@ const pestLabels: Record<string, string> = {
             const isRated = value != null;
             return (
               <div class="flex justify-between text-sm">
-                <span class={isRated ? 'text-gray-600' : 'text-slate-500'}>
+                <span class={isRated ? 'text-gray-600' : 'text-slate-600'}>
                   {label}
                   {isRated && weighted && <span class="text-red-400 ml-0.5" title="Health/Safety weighted">*</span>}
                 </span>
                 {isRated ? (
                   <span class={`font-medium ${getScoreTextColor(value)}`}>{value}/5</span>
                 ) : (
-                  <span class="text-slate-400 text-xs italic">Not rated</span>
+                  <span class="text-slate-600 text-xs italic">Not rated</span>
                 )}
               </div>
             );
@@ -333,14 +333,14 @@ const pestLabels: Record<string, string> = {
             const isRated = value != null;
             return (
               <div class="flex justify-between text-sm">
-                <span class={isRated ? 'text-gray-600' : 'text-slate-500'}>
+                <span class={isRated ? 'text-gray-600' : 'text-slate-600'}>
                   {label}
                   {isRated && weighted && <span class="text-red-400 ml-0.5" title="Health/Safety weighted">*</span>}
                 </span>
                 {isRated ? (
                   <span class={`font-medium ${getScoreTextColor(value)}`}>{value}/5</span>
                 ) : (
-                  <span class="text-slate-400 text-xs italic">Not rated</span>
+                  <span class="text-slate-600 text-xs italic">Not rated</span>
                 )}
               </div>
             );
