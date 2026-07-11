@@ -319,14 +319,14 @@ describe('calculateAggregatedScores', () => {
 
 describe('calculateAggregatedScores uses the stored overall_score', () => {
   it('avgOverall equals the recency-weighted mean of the stored column', () => {
-    // Two recent reviews whose STORED overall_score differs from what recomputing
-    // from items would give — proves we use the stored value.
+    // Stored overall is 4.0 for both; item-derived overall would be ~1.0 and ~5.0
+    // (mean 3.0). Only the stored-column implementation yields 4.0 — this fails
+    // if the aggregate ever reverts to recomputing overall from items.
     const reviews = [
       { overall_score: 4.0, move_out_year: 2026, unit_structural: 1 },
-      { overall_score: 2.0, move_out_year: 2026, unit_structural: 5 },
+      { overall_score: 4.0, move_out_year: 2026, unit_structural: 5 },
     ];
-    // recency weight 1.0 each → (4.0 + 2.0)/2 = 3.0 from the STORED column
-    expect(calculateAggregatedScores(reviews, 2026).avgOverall).toBe(3.0);
+    expect(calculateAggregatedScores(reviews, 2026).avgOverall).toBe(4.0);
   });
 
   it('excludes reviews with a null overall_score from avgOverall', () => {
