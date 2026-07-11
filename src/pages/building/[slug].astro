@@ -8,6 +8,7 @@ import BookmarkButton from '../../components/ui/BookmarkButton';
 import PostSubmitVerification from '../../components/profile/PostSubmitVerification';
 import EmptyState from '../../components/ui/EmptyState.astro';
 import { calculateBuildingAverages, getRecencyWeight, getReviewYear } from '../../lib/scoring';
+import { currentReviewYear } from '../../lib/scoring-sql';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 import { humanize } from '../../lib/format';
 
@@ -134,7 +135,7 @@ reviews.forEach(review => {
 });
 
 // Calculate aggregated stats for each unit using weighted scoring
-const currentYear = new Date().getUTCFullYear();
+const currentYear = currentReviewYear();
 reviewsByUnit.forEach((stats) => {
   // Recency-weighted mean of the stored overall_score, matching the headline method.
   let weightedSum = 0;

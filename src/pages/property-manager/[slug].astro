@@ -60,15 +60,13 @@ try {
 
       // property_manager_scores is not maintained by the app, so recompute the
       // aggregate scores from approved reviews (mirrors the landlord page fallback).
-      if (!scores) {
-        const allReviewsResult = await db.prepare(`
-          SELECT r.* FROM reviews r
-          WHERE r.building_id IN (${placeholders}) AND r.status = 'approved'
-        `).bind(...buildingIds).all();
-        const allReviews = allReviewsResult.results || [];
-        if (allReviews.length > 0) {
-          scores = { ...calculateLandlordAverages(allReviews), building_count: buildings.filter(b => (b.review_count || 0) > 0).length };
-        }
+      const allReviewsResult = await db.prepare(`
+        SELECT r.* FROM reviews r
+        WHERE r.building_id IN (${placeholders}) AND r.status = 'approved'
+      `).bind(...buildingIds).all();
+      const allReviews = allReviewsResult.results || [];
+      if (allReviews.length > 0) {
+        scores = { ...calculateLandlordAverages(allReviews), building_count: buildings.filter(b => (b.review_count || 0) > 0).length };
       }
     }
   }
