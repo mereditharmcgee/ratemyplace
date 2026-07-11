@@ -1,5 +1,7 @@
 import type { APIContext } from 'astro';
 import { getEnv } from '../../../lib/runtime';
+import { getDB } from '../../../lib/db';
+import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
 
 export async function GET(context: APIContext): Promise<Response> {
   const placeId = context.url.searchParams.get('placeId') || '';
@@ -8,6 +10,15 @@ export async function GET(context: APIContext): Promise<Response> {
   if (!placeId) {
     return new Response(JSON.stringify({ error: 'placeId required' }), {
       status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // Rate limit — this proxies a paid Google API, so cap per-IP abuse (60/min).
+  const rateLimit = await checkRateLimit(getDB(context), getClientIP(context), 'places-details', 60, 60);
+  if (!rateLimit.allowed) {
+    return new Response(JSON.stringify({ error: 'Too many requests. Please slow down.' }), {
+      status: rateLimit.error ? 503 : 429,
       headers: { 'Content-Type': 'application/json' }
     });
   }
@@ -27,8 +38,8 @@ export async function GET(context: APIContext): Promise<Response> {
     // Autocomplete-as-You-Type + Details as a single $0.005 session instead
     // of charging Autocomplete per keystroke. Big cost reduction.
     const detailsUrl = sessionToken
-      ? `https://places.googleapis.com/v1/places/${placeId}?sessionToken=${encodeURIComponent(sessionToken)}`
-      : `https://places.googleapis.com/v1/places/${placeId}`;
+      ? `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?sessionToken=${encodeURIComponent(sessionToken)}`
+      : `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`;
 
     // Use Places API (New) - Place Details
     const response = await fetch(

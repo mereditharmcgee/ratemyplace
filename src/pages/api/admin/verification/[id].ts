@@ -56,11 +56,18 @@ export async function GET(context: APIContext): Promise<Response> {
       });
     }
 
+    // Sanitize the user-supplied filename before echoing it into the header —
+    // strip quotes, path separators, and control chars that could break the
+    // Content-Disposition parameter. Fall back to a generic name.
+    const safeFilename = (verification.filename || 'verification')
+      .replace(/[^\w.\- ]/g, '_')
+      .slice(0, 100) || 'verification';
+
     // Stream the image
     return new Response(r2Object.body, {
       headers: {
         'Content-Type': verification.content_type,
-        'Content-Disposition': `inline; filename="${verification.filename}"`,
+        'Content-Disposition': `inline; filename="${safeFilename}"`,
         'Cache-Control': 'private, max-age=3600'
       }
     });

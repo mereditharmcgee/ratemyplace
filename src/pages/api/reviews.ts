@@ -4,7 +4,7 @@ import { getEnv } from '../../lib/runtime';
 import { calculateDomainScores, ALL_SCORE_FIELDS } from '../../lib/scoring';
 import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
-import { getClientIP } from '../../lib/rateLimit';
+import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
 import { getSeasonFromMonth } from '../../lib/privacy';
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -17,6 +17,22 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   try {
+    const db = getDB(context);
+
+    // Rate limit: 10 review submissions per hour per user — prevents flooding
+    // the moderation queue from a single account.
+    const rateLimit = await checkRateLimit(db, context.locals.user.id, 'review-submit', 10, 3600);
+    if (!rateLimit.allowed) {
+      const status = rateLimit.error ? 503 : 429;
+      const message = rateLimit.error
+        ? 'Service temporarily unavailable. Please try again in a few minutes.'
+        : 'You are submitting reviews too quickly. Please try again later.';
+      return new Response(JSON.stringify({ error: message }), {
+        status,
+        headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 10) }
+      });
+    }
+
     const formData = await context.request.formData();
 
     // Verify Turnstile token
@@ -116,8 +132,6 @@ export async function POST(context: APIContext): Promise<Response> {
     // New survey fields (nullable — empty string stored as NULL)
     const acceptsHousingVouchers = (formData.get('accepts_housing_vouchers') as string) || null;
     const safelyLitAtNight = (formData.get('safely_lit_at_night') as string) || null;
-
-    const db = getDB(context);
 
     // Verify building exists and get its slug
     const building = await db.prepare('SELECT id, slug FROM buildings WHERE id = ?')

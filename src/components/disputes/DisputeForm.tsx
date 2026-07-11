@@ -1,5 +1,20 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { DISPUTE_REASONS } from '../../lib/disputes';
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: HTMLElement, options: {
+        sitekey: string;
+        theme?: string;
+        callback?: (token: string) => void;
+        'expired-callback'?: () => void;
+      }) => string;
+      reset: (widgetId: string) => void;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
 
 interface Props {
   siteUrl: string;
@@ -19,6 +34,42 @@ export default function DisputeForm({ siteUrl }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Turnstile bot verification
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const renderWidget = () => {
+      if (!turnstileRef.current || !window.turnstile || widgetIdRef.current) return;
+      widgetIdRef.current = window.turnstile.render(turnstileRef.current, {
+        sitekey: '0x4AAAAAACo4KpkxsacPhM2r',
+        theme: 'light',
+        callback: (token: string) => setTurnstileToken(token),
+        'expired-callback': () => setTurnstileToken(null),
+      });
+    };
+
+    if (window.turnstile) {
+      renderWidget();
+    } else {
+      const interval = setInterval(() => {
+        if (window.turnstile) {
+          clearInterval(interval);
+          renderWidget();
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+
+    return () => {
+      if (widgetIdRef.current && window.turnstile) {
+        window.turnstile.remove(widgetIdRef.current);
+        widgetIdRef.current = null;
+      }
+    };
+  }, []);
 
   // Handle checkbox toggle
   const handleReasonToggle = (reason: string) => {
@@ -71,6 +122,11 @@ export default function DisputeForm({ siteUrl }: Props) {
       return;
     }
 
+    if (!turnstileToken) {
+      setError('Please complete the bot verification below before submitting.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -87,6 +143,7 @@ export default function DisputeForm({ siteUrl }: Props) {
           landlordPhone,
           disputeReasons,
           disputeExplanation: disputeExplanation || undefined,
+          turnstileToken,
         }),
       });
 
@@ -94,6 +151,9 @@ export default function DisputeForm({ siteUrl }: Props) {
 
       if (!response.ok) {
         setError(data.error || 'Failed to submit dispute');
+        // Turnstile tokens are single-use — reset the widget for a retry.
+        if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
+        setTurnstileToken(null);
         setLoading(false);
         return;
       }
@@ -104,6 +164,8 @@ export default function DisputeForm({ siteUrl }: Props) {
     } catch (err) {
       console.error('Submit error:', err);
       setError('An unexpected error occurred. Please try again.');
+      if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
+      setTurnstileToken(null);
       setLoading(false);
     }
   };
@@ -119,6 +181,8 @@ export default function DisputeForm({ siteUrl }: Props) {
     setSuccess(false);
     setError(null);
     setFieldErrors({});
+    if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
+    setTurnstileToken(null);
   };
 
   // Success state
@@ -315,11 +379,16 @@ export default function DisputeForm({ siteUrl }: Props) {
         </p>
       </div>
 
+      {/* Turnstile bot verification */}
+      <div className="border-t pt-6">
+        <div ref={turnstileRef} className="flex justify-center"></div>
+      </div>
+
       {/* Submit Button */}
       <div className="border-t pt-6">
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !turnstileToken}
           className="w-full bg-teal-700 text-white px-6 py-3 rounded-[4px] font-semibold hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? 'Submitting...' : 'Submit Dispute'}

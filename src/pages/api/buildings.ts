@@ -1,6 +1,8 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../lib/db';
 import { generateIdFromEntropySize } from 'lucia';
+import { checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
+import { escapeLikePattern } from '../../lib/validation';
 
 export async function GET(context: APIContext): Promise<Response> {
   const query = context.url.searchParams.get('q') || '';
@@ -37,13 +39,14 @@ export async function GET(context: APIContext): Promise<Response> {
   try {
     const db = getDB(context);
 
+    const pattern = `%${escapeLikePattern(query)}%`;
     const result = await db.prepare(`
       SELECT id, address, neighborhood, city, state, slug
       FROM buildings
-      WHERE address LIKE ? OR neighborhood LIKE ?
+      WHERE address LIKE ? ESCAPE '\\' OR neighborhood LIKE ? ESCAPE '\\'
       ORDER BY address
       LIMIT 10
-    `).bind(`%${query}%`, `%${query}%`).all();
+    `).bind(pattern, pattern).all();
 
     return new Response(JSON.stringify({ buildings: result.results || [] }), {
       headers: { 'Content-Type': 'application/json' }
@@ -68,6 +71,22 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   try {
+    const db = getDB(context);
+
+    // Rate limit: 20 building creations per hour per user (anti-abuse; legit
+    // users create at most a handful when their address isn't already listed).
+    const rateLimit = await checkRateLimit(db, context.locals.user.id, 'building-create', 20, 3600);
+    if (!rateLimit.allowed) {
+      const status = rateLimit.error ? 503 : 429;
+      const message = rateLimit.error
+        ? 'Service temporarily unavailable. Please try again in a few minutes.'
+        : 'Too many requests. Please try again later.';
+      return new Response(JSON.stringify({ error: message }), {
+        status,
+        headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 20) }
+      });
+    }
+
     const body = await context.request.json();
     const {
       placeId,
@@ -88,8 +107,6 @@ export async function POST(context: APIContext): Promise<Response> {
         headers: { 'Content-Type': 'application/json' }
       });
     }
-
-    const db = getDB(context);
 
     // For Google-sourced submissions, dedupe by place ID
     if (placeId) {

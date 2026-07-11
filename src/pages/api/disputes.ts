@@ -6,6 +6,7 @@ import { sanitizeText, validateDisputeForm } from '../../lib/validation';
 import { sendDisputeConfirmationEmail } from '../../lib/email';
 import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../lib/rateLimit';
 import { createNotification } from '../../lib/notifications';
+import { verifyTurnstile } from '../../lib/turnstile';
 
 export const POST: APIRoute = async (context: APIContext) => {
   // Content-type guard — MUST come before request.json() (which throws SyntaxError on non-JSON)
@@ -45,7 +46,23 @@ export const POST: APIRoute = async (context: APIContext) => {
       landlordPhone,
       disputeReasons,
       disputeExplanation,
+      turnstileToken,
     } = body;
+
+    // Turnstile bot verification — this endpoint is unauthenticated, accepts JSON
+    // (so Astro checkOrigin does not cover it), and sends email to an attacker-
+    // supplied address, so Turnstile is the primary anti-bot control.
+    const turnstileResult = await verifyTurnstile(
+      turnstileToken,
+      getEnv(context).TURNSTILE_SECRET_KEY,
+      clientIP
+    );
+    if (!turnstileResult.success) {
+      return new Response(
+        JSON.stringify({ error: turnstileResult.error || 'Bot verification failed. Please try again.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     // VAL-01: validate landlord fields and explanation length
     const errors = validateDisputeForm(body);

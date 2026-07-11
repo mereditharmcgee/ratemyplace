@@ -2,11 +2,26 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import { hashPassword } from '../../../lib/password';
 import { initializeLucia } from '../../../lib/auth';
+import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
 
 export async function POST(context: APIContext): Promise<Response> {
   const db = getDB(context);
 
   try {
+    // Rate limit: 5 reset attempts per hour per IP (defense-in-depth on top of
+    // the high-entropy single-use token).
+    const rateLimit = await checkRateLimit(db, getClientIP(context), 'reset-password', 5, 3600);
+    if (!rateLimit.allowed) {
+      const status = rateLimit.error ? 503 : 429;
+      const message = rateLimit.error
+        ? 'Service temporarily unavailable. Please try again in a few minutes.'
+        : 'Too many attempts. Please try again later.';
+      return new Response(JSON.stringify({ error: message }), {
+        status,
+        headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 5) }
+      });
+    }
+
     const formData = await context.request.formData();
     const token = formData.get('token')?.toString();
     const password = formData.get('password')?.toString();

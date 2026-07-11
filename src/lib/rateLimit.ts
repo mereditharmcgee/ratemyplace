@@ -105,15 +105,22 @@ export function buildRateLimitHeaders(
  * Get the client's IP address from the request context
  */
 export function getClientIP(context: any): string {
-  // Cloudflare provides the client IP in CF-Connecting-IP header
+  // Cloudflare sets CF-Connecting-IP to the true client IP and overwrites any
+  // client-supplied value, so it cannot be spoofed. Always prefer it.
   const cfIP = context.request.headers.get('cf-connecting-ip');
   if (cfIP) return cfIP;
 
-  // Fallback to X-Forwarded-For
+  // In production we are always behind Cloudflare. A missing CF-Connecting-IP
+  // means the request didn't traverse the edge, so we must NOT trust the
+  // client-supplied X-Forwarded-For / X-Real-IP (both spoofable — an attacker
+  // could rotate them to bypass rate limits). Bucket all such requests into one
+  // key so they're throttled together rather than trivially evaded.
+  if (import.meta.env.PROD) return 'unknown';
+
+  // Dev / non-Cloudflare fallbacks — only reached locally, where spoofing is moot.
   const xff = context.request.headers.get('x-forwarded-for');
   if (xff) return xff.split(',')[0].trim();
 
-  // Fallback to X-Real-IP
   const xri = context.request.headers.get('x-real-ip');
   if (xri) return xri;
 

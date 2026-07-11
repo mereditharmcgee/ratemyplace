@@ -11,8 +11,13 @@ export async function verifyTurnstile(token: string, secretKey: string, ip?: str
   }
 
   if (!secretKey) {
-    // Fail open in development if secret key is not configured
-    console.warn('TURNSTILE_SECRET_KEY not set — skipping verification');
+    // Fail CLOSED in production: a missing secret in prod is a misconfiguration
+    // that would silently disable bot protection on every form. Only skip in dev.
+    if (import.meta.env.PROD) {
+      console.error('TURNSTILE_SECRET_KEY not set in production — failing closed');
+      return { success: false, error: 'Bot verification is unavailable. Please try again later.' };
+    }
+    console.warn('TURNSTILE_SECRET_KEY not set — skipping verification (dev only)');
     return { success: true };
   }
 
