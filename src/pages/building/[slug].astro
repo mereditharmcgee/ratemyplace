@@ -7,7 +7,7 @@ import UGCDisclaimer from '../../components/reviews/UGCDisclaimer.astro';
 import BookmarkButton from '../../components/ui/BookmarkButton';
 import PostSubmitVerification from '../../components/profile/PostSubmitVerification';
 import EmptyState from '../../components/ui/EmptyState.astro';
-import { calculateBuildingAverages, calculateDomainScores } from '../../lib/scoring';
+import { calculateBuildingAverages, getRecencyWeight, getReviewYear } from '../../lib/scoring';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 import { humanize } from '../../lib/format';
 
@@ -49,12 +49,6 @@ try {
   if (buildingResult) {
     building = buildingResult;
 
-    const scoresResult = await db.prepare(`
-      SELECT * FROM building_scores WHERE building_id = ?
-    `).bind(building.id).first();
-
-    scores = scoresResult;
-
     // Fetch all approved reviews (bounded at 500) — the header score, per-unit
     // stats, and review count are all derived from this array, so a low cap
     // would make them undercount buildings with many reviews. 500 far exceeds
@@ -70,13 +64,8 @@ try {
 
     reviews = reviewsResult.results || [];
 
-    // If we have reviews but building_scores doesn't have domain scores,
-    // calculate them from the reviews
-    if (reviews.length > 0 && scores && !scores.avg_unit && !scores.avg_building && !scores.avg_landlord) {
-      const calculatedScores = calculateBuildingAverages(reviews);
-      scores = { ...scores, ...calculatedScores };
-    } else if (reviews.length > 0 && !scores) {
-      // No building_scores record at all, calculate everything
+    // Always compute from the fetched approved reviews — no cache table.
+    if (reviews.length > 0) {
       scores = calculateBuildingAverages(reviews);
     }
 
@@ -145,22 +134,19 @@ reviews.forEach(review => {
 });
 
 // Calculate aggregated stats for each unit using weighted scoring
+const currentYear = new Date().getUTCFullYear();
 reviewsByUnit.forEach((stats) => {
-  // Calculate weighted average score using the same methodology
-  let scoreSum = 0;
-  let scoreCount = 0;
+  // Recency-weighted mean of the stored overall_score, matching the headline method.
+  let weightedSum = 0;
+  let weightTotal = 0;
   stats.reviews.forEach(review => {
-    const domainScores = calculateDomainScores(review);
-    if (domainScores.overall !== null) {
-      scoreSum += domainScores.overall;
-      scoreCount++;
-    } else if (review.overall_score) {
-      // Fallback to stored overall_score if available
-      scoreSum += review.overall_score;
-      scoreCount++;
-    }
+    const stored = review.overall_score;
+    if (stored === null || stored === undefined) return;
+    const w = getRecencyWeight(getReviewYear(review, currentYear), currentYear);
+    weightedSum += stored * w;
+    weightTotal += w;
   });
-  stats.avgScore = scoreCount > 0 ? scoreSum / scoreCount : 0;
+  stats.avgScore = weightTotal > 0 ? Math.round((weightedSum / weightTotal) * 10) / 10 : 0;
 
   const rents = stats.reviews.filter(r => r.rent_amount).map(r => r.rent_amount);
   if (rents.length > 0) {

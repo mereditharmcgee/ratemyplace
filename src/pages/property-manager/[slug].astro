@@ -5,6 +5,7 @@ import ScoreCard from '../../components/ratings/ScoreCard.astro';
 import ReviewCard from '../../components/reviews/ReviewCard.astro';
 import UGCDisclaimer from '../../components/reviews/UGCDisclaimer.astro';
 import { calculateLandlordAverages } from '../../lib/scoring';
+import { recencyWeightedOverallSql, currentReviewYear } from '../../lib/scoring-sql';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 
 const { slug } = Astro.params;
@@ -24,16 +25,12 @@ try {
   if (pmResult) {
     propertyManager = pmResult;
 
-    const scoresResult = await db.prepare(`
-      SELECT * FROM property_manager_scores WHERE property_manager_id = ?
-    `).bind(propertyManager.id).first();
-
-    scores = scoresResult;
+    const currentYear = currentReviewYear();
 
     const buildingsResult = await db.prepare(`
       SELECT b.*,
         COUNT(r.id) as review_count,
-        ROUND(AVG(r.overall_score), 1) as avg_overall,
+        ${recencyWeightedOverallSql('r', currentYear)} as avg_overall,
         l.name as landlord_name, l.slug as landlord_slug
       FROM buildings b
       LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'

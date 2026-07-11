@@ -5,6 +5,7 @@ import ScoreCard from '../../components/ratings/ScoreCard.astro';
 import ReviewCard from '../../components/reviews/ReviewCard.astro';
 import UGCDisclaimer from '../../components/reviews/UGCDisclaimer.astro';
 import { calculateLandlordAverages } from '../../lib/scoring';
+import { recencyWeightedOverallSql, currentReviewYear } from '../../lib/scoring-sql';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 
 const { slug } = Astro.params;
@@ -24,16 +25,12 @@ try {
   if (landlordResult) {
     landlord = landlordResult;
 
-    const scoresResult = await db.prepare(`
-      SELECT * FROM landlord_scores WHERE landlord_id = ?
-    `).bind(landlord.id).first();
-
-    scores = scoresResult;
+    const currentYear = currentReviewYear();
 
     const buildingsResult = await db.prepare(`
       SELECT b.*,
         COUNT(r.id) as review_count,
-        ROUND(AVG(r.overall_score), 1) as avg_overall
+        ${recencyWeightedOverallSql('r', currentYear)} as avg_overall
       FROM buildings b
       LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
       WHERE b.landlord_id = ?
@@ -59,32 +56,15 @@ try {
 
       recentReviews = reviewsResult.results || [];
 
-      // If we have reviews but landlord_scores doesn't have domain scores,
-      // calculate them from the reviews
-      if (recentReviews.length > 0 && scores && !scores.avg_landlord) {
-        // Fetch all reviews for this landlord to calculate accurate scores
-        const allReviewsResult = await db.prepare(`
-          SELECT r.* FROM reviews r
-          JOIN buildings b ON r.building_id = b.id
-          WHERE b.landlord_id = ? AND r.status = 'approved'
-        `).bind(landlord.id).all();
-        const allReviews = allReviewsResult.results || [];
-        if (allReviews.length > 0) {
-          const calculatedScores = calculateLandlordAverages(allReviews);
-          scores = { ...scores, ...calculatedScores, building_count: buildings.filter(b => (b.review_count || 0) > 0).length };
-        }
-      } else if (recentReviews.length > 0 && !scores) {
-        // No landlord_scores record at all, calculate everything
-        const allReviewsResult = await db.prepare(`
-          SELECT r.* FROM reviews r
-          JOIN buildings b ON r.building_id = b.id
-          WHERE b.landlord_id = ? AND r.status = 'approved'
-        `).bind(landlord.id).all();
-        const allReviews = allReviewsResult.results || [];
-        if (allReviews.length > 0) {
-          scores = calculateLandlordAverages(allReviews);
-          scores.building_count = buildings.filter(b => (b.review_count || 0) > 0).length;
-        }
+      // Always compute landlord scores from approved reviews — no cache table.
+      const allReviewsResult = await db.prepare(`
+        SELECT r.* FROM reviews r
+        JOIN buildings b ON r.building_id = b.id
+        WHERE b.landlord_id = ? AND r.status = 'approved'
+      `).bind(landlord.id).all();
+      const allReviews = allReviewsResult.results || [];
+      if (allReviews.length > 0) {
+        scores = { ...calculateLandlordAverages(allReviews), building_count: buildings.filter(b => (b.review_count || 0) > 0).length };
       }
     }
   }
