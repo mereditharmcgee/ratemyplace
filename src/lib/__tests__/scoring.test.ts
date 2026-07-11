@@ -388,3 +388,65 @@ describe('formatScore', () => {
     expect(formatScore(4.2)).toBe('4.2');
   });
 });
+
+// ═══════════════════════════════════════════════════
+// Write-path parity: submit vs edit compute the same stored overall_score
+// (api/reviews.ts uses calculateDomainScores().overall; api/reviews/[id].ts
+//  uses calculateOverallScore()). They must agree for identical input.
+// ═══════════════════════════════════════════════════
+
+describe('submit vs edit overall_score parity', () => {
+  it('calculateOverallScore equals calculateDomainScores().overall for scored reviews', () => {
+    for (const v of [1, 2, 3, 4, 5]) {
+      const scores = allScores(v);
+      expect(calculateOverallScore(scores)).toBe(calculateDomainScores(scores).overall);
+    }
+  });
+
+  it('agrees on a mixed-domain review', () => {
+    const scores = { ...allScores(4), unit_pests: 1, unit_mold: 2, landlord_deposit: 5 };
+    expect(calculateOverallScore(scores)).toBe(calculateDomainScores(scores).overall);
+  });
+
+  it('differs only in the all-null case (0 vs null), by design', () => {
+    const empty = domainScores([], 0); // all fields null
+    expect(calculateDomainScores(empty).overall).toBeNull();
+    expect(calculateOverallScore(empty)).toBe(0); // legacy column default
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// Aggregate vs simple mean: SQL AVG(overall_score) (used by search/map/admin)
+// vs calculateAggregatedScores (used by detail headers). They agree when all
+// reviews are recent (recency weight 1.0) and diverge only as reviews age —
+// the documented "recency divergence". These tests pin that contract.
+// ═══════════════════════════════════════════════════
+
+describe('aggregate vs simple-mean agreement (recency divergence)', () => {
+  const thisYear = new Date().getFullYear();
+
+  it('recency weighting is a no-op when all reviews are recent', () => {
+    const reviews = [
+      { ...allScores(4), move_out_year: thisYear },
+      { ...allScores(2), move_out_year: thisYear },
+    ];
+    // Simple mean of per-review domain overalls = (4.0 + 2.0) / 2 = 3.0
+    const simpleMean =
+      Math.round(
+        ((calculateDomainScores(reviews[0]).overall! +
+          calculateDomainScores(reviews[1]).overall!) /
+          2) * 10
+      ) / 10;
+    expect(calculateAggregatedScores(reviews).avgOverall).toBe(simpleMean);
+    expect(calculateAggregatedScores(reviews).avgOverall).toBe(3.0);
+  });
+
+  it('diverges from the simple mean once a review is old enough to decay', () => {
+    const reviews = [
+      { ...allScores(4), move_out_year: thisYear },      // weight 1.0
+      { ...allScores(2), move_out_year: thisYear - 5 },  // weight 0.85 (5+ yrs)
+    ];
+    // Weighted: (4*1.0 + 2*0.85) / 1.85 = 3.08 → 3.1; simple mean would be 3.0
+    expect(calculateAggregatedScores(reviews).avgOverall).toBeGreaterThan(3.0);
+  });
+});
