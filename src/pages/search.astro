@@ -2,6 +2,7 @@
 import BaseLayout from '../components/layout/BaseLayout.astro';
 import SearchResults from '../components/search/SearchResults';
 import EmptyState from '../components/ui/EmptyState.astro';
+import { escapeLikePattern } from '../lib/validation';
 
 const query = (Astro.url.searchParams.get('q') || '').trim();
 const type = Astro.url.searchParams.get('type') || 'all';
@@ -17,7 +18,11 @@ let totalLandlords = 0;
 let hasAnyListings = false;
 
 if (query) {
-  // Search mode — filtered results with totals
+  // Search mode — filtered results with totals.
+  // Escape LIKE wildcards (% and _) so they match literally, matching the
+  // paginated /api/search/results endpoint (otherwise SSR counts and Load-more
+  // results diverge on queries containing % or _).
+  const likePattern = `%${escapeLikePattern(query)}%`;
   try {
     if (type === 'all' || type === 'buildings') {
       const countResult = await db.prepare(`
@@ -26,11 +31,11 @@ if (query) {
           FROM buildings b
           LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
           LEFT JOIN landlords l ON b.landlord_id = l.id
-          WHERE b.address LIKE ? OR b.neighborhood LIKE ? OR l.name LIKE ?
+          WHERE b.address LIKE ? ESCAPE '\\' OR b.neighborhood LIKE ? ESCAPE '\\' OR l.name LIKE ? ESCAPE '\\'
           GROUP BY b.id
           HAVING COUNT(r.id) > 0
         )
-      `).bind(`%${query}%`, `%${query}%`, `%${query}%`).first<{ total: number }>();
+      `).bind(likePattern, likePattern, likePattern).first<{ total: number }>();
       totalBuildings = countResult?.total || 0;
 
       if (totalBuildings > 0) {
@@ -42,12 +47,12 @@ if (query) {
           FROM buildings b
           LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
           LEFT JOIN landlords l ON b.landlord_id = l.id
-          WHERE b.address LIKE ? OR b.neighborhood LIKE ? OR l.name LIKE ?
+          WHERE b.address LIKE ? ESCAPE '\\' OR b.neighborhood LIKE ? ESCAPE '\\' OR l.name LIKE ? ESCAPE '\\'
           GROUP BY b.id
           HAVING COUNT(r.id) > 0
           ORDER BY COUNT(r.id) DESC, AVG(r.overall_score) DESC
           LIMIT ?
-        `).bind(`%${query}%`, `%${query}%`, `%${query}%`, PAGE_SIZE).all();
+        `).bind(likePattern, likePattern, likePattern, PAGE_SIZE).all();
         buildings = buildingResults.results || [];
       }
     }
@@ -59,11 +64,11 @@ if (query) {
           FROM landlords l
           LEFT JOIN buildings b ON b.landlord_id = l.id
           LEFT JOIN reviews r ON r.building_id = b.id AND r.status = 'approved'
-          WHERE l.name LIKE ?
+          WHERE l.name LIKE ? ESCAPE '\\'
           GROUP BY l.id
           HAVING COUNT(r.id) > 0
         )
-      `).bind(`%${query}%`).first<{ total: number }>();
+      `).bind(likePattern).first<{ total: number }>();
       totalLandlords = countResult?.total || 0;
 
       if (totalLandlords > 0) {
@@ -75,12 +80,12 @@ if (query) {
           FROM landlords l
           LEFT JOIN buildings b ON b.landlord_id = l.id
           LEFT JOIN reviews r ON r.building_id = b.id AND r.status = 'approved'
-          WHERE l.name LIKE ?
+          WHERE l.name LIKE ? ESCAPE '\\'
           GROUP BY l.id
           HAVING COUNT(r.id) > 0
           ORDER BY COUNT(r.id) DESC, l.name ASC
           LIMIT ?
-        `).bind(`%${query}%`, PAGE_SIZE).all();
+        `).bind(likePattern, PAGE_SIZE).all();
         landlords = landlordResults.results || [];
       }
     }

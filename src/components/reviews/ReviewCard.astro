@@ -5,7 +5,7 @@ import EmailVerifiedBadge from '../ui/EmailVerifiedBadge.astro';
 import SeasonChip from '../ui/SeasonChip.astro';
 import { formatRecency } from '../../lib/privacy';
 import { calculateDomainScores, ITEM_WEIGHTS } from '../../lib/scoring';
-import { getScoreTextColor, getScoreColor } from '../../lib/scoring-colors';
+import { getScoreTextColor, getScoreColor, getScoreBgTint } from '../../lib/scoring-colors';
 
 interface Props {
   review: any;
@@ -193,17 +193,17 @@ const pestLabels: Record<string, string> = {
       {(domainScores.unit || domainScores.building || domainScores.landlord) && (
         <div class="flex flex-wrap gap-2">
           {domainScores.unit && (
-            <span class={`px-2 py-0.5 text-xs font-medium rounded ${domainScores.unit >= 4 ? 'bg-emerald-100 text-emerald-700' : domainScores.unit >= 3 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+            <span class={`px-2 py-0.5 text-xs font-medium rounded ${getScoreBgTint(domainScores.unit)} ${getScoreTextColor(domainScores.unit)}`}>
               Unit: {domainScores.unit.toFixed(1)}
             </span>
           )}
           {domainScores.building && (
-            <span class={`px-2 py-0.5 text-xs font-medium rounded ${domainScores.building >= 4 ? 'bg-emerald-100 text-emerald-700' : domainScores.building >= 3 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+            <span class={`px-2 py-0.5 text-xs font-medium rounded ${getScoreBgTint(domainScores.building)} ${getScoreTextColor(domainScores.building)}`}>
               Building: {domainScores.building.toFixed(1)}
             </span>
           )}
           {domainScores.landlord && (
-            <span class={`px-2 py-0.5 text-xs font-medium rounded ${domainScores.landlord >= 4 ? 'bg-emerald-100 text-emerald-700' : domainScores.landlord >= 3 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+            <span class={`px-2 py-0.5 text-xs font-medium rounded ${getScoreBgTint(domainScores.landlord)} ${getScoreTextColor(domainScores.landlord)}`}>
               Landlord: {domainScores.landlord.toFixed(1)}
             </span>
           )}
@@ -369,7 +369,7 @@ const pestLabels: Record<string, string> = {
               <div class="flex items-center gap-2">
                 <div class="flex gap-0.5">
                   {[1, 2, 3, 4, 5].map(i => (
-                    <div class={`w-3 h-3 rounded-sm ${i <= review.landlord_deposit ? (review.landlord_deposit >= 4 ? 'bg-green-500' : review.landlord_deposit >= 3 ? 'bg-yellow-500' : 'bg-red-500') : 'bg-gray-200'}`} />
+                    <div class={`w-3 h-3 rounded-sm ${i <= review.landlord_deposit ? getScoreColor(review.landlord_deposit).bg : 'bg-gray-200'}`} />
                   ))}
                 </div>
                 <span class={`text-sm font-bold ${depositStatus?.color}`}>{review.landlord_deposit}/5</span>

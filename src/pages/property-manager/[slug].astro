@@ -4,6 +4,7 @@ import StarRating from '../../components/ratings/StarRating.astro';
 import ScoreCard from '../../components/ratings/ScoreCard.astro';
 import ReviewCard from '../../components/reviews/ReviewCard.astro';
 import UGCDisclaimer from '../../components/reviews/UGCDisclaimer.astro';
+import { calculateLandlordAverages } from '../../lib/scoring';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 
 const { slug } = Astro.params;
@@ -59,6 +60,19 @@ try {
       `).bind(...buildingIds).all();
 
       recentReviews = reviewsResult.results || [];
+
+      // property_manager_scores is not maintained by the app, so recompute the
+      // aggregate scores from approved reviews (mirrors the landlord page fallback).
+      if (!scores) {
+        const allReviewsResult = await db.prepare(`
+          SELECT r.* FROM reviews r
+          WHERE r.building_id IN (${placeholders}) AND r.status = 'approved'
+        `).bind(...buildingIds).all();
+        const allReviews = allReviewsResult.results || [];
+        if (allReviews.length > 0) {
+          scores = { ...calculateLandlordAverages(allReviews), building_count: buildings.filter(b => (b.review_count || 0) > 0).length };
+        }
+      }
     }
   }
 } catch (error) {
@@ -66,7 +80,7 @@ try {
 }
 
 if (!propertyManager) {
-  return Astro.redirect('/404');
+  return Astro.rewrite('/404');
 }
 ---
 

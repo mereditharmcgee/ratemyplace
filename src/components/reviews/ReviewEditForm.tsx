@@ -256,7 +256,7 @@ export default function ReviewEditForm({ review }: Props) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <h3 className="text-lg font-semibold text-green-800 mb-2">Review Updated!</h3>
-        <p className="text-green-700">Redirecting to your profile...</p>
+        <p className="text-green-700">Your edited review will be re-reviewed by our team before going live again. Redirecting to your profile...</p>
       </div>
     );
   }

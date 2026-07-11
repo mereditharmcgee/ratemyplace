@@ -9,6 +9,7 @@ import PostSubmitVerification from '../../components/profile/PostSubmitVerificat
 import EmptyState from '../../components/ui/EmptyState.astro';
 import { calculateBuildingAverages, calculateDomainScores } from '../../lib/scoring';
 import { getScoreTextColor } from '../../lib/scoring-colors';
+import { humanize } from '../../lib/format';
 
 const { slug } = Astro.params;
 const submitted = Astro.url.searchParams.get('submitted') === 'true';
@@ -54,13 +55,17 @@ try {
 
     scores = scoresResult;
 
+    // Fetch all approved reviews (bounded at 500) — the header score, per-unit
+    // stats, and review count are all derived from this array, so a low cap
+    // would make them undercount buildings with many reviews. 500 far exceeds
+    // any realistic building while bounding worst-case render cost.
     const reviewsResult = await db.prepare(`
       SELECT r.*, u.email_verified as user_email_verified
       FROM reviews r
       LEFT JOIN users u ON r.user_id = u.id
       WHERE r.building_id = ? AND r.status = 'approved'
       ORDER BY r.created_at DESC
-      LIMIT 50
+      LIMIT 500
     `).bind(building.id).all();
 
     reviews = reviewsResult.results || [];
@@ -96,7 +101,7 @@ try {
 }
 
 if (!building) {
-  return Astro.redirect('/404');
+  return Astro.rewrite('/404');
 }
 
 // Group reviews by bedroom count only. Unit numbers are intentionally never
@@ -163,11 +168,20 @@ reviewsByUnit.forEach((stats) => {
     stats.maxRent = Math.max(...rents);
   }
 
-  // Check both old and new would_recommend fields
-  const recommends = stats.reviews.filter(r =>
-    r.would_recommend === 1 || r.would_recommend_new === 'yes'
-  ).length;
-  stats.wouldRecommendPct = stats.reviewCount > 0 ? (recommends / stats.reviewCount) * 100 : 0;
+  // % would recommend — match calculateAggregatedScores in scoring.ts: exclude
+  // 'maybe' and missing answers from the denominator, count only definitive yes/no.
+  let recommendYes = 0;
+  let recommendTotal = 0;
+  stats.reviews.forEach(review => {
+    const wouldRecommend = review.would_recommend_new || review.would_recommend;
+    if (wouldRecommend !== null && wouldRecommend !== undefined && wouldRecommend !== 'maybe') {
+      recommendTotal++;
+      if (wouldRecommend === 'yes' || wouldRecommend === 1 || wouldRecommend === true) {
+        recommendYes++;
+      }
+    }
+  });
+  stats.wouldRecommendPct = recommendTotal > 0 ? (recommendYes / recommendTotal) * 100 : 0;
 });
 
 const sortedUnits = Array.from(reviewsByUnit.values())
@@ -283,7 +297,7 @@ const sortedUnits = Array.from(reviewsByUnit.values())
             {building.building_type && (
               <>
                 <dt class="text-gray-500">Type</dt>
-                <dd class="text-gray-900">{building.building_type}</dd>
+                <dd class="text-gray-900">{humanize(building.building_type)}</dd>
               </>
             )}
             {building.year_built && (

@@ -71,7 +71,7 @@ try {
         const allReviews = allReviewsResult.results || [];
         if (allReviews.length > 0) {
           const calculatedScores = calculateLandlordAverages(allReviews);
-          scores = { ...scores, ...calculatedScores, building_count: buildings.length };
+          scores = { ...scores, ...calculatedScores, building_count: buildings.filter(b => (b.review_count || 0) > 0).length };
         }
       } else if (recentReviews.length > 0 && !scores) {
         // No landlord_scores record at all, calculate everything
@@ -83,7 +83,7 @@ try {
         const allReviews = allReviewsResult.results || [];
         if (allReviews.length > 0) {
           scores = calculateLandlordAverages(allReviews);
-          scores.building_count = buildings.length;
+          scores.building_count = buildings.filter(b => (b.review_count || 0) > 0).length;
         }
       }
     }
@@ -93,7 +93,7 @@ try {
 }
 
 if (!landlord) {
-  return Astro.redirect('/404');
+  return Astro.rewrite('/404');
 }
 
 // Calculate aggregated issue percentages from building scores

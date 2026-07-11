@@ -168,9 +168,9 @@ export async function PATCH(context: APIContext): Promise<Response> {
     const db = getDB(context);
 
     // Verify ownership
-    const existing = await db.prepare('SELECT user_id, building_id FROM reviews WHERE id = ?')
+    const existing = await db.prepare('SELECT user_id, building_id, unit_type FROM reviews WHERE id = ?')
       .bind(id)
-      .first<{ user_id: string; building_id: string }>();
+      .first<{ user_id: string; building_id: string; unit_type: string | null }>();
 
     if (!existing) {
       return new Response(JSON.stringify({ error: 'Review not found' }), {
@@ -308,10 +308,13 @@ export async function PATCH(context: APIContext): Promise<Response> {
         had_eviction_threat = ?,
         accepts_housing_vouchers = ?,
         safely_lit_at_night = ?,
+        status = 'pending',
         updated_at = unixepoch()
       WHERE id = ?
     `).bind(
-      body.unit_type,
+      // Preserve the existing unit_type when the (partial) body omits it —
+      // binding raw undefined throws D1_TYPE_ERROR.
+      body.unit_type ?? existing.unit_type ?? null,
       body.unit_number || null,
       body.bedrooms || null,
       body.bathrooms || null,
