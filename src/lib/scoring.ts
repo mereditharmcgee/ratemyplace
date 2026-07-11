@@ -130,6 +130,9 @@ export function getRecencyWeight(
  * NOTE (Phase 4): new reviews store move-out in `move_out_year_new`, not the
  * legacy `move_out_year` read here, so today this falls back to created_at for
  * new reviews. Preserved deliberately; the dual-column phase revisits this.
+ * JS/SQL year parity relies on `created_at` being NOT NULL (schema:
+ * `INTEGER NOT NULL DEFAULT (unixepoch())`), so the `currentYear` fallback below
+ * is never reached in practice and cannot diverge from the SQL `COALESCE`.
  */
 export function getReviewYear(
   review: { move_out_year?: number | null; created_at?: number | null },

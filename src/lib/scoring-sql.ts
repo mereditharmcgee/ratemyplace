@@ -28,9 +28,9 @@ export function recencyWeightSql(alias: string, currentYear: number): string {
   const age = `(${cy} - ${reviewYearSql(alias)})`;
   const branches = RECENCY_BANDS
     .filter((b) => Number.isFinite(b.maxAge))
-    .map((b) => `    WHEN ${age} <= ${b.maxAge} THEN ${b.weight}`)
+    .map((b) => `    WHEN ${age} <= ${b.maxAge} THEN ${b.weight.toFixed(2)}`)
     .join('\n');
-  const terminal = RECENCY_BANDS[RECENCY_BANDS.length - 1].weight;
+  const terminal = RECENCY_BANDS[RECENCY_BANDS.length - 1].weight.toFixed(2);
   return `CASE\n${branches}\n    ELSE ${terminal}\n  END`;
 }
 

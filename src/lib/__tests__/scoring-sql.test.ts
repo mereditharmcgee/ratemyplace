@@ -25,9 +25,14 @@ describe('recencyWeightSql', () => {
   });
   it('emits a weight branch for every band in RECENCY_BANDS', () => {
     const sql = recencyWeightSql('r', 2026);
-    for (const band of RECENCY_BANDS) {
-      expect(sql).toContain(String(band.weight));
-    }
+    // finite-maxAge bands become WHEN ... THEN <weight>, terminal band is ELSE <weight>
+    expect(sql).toContain('THEN 1.00');
+    expect(sql).toContain('THEN 0.95');
+    expect(sql).toContain('THEN 0.90');
+    expect(sql).toContain('ELSE 0.85');
+    // one WHEN per finite band, plus one ELSE
+    const whenCount = (sql.match(/WHEN /g) || []).length;
+    expect(whenCount).toBe(RECENCY_BANDS.filter(b => Number.isFinite(b.maxAge)).length);
   });
 });
 
