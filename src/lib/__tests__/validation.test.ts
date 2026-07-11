@@ -155,15 +155,19 @@ describe('validateReviewForm', () => {
   });
 
   it('accepts null rent amount', () => {
-    const errors = validateReviewForm({ ...validData, rent_amount: null });
+    // rent_amount is typed number|undefined but validateReviewForm handles null at
+    // runtime; cast the arg to the param type to assert null is accepted.
+    const errors = validateReviewForm({ ...validData, rent_amount: null } as unknown as Parameters<typeof validateReviewForm>[0]);
     expect(errors.some(e => e.field === 'rent_amount')).toBe(false);
   });
 
   it('rejects score outside 1-5 range', () => {
+    // Partial scores object exercises per-field validation; cast to the param type
+    // since the function reads scores field-by-field and tolerates partial input.
     const errors = validateReviewForm({
       ...validData,
       scores: { building_quality: 6 },
-    });
+    } as Parameters<typeof validateReviewForm>[0]);
     expect(errors.some(e => e.field.startsWith('scores.'))).toBe(true);
   });
 
@@ -171,7 +175,7 @@ describe('validateReviewForm', () => {
     const errors = validateReviewForm({
       ...validData,
       scores: { building_quality: 3.5 },
-    });
+    } as Parameters<typeof validateReviewForm>[0]);
     expect(errors.some(e => e.field.startsWith('scores.'))).toBe(true);
   });
 
@@ -180,7 +184,7 @@ describe('validateReviewForm', () => {
       const errors = validateReviewForm({
         ...validData,
         scores: { building_quality: score },
-      });
+      } as Parameters<typeof validateReviewForm>[0]);
       expect(errors.some(e => e.field.startsWith('scores.'))).toBe(false);
     }
   });

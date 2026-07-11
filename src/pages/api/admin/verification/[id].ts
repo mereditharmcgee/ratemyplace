@@ -63,8 +63,9 @@ export async function GET(context: APIContext): Promise<Response> {
       .replace(/[^\w.\- ]/g, '_')
       .slice(0, 100) || 'verification';
 
-    // Stream the image
-    return new Response(r2Object.body, {
+    // Stream the image. r2Object.body is a workers-types ReadableStream, which
+    // the DOM Response BodyInit type doesn't recognize; cast. Type-only.
+    return new Response(r2Object.body as unknown as ReadableStream, {
       headers: {
         'Content-Type': verification.content_type,
         'Content-Disposition': `inline; filename="${safeFilename}"`,

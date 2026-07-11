@@ -117,7 +117,7 @@ export const POST: APIRoute = async (context: APIContext) => {
     const building = await db
       .prepare('SELECT address FROM buildings WHERE id = ?')
       .bind(review.building_id)
-      .first();
+      .first<{ address: string }>();
 
     const buildingAddress = building?.address || 'Unknown address';
 

@@ -36,9 +36,10 @@ export async function checkRateLimit(
       'DELETE FROM rate_limits WHERE expires_at < ?'
     ).bind(now).run();
 
+    // db is typed `any`, so `.first<T>()` type args aren't allowed; cast the result instead.
     const result = await db.prepare(
       'SELECT COUNT(*) as attempt_count, MIN(created_at) as first_attempt FROM rate_limits WHERE rate_key = ? AND created_at > ?'
-    ).bind(key, windowStart).first<{ attempt_count: number; first_attempt: number | null }>();
+    ).bind(key, windowStart).first() as { attempt_count: number; first_attempt: number | null } | null;
 
     const attemptCount = result?.attempt_count || 0;
 

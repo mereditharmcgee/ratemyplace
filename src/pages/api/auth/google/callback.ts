@@ -98,7 +98,7 @@ export async function GET(context: APIContext): Promise<Response> {
     // Check if user exists with this Google ID
     let user = await db.prepare(
       'SELECT id, email FROM users WHERE google_id = ?'
-    ).bind(googleUser.sub).first<{ id: string; email: string }>();
+    ).bind(googleUser.sub).first<{ id: string; email: string; google_id?: string | null }>();
 
     if (!user) {
       // Check if user exists with this email (link accounts)

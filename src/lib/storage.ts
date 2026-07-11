@@ -55,7 +55,12 @@ export async function uploadVerificationImage(
   const key = `users/${userId}/verifications/${reviewId}/${timestamp}.${ext}`;
 
   try {
-    await bucket.put(key, file.stream(), {
+    // file.stream() is a DOM ReadableStream<Uint8Array>; R2.put expects the
+    // @cloudflare/workers-types ReadableStream. The two are structurally
+    // incompatible in the type checker (getReader/readAtLeast differ) but
+    // identical at runtime, and the workers-types global collides with the DOM
+    // one so it can't be named here — `as any` is the minimal type-only escape.
+    await bucket.put(key, file.stream() as any, {
       httpMetadata: {
         contentType: file.type
       },

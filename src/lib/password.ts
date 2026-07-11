@@ -64,7 +64,9 @@ export async function verifyPassword(password: string, storedHash: string): Prom
     return false;
   }
 
-  const salt = decodeBase64(saltBase64);
+  // decodeBase64 returns Uint8Array<ArrayBufferLike>; WebCrypto's BufferSource wants a
+  // non-shared ArrayBuffer view, so assert the concrete type. Type-only, no behavior change.
+  const salt = decodeBase64(saltBase64) as BufferSource;
   const storedHashBytes = decodeBase64(hashBase64);
 
   // Import password as a key

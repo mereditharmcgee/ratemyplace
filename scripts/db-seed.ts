@@ -890,7 +890,14 @@ type ReviewScores = Pick<ReviewBase,
   'building_noise_external' | 'building_mail' | 'building_laundry' | 'building_parking' | 'building_trash' |
   'landlord_maintenance' | 'landlord_communication' | 'landlord_professionalism' | 'landlord_lease_clarity' |
   'landlord_privacy' | 'landlord_deposit' | 'landlord_rent_practices' | 'landlord_non_retaliation'
->;
+> & {
+  // Optional issue flags may be supplied inline alongside scores; they are otherwise
+  // auto-derived in makeReview. Kept optional so callers can override the derived value.
+  had_pests?: number;
+  had_heat_issues?: number;
+  had_water_issues?: number;
+  had_security_deposit_issues?: number;
+};
 
 interface ReviewExtras {
   move_in_year?: number;
@@ -1374,7 +1381,9 @@ function insertBuildings(): void {
 function insertReviews(): void {
   const inserts: string[] = [];
   for (const r of REVIEWS) {
-    const overallScore = calculateOverallScore(r);
+    // calculateOverallScore only reads numeric score fields; ReviewBase has no index
+    // signature, so cast to the Record shape it expects. Type-only, no behavior change.
+    const overallScore = calculateOverallScore(r as unknown as Record<string, number | null | undefined>);
     const moveOutYear = r.move_out_year !== null ? String(r.move_out_year) : 'NULL';
     const moveOutSeason = r.move_out_season !== null ? `'${r.move_out_season}'` : 'NULL';
     const buildingParking = r.building_parking !== null ? String(r.building_parking) : 'NULL';
