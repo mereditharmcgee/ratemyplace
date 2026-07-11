@@ -7,7 +7,6 @@
  *   - 30 buildings (spread across 8 Boston neighborhoods)
  *   - 128 reviews distributed across 29 buildings (building-30 has 0)
  *   - 10 disputes (7 pending, 3 resolved)
- *   - Pre-computed and verified building_scores and landlord_scores
  *
  * All IDs, slugs, and content are hardcoded for determinism.
  * The password hash is pre-computed (PBKDF2-SHA256) so no async work is needed.
@@ -23,7 +22,7 @@ import { execSync } from 'child_process';
 import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { calculateOverallScore, calculateBuildingAverages, calculateLandlordAverages } from '../src/lib/scoring.js';
+import { calculateOverallScore } from '../src/lib/scoring.js';
 
 // ─── ANSI color constants (matching Phase 4 script style) ──────────────────────
 
@@ -1443,121 +1442,6 @@ function insertDisputes(): void {
   executeSqlBatch(inserts);
 }
 
-/**
- * Compute and insert building_scores rows for all buildings with reviews.
- * Skips building-30 (0 reviews). Populates avg_overall, review_count, pct_* columns.
- * Per-field averages are left NULL — building page falls back to live calculation.
- */
-function insertBuildingScores(): void {
-  const inserts: string[] = [];
-  const now = Math.floor(Date.now() / 1000);
-
-  for (const b of BUILDINGS) {
-    const bReviews = REVIEWS.filter(r => r.building_id === b.id);
-    if (bReviews.length === 0) continue;
-
-    const avgs = calculateBuildingAverages(bReviews);
-
-    inserts.push(`INSERT INTO building_scores (
-      building_id, review_count, avg_overall,
-      pct_would_recommend, pct_pest_issues, pct_heat_issues,
-      pct_water_issues, pct_deposit_issues, updated_at
-    ) VALUES (
-      '${b.id}', ${avgs.review_count ?? bReviews.length}, ${avgs.avg_overall ?? 'NULL'},
-      ${avgs.pct_would_recommend ?? 'NULL'}, ${avgs.pct_pest_issues ?? 'NULL'},
-      ${avgs.pct_heat_issues ?? 'NULL'}, ${avgs.pct_water_issues ?? 'NULL'},
-      ${avgs.pct_deposit_issues ?? 'NULL'}, ${now}
-    )`);
-  }
-
-  executeSqlBatch(inserts);
-}
-
-/**
- * Compute and insert landlord_scores rows for all landlords with reviews.
- * building_count is the total number of buildings owned (not just reviewed ones).
- * Per-field averages are left NULL — pages fall back to live calculation.
- */
-function insertLandlordScores(): void {
-  const inserts: string[] = [];
-  const now = Math.floor(Date.now() / 1000);
-
-  for (const l of LANDLORDS) {
-    const landlordBuildingIds = BUILDINGS
-      .filter(b => b.landlord_id === l.id)
-      .map(b => b.id);
-
-    const lReviews = REVIEWS.filter(r => landlordBuildingIds.includes(r.building_id));
-    if (lReviews.length === 0) continue;
-
-    const avgs = calculateLandlordAverages(lReviews);
-
-    inserts.push(`INSERT INTO landlord_scores (
-      landlord_id, building_count, review_count, avg_overall,
-      pct_would_recommend, pct_deposit_issues, updated_at
-    ) VALUES (
-      '${l.id}', ${landlordBuildingIds.length}, ${avgs.review_count ?? lReviews.length}, ${avgs.avg_overall ?? 'NULL'},
-      ${avgs.pct_would_recommend ?? 'NULL'}, ${avgs.pct_deposit_issues ?? 'NULL'}, ${now}
-    )`);
-  }
-
-  executeSqlBatch(inserts);
-}
-
-/**
- * Verify that stored building_scores match re-computed values from REVIEWS data.
- * Allows 0.01 tolerance for floating point rounding.
- * Returns true if all buildings verified, false if any mismatch found.
- */
-function verifyScores(): boolean {
-  process.stdout.write(`  ${BOLD}Verifying scores${RESET}... `);
-  let allMatch = true;
-  let checked = 0;
-
-  for (const b of BUILDINGS) {
-    const bReviews = REVIEWS.filter(r => r.building_id === b.id);
-    if (bReviews.length === 0) continue;
-
-    const rows = wranglerQuery(`SELECT avg_overall, review_count FROM building_scores WHERE building_id = '${b.id}'`);
-    if (!rows || rows.length === 0) {
-      console.error(`\n    ${RED}Missing building_scores row for ${b.id}${RESET}`);
-      allMatch = false;
-      continue;
-    }
-
-    const stored = rows[0];
-    const expected = calculateBuildingAverages(bReviews);
-
-    const storedOverall = stored.avg_overall;
-    const expectedOverall = expected.avg_overall;
-
-    if (storedOverall === null && expectedOverall === null) {
-      // Both null — OK
-    } else if (storedOverall === null || expectedOverall === null) {
-      console.error(`\n    ${RED}Score null mismatch for ${b.id}: stored=${storedOverall}, expected=${expectedOverall}${RESET}`);
-      allMatch = false;
-    } else if (Math.abs(storedOverall - expectedOverall) > 0.01) {
-      console.error(`\n    ${RED}Score mismatch for ${b.id}: stored=${storedOverall}, expected=${expectedOverall}${RESET}`);
-      allMatch = false;
-    }
-
-    if (stored.review_count !== bReviews.length) {
-      console.error(`\n    ${RED}Count mismatch for ${b.id}: stored=${stored.review_count}, expected=${bReviews.length}${RESET}`);
-      allMatch = false;
-    }
-
-    checked++;
-  }
-
-  if (allMatch) {
-    console.log(`${GREEN}✓${RESET} (${checked} buildings verified)`);
-  } else {
-    console.log(`${RED}✗${RESET}`);
-  }
-
-  return allMatch;
-}
-
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
 function main() {
@@ -1574,14 +1458,6 @@ function main() {
 
   run('Insert reviews (128)', insertReviews);
   run('Insert disputes (10)', insertDisputes);
-  run('Compute building scores', insertBuildingScores);
-  run('Compute landlord scores', insertLandlordScores);
-
-  const ok = verifyScores();
-  if (!ok) {
-    console.error(`\n  ${RED}✗ Score verification failed${RESET}\n`);
-    process.exit(1);
-  }
 
   console.log(`\n  ${GREEN}✓ Seed complete — database ready${RESET}`);
   console.log(`\n  Summary: ${reviewsOnly ? '' : '8 users, 10 landlords, 30 buildings, '}128 reviews, 10 disputes`);
