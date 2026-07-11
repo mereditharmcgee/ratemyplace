@@ -1,5 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
+import { recencyWeightedOverallSql, currentReviewYear } from '../../../lib/scoring-sql';
 
 interface BuildingMapData {
   id: string;
@@ -32,6 +33,8 @@ export async function GET(context: APIContext): Promise<Response> {
       : '';
     const boundsBinds = hasBounds ? [south, north, west, east] : [];
 
+    const currentYear = currentReviewYear();
+
     // Get buildings with coordinates and their review stats
     const result = await db.prepare(`
       SELECT
@@ -42,7 +45,7 @@ export async function GET(context: APIContext): Promise<Response> {
         b.latitude,
         b.longitude,
         COUNT(r.id) as review_count,
-        AVG(r.overall_score) as avg_score
+        ${recencyWeightedOverallSql('r', currentYear)} as avg_score
       FROM buildings b
       LEFT JOIN reviews r ON r.building_id = b.id AND r.status = 'approved'
       WHERE b.latitude IS NOT NULL AND b.longitude IS NOT NULL ${boundsClause}

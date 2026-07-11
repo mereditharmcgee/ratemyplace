@@ -2,6 +2,7 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
 import { createAuditLog } from '../../../../lib/audit';
 import { getClientIP } from '../../../../lib/rateLimit';
+import { recencyWeightedOverallSql, currentReviewYear } from '../../../../lib/scoring-sql';
 
 export async function PATCH(context: APIContext): Promise<Response> {
   // Require authentication
@@ -136,6 +137,7 @@ export async function GET(context: APIContext): Promise<Response> {
     }
 
     // Get buildings for this landlord
+    const currentYear = currentReviewYear();
     const buildings = await db.prepare(`
       SELECT
         b.id,
@@ -143,7 +145,7 @@ export async function GET(context: APIContext): Promise<Response> {
         b.city,
         b.neighborhood,
         COUNT(r.id) as review_count,
-        AVG(r.overall_score) as avg_score
+        ${recencyWeightedOverallSql('r', currentYear)} as avg_score
       FROM buildings b
       LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
       WHERE b.landlord_id = ?

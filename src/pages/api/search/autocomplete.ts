@@ -2,6 +2,7 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { validateSearch, escapeLikePattern } from '../../../lib/validation';
+import { recencyWeightedOverallSql, currentReviewYear } from '../../../lib/scoring-sql';
 
 export async function GET(context: APIContext): Promise<Response> {
   const db = getDB(context);
@@ -43,6 +44,7 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   try {
+    const currentYear = currentReviewYear();
     const escaped = escapeLikePattern(input);
     const pattern = `%${escaped}%`;
 
@@ -50,7 +52,7 @@ export async function GET(context: APIContext): Promise<Response> {
       SELECT
         b.id, b.address, b.neighborhood, b.city, b.state, b.slug,
         COUNT(r.id) as review_count,
-        ROUND(AVG(r.overall_score), 1) as avg_overall
+        ${recencyWeightedOverallSql('r', currentYear)} as avg_overall
       FROM buildings b
       LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
       WHERE b.address LIKE ? ESCAPE '\\' OR b.neighborhood LIKE ? ESCAPE '\\'
@@ -63,7 +65,7 @@ export async function GET(context: APIContext): Promise<Response> {
       SELECT
         l.id, l.name, l.slug,
         COUNT(r.id) as review_count,
-        ROUND(AVG(r.overall_score), 1) as avg_overall
+        ${recencyWeightedOverallSql('r', currentYear)} as avg_overall
       FROM landlords l
       LEFT JOIN buildings b ON b.landlord_id = l.id
       LEFT JOIN reviews r ON r.building_id = b.id AND r.status = 'approved'

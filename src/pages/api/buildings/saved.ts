@@ -1,6 +1,7 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import type { SavedBuildingsResponse } from '../../../lib/api-types';
+import { recencyWeightedOverallSql, currentReviewYear } from '../../../lib/scoring-sql';
 
 export async function GET(context: APIContext): Promise<Response> {
   if (!context.locals.user) {
@@ -12,6 +13,7 @@ export async function GET(context: APIContext): Promise<Response> {
 
   try {
     const db = getDB(context);
+    const currentYear = currentReviewYear();
 
     const { results } = await db.prepare(`
       SELECT
@@ -24,7 +26,7 @@ export async function GET(context: APIContext): Promise<Response> {
         b.city,
         b.state,
         (SELECT COUNT(*) FROM reviews r WHERE r.building_id = b.id AND r.status = 'approved') as review_count,
-        (SELECT ROUND(AVG(r.overall_score), 1) FROM reviews r WHERE r.building_id = b.id AND r.status = 'approved') as avg_overall
+        (SELECT ${recencyWeightedOverallSql('r', currentYear)} FROM reviews r WHERE r.building_id = b.id AND r.status = 'approved') as avg_overall
       FROM saved_buildings sb
       JOIN buildings b ON sb.building_id = b.id
       WHERE sb.user_id = ?

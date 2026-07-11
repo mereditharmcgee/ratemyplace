@@ -1,5 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
+import { recencyWeightedOverallSql, currentReviewYear } from '../../../../lib/scoring-sql';
 import { generateIdFromEntropySize } from 'lucia';
 
 export async function GET(context: APIContext): Promise<Response> {
@@ -21,6 +22,7 @@ export async function GET(context: APIContext): Promise<Response> {
 
   try {
     const db = getDB(context);
+    const currentYear = currentReviewYear();
 
     const managers = await db.prepare(`
       SELECT
@@ -35,7 +37,7 @@ export async function GET(context: APIContext): Promise<Response> {
         pm.created_at,
         COUNT(DISTINCT b.id) as building_count,
         COUNT(DISTINCT r.id) as review_count,
-        AVG(r.overall_score) as avg_score
+        ${recencyWeightedOverallSql('r', currentYear)} as avg_score
       FROM property_managers pm
       LEFT JOIN buildings b ON pm.id = b.property_manager_id
       LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'

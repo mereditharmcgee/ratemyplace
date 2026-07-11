@@ -185,7 +185,7 @@ export async function DELETE(context: APIContext): Promise<Response> {
     // Check if building has reviews - warn but still allow deletion
     const reviewCount = await db.prepare('SELECT COUNT(*) as count FROM reviews WHERE building_id = ?').bind(buildingId).first<{ count: number }>();
 
-    // Delete building (cascades to reviews, building_scores due to ON DELETE CASCADE)
+    // Delete building (cascades to reviews due to ON DELETE CASCADE)
     await db.prepare('DELETE FROM buildings WHERE id = ?').bind(buildingId).run();
 
     return new Response(JSON.stringify({

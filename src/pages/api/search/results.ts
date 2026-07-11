@@ -2,10 +2,12 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { validateSearch, escapeLikePattern } from '../../../lib/validation';
+import { recencyWeightedOverallSql, currentReviewYear } from '../../../lib/scoring-sql';
 
 export async function GET(context: APIContext): Promise<Response> {
   const db = getDB(context);
   const ip = getClientIP(context);
+  const currentYear = currentReviewYear();
 
   // 1. Rate limit: 60 / minute per IP (SEC-05)
   const rateLimit = await checkRateLimit(db, ip, 'search-results', 60, 60);
@@ -62,7 +64,7 @@ export async function GET(context: APIContext): Promise<Response> {
       ).bind(...binds).first<{ total: number }>();
 
       const rows = await db.prepare(
-        `SELECT b.*, COUNT(r.id) as review_count, ROUND(AVG(r.overall_score), 1) as avg_overall, l.name as landlord_name
+        `SELECT b.*, COUNT(r.id) as review_count, ${recencyWeightedOverallSql('r', currentYear)} as avg_overall, l.name as landlord_name
          ${baseQuery}
          ORDER BY COUNT(r.id) DESC, AVG(r.overall_score) DESC
          LIMIT ? OFFSET ?`
@@ -97,7 +99,7 @@ export async function GET(context: APIContext): Promise<Response> {
       ).bind(...binds).first<{ total: number }>();
 
       const rows = await db.prepare(
-        `SELECT l.*, COUNT(DISTINCT b.id) as building_count, COUNT(r.id) as review_count, ROUND(AVG(r.overall_score), 1) as avg_overall
+        `SELECT l.*, COUNT(DISTINCT b.id) as building_count, COUNT(r.id) as review_count, ${recencyWeightedOverallSql('r', currentYear)} as avg_overall
          ${baseQuery}
          ORDER BY COUNT(r.id) DESC, l.name ASC
          LIMIT ? OFFSET ?`

@@ -1,5 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
+import { recencyWeightedOverallSql, currentReviewYear } from '../../../../lib/scoring-sql';
 
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
@@ -29,6 +30,7 @@ export async function GET(context: APIContext): Promise<Response> {
 
   try {
     const db = getDB(context);
+    const currentYear = currentReviewYear();
 
     // Aggregate stats across the WHOLE dataset (not the paginated slice) so the
     // four stat cards stay accurate when the user has only loaded the first page.
@@ -62,7 +64,7 @@ export async function GET(context: APIContext): Promise<Response> {
         pm.name as property_manager_name,
         b.created_at,
         COUNT(r.id) as review_count,
-        AVG(r.overall_score) as avg_score
+        ${recencyWeightedOverallSql('r', currentYear)} as avg_score
       FROM buildings b
       LEFT JOIN landlords l ON b.landlord_id = l.id
       LEFT JOIN property_managers pm ON b.property_manager_id = pm.id

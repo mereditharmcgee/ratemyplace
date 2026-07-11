@@ -1,5 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
+import { recencyWeightedOverallSql, currentReviewYear } from '../../../../lib/scoring-sql';
 import { generateIdFromEntropySize } from 'lucia';
 
 const DEFAULT_LIMIT = 100;
@@ -30,6 +31,7 @@ export async function GET(context: APIContext): Promise<Response> {
 
   try {
     const db = getDB(context);
+    const currentYear = currentReviewYear();
 
     // Aggregate stats across the WHOLE dataset (not the paginated slice) so the
     // four stat cards stay accurate when the user has only loaded the first page.
@@ -43,7 +45,7 @@ export async function GET(context: APIContext): Promise<Response> {
       LEFT JOIN buildings b ON l.id = b.landlord_id
       LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
       LEFT JOIN (
-        SELECT l2.id, AVG(r2.overall_score) as avg_score
+        SELECT l2.id, ${recencyWeightedOverallSql('r2', currentYear)} as avg_score
         FROM landlords l2
         LEFT JOIN buildings b2 ON l2.id = b2.landlord_id
         LEFT JOIN reviews r2 ON b2.id = r2.building_id AND r2.status = 'approved'
@@ -63,7 +65,7 @@ export async function GET(context: APIContext): Promise<Response> {
         l.created_at,
         COUNT(DISTINCT b.id) as building_count,
         COUNT(DISTINCT r.id) as review_count,
-        AVG(r.overall_score) as avg_score
+        ${recencyWeightedOverallSql('r', currentYear)} as avg_score
       FROM landlords l
       LEFT JOIN buildings b ON l.id = b.landlord_id
       LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
