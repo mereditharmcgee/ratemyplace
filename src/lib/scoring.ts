@@ -98,19 +98,46 @@ export const ITEM_WEIGHTS: Record<ScoreFieldName, number> = {
 };
 
 /**
- * Recency weight factor
- * Gentle decay for older reviews: 5% reduction per year after 2 years, floor at 85%
- * Based on Hu, Pavlou & Zhang (2017) - MIS Quarterly
+ * Recency weight bands — the single source of truth for review-age decay.
+ * Both the JS weight (getRecencyWeight) and the SQL CASE generator
+ * (src/lib/scoring-sql.ts) derive from this array, so they cannot diverge.
+ * A review of `age` years gets the weight of the first band whose maxAge it
+ * does not exceed. Based on Hu, Pavlou & Zhang (2017) - MIS Quarterly.
  */
-export function getRecencyWeight(reviewYear: number | null, currentYear: number = new Date().getFullYear()): number {
+export const RECENCY_BANDS: ReadonlyArray<{ maxAge: number; weight: number }> = [
+  { maxAge: 2, weight: 1.0 },
+  { maxAge: 3, weight: 0.95 },
+  { maxAge: 4, weight: 0.90 },
+  { maxAge: Infinity, weight: 0.85 },
+];
+
+export function getRecencyWeight(
+  reviewYear: number | null,
+  currentYear: number = new Date().getUTCFullYear()
+): number {
   if (!reviewYear) return 1.0;
-
   const age = currentYear - reviewYear;
+  for (const band of RECENCY_BANDS) {
+    if (age <= band.maxAge) return band.weight;
+  }
+  return RECENCY_BANDS[RECENCY_BANDS.length - 1].weight;
+}
 
-  if (age <= 2) return 1.0;
-  if (age === 3) return 0.95;
-  if (age === 4) return 0.90;
-  return 0.85; // Floor for 5+ years old
+/**
+ * A review's recency basis year: its move-out year, else the UTC year of its
+ * created_at, else the current year. UTC is used so this matches the SQL
+ * strftime(...'unixepoch') in scoring-sql.ts deterministically at year edges.
+ * NOTE (Phase 4): new reviews store move-out in `move_out_year_new`, not the
+ * legacy `move_out_year` read here, so today this falls back to created_at for
+ * new reviews. Preserved deliberately; the dual-column phase revisits this.
+ */
+export function getReviewYear(
+  review: { move_out_year?: number | null; created_at?: number | null },
+  currentYear: number = new Date().getUTCFullYear()
+): number {
+  if (review.move_out_year) return review.move_out_year;
+  if (review.created_at) return new Date(review.created_at * 1000).getUTCFullYear();
+  return currentYear;
 }
 
 export interface DomainScores {

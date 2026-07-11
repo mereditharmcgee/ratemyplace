@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  RECENCY_BANDS,
   getRecencyWeight,
+  getReviewYear,
   calculateDomainScores,
   calculateOverallScore,
   calculateAggregatedScores,
@@ -448,5 +450,31 @@ describe('aggregate vs simple-mean agreement (recency divergence)', () => {
     ];
     // Weighted: (4*1.0 + 2*0.85) / 1.85 = 3.08 → 3.1; simple mean would be 3.0
     expect(calculateAggregatedScores(reviews).avgOverall).toBeGreaterThan(3.0);
+  });
+});
+
+describe('RECENCY_BANDS (single source of recency weighting)', () => {
+  it('is ordered and covers all ages with a terminal Infinity band', () => {
+    expect(RECENCY_BANDS.map(b => b.weight)).toEqual([1.0, 0.95, 0.90, 0.85]);
+    expect(RECENCY_BANDS[RECENCY_BANDS.length - 1].maxAge).toBe(Infinity);
+  });
+
+  it('getRecencyWeight derives from the bands', () => {
+    expect(getRecencyWeight(2026, 2026)).toBe(1.0);  // age 0
+    expect(getRecencyWeight(2024, 2026)).toBe(1.0);  // age 2
+    expect(getRecencyWeight(2023, 2026)).toBe(0.95); // age 3
+    expect(getRecencyWeight(2022, 2026)).toBe(0.90); // age 4
+    expect(getRecencyWeight(2021, 2026)).toBe(0.85); // age 5
+    expect(getRecencyWeight(2010, 2026)).toBe(0.85); // very old
+    expect(getRecencyWeight(null, 2026)).toBe(1.0);  // unknown → no decay
+  });
+});
+
+describe('getReviewYear', () => {
+  it('prefers move_out_year, falls back to created_at UTC year, then currentYear', () => {
+    expect(getReviewYear({ move_out_year: 2023 }, 2026)).toBe(2023);
+    const tsUtc2025 = Date.UTC(2025, 5, 15) / 1000;
+    expect(getReviewYear({ created_at: tsUtc2025 }, 2026)).toBe(2025);
+    expect(getReviewYear({}, 2026)).toBe(2026);
   });
 });
