@@ -238,7 +238,10 @@ export function calculateOverallScore(scores: Record<string, number | null | und
 /**
  * Calculate aggregated scores across multiple reviews with recency weighting
  */
-export function calculateAggregatedScores(reviews: any[]): {
+export function calculateAggregatedScores(
+  reviews: any[],
+  currentYear: number = new Date().getUTCFullYear()
+): {
   avgOverall: number | null;
   avgUnit: number | null;
   avgBuilding: number | null;
@@ -257,8 +260,6 @@ export function calculateAggregatedScores(reviews: any[]): {
     };
   }
 
-  const currentYear = new Date().getFullYear();
-
   let overallSum = 0;
   let overallWeight = 0;
   let unitSum = 0;
@@ -271,19 +272,17 @@ export function calculateAggregatedScores(reviews: any[]): {
   let recommendTotal = 0;
 
   for (const review of reviews) {
-    // Determine review year for recency weighting
-    const reviewYear = review.move_out_year
-      ? review.move_out_year
-      : review.created_at
-        ? new Date((review.created_at || 0) * 1000).getFullYear()
-        : currentYear;
+    const reviewYear = getReviewYear(review, currentYear);
     const recencyWeight = getRecencyWeight(reviewYear, currentYear);
 
-    // Calculate domain scores for this review
+    // Domain sub-scores are computed from items (no stored column for these).
     const domainScores = calculateDomainScores(review);
 
-    if (domainScores.overall !== null) {
-      overallSum += domainScores.overall * recencyWeight;
+    // The AGGREGATE overall uses the STORED overall_score column — the single
+    // source of truth — so it matches the SQL fragment used by list views.
+    const storedOverall = review.overall_score;
+    if (storedOverall !== null && storedOverall !== undefined) {
+      overallSum += storedOverall * recencyWeight;
       overallWeight += recencyWeight;
     }
     if (domainScores.unit !== null) {

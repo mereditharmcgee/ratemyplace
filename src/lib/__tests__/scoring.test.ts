@@ -22,6 +22,7 @@ function allScores(value: number): Record<string, number> {
   for (const field of ALL_SCORE_FIELDS) {
     scores[field] = value;
   }
+  scores.overall_score = calculateOverallScore(scores);
   return scores;
 }
 
@@ -34,6 +35,7 @@ function domainScores(fields: readonly string[], value: number): Record<string, 
   for (const field of fields) {
     scores[field] = value;
   }
+  scores.overall_score = calculateOverallScore(scores);
   return scores;
 }
 
@@ -312,6 +314,27 @@ describe('calculateAggregatedScores', () => {
     expect(resultWeighted.avgOverall).toBeDefined();
     expect(resultEqual.avgOverall).toBeDefined();
     expect(resultWeighted.avgOverall!).toBeGreaterThanOrEqual(resultEqual.avgOverall!);
+  });
+});
+
+describe('calculateAggregatedScores uses the stored overall_score', () => {
+  it('avgOverall equals the recency-weighted mean of the stored column', () => {
+    // Two recent reviews whose STORED overall_score differs from what recomputing
+    // from items would give — proves we use the stored value.
+    const reviews = [
+      { overall_score: 4.0, move_out_year: 2026, unit_structural: 1 },
+      { overall_score: 2.0, move_out_year: 2026, unit_structural: 5 },
+    ];
+    // recency weight 1.0 each → (4.0 + 2.0)/2 = 3.0 from the STORED column
+    expect(calculateAggregatedScores(reviews, 2026).avgOverall).toBe(3.0);
+  });
+
+  it('excludes reviews with a null overall_score from avgOverall', () => {
+    const reviews = [
+      { overall_score: 4.0, move_out_year: 2026 },
+      { overall_score: null, move_out_year: 2026 },
+    ];
+    expect(calculateAggregatedScores(reviews, 2026).avgOverall).toBe(4.0);
   });
 });
 
