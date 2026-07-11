@@ -16,6 +16,22 @@ export async function GET(context: APIContext): Promise<Response> {
   try {
     const db = getDB(context);
 
+    // Optional viewport-bounds filter. When the client supplies all four
+    // numeric bounds, only return buildings inside the current map view; when
+    // absent, fall back to the global set (backward compatible). Assumes a
+    // non-antimeridian-crossing viewport (true for Boston/New Haven).
+    const sp = context.url.searchParams;
+    const north = parseFloat(sp.get('north') ?? '');
+    const south = parseFloat(sp.get('south') ?? '');
+    const east = parseFloat(sp.get('east') ?? '');
+    const west = parseFloat(sp.get('west') ?? '');
+    const hasBounds = [north, south, east, west].every((n) => Number.isFinite(n));
+
+    const boundsClause = hasBounds
+      ? 'AND b.latitude BETWEEN ? AND ? AND b.longitude BETWEEN ? AND ?'
+      : '';
+    const boundsBinds = hasBounds ? [south, north, west, east] : [];
+
     // Get buildings with coordinates and their review stats
     const result = await db.prepare(`
       SELECT
@@ -29,11 +45,11 @@ export async function GET(context: APIContext): Promise<Response> {
         AVG(r.overall_score) as avg_score
       FROM buildings b
       LEFT JOIN reviews r ON r.building_id = b.id AND r.status = 'approved'
-      WHERE b.latitude IS NOT NULL AND b.longitude IS NOT NULL
+      WHERE b.latitude IS NOT NULL AND b.longitude IS NOT NULL ${boundsClause}
       GROUP BY b.id
       ORDER BY review_count DESC
       LIMIT 500
-    `).all();
+    `).bind(...boundsBinds).all();
 
     const buildings: BuildingMapData[] = (result.results || []).map((row: any) => ({
       id: row.id,

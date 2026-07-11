@@ -99,23 +99,37 @@ export default function BuildingMap({
     };
   }, [apiKey]);
 
-  // Fetch buildings data
-  useEffect(() => {
-    async function fetchBuildings() {
-      try {
-        const response = await fetch('/api/buildings/map');
-        const data = await response.json();
-        setBuildings(data.buildings || []);
-      } catch (err) {
-        console.error('Failed to fetch buildings:', err);
-        setError('Failed to load building data');
-      } finally {
-        setLoading(false);
+  // Fetch buildings, optionally constrained to the current map viewport.
+  const loadBuildings = useCallback(async (bounds?: google.maps.LatLngBounds | null) => {
+    try {
+      let url = '/api/buildings/map';
+      if (bounds) {
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        const params = new URLSearchParams({
+          north: String(ne.lat()),
+          south: String(sw.lat()),
+          east: String(ne.lng()),
+          west: String(sw.lng()),
+        });
+        url += `?${params.toString()}`;
       }
+      const response = await fetch(url);
+      const data = await response.json();
+      setBuildings(data.buildings || []);
+    } catch (err) {
+      console.error('Failed to fetch buildings:', err);
+      setError('Failed to load building data');
+    } finally {
+      setLoading(false);
     }
-
-    fetchBuildings();
   }, []);
+
+  // Initial (unbounded) load so the map can initialize; the idle listener below
+  // then refetches by viewport bounds as the user pans/zooms.
+  useEffect(() => {
+    loadBuildings();
+  }, [loadBuildings]);
 
   // Create custom marker element
   const createMarkerElement = useCallback((building: Building): HTMLElement => {
@@ -159,12 +173,15 @@ export default function BuildingMap({
   // Initialize map and markers
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return;
-    if (!loading && buildings.length === 0) {
-      // No buildings to show — skip map init, clear loading overlay
-      setTilesLoaded(true);
+
+    // Before the map exists we need at least one building to justify init;
+    // with none, clear the loading overlay and wait. Once the map IS
+    // initialized we fall through even when empty, so a pan into an empty
+    // viewport clears stale markers instead of leaving them behind.
+    if (buildings.length === 0 && !mapInstanceRef.current) {
+      if (!loading) setTilesLoaded(true);
       return;
     }
-    if (buildings.length === 0) return;
 
     // Initialize map
     if (!mapInstanceRef.current) {
@@ -192,6 +209,17 @@ export default function BuildingMap({
 
       mapInstanceRef.current.addListener('tilesloaded', () => {
         setTilesLoaded(true);
+      });
+
+      // Refetch buildings for the current viewport whenever the map settles
+      // (debounced), so only in-view buildings are loaded as the user pans/zooms.
+      let idleTimer: ReturnType<typeof setTimeout> | undefined;
+      mapInstanceRef.current.addListener('idle', () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          const b = mapInstanceRef.current?.getBounds();
+          if (b) loadBuildings(b);
+        }, 300);
       });
     }
 
@@ -312,7 +340,7 @@ export default function BuildingMap({
       {/* Building count */}
       {!loading && (
         <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg px-3 py-2 text-sm">
-          <span className="font-medium">{buildings.length}</span> buildings
+          <span className="font-medium">{buildings.length}</span> in view
         </div>
       )}
     </div>
