@@ -333,7 +333,7 @@ export function calculateBuildingAverages(reviews: any[]): Record<string, number
   let depositCount = 0;
 
   for (const review of reviews) {
-    if (review.had_pest_issues || review.had_pests) pestCount++;
+    if (review.had_pest_issues) pestCount++;
     if (review.had_heat_issues) heatCount++;
     if (review.had_water_issues) waterCount++;
     if (review.had_security_deposit_issues) depositCount++;

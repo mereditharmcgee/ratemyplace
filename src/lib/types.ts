@@ -54,19 +54,6 @@ export interface Review {
   unit_type: UnitType;
   rent_amount?: number;
 
-  score_building_quality?: number;
-  score_maintenance?: number;
-  score_pest_control?: number;
-  score_safety?: number;
-  score_noise?: number;
-  score_landlord_responsiveness?: number;
-  score_landlord_communication?: number;
-  score_landlord_fairness?: number;
-  score_lease_clarity?: number;
-  score_deposit_handling?: number;
-  score_rent_value?: number;
-  score_amenities?: number;
-
   overall_score?: number;
 
   review_title?: string;

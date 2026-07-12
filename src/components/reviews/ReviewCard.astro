@@ -461,10 +461,10 @@ const pestLabels: Record<string, string> = {
   )}
 
   <!-- Issues Tags -->
-  {(review.had_pest_issues === 1 || review.had_heat_issues === 1 || review.had_water_issues === 1 || review.had_security_deposit_issues === 1 || review.had_pests === 1) && (
+  {(review.had_pest_issues === 1 || review.had_heat_issues === 1 || review.had_water_issues === 1 || review.had_security_deposit_issues === 1) && (
     <div class="flex flex-wrap gap-2 mb-4">
       <span class="text-sm text-gray-600 font-medium">Issues reported:</span>
-      {(review.had_pest_issues === 1 || review.had_pests === 1) && (
+      {(review.had_pest_issues === 1) && (
         <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full break-words">
           Pest issues{pestTypes.length > 0 && `: ${pestTypes.map(p => pestLabels[p] || humanize(p)).join(', ')}`}
         </span>

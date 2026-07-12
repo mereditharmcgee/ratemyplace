@@ -56,19 +56,6 @@ export interface ReviewDetail {
   landlord_deposit: number | null;
   landlord_rent_practices: number | null;
   landlord_non_retaliation: number | null;
-  // Legacy score fields (kept for backward compatibility)
-  score_building_quality: number | null;
-  score_maintenance: number | null;
-  score_pest_control: number | null;
-  score_safety: number | null;
-  score_noise: number | null;
-  score_landlord_responsiveness: number | null;
-  score_landlord_communication: number | null;
-  score_landlord_fairness: number | null;
-  score_lease_clarity: number | null;
-  score_deposit_handling: number | null;
-  score_rent_value: number | null;
-  score_amenities: number | null;
   overall_score: number;
   review_title: string | null;
   review_text: string | null;
