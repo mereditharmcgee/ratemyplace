@@ -236,6 +236,22 @@ function parseMigrations(): SchemaMap {
       schema.get(tableName)!.push({ name: colName, type: colType });
     }
 
+    // ── ALTER TABLE tableName DROP COLUMN colName ───────────────────────────
+    const dropColRegex =
+      /ALTER\s+TABLE\s+(\w+)\s+DROP\s+COLUMN\s+(\w+)/gim;
+
+    while ((match = dropColRegex.exec(sql)) !== null) {
+      const tableName = match[1];
+      const colName = match[2].toLowerCase();
+      const cols = schema.get(tableName);
+      if (cols) {
+        schema.set(
+          tableName,
+          cols.filter((c) => c.name.toLowerCase() !== colName)
+        );
+      }
+    }
+
     // ── DROP TABLE [IF EXISTS] tableName ────────────────────────────────────
     const dropRegex = /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)/gim;
 
