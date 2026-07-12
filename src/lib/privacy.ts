@@ -44,21 +44,17 @@ export function getCurrentYear(): number {
  */
 export function formatRecency(review: {
   is_current_tenant?: number;
-  move_out_year?: number;
   move_out_year_new?: string;
 }): string {
   if (review.is_current_tenant === 1) {
     return 'Current tenant';
   }
 
-  // Determine move-out year from new or legacy field
+  // Determine move-out year from the canonical move_out_year_new column
   let moveOutYear: number | null = null;
   if (review.move_out_year_new && review.move_out_year_new !== 'current') {
     const parsed = parseInt(review.move_out_year_new);
     if (!isNaN(parsed)) moveOutYear = parsed;
-  }
-  if (!moveOutYear && review.move_out_year) {
-    moveOutYear = review.move_out_year;
   }
 
   if (!moveOutYear) return 'Past tenant';
