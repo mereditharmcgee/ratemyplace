@@ -838,7 +838,6 @@ interface ReviewBase {
   building_id: string;
   move_in_year: number;
   move_in_season: string;
-  move_out_year: number | null;
   move_out_season: string | null;
   is_current_tenant: number;
   unit_type: string;
@@ -874,7 +873,7 @@ interface ReviewBase {
   status: string;
   comments: string;
   would_recommend_new: string;
-  had_pests: number;
+  had_pest_issues: number;
   had_heat_issues: number;
   had_water_issues: number;
   had_security_deposit_issues: number;
@@ -893,7 +892,7 @@ type ReviewScores = Pick<ReviewBase,
 > & {
   // Optional issue flags may be supplied inline alongside scores; they are otherwise
   // auto-derived in makeReview. Kept optional so callers can override the derived value.
-  had_pests?: number;
+  had_pest_issues?: number;
   had_heat_issues?: number;
   had_water_issues?: number;
   had_security_deposit_issues?: number;
@@ -948,7 +947,6 @@ function makeReview(
     building_id,
     move_in_year: extras.move_in_year ?? 2021,
     move_in_season: extras.move_in_season ?? 'fall',
-    move_out_year,
     move_out_season,
     is_current_tenant,
     unit_type: extras.unit_type ?? '1br',
@@ -958,7 +956,7 @@ function makeReview(
     status: 'approved',
     comments: extras.comments ?? 'Decent place overall. The location is convenient and the unit is reasonably maintained.',
     would_recommend_new: avg27 >= 3.5 ? 'yes' : 'no',
-    had_pests: scores.unit_pests <= 2 ? 1 : 0,
+    had_pest_issues: scores.unit_pests <= 2 ? 1 : 0,
     had_heat_issues: scores.unit_climate <= 2 ? 1 : 0,
     had_water_issues: scores.unit_plumbing <= 2 ? 1 : 0,
     had_security_deposit_issues: scores.landlord_deposit <= 2 ? 1 : 0,
@@ -1384,14 +1382,13 @@ function insertReviews(): void {
     // calculateOverallScore only reads numeric score fields; ReviewBase has no index
     // signature, so cast to the Record shape it expects. Type-only, no behavior change.
     const overallScore = calculateOverallScore(r as unknown as Record<string, number | null | undefined>);
-    const moveOutYear = r.move_out_year !== null ? String(r.move_out_year) : 'NULL';
     const moveOutSeason = r.move_out_season !== null ? `'${r.move_out_season}'` : 'NULL';
     const buildingParking = r.building_parking !== null ? String(r.building_parking) : 'NULL';
     const moveOutYearNew = r.move_out_year_new !== null ? `'${r.move_out_year_new}'` : 'NULL';
 
     inserts.push(`INSERT INTO reviews (
       id, user_id, building_id, move_in_year, move_in_season,
-      move_out_year, move_out_season, is_current_tenant, unit_type, rent_amount,
+      move_out_season, is_current_tenant, unit_type, rent_amount,
       unit_structural, unit_plumbing, unit_electrical, unit_climate, unit_ventilation,
       unit_pests, unit_mold, unit_appliances, unit_layout, unit_accuracy,
       building_common_areas, building_security, building_exterior, building_noise_neighbors, building_noise_external,
@@ -1399,11 +1396,11 @@ function insertReviews(): void {
       landlord_maintenance, landlord_communication, landlord_professionalism, landlord_lease_clarity,
       landlord_privacy, landlord_deposit, landlord_rent_practices, landlord_non_retaliation,
       overall_score, status, comments, would_recommend_new,
-      had_pests, had_heat_issues, had_water_issues, had_security_deposit_issues,
+      had_pest_issues, had_heat_issues, had_water_issues, had_security_deposit_issues,
       created_at, updated_at, move_out_year_new
     ) VALUES (
       '${r.id}', '${r.user_id}', '${r.building_id}', ${r.move_in_year}, '${r.move_in_season}',
-      ${moveOutYear}, ${moveOutSeason},
+      ${moveOutSeason},
       ${r.is_current_tenant}, '${r.unit_type}', ${r.rent_amount},
       ${r.unit_structural}, ${r.unit_plumbing}, ${r.unit_electrical}, ${r.unit_climate}, ${r.unit_ventilation},
       ${r.unit_pests}, ${r.unit_mold}, ${r.unit_appliances}, ${r.unit_layout}, ${r.unit_accuracy},
@@ -1412,7 +1409,7 @@ function insertReviews(): void {
       ${r.landlord_maintenance}, ${r.landlord_communication}, ${r.landlord_professionalism}, ${r.landlord_lease_clarity},
       ${r.landlord_privacy}, ${r.landlord_deposit}, ${r.landlord_rent_practices}, ${r.landlord_non_retaliation},
       ${overallScore}, 'approved', '${escapeSql(r.comments)}', '${r.would_recommend_new}',
-      ${r.had_pests}, ${r.had_heat_issues}, ${r.had_water_issues}, ${r.had_security_deposit_issues},
+      ${r.had_pest_issues}, ${r.had_heat_issues}, ${r.had_water_issues}, ${r.had_security_deposit_issues},
       ${r.created_at}, ${r.updated_at}, ${moveOutYearNew}
     )`);
   }
