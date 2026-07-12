@@ -64,7 +64,6 @@ export interface Review {
   had_water_issues: boolean;
   had_security_deposit_issues: boolean;
   had_eviction_threat: boolean;
-  would_recommend: boolean;
 
   status: ReviewStatus;
   moderation_notes?: string;
@@ -142,7 +141,6 @@ export interface ReviewFormData {
     deposit: boolean;
     eviction: boolean;
   };
-  would_recommend: boolean;
   review_title?: string;
   review_text?: string;
 }

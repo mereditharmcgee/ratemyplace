@@ -43,11 +43,10 @@ export default function ReviewEditForm({ review }: Props) {
   const [propertyManagerName, setPropertyManagerName] = useState((review as any).property_manager_name || '');
   const [reviewText, setReviewText] = useState(review.review_text || review.comments || '');
 
-  // Would recommend - support new text format with fallback to legacy boolean
-  const [wouldRecommend, setWouldRecommend] = useState<string>(() => {
-    if (review.would_recommend_new) return review.would_recommend_new;
-    return review.would_recommend ? 'yes' : 'no';
-  });
+  // Would recommend - canonical text column
+  const [wouldRecommend, setWouldRecommend] = useState<string>(
+    review.would_recommend_new || 'no'
+  );
 
   // Amenities & utilities
   const [amenities, setAmenities] = useState<string[]>(() => {

@@ -286,15 +286,6 @@ describe('calculateAggregatedScores', () => {
     expect(result.pctWouldRecommend).toBe(67);
   });
 
-  it('handles legacy would_recommend boolean', () => {
-    const reviews = [
-      { ...allScores(4), would_recommend: true, move_out_year: 2026 },
-      { ...allScores(3), would_recommend: false, move_out_year: 2026 },
-    ];
-    const result = calculateAggregatedScores(reviews);
-    expect(result.pctWouldRecommend).toBe(50);
-  });
-
   it('applies recency weighting to older reviews', () => {
     // Recent review (2026) scores 5, old review (2020, 6 yrs old = 0.85 weight) scores 1
     const recentReview = { ...allScores(5), move_out_year: 2026 };

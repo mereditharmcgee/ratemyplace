@@ -67,7 +67,6 @@ export interface ReviewDetail {
   had_eviction_threat: boolean;
   accepts_housing_vouchers: string | null;
   safely_lit_at_night: string | null;
-  would_recommend: boolean;
   would_recommend_new: string | null;
   status: string;
   is_verified: boolean;
@@ -124,7 +123,6 @@ export async function GET(context: APIContext): Promise<Response> {
       had_water_issues: review.had_water_issues === 1,
       had_security_deposit_issues: review.had_security_deposit_issues === 1,
       had_eviction_threat: review.had_eviction_threat === 1,
-      would_recommend: review.would_recommend === 1,
       is_verified: review.is_verified === 1
     };
 
@@ -229,9 +227,8 @@ export async function PATCH(context: APIContext): Promise<Response> {
     // Calculate overall score using the proper weighted scoring
     const overallScore = calculateOverallScore(scores);
 
-    // Handle would_recommend - support both new text format and legacy boolean
+    // Handle would_recommend - canonical text column only
     const wouldRecommendNew = body.would_recommend_new || null;
-    const wouldRecommendLegacy = wouldRecommendNew === 'yes' ? 1 : wouldRecommendNew === 'no' ? 0 : (body.would_recommend ? 1 : 0);
 
     // unit_number is stored for moderation only — never displayed on public pages.
     await db.prepare(`
@@ -279,7 +276,6 @@ export async function PATCH(context: APIContext): Promise<Response> {
         landlord_non_retaliation = ?,
         overall_score = ?,
         would_recommend_new = ?,
-        would_recommend = ?,
         review_title = ?,
         landlord_name = ?,
         property_manager_name = ?,
@@ -348,7 +344,6 @@ export async function PATCH(context: APIContext): Promise<Response> {
       // Overall
       overallScore,
       wouldRecommendNew,
-      wouldRecommendLegacy,
       body.review_title ?? null,
       body.landlord_name ?? null,
       body.property_manager_name ?? null,
