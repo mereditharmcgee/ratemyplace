@@ -44,7 +44,7 @@ type FixtureRow = {
   building_id: string;
   status: string;
   overall_score: number | null;
-  move_out_year: number | null;
+  move_out_year_new: string | null; // TEXT: a 4-digit year, 'current', or null
   created_at: number; // unix epoch seconds
 };
 
@@ -59,13 +59,13 @@ suite('recencyWeightedOverallSql ⇄ calculateAggregatedScores parity (real SQLi
   function makeDb(rows: FixtureRow[]) {
     const db = new DatabaseSync(':memory:');
     db.exec(
-      'CREATE TABLE reviews (id TEXT, building_id TEXT, status TEXT, overall_score REAL, move_out_year INTEGER, created_at INTEGER)'
+      'CREATE TABLE reviews (id TEXT, building_id TEXT, status TEXT, overall_score REAL, move_out_year_new TEXT, created_at INTEGER)'
     );
     const stmt = db.prepare(
-      'INSERT INTO reviews (id, building_id, status, overall_score, move_out_year, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO reviews (id, building_id, status, overall_score, move_out_year_new, created_at) VALUES (?, ?, ?, ?, ?, ?)'
     );
     for (const r of rows) {
-      stmt.run(r.id, r.building_id, r.status, r.overall_score, r.move_out_year, r.created_at);
+      stmt.run(r.id, r.building_id, r.status, r.overall_score, r.move_out_year_new, r.created_at);
     }
     return db;
   }
@@ -86,18 +86,19 @@ suite('recencyWeightedOverallSql ⇄ calculateAggregatedScores parity (real SQLi
   }
 
   it('mixed recent + aged reviews, with a NULL-overall row excluded (ages 0,3,4,5)', () => {
-    // Ages exercised against CURRENT_YEAR=2026 via explicit move_out_year:
-    //   2026 -> age 0 -> weight 1.00
-    //   2023 -> age 3 -> weight 0.95
-    //   2022 -> age 4 -> weight 0.90
-    //   2021 -> age 5 -> weight 0.85
+    // Ages exercised against CURRENT_YEAR=2026 via explicit move_out_year_new
+    // (a 4-digit TEXT year wins over created_at):
+    //   '2026' -> age 0 -> weight 1.00
+    //   '2023' -> age 3 -> weight 0.95
+    //   '2022' -> age 4 -> weight 0.90
+    //   '2021' -> age 5 -> weight 0.85
     const rows: FixtureRow[] = [
-      { id: 'r1', building_id: 'b1', status: 'approved', overall_score: 4.0, move_out_year: 2026, created_at: midYearUnix(2026) },
-      { id: 'r2', building_id: 'b1', status: 'approved', overall_score: 3.0, move_out_year: 2023, created_at: midYearUnix(2023) },
-      { id: 'r3', building_id: 'b1', status: 'approved', overall_score: 5.0, move_out_year: 2022, created_at: midYearUnix(2022) },
-      { id: 'r4', building_id: 'b1', status: 'approved', overall_score: 2.0, move_out_year: 2021, created_at: midYearUnix(2021) },
+      { id: 'r1', building_id: 'b1', status: 'approved', overall_score: 4.0, move_out_year_new: '2026', created_at: midYearUnix(2026) },
+      { id: 'r2', building_id: 'b1', status: 'approved', overall_score: 3.0, move_out_year_new: '2023', created_at: midYearUnix(2023) },
+      { id: 'r3', building_id: 'b1', status: 'approved', overall_score: 5.0, move_out_year_new: '2022', created_at: midYearUnix(2022) },
+      { id: 'r4', building_id: 'b1', status: 'approved', overall_score: 2.0, move_out_year_new: '2021', created_at: midYearUnix(2021) },
       // NULL overall_score — MUST be excluded from both SQL and JS aggregates.
-      { id: 'r5', building_id: 'b1', status: 'approved', overall_score: null, move_out_year: 2026, created_at: midYearUnix(2026) },
+      { id: 'r5', building_id: 'b1', status: 'approved', overall_score: null, move_out_year_new: '2026', created_at: midYearUnix(2026) },
     ];
     const db = makeDb(rows);
     try {
@@ -117,12 +118,13 @@ suite('recencyWeightedOverallSql ⇄ calculateAggregatedScores parity (real SQLi
     }
   });
 
-  it('created_at-fallback year (move_out_year NULL) stays in parity', () => {
-    // No move_out_year -> recency basis is the UTC year of created_at in BOTH
-    // paths (SQL strftime vs JS getReviewYear). Mid-year timestamps avoid edges.
+  it("created_at-fallback year ('current' / NULL move_out_year_new) stays in parity", () => {
+    // A non-4-digit move_out_year_new ('current') or NULL -> recency basis is the
+    // UTC year of created_at in BOTH paths (SQL strftime vs JS getReviewYear).
+    // Mid-year timestamps avoid edges.
     const rows: FixtureRow[] = [
-      { id: 'c1', building_id: 'b4', status: 'approved', overall_score: 2.0, move_out_year: null, created_at: midYearUnix(2021) }, // age 5 -> 0.85
-      { id: 'c2', building_id: 'b4', status: 'approved', overall_score: 4.0, move_out_year: null, created_at: midYearUnix(2026) }, // age 0 -> 1.00
+      { id: 'c1', building_id: 'b4', status: 'approved', overall_score: 2.0, move_out_year_new: 'current', created_at: midYearUnix(2021) }, // age 5 -> 0.85
+      { id: 'c2', building_id: 'b4', status: 'approved', overall_score: 4.0, move_out_year_new: null, created_at: midYearUnix(2026) }, // age 0 -> 1.00
     ];
     const db = makeDb(rows);
     try {
@@ -138,8 +140,8 @@ suite('recencyWeightedOverallSql ⇄ calculateAggregatedScores parity (real SQLi
 
   it('all-NULL overall_score -> both return NULL', () => {
     const rows: FixtureRow[] = [
-      { id: 'n1', building_id: 'b2', status: 'approved', overall_score: null, move_out_year: 2026, created_at: midYearUnix(2026) },
-      { id: 'n2', building_id: 'b2', status: 'approved', overall_score: null, move_out_year: 2022, created_at: midYearUnix(2022) },
+      { id: 'n1', building_id: 'b2', status: 'approved', overall_score: null, move_out_year_new: '2026', created_at: midYearUnix(2026) },
+      { id: 'n2', building_id: 'b2', status: 'approved', overall_score: null, move_out_year_new: '2022', created_at: midYearUnix(2022) },
     ];
     const db = makeDb(rows);
     try {
@@ -153,7 +155,7 @@ suite('recencyWeightedOverallSql ⇄ calculateAggregatedScores parity (real SQLi
   it('no matching rows -> both return NULL', () => {
     const rows: FixtureRow[] = [
       // A row for a DIFFERENT building, so b3 has zero approved rows.
-      { id: 'x1', building_id: 'other', status: 'approved', overall_score: 4.0, move_out_year: 2026, created_at: midYearUnix(2026) },
+      { id: 'x1', building_id: 'other', status: 'approved', overall_score: 4.0, move_out_year_new: '2026', created_at: midYearUnix(2026) },
     ];
     const db = makeDb(rows);
     try {

@@ -19,7 +19,10 @@ function safeYear(currentYear: number): number {
 
 /** SQL expression for a review's recency-basis year (mirrors getReviewYear). */
 export function reviewYearSql(alias: string): string {
-  return `COALESCE(${alias}.move_out_year, CAST(strftime('%Y', ${alias}.created_at, 'unixepoch') AS INTEGER))`;
+  return `COALESCE(
+    CASE WHEN ${alias}.move_out_year_new GLOB '[0-9][0-9][0-9][0-9]' THEN CAST(${alias}.move_out_year_new AS INTEGER) END,
+    CAST(strftime('%Y', ${alias}.created_at, 'unixepoch') AS INTEGER)
+  )`;
 }
 
 /** SQL CASE expression for a review's recency weight (mirrors getRecencyWeight). */

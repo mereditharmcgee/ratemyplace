@@ -265,7 +265,7 @@ describe('calculateAggregatedScores', () => {
   it('calculates averages for a single review', () => {
     const review = {
       ...allScores(4),
-      move_out_year: 2026,
+      move_out_year_new: '2026',
       would_recommend_new: 'yes',
     };
     const result = calculateAggregatedScores([review]);
@@ -276,10 +276,10 @@ describe('calculateAggregatedScores', () => {
 
   it('calculates pctWouldRecommend correctly', () => {
     const reviews = [
-      { ...allScores(4), would_recommend_new: 'yes', move_out_year: 2026 },
-      { ...allScores(3), would_recommend_new: 'no', move_out_year: 2026 },
-      { ...allScores(5), would_recommend_new: 'yes', move_out_year: 2026 },
-      { ...allScores(2), would_recommend_new: 'maybe', move_out_year: 2026 },
+      { ...allScores(4), would_recommend_new: 'yes', move_out_year_new: '2026' },
+      { ...allScores(3), would_recommend_new: 'no', move_out_year_new: '2026' },
+      { ...allScores(5), would_recommend_new: 'yes', move_out_year_new: '2026' },
+      { ...allScores(2), would_recommend_new: 'maybe', move_out_year_new: '2026' },
     ];
     const result = calculateAggregatedScores(reviews);
     // 2 yes out of 3 definitive (maybe excluded) = 67%
@@ -288,14 +288,14 @@ describe('calculateAggregatedScores', () => {
 
   it('applies recency weighting to older reviews', () => {
     // Recent review (2026) scores 5, old review (2020, 6 yrs old = 0.85 weight) scores 1
-    const recentReview = { ...allScores(5), move_out_year: 2026 };
-    const oldReview = { ...allScores(1), move_out_year: 2020 };
+    const recentReview = { ...allScores(5), move_out_year_new: '2026' };
+    const oldReview = { ...allScores(1), move_out_year_new: '2020' };
 
     const resultWeighted = calculateAggregatedScores([recentReview, oldReview]);
 
     // Compare: two equally-weighted recent reviews with same scores
-    const recentReview2 = { ...allScores(5), move_out_year: 2026 };
-    const recentOldEquiv = { ...allScores(1), move_out_year: 2026 };
+    const recentReview2 = { ...allScores(5), move_out_year_new: '2026' };
+    const recentOldEquiv = { ...allScores(1), move_out_year_new: '2026' };
 
     const resultEqual = calculateAggregatedScores([recentReview2, recentOldEquiv]);
 
@@ -314,16 +314,16 @@ describe('calculateAggregatedScores uses the stored overall_score', () => {
     // (mean 3.0). Only the stored-column implementation yields 4.0 — this fails
     // if the aggregate ever reverts to recomputing overall from items.
     const reviews = [
-      { overall_score: 4.0, move_out_year: 2026, unit_structural: 1 },
-      { overall_score: 4.0, move_out_year: 2026, unit_structural: 5 },
+      { overall_score: 4.0, move_out_year_new: '2026', unit_structural: 1 },
+      { overall_score: 4.0, move_out_year_new: '2026', unit_structural: 5 },
     ];
     expect(calculateAggregatedScores(reviews, 2026).avgOverall).toBe(4.0);
   });
 
   it('excludes reviews with a null overall_score from avgOverall', () => {
     const reviews = [
-      { overall_score: 4.0, move_out_year: 2026 },
-      { overall_score: null, move_out_year: 2026 },
+      { overall_score: 4.0, move_out_year_new: '2026' },
+      { overall_score: null, move_out_year_new: '2026' },
     ];
     expect(calculateAggregatedScores(reviews, 2026).avgOverall).toBe(4.0);
   });
@@ -442,15 +442,17 @@ describe('aggregate vs simple-mean agreement (recency divergence)', () => {
   const thisYear = new Date().getFullYear();
 
   it('recency weighting is a no-op when all reviews are recent', () => {
+    const scores4 = allScores(4);
+    const scores2 = allScores(2);
     const reviews = [
-      { ...allScores(4), move_out_year: thisYear },
-      { ...allScores(2), move_out_year: thisYear },
+      { ...scores4, move_out_year_new: String(thisYear) },
+      { ...scores2, move_out_year_new: String(thisYear) },
     ];
     // Simple mean of per-review domain overalls = (4.0 + 2.0) / 2 = 3.0
     const simpleMean =
       Math.round(
-        ((calculateDomainScores(reviews[0]).overall! +
-          calculateDomainScores(reviews[1]).overall!) /
+        ((calculateDomainScores(scores4).overall! +
+          calculateDomainScores(scores2).overall!) /
           2) * 10
       ) / 10;
     expect(calculateAggregatedScores(reviews).avgOverall).toBe(simpleMean);
@@ -459,8 +461,8 @@ describe('aggregate vs simple-mean agreement (recency divergence)', () => {
 
   it('diverges from the simple mean once a review is old enough to decay', () => {
     const reviews = [
-      { ...allScores(4), move_out_year: thisYear },      // weight 1.0
-      { ...allScores(2), move_out_year: thisYear - 5 },  // weight 0.85 (5+ yrs)
+      { ...allScores(4), move_out_year_new: String(thisYear) },      // weight 1.0
+      { ...allScores(2), move_out_year_new: String(thisYear - 5) },  // weight 0.85 (5+ yrs)
     ];
     // Weighted: (4*1.0 + 2*0.85) / 1.85 = 3.08 → 3.1; simple mean would be 3.0
     expect(calculateAggregatedScores(reviews).avgOverall).toBeGreaterThan(3.0);
@@ -484,11 +486,19 @@ describe('RECENCY_BANDS (single source of recency weighting)', () => {
   });
 });
 
-describe('getReviewYear', () => {
-  it('prefers move_out_year, falls back to created_at UTC year, then currentYear', () => {
-    expect(getReviewYear({ move_out_year: 2023 }, 2026)).toBe(2023);
-    const tsUtc2025 = Date.UTC(2025, 5, 15) / 1000;
+describe('getReviewYear (derives recency from move_out_year_new)', () => {
+  const tsUtc2025 = Date.UTC(2025, 5, 15) / 1000;
+  it('uses a 4-digit move_out_year_new', () => {
+    expect(getReviewYear({ move_out_year_new: '2023', created_at: tsUtc2025 }, 2026)).toBe(2023);
+  });
+  it("falls back to created_at UTC year for 'current'", () => {
+    expect(getReviewYear({ move_out_year_new: 'current', created_at: tsUtc2025 }, 2026)).toBe(2025);
+  });
+  it('falls back to created_at when move_out_year_new is null/empty', () => {
+    expect(getReviewYear({ move_out_year_new: null, created_at: tsUtc2025 }, 2026)).toBe(2025);
     expect(getReviewYear({ created_at: tsUtc2025 }, 2026)).toBe(2025);
+  });
+  it('falls back to currentYear when nothing is available', () => {
     expect(getReviewYear({}, 2026)).toBe(2026);
   });
 });

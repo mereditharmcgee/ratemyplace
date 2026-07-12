@@ -8,9 +8,9 @@ import {
 } from '../scoring-sql';
 
 describe('reviewYearSql', () => {
-  it('uses move_out_year then created_at UTC year for the given alias', () => {
+  it('uses a 4-digit move_out_year_new then created_at UTC year for the given alias', () => {
     const sql = reviewYearSql('r');
-    expect(sql).toContain('r.move_out_year');
+    expect(sql).toContain("r.move_out_year_new GLOB '[0-9][0-9][0-9][0-9]'");
     expect(sql).toContain("strftime('%Y', r.created_at, 'unixepoch')");
   });
 });
@@ -30,9 +30,11 @@ describe('recencyWeightSql', () => {
     expect(sql).toContain('THEN 0.95');
     expect(sql).toContain('THEN 0.90');
     expect(sql).toContain('ELSE 0.85');
-    // one WHEN per finite band, plus one ELSE
-    const whenCount = (sql.match(/WHEN /g) || []).length;
-    expect(whenCount).toBe(RECENCY_BANDS.filter(b => Number.isFinite(b.maxAge)).length);
+    // one WHEN per finite band, plus one ELSE. Match only the band branches
+    // (`WHEN (2026 - ...)`) so the WHEN inside reviewYearSql's GLOB CASE — which
+    // is inlined once per branch — is not miscounted.
+    const bandWhenCount = (sql.match(/WHEN \(2026 -/g) || []).length;
+    expect(bandWhenCount).toBe(RECENCY_BANDS.filter(b => Number.isFinite(b.maxAge)).length);
   });
 });
 

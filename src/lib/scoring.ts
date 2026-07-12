@@ -124,21 +124,22 @@ export function getRecencyWeight(
 }
 
 /**
- * A review's recency basis year: its move-out year, else the UTC year of its
- * created_at, else the current year. UTC is used so this matches the SQL
- * strftime(...'unixepoch') in scoring-sql.ts deterministically at year edges.
- * NOTE (Phase 4): new reviews store move-out in `move_out_year_new`, not the
- * legacy `move_out_year` read here, so today this falls back to created_at for
- * new reviews. Preserved deliberately; the dual-column phase revisits this.
+ * A review's recency basis year: its real move-out year (`move_out_year_new`,
+ * a TEXT column) when that holds a 4-digit year, else the UTC year of its
+ * created_at, else the current year. A `'current'` (still-a-tenant) or otherwise
+ * non-4-digit `move_out_year_new` falls through to created_at. UTC is used so
+ * this matches the SQL strftime(...'unixepoch') in scoring-sql.ts deterministically
+ * at year edges.
  * JS/SQL year parity relies on `created_at` being NOT NULL (schema:
  * `INTEGER NOT NULL DEFAULT (unixepoch())`), so the `currentYear` fallback below
  * is never reached in practice and cannot diverge from the SQL `COALESCE`.
  */
 export function getReviewYear(
-  review: { move_out_year?: number | null; created_at?: number | null },
+  review: { move_out_year_new?: string | null; created_at?: number | null },
   currentYear: number = new Date().getUTCFullYear()
 ): number {
-  if (review.move_out_year) return review.move_out_year;
+  const moy = review.move_out_year_new;
+  if (moy && /^\d{4}$/.test(moy)) return parseInt(moy, 10);
   if (review.created_at) return new Date(review.created_at * 1000).getUTCFullYear();
   return currentYear;
 }
