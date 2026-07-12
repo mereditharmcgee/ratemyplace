@@ -96,7 +96,7 @@ export default function ReviewEditForm({ review }: Props) {
   // Tenure & move-out
   const [tenureMonths, setTenureMonths] = useState(review.tenure_months || 18);
   const [moveOutYear, setMoveOutYear] = useState(
-    review.is_current_tenant ? 'current' : (review.move_out_year_new || review.move_out_year?.toString() || 'current')
+    review.is_current_tenant ? 'current' : (review.move_out_year_new || 'current')
   );
 
   // New survey fields
@@ -270,7 +270,7 @@ export default function ReviewEditForm({ review }: Props) {
         </div>
         <div className="text-xs text-gray-400 mt-1">
           Move-in: {review.move_in_season} {review.move_in_year}
-          {review.is_current_tenant ? ' (Current tenant)' : review.move_out_year && ` - Move-out: ${(review as any).move_out_season} ${review.move_out_year}`}
+          {review.is_current_tenant ? ' (Current tenant)' : (review as any).move_out_year_new && ` - Move-out: ${(review as any).move_out_season} ${(review as any).move_out_year_new}`}
         </div>
       </div>
 

@@ -47,7 +47,7 @@ export interface Review {
 
   move_in_year: number;
   move_in_season: Season;
-  move_out_year?: number;
+  move_out_year_new?: string;
   move_out_season?: Season;
   is_current_tenant: boolean;
 

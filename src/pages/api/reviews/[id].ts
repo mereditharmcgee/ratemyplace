@@ -12,7 +12,6 @@ export interface ReviewDetail {
   city: string;
   move_in_year: number;
   move_in_season: string;
-  move_out_year: number | null;
   move_out_season: string | null;
   move_out_year_new: string | null;
   is_current_tenant: boolean;
