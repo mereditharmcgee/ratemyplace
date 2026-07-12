@@ -160,7 +160,7 @@ reviewsByUnit.forEach((stats) => {
   let recommendYes = 0;
   let recommendTotal = 0;
   stats.reviews.forEach(review => {
-    const wouldRecommend = review.would_recommend_new || review.would_recommend;
+    const wouldRecommend = review.would_recommend_new;
     if (wouldRecommend !== null && wouldRecommend !== undefined && wouldRecommend !== 'maybe') {
       recommendTotal++;
       if (wouldRecommend === 'yes' || wouldRecommend === 1 || wouldRecommend === true) {

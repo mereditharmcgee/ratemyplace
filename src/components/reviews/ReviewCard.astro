@@ -215,7 +215,7 @@ const pestLabels: Record<string, string> = {
       <SeasonChip
         moveInSeason={review.move_in_season}
         moveInYear={review.move_in_year}
-        moveOutYear={review.move_out_year_new || review.move_out_year}
+        moveOutYear={review.move_out_year_new}
         isCurrentTenant={review.is_current_tenant === 1 || review.move_out_year_new === 'current'}
         class="my-1"
       />
@@ -509,13 +509,13 @@ const pestLabels: Record<string, string> = {
   <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm">
     <div class="flex items-center gap-3">
       <span class={`px-2 py-1 rounded-full text-xs ${
-        review.would_recommend === 1 || review.would_recommend_new === 'yes'
+        review.would_recommend_new === 'yes'
           ? 'bg-green-100 text-green-800'
           : review.would_recommend_new === 'maybe'
             ? 'bg-amber-100 text-amber-800'
             : 'bg-red-100 text-red-800'
       }`}>
-        {review.would_recommend === 1 || review.would_recommend_new === 'yes'
+        {review.would_recommend_new === 'yes'
           ? 'Would recommend'
           : review.would_recommend_new === 'maybe'
             ? 'Maybe / It depends'
