@@ -4,7 +4,7 @@ import { getEnv } from '../../lib/runtime';
 import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
 import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
-import { validateBugReport } from '../../lib/validation';
+import { validateBugReport, isSafeHttpUrl } from '../../lib/validation';
 
 export async function POST(context: APIContext): Promise<Response> {
   // 1. Content-type guard — MUST come before any body parse (formData throws TypeError on wrong type)
@@ -81,6 +81,10 @@ export async function POST(context: APIContext): Promise<Response> {
     const id = generateIdFromEntropySize(10);
     const userId = context.locals.user?.id || null;
 
+    // Only persist a URL that is a well-formed http(s) link (validateBugReport
+    // already rejects others; this keeps the stored value clean regardless).
+    const safeUrl = url && isSafeHttpUrl(url.trim()) ? url.trim() : null;
+
     await db.prepare(`
       INSERT INTO bug_reports (id, user_id, email, category, description, url)
       VALUES (?, ?, ?, ?, ?, ?)
@@ -90,7 +94,7 @@ export async function POST(context: APIContext): Promise<Response> {
       email || null,
       safeCategory,
       (description || '').trim(),
-      url || null
+      safeUrl
     ).run();
 
     return new Response(JSON.stringify({ success: true }), {

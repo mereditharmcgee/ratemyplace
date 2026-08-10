@@ -124,6 +124,23 @@ export function isValidZipCode(zip: string): boolean {
 }
 
 /**
+ * True only for absolute http(s) URLs. Used to reject `javascript:`, `data:`,
+ * and other dangerous schemes before a user-supplied URL is stored and later
+ * rendered as a clickable link in the admin panel (React renders a
+ * `javascript:` href, so an admin click would run attacker script same-origin).
+ * Both the write path and the render path gate on this.
+ */
+export function isSafeHttpUrl(value: string | null | undefined): boolean {
+  if (!value) return false;
+  try {
+    const scheme = new URL(value).protocol;
+    return scheme === 'http:' || scheme === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Canonical max-length helper. Returns null when value is undefined/null/empty
  * or within bounds; returns ValidationError when over max.
  *
@@ -236,6 +253,9 @@ export function validateBugReport(data: {
   if (data.url) {
     const err = enforceMaxLength(data.url, 2000, 'url', 'URL');
     if (err) errors.push(err);
+    else if (!isSafeHttpUrl(data.url.trim())) {
+      errors.push({ field: 'url', message: 'URL must start with http:// or https://.' });
+    }
   }
 
   return errors;

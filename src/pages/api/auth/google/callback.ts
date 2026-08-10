@@ -92,6 +92,15 @@ export async function GET(context: APIContext): Promise<Response> {
       return context.redirect('/auth/signin?error=no_email');
     }
 
+    // Require a Google-verified email before trusting it. Google's userinfo can
+    // return an unverified email (e.g. some Workspace configurations); without
+    // this check, an identity asserting a victim's email would silently link to
+    // — and take over — that victim's existing password account below, and would
+    // seed new accounts with email_verified=1 they never proved.
+    if (googleUser.email_verified !== true) {
+      return context.redirect('/auth/signin?error=unverified_email');
+    }
+
     const db = getDB(context);
     const lucia = initializeLucia(db);
 

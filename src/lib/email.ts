@@ -7,6 +7,26 @@ interface EmailResult {
 }
 
 /**
+ * Escape HTML metacharacters before interpolating user-controlled values into
+ * email HTML. These emails are DKIM-signed and sent from our own domain, so an
+ * unescaped `<a>`/`<img>` in a dispute reason or contact message turns us into a
+ * phishing relay. String() coerces non-string inputs (defends against JSON
+ * type-confusion, e.g. an array/number arriving in a "reason" field).
+ *
+ * Do NOT apply to trusted constants (copy strings) or system-generated URLs —
+ * escaping a URL's query `&` would corrupt the link.
+ */
+function escapeHtml(value: unknown): string {
+  if (value == null) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * Send verification email to user
  *
  * @param apiKey - Resend API key from environment
@@ -183,7 +203,7 @@ export async function sendDisputeConfirmationEmail(
   const resend = new Resend(apiKey);
 
   const reasonsList = disputeDetails.disputeReasons
-    .map(reason => `<li>${reason}</li>`)
+    .map(reason => `<li>${escapeHtml(reason)}</li>`)
     .join('');
 
   try {
@@ -203,9 +223,9 @@ export async function sendDisputeConfirmationEmail(
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <h2 style="color: #0d9488;">We received your dispute</h2>
 
-  <p>Hi ${disputeDetails.landlordName},</p>
+  <p>Hi ${escapeHtml(disputeDetails.landlordName)},</p>
 
-  <p>Your dispute about the review at <strong>${disputeDetails.buildingAddress}</strong> is in our queue.</p>
+  <p>Your dispute about the review at <strong>${escapeHtml(disputeDetails.buildingAddress)}</strong> is in our queue.</p>
 
   <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
     <p style="margin: 0 0 10px 0;"><strong>Reasons cited:</strong></p>
@@ -214,7 +234,7 @@ export async function sendDisputeConfirmationEmail(
     </ul>
     ${disputeDetails.disputeExplanation ? `
     <p style="margin: 16px 0 0 0;"><strong>Your explanation:</strong></p>
-    <p style="margin: 8px 0 0 0; color: #666;">${disputeDetails.disputeExplanation}</p>
+    <p style="margin: 8px 0 0 0; color: #666;">${escapeHtml(disputeDetails.disputeExplanation)}</p>
     ` : ''}
   </div>
 
@@ -289,7 +309,7 @@ export async function sendContactConfirmationEmail(
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <h2 style="color: #0d9488;">We received your message</h2>
 
-  <p>Hi ${toName},</p>
+  <p>Hi ${escapeHtml(toName)},</p>
 
   <p>We've got your ${categoryLabel} and will reply within 2-3 business days.</p>
 
@@ -357,11 +377,11 @@ export async function sendContactNotificationEmail(
   <h2 style="color: #0d9488;">New Contact Form Submission</h2>
 
   <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
-    <p style="margin: 0 0 8px 0;"><strong>Name:</strong> ${submitterName}</p>
-    <p style="margin: 0 0 8px 0;"><strong>Email:</strong> <a href="mailto:${submitterEmail}" style="color: #0d9488;">${submitterEmail}</a></p>
-    <p style="margin: 0 0 8px 0;"><strong>Category:</strong> ${category}</p>
+    <p style="margin: 0 0 8px 0;"><strong>Name:</strong> ${escapeHtml(submitterName)}</p>
+    <p style="margin: 0 0 8px 0;"><strong>Email:</strong> <a href="mailto:${encodeURIComponent(submitterEmail)}" style="color: #0d9488;">${escapeHtml(submitterEmail)}</a></p>
+    <p style="margin: 0 0 8px 0;"><strong>Category:</strong> ${escapeHtml(category)}</p>
     <p style="margin: 16px 0 4px 0;"><strong>Message preview:</strong></p>
-    <p style="margin: 0; color: #666;">${messagePreview}</p>
+    <p style="margin: 0; color: #666;">${escapeHtml(messagePreview)}</p>
   </div>
 
   <p style="color: #666; font-size: 14px;">
@@ -457,13 +477,13 @@ export async function sendDisputeResolutionEmail(
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <h2 style="color: #0d9488;">${copy.heading}</h2>
 
-  <p>Hi ${landlordName},</p>
+  <p>Hi ${escapeHtml(landlordName)},</p>
 
   <p>${copy.lede}</p>
 
   <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
     <p style="margin: 0 0 10px 0;"><strong>Resolution notes:</strong></p>
-    <p style="margin: 0; color: #666;">${resolutionNotes}</p>
+    <p style="margin: 0; color: #666;">${escapeHtml(resolutionNotes)}</p>
   </div>
 
   <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
@@ -525,7 +545,7 @@ export async function sendReviewRejectedEmail(
     ? `
   <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
     <p style="margin: 0 0 10px 0;"><strong>What we noted:</strong></p>
-    <p style="margin: 0; color: #666;">${rejectionReason}</p>
+    <p style="margin: 0; color: #666;">${escapeHtml(rejectionReason)}</p>
   </div>
 `
     : '';
@@ -548,7 +568,7 @@ export async function sendReviewRejectedEmail(
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <h2 style="color: #0d9488;">Your review wasn't published</h2>
 
-  <p>We didn't publish your review of <strong>${buildingAddress}</strong>. It didn't meet our <a href="${guidelinesUrl}" style="color: #0d9488;">content guidelines</a>.</p>
+  <p>We didn't publish your review of <strong>${escapeHtml(buildingAddress)}</strong>. It didn't meet our <a href="${guidelinesUrl}" style="color: #0d9488;">content guidelines</a>.</p>
 ${reasonBlock}
   <p>You can edit and resubmit from your <a href="${profileUrl}" style="color: #0d9488;">profile</a>. Most rejections are about specific fixes (removing names, dates, or other identifying details), not the substance of what you experienced.</p>
 

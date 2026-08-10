@@ -1,7 +1,7 @@
 import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../lib/db';
 import { getEnv, fireAndForget } from '../../lib/runtime';
-import { extractReviewIdFromUrl } from '../../lib/disputes';
+import { extractReviewIdFromUrl, DISPUTE_REASONS } from '../../lib/disputes';
 import { sanitizeText, validateDisputeForm } from '../../lib/validation';
 import { sendDisputeConfirmationEmail } from '../../lib/email';
 import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../lib/rateLimit';
@@ -81,10 +81,18 @@ export const POST: APIRoute = async (context: APIContext) => {
       );
     }
 
-    // disputeReasons stays as inline business-logic check (it's an array, not a form field value)
-    if (!Array.isArray(disputeReasons) || disputeReasons.length === 0) {
+    // disputeReasons stays as inline business-logic check (it's an array, not a form field value).
+    // Every element MUST be a member of the DISPUTE_REASONS whitelist: these strings are
+    // interpolated into a DKIM-signed confirmation email, so accepting arbitrary text would
+    // let an attacker author email content sent from our domain (and store an unbounded blob).
+    if (
+      !Array.isArray(disputeReasons) ||
+      disputeReasons.length === 0 ||
+      disputeReasons.length > DISPUTE_REASONS.length ||
+      !disputeReasons.every((r) => (DISPUTE_REASONS as readonly string[]).includes(r))
+    ) {
       return new Response(
-        JSON.stringify({ error: 'Validation failed', details: [{ field: 'disputeReasons', message: 'At least one dispute reason is required.' }] }),
+        JSON.stringify({ error: 'Validation failed', details: [{ field: 'disputeReasons', message: 'Invalid dispute reason.' }] }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
