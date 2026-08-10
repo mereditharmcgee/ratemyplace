@@ -6,6 +6,7 @@ import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
 import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
 import { getSeasonFromMonth } from '../../lib/privacy';
+import { validateReviewText } from '../../lib/validation';
 
 export async function POST(context: APIContext): Promise<Response> {
   // Require authentication
@@ -113,7 +114,16 @@ export async function POST(context: APIContext): Promise<Response> {
 
     // Calculate domain scores and overall
     const domainScores = calculateDomainScores(scores);
-    const overallScore = domainScores.overall ?? 0;
+    // A review with no rating items answered has no meaningful score. Reject it
+    // rather than storing 0 (which would count as a real 0/5 and drag down the
+    // building's recency-weighted average).
+    const overallScore = domainScores.overall;
+    if (overallScore === null) {
+      return new Response(JSON.stringify({ error: 'Please rate at least one item before submitting your review.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     // Additional info
     const reviewTitle = formData.get('review_title') as string || null;
@@ -121,6 +131,20 @@ export async function POST(context: APIContext): Promise<Response> {
     const propertyManagerName = formData.get('property_manager_name') as string || null;
     const wouldRecommendNew = formData.get('would_recommend') as string || null;
     const comments = formData.get('comments') as string || null;
+
+    // Cap free-text lengths before anything is written (prevents oversized payloads).
+    const textErrors = validateReviewText({
+      review_title: reviewTitle,
+      landlord_name: landlordName,
+      property_manager_name: propertyManagerName,
+      comments,
+    });
+    if (textErrors.length > 0) {
+      return new Response(JSON.stringify({ error: 'Validation failed', details: textErrors }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     // Issues experienced
     const hadPestIssues = formData.get('had_pest_issues') === '1' ? 1 : 0;

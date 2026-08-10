@@ -228,12 +228,16 @@ export function calculateDomainScores(scores: Record<string, number | null | und
 }
 
 /**
- * Calculate overall score (for backward compatibility)
- * This is what gets stored in the overall_score column
+ * Calculate overall score. This is what gets stored in the overall_score column.
+ *
+ * Returns null when no rating items were answered — the caller MUST reject such a
+ * review rather than storing 0. A stored 0 is indistinguishable from a real 0/5
+ * rating and enters every recency-weighted average, silently tanking a building's
+ * score; null is correctly excluded from all aggregates.
  */
-export function calculateOverallScore(scores: Record<string, number | null | undefined>): number {
+export function calculateOverallScore(scores: Record<string, number | null | undefined>): number | null {
   const domainScores = calculateDomainScores(scores);
-  return domainScores.overall ?? 0;
+  return domainScores.overall;
 }
 
 /**

@@ -100,6 +100,33 @@ export function validateReviewForm(data: Partial<ReviewFormData & { move_in_mont
   return errors;
 }
 
+/**
+ * Length caps for the free-text fields written by the review create/edit routes,
+ * keyed on canonical DB column names. Without this an authenticated user can POST
+ * a multi-megabyte review_text/comments and exhaust the DB / wreck the moderation
+ * queue (score fields are already range-validated separately). Both write paths
+ * call this.
+ */
+export function validateReviewText(data: Record<string, unknown>): ValidationError[] {
+  const errors: ValidationError[] = [];
+  const caps: Array<[string, number, string]> = [
+    ['review_title', 200, 'Title'],
+    ['review_text', 5000, 'Review'],
+    ['comments', 5000, 'Comments'],
+    ['landlord_name', 200, 'Landlord name'],
+    ['property_manager_name', 200, 'Property manager name'],
+    ['parking_type', 100, 'Parking type'],
+  ];
+  for (const [field, max, label] of caps) {
+    const value = data[field];
+    if (typeof value === 'string') {
+      const err = enforceMaxLength(value, max, field, label);
+      if (err) errors.push(err);
+    }
+  }
+  return errors;
+}
+
 // ═══════════════════════════════════════════════════
 // Shared validation primitives (VAL-05)
 // ═══════════════════════════════════════════════════

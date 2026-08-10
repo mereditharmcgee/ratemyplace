@@ -22,7 +22,8 @@ function allScores(value: number): Record<string, number> {
   for (const field of ALL_SCORE_FIELDS) {
     scores[field] = value;
   }
-  scores.overall_score = calculateOverallScore(scores);
+  // Every field is set, so overall is always a number here (never null).
+  scores.overall_score = calculateOverallScore(scores) as number;
   return scores;
 }
 
@@ -232,8 +233,8 @@ describe('calculateDomainScores', () => {
 // ═══════════════════════════════════════════════════
 
 describe('calculateOverallScore', () => {
-  it('returns 0 for empty scores', () => {
-    expect(calculateOverallScore({})).toBe(0);
+  it('returns null for empty scores (no items rated → caller must reject, never store 0)', () => {
+    expect(calculateOverallScore({})).toBe(null);
   });
 
   it('returns correct weighted average for all-3 scores', () => {
@@ -424,10 +425,10 @@ describe('submit vs edit overall_score parity', () => {
     expect(calculateOverallScore(scores)).toBe(calculateDomainScores(scores).overall);
   });
 
-  it('differs only in the all-null case (0 vs null), by design', () => {
+  it('agrees with calculateDomainScores in the all-null case (both null)', () => {
     const empty = domainScores([], 0); // all fields null
     expect(calculateDomainScores(empty).overall).toBeNull();
-    expect(calculateOverallScore(empty)).toBe(0); // legacy column default
+    expect(calculateOverallScore(empty)).toBeNull();
   });
 });
 

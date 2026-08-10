@@ -2,6 +2,7 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import { getEnv } from '../../../lib/runtime';
 import { uploadVerificationImage } from '../../../lib/storage';
+import { checkRateLimit, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { generateIdFromEntropySize } from 'lucia';
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -14,6 +15,25 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   try {
+    const db = getDB(context);
+
+    // Rate limit BEFORE parsing the (up to 10 MB) upload. Keyed on user id since
+    // the endpoint is authenticated. The "one pending per review" guard below
+    // stops re-uploads only while a request is pending — once one is rejected it
+    // no longer blocks, so without this a user could loop large uploads and fill
+    // the R2 bucket. 10 / hour is well above any honest verification flow.
+    const rateLimit = await checkRateLimit(db, context.locals.user.id, 'verification-upload', 10, 3600);
+    if (!rateLimit.allowed) {
+      const status = rateLimit.error ? 503 : 429;
+      const message = rateLimit.error
+        ? 'Service temporarily unavailable. Please try again in a few minutes.'
+        : 'Too many verification uploads. Please try again later.';
+      return new Response(JSON.stringify({ error: message }), {
+        status,
+        headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 10) }
+      });
+    }
+
     const formData = await context.request.formData();
     const reviewId = formData.get('review_id') as string;
     const file = formData.get('file') as File;
@@ -31,8 +51,6 @@ export async function POST(context: APIContext): Promise<Response> {
         headers: { 'Content-Type': 'application/json' }
       });
     }
-
-    const db = getDB(context);
 
     // Verify user owns this review
     const review = await db.prepare('SELECT user_id, is_verified FROM reviews WHERE id = ?')
