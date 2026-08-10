@@ -1,6 +1,8 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
 import { recencyWeightedOverallSql, currentReviewYear } from '../../../../lib/scoring-sql';
+import { createAuditLog } from '../../../../lib/audit';
+import { getClientIP } from '../../../../lib/rateLimit';
 
 export async function PATCH(context: APIContext): Promise<Response> {
   // Require authentication
@@ -86,6 +88,15 @@ export async function PATCH(context: APIContext): Promise<Response> {
       SET ${updates.join(', ')}
       WHERE id = ?
     `).bind(...values).run();
+
+    await createAuditLog(db, {
+      adminUserId: context.locals.user.id,
+      adminIp: getClientIP(context),
+      actionType: 'manager_updated',
+      entityType: 'manager',
+      entityId: managerId,
+      newValue: { fields: updates.filter((u) => !u.startsWith('updated_at')) },
+    });
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }

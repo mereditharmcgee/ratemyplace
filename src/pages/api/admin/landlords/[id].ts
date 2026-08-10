@@ -85,6 +85,15 @@ export async function PATCH(context: APIContext): Promise<Response> {
       WHERE id = ?
     `).bind(...values).run();
 
+    await createAuditLog(db, {
+      adminUserId: context.locals.user.id,
+      adminIp: getClientIP(context),
+      actionType: 'landlord_updated',
+      entityType: 'landlord',
+      entityId: landlordId,
+      newValue: { fields: updates.filter((u) => !u.startsWith('updated_at')) },
+    });
+
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }
     });

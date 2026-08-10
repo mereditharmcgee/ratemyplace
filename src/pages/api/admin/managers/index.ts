@@ -2,6 +2,8 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
 import { recencyWeightedOverallSql, currentReviewYear } from '../../../../lib/scoring-sql';
 import { generateIdFromEntropySize } from 'lucia';
+import { createAuditLog } from '../../../../lib/audit';
+import { getClientIP } from '../../../../lib/rateLimit';
 
 export async function GET(context: APIContext): Promise<Response> {
   // Require authentication
@@ -105,6 +107,15 @@ export async function POST(context: APIContext): Promise<Response> {
       body.phone || null,
       body.email || null
     ).run();
+
+    await createAuditLog(db, {
+      adminUserId: context.locals.user.id,
+      adminIp: getClientIP(context),
+      actionType: 'manager_created',
+      entityType: 'manager',
+      entityId: id,
+      newValue: { name, slug },
+    });
 
     return new Response(JSON.stringify({
       manager: { id, name, slug, building_count: 0, review_count: 0, avg_score: null }

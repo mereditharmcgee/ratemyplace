@@ -53,7 +53,7 @@ if (query) {
           WHERE b.address LIKE ? ESCAPE '\\' OR b.neighborhood LIKE ? ESCAPE '\\' OR l.name LIKE ? ESCAPE '\\'
           GROUP BY b.id
           HAVING COUNT(r.id) > 0
-          ORDER BY COUNT(r.id) DESC, AVG(r.overall_score) DESC
+          ORDER BY COUNT(r.id) DESC, avg_overall DESC, b.id ASC
           LIMIT ?
         `).bind(likePattern, likePattern, likePattern, PAGE_SIZE).all();
         buildings = buildingResults.results || [];
@@ -86,7 +86,7 @@ if (query) {
           WHERE l.name LIKE ? ESCAPE '\\'
           GROUP BY l.id
           HAVING COUNT(r.id) > 0
-          ORDER BY COUNT(r.id) DESC, l.name ASC
+          ORDER BY COUNT(r.id) DESC, l.name ASC, l.id ASC
           LIMIT ?
         `).bind(likePattern, PAGE_SIZE).all();
         landlords = landlordResults.results || [];
@@ -120,7 +120,7 @@ if (query) {
         LEFT JOIN landlords l ON b.landlord_id = l.id
         GROUP BY b.id
         HAVING COUNT(r.id) > 0
-        ORDER BY COUNT(r.id) DESC, AVG(r.overall_score) DESC
+        ORDER BY COUNT(r.id) DESC, avg_overall DESC, b.id ASC
         LIMIT ?
       `).bind(PAGE_SIZE).all();
       buildings = buildingResults.results || [];
@@ -149,7 +149,7 @@ if (query) {
         LEFT JOIN reviews r ON r.building_id = b.id AND r.status = 'approved'
         GROUP BY l.id
         HAVING COUNT(r.id) > 0
-        ORDER BY COUNT(r.id) DESC, l.name ASC
+        ORDER BY COUNT(r.id) DESC, l.name ASC, l.id ASC
         LIMIT ?
       `).bind(PAGE_SIZE).all();
       landlords = landlordResults.results || [];

@@ -2,6 +2,8 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
 import { getEnv } from '../../../../lib/runtime';
 import { getVerificationImage, deleteVerificationImage } from '../../../../lib/storage';
+import { createAuditLog } from '../../../../lib/audit';
+import { getClientIP } from '../../../../lib/rateLimit';
 
 // GET - Stream the verification image
 export async function GET(context: APIContext): Promise<Response> {
@@ -101,6 +103,13 @@ export async function POST(context: APIContext): Promise<Response> {
     });
   }
 
+  if (!id) {
+    return new Response(JSON.stringify({ error: 'Verification ID required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
   try {
     const body = await context.request.json();
     const { action, rejection_reason } = body;
@@ -156,6 +165,17 @@ export async function POST(context: APIContext): Promise<Response> {
         await deleteVerificationImage(bucket, verification.r2_key);
       }
 
+      // Audit log — approval flips the review's is_verified trust signal AND
+      // irreversibly deletes the evidence, so record who did it.
+      await createAuditLog(db, {
+        adminUserId: context.locals.user.id,
+        adminIp: getClientIP(context),
+        actionType: 'verification_approved',
+        entityType: 'verification',
+        entityId: id,
+        newValue: { review_id: verification.review_id, is_verified: 1 },
+      });
+
       return new Response(JSON.stringify({
         success: true,
         message: 'Verification approved'
@@ -172,6 +192,16 @@ export async function POST(context: APIContext): Promise<Response> {
 
       // Keep the image for 30 days so user can see why it was rejected
       // (Could add cleanup job later)
+
+      await createAuditLog(db, {
+        adminUserId: context.locals.user.id,
+        adminIp: getClientIP(context),
+        actionType: 'verification_rejected',
+        entityType: 'verification',
+        entityId: id,
+        newValue: { review_id: verification.review_id },
+        notes: rejection_reason || undefined,
+      });
 
       return new Response(JSON.stringify({
         success: true,

@@ -50,6 +50,7 @@ export async function GET(context: APIContext): Promise<Response> {
       LEFT JOIN reviews r ON r.building_id = b.id AND r.status = 'approved'
       WHERE b.latitude IS NOT NULL AND b.longitude IS NOT NULL ${boundsClause}
       GROUP BY b.id
+      HAVING COUNT(r.id) > 0
       ORDER BY review_count DESC
       LIMIT 500
     `).bind(...boundsBinds).all();

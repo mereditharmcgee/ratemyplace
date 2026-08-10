@@ -1,5 +1,7 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
+import { createAuditLog } from '../../../../lib/audit';
+import { getClientIP } from '../../../../lib/rateLimit';
 
 export async function PATCH(context: APIContext): Promise<Response> {
   // Require authentication
@@ -133,6 +135,17 @@ export async function PATCH(context: APIContext): Promise<Response> {
       WHERE id = ?
     `).bind(...values).run();
 
+    // Audit log — records which fields an admin changed (owner data, landlord
+    // link, internal notes) without echoing the full old row.
+    await createAuditLog(db, {
+      adminUserId: context.locals.user.id,
+      adminIp: getClientIP(context),
+      actionType: 'building_updated',
+      entityType: 'building',
+      entityId: buildingId,
+      newValue: { fields: updates.filter((u) => !u.startsWith('updated_at')) },
+    });
+
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }
     });
@@ -187,6 +200,17 @@ export async function DELETE(context: APIContext): Promise<Response> {
 
     // Delete building (cascades to reviews due to ON DELETE CASCADE)
     await db.prepare('DELETE FROM buildings WHERE id = ?').bind(buildingId).run();
+
+    // Audit log — this can silently destroy tenant reviews via the cascade, so
+    // record what was deleted and how many reviews went with it.
+    await createAuditLog(db, {
+      adminUserId: context.locals.user.id,
+      adminIp: getClientIP(context),
+      actionType: 'building_deleted',
+      entityType: 'building',
+      entityId: buildingId,
+      oldValue: { address: building.address, reviewsDeleted: reviewCount?.count || 0 },
+    });
 
     return new Response(JSON.stringify({
       success: true,
