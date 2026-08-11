@@ -43,7 +43,7 @@ if (query) {
 
       if (totalBuildings > 0) {
         const buildingResults = await db.prepare(`
-          SELECT b.*,
+          SELECT b.slug, b.address, b.neighborhood, b.city, b.state,
             COUNT(r.id) as review_count,
             ${recencyWeightedOverallSql('r', currentYear)} as avg_overall,
             l.name as landlord_name
@@ -76,7 +76,7 @@ if (query) {
 
       if (totalLandlords > 0) {
         const landlordResults = await db.prepare(`
-          SELECT l.*,
+          SELECT l.slug, l.name,
             COUNT(DISTINCT b.id) as building_count,
             COUNT(r.id) as review_count,
             ${recencyWeightedOverallSql('r', currentYear)} as avg_overall
@@ -111,7 +111,7 @@ if (query) {
 
     if (totalBuildings > 0) {
       const buildingResults = await db.prepare(`
-        SELECT b.*,
+        SELECT b.slug, b.address, b.neighborhood, b.city, b.state,
           COUNT(r.id) as review_count,
           ${recencyWeightedOverallSql('r', currentYear)} as avg_overall,
           l.name as landlord_name
@@ -140,7 +140,7 @@ if (query) {
 
     if (totalLandlords > 0) {
       const landlordResults = await db.prepare(`
-        SELECT l.*,
+        SELECT l.slug, l.name,
           COUNT(DISTINCT b.id) as building_count,
           COUNT(r.id) as review_count,
           ${recencyWeightedOverallSql('r', currentYear)} as avg_overall

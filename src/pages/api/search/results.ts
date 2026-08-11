@@ -63,8 +63,12 @@ export async function GET(context: APIContext): Promise<Response> {
         `SELECT COUNT(*) as total FROM (SELECT b.id ${baseQuery})`
       ).bind(...binds).first<{ total: number }>();
 
+      // Explicit column list — never `b.*`. A wildcard leaks internal columns
+      // (admin_notes, owner_*) into this public JSON response and into the search
+      // island's serialized props (visible in view-source).
       const rows = await db.prepare(
-        `SELECT b.*, COUNT(r.id) as review_count, ${recencyWeightedOverallSql('r', currentYear)} as avg_overall, l.name as landlord_name
+        `SELECT b.slug, b.address, b.neighborhood, b.city, b.state,
+                COUNT(r.id) as review_count, ${recencyWeightedOverallSql('r', currentYear)} as avg_overall, l.name as landlord_name
          ${baseQuery}
          ORDER BY COUNT(r.id) DESC, AVG(r.overall_score) DESC
          LIMIT ? OFFSET ?`
@@ -98,8 +102,9 @@ export async function GET(context: APIContext): Promise<Response> {
         `SELECT COUNT(*) as total FROM (SELECT l.id ${baseQuery})`
       ).bind(...binds).first<{ total: number }>();
 
+      // Explicit column list — never `l.*` (leaks admin_notes, owner_entity).
       const rows = await db.prepare(
-        `SELECT l.*, COUNT(DISTINCT b.id) as building_count, COUNT(r.id) as review_count, ${recencyWeightedOverallSql('r', currentYear)} as avg_overall
+        `SELECT l.slug, l.name, COUNT(DISTINCT b.id) as building_count, COUNT(r.id) as review_count, ${recencyWeightedOverallSql('r', currentYear)} as avg_overall
          ${baseQuery}
          ORDER BY COUNT(r.id) DESC, l.name ASC
          LIMIT ? OFFSET ?`

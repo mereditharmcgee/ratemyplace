@@ -2,7 +2,7 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../lib/db';
 import { generateIdFromEntropySize } from 'lucia';
 import { checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
-import { escapeLikePattern } from '../../lib/validation';
+import { escapeLikePattern, sanitizeText, isValidZipCode } from '../../lib/validation';
 
 export async function GET(context: APIContext): Promise<Response> {
   const query = context.url.searchParams.get('q') || '';
@@ -101,12 +101,48 @@ export async function POST(context: APIContext): Promise<Response> {
 
     // placeId is optional — manual address entries (fallback when Google
     // Places fails or the user's address isn't found) are accepted without one.
-    if (!streetAddress || !city) {
+    if (!streetAddress || !city || typeof streetAddress !== 'string' || typeof city !== 'string') {
       return new Response(JSON.stringify({ error: 'Street address and city are required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
     }
+
+    // Type/length validation + sanitization. These fields are user-supplied on
+    // manual entry and flow to the public map/search (where address/neighborhood
+    // are rendered), so strip markup, cap lengths, and reject non-numeric
+    // coordinates before anything reaches the DB.
+    const cleanAddress = sanitizeText(streetAddress).slice(0, 500);
+    const cleanCity = sanitizeText(city).slice(0, 120);
+    const cleanNeighborhood = typeof neighborhood === 'string' && neighborhood.trim()
+      ? sanitizeText(neighborhood).slice(0, 120)
+      : null;
+    const cleanState = typeof state === 'string' && state.trim()
+      ? state.trim().slice(0, 2).toUpperCase()
+      : null;
+    const cleanZip = typeof zipCode === 'string' && isValidZipCode(zipCode.trim())
+      ? zipCode.trim()
+      : null;
+
+    // sanitizeText can empty out an all-markup input (e.g. "<b></b>") that passed
+    // the truthy check above — re-verify after cleaning.
+    if (!cleanAddress || !cleanCity) {
+      return new Response(JSON.stringify({ error: 'Street address and city are required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Coordinates: accept only finite numbers within valid lat/lng ranges; a bad
+    // coordinate becomes null (building simply won't appear on the map) rather
+    // than poisoning map.ts for every visitor.
+    const parseCoord = (raw: unknown, min: number, max: number): number | null => {
+      if (raw === null || raw === undefined || raw === '') return null;
+      const n = Number(raw);
+      return Number.isFinite(n) && n >= min && n <= max ? n : null;
+    };
+    const cleanLatitude = parseCoord(latitude, -90, 90);
+    const cleanLongitude = parseCoord(longitude, -180, 180);
 
     // For Google-sourced submissions, dedupe by place ID
     if (placeId) {
@@ -126,7 +162,7 @@ export async function POST(context: APIContext): Promise<Response> {
       // Manual entry: dedupe by exact (address, city) match — case-insensitive
       const existing = await db.prepare(
         'SELECT id, slug FROM buildings WHERE LOWER(address) = LOWER(?) AND LOWER(city) = LOWER(?) LIMIT 1'
-      ).bind(streetAddress, city).first<{ id: string; slug: string }>();
+      ).bind(cleanAddress, cleanCity).first<{ id: string; slug: string }>();
 
       if (existing) {
         return new Response(JSON.stringify({
@@ -138,14 +174,14 @@ export async function POST(context: APIContext): Promise<Response> {
       }
     }
 
-    // Truncate address to prevent excessively long values
-    const safeAddress = streetAddress.slice(0, 500);
+    // Already sanitized + length-capped above.
+    const safeAddress = cleanAddress;
 
     // Generate slug from address
     let slug = safeAddress
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '') + '-' + city.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      .replace(/^-|-$/g, '') + '-' + cleanCity.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
     // Check for slug collision and append suffix if needed
     const existingSlug = await db.prepare(
@@ -167,12 +203,12 @@ export async function POST(context: APIContext): Promise<Response> {
       buildingId,
       safeAddress,
       slug,
-      neighborhood || null,
-      city,
-      state || null,
-      zipCode || null,
-      latitude || null,
-      longitude || null,
+      cleanNeighborhood,
+      cleanCity,
+      cleanState,
+      cleanZip,
+      cleanLatitude,
+      cleanLongitude,
       placeId || null
     ).run();
 

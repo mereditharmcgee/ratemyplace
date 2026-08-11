@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { isSafeHttpUrl } from '../../lib/validation';
 
 interface BugReport {
   id: string;
@@ -223,14 +224,22 @@ export default function BugReportsTable() {
                 {bug.url && (
                   <div>
                     <h4 className="text-sm font-medium text-gray-500 mb-1">Page URL</h4>
-                    <a
-                      href={bug.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-teal-700 hover:text-teal-700 break-all"
-                    >
-                      {bug.url}
-                    </a>
+                    {/* Only render a clickable link for http(s) URLs. A stored
+                        `javascript:`/`data:` URL rendered as an href would run
+                        attacker script in the admin session on click, so unsafe
+                        values (incl. legacy rows) show as inert text. */}
+                    {isSafeHttpUrl(bug.url) ? (
+                      <a
+                        href={bug.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-teal-700 hover:text-teal-700 break-all"
+                      >
+                        {bug.url}
+                      </a>
+                    ) : (
+                      <p className="text-sm text-gray-900 break-all">{bug.url}</p>
+                    )}
                   </div>
                 )}
 

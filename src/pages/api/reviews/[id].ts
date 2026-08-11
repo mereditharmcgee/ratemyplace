@@ -1,6 +1,7 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import { calculateOverallScore, ALL_SCORE_FIELDS } from '../../../lib/scoring';
+import { validateReviewText } from '../../../lib/validation';
 
 export interface ReviewDetail {
   id: string;
@@ -172,6 +173,15 @@ export async function PATCH(context: APIContext): Promise<Response> {
 
     const body = await context.request.json();
 
+    // Cap free-text field lengths before any DB work (prevents oversized payloads).
+    const textErrors = validateReviewText(body);
+    if (textErrors.length > 0) {
+      return new Response(JSON.stringify({ error: 'Validation failed', details: textErrors }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     // Collect all 27 survey scores from the request body
     // Only include fields that are present in the body to avoid wiping scores on partial update
     const scores: Record<string, number | null> = {};
@@ -223,8 +233,15 @@ export async function PATCH(context: APIContext): Promise<Response> {
       }
     }
 
-    // Calculate overall score using the proper weighted scoring
+    // Calculate overall score using the proper weighted scoring. Null means no
+    // items were rated — reject rather than persisting 0 (see calculateOverallScore).
     const overallScore = calculateOverallScore(scores);
+    if (overallScore === null) {
+      return new Response(JSON.stringify({ error: 'Please rate at least one item before saving your review.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     // Handle would_recommend - canonical text column only
     const wouldRecommendNew = body.would_recommend_new || null;

@@ -228,6 +228,15 @@ export default function ReviewForm({ building }: Props) {
   const handleSubmit = async () => {
     if (!selectedBuilding) return;
 
+    // A review with no rating items answered has no score — block it here so the
+    // reviewer gets clear feedback instead of the server's 400 (the API enforces
+    // this too; this is the friendly front-line check).
+    const hasAnyRating = Object.values(scores).some((v) => v !== null);
+    if (!hasAnyRating) {
+      setError('Please rate at least one item before submitting your review.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 

@@ -126,6 +126,15 @@ export default function ReviewEditForm({ review }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Block a review with every rating cleared — the API rejects it too, but this
+    // gives the reviewer clear feedback instead of a 400.
+    const hasAnyRating = Object.values(scores).some((v) => v !== null);
+    if (!hasAnyRating) {
+      setError('Please rate at least one item before saving your review.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 

@@ -4,10 +4,12 @@ import {
   sanitizeText,
   isValidEmail,
   isValidZipCode,
+  isSafeHttpUrl,
   enforceMaxLength,
   escapeLikePattern,
   validateDisputeForm,
   validateBugReport,
+  validateReviewText,
   validateContactForm,
   validateSearch,
 } from '../validation';
@@ -498,9 +500,76 @@ describe('validateBugReport', () => {
     expect(errors.some(e => e.field === 'url')).toBe(true);
   });
 
+  it('rejects a javascript: URL', () => {
+    const errors = validateBugReport({
+      description: 'long enough description here',
+      url: 'javascript:fetch("/api/admin/users/x",{method:"PATCH"})',
+    });
+    expect(errors.some(e => e.field === 'url')).toBe(true);
+  });
+
+  it('accepts a normal https URL', () => {
+    const errors = validateBugReport({
+      description: 'long enough description here',
+      url: 'https://ratemyplace.org/building/123-main-st-boston',
+    });
+    expect(errors.some(e => e.field === 'url')).toBe(false);
+  });
+
   it('returns no errors for valid input', () => {
     const errors = validateBugReport({ description: 'long enough description here', category: 'bug' });
     expect(errors).toHaveLength(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// validateReviewText — length caps on free-text fields
+// ═══════════════════════════════════════════════════
+
+describe('validateReviewText', () => {
+  it('rejects an oversized comments field', () => {
+    const errors = validateReviewText({ comments: 'a'.repeat(5001) });
+    expect(errors.some(e => e.field === 'comments')).toBe(true);
+  });
+
+  it('rejects an oversized review_title', () => {
+    const errors = validateReviewText({ review_title: 'a'.repeat(201) });
+    expect(errors.some(e => e.field === 'review_title')).toBe(true);
+  });
+
+  it('accepts normal-length text and ignores non-string/missing fields', () => {
+    const errors = validateReviewText({
+      review_title: 'Great place',
+      comments: 'Lived here two years, solid landlord.',
+      landlord_name: 'Acme Property LLC',
+      rent_amount: 2400, // non-string field is ignored
+    });
+    expect(errors).toHaveLength(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// isSafeHttpUrl — blocks dangerous schemes before render
+// ═══════════════════════════════════════════════════
+
+describe('isSafeHttpUrl', () => {
+  it('accepts http and https', () => {
+    expect(isSafeHttpUrl('http://example.com')).toBe(true);
+    expect(isSafeHttpUrl('https://ratemyplace.org/x?y=1')).toBe(true);
+  });
+
+  it('rejects javascript:, data:, and vbscript: schemes', () => {
+    expect(isSafeHttpUrl('javascript:alert(1)')).toBe(false);
+    expect(isSafeHttpUrl('data:text/html,<script>alert(1)</script>')).toBe(false);
+    expect(isSafeHttpUrl('vbscript:msgbox(1)')).toBe(false);
+  });
+
+  it('rejects relative URLs, empty, and null', () => {
+    expect(isSafeHttpUrl('/building/x')).toBe(false);
+    expect(isSafeHttpUrl('not a url')).toBe(false);
+    expect(isSafeHttpUrl('')).toBe(false);
+    expect(isSafeHttpUrl(null)).toBe(false);
+    expect(isSafeHttpUrl(undefined)).toBe(false);
   });
 });
 

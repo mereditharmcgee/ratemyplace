@@ -100,6 +100,33 @@ export function validateReviewForm(data: Partial<ReviewFormData & { move_in_mont
   return errors;
 }
 
+/**
+ * Length caps for the free-text fields written by the review create/edit routes,
+ * keyed on canonical DB column names. Without this an authenticated user can POST
+ * a multi-megabyte review_text/comments and exhaust the DB / wreck the moderation
+ * queue (score fields are already range-validated separately). Both write paths
+ * call this.
+ */
+export function validateReviewText(data: Record<string, unknown>): ValidationError[] {
+  const errors: ValidationError[] = [];
+  const caps: Array<[string, number, string]> = [
+    ['review_title', 200, 'Title'],
+    ['review_text', 5000, 'Review'],
+    ['comments', 5000, 'Comments'],
+    ['landlord_name', 200, 'Landlord name'],
+    ['property_manager_name', 200, 'Property manager name'],
+    ['parking_type', 100, 'Parking type'],
+  ];
+  for (const [field, max, label] of caps) {
+    const value = data[field];
+    if (typeof value === 'string') {
+      const err = enforceMaxLength(value, max, field, label);
+      if (err) errors.push(err);
+    }
+  }
+  return errors;
+}
+
 // ═══════════════════════════════════════════════════
 // Shared validation primitives (VAL-05)
 // ═══════════════════════════════════════════════════
@@ -121,6 +148,23 @@ export function isValidEmail(email: string): boolean {
  */
 export function isValidZipCode(zip: string): boolean {
   return /^\d{5}(-\d{4})?$/.test(zip);
+}
+
+/**
+ * True only for absolute http(s) URLs. Used to reject `javascript:`, `data:`,
+ * and other dangerous schemes before a user-supplied URL is stored and later
+ * rendered as a clickable link in the admin panel (React renders a
+ * `javascript:` href, so an admin click would run attacker script same-origin).
+ * Both the write path and the render path gate on this.
+ */
+export function isSafeHttpUrl(value: string | null | undefined): boolean {
+  if (!value) return false;
+  try {
+    const scheme = new URL(value).protocol;
+    return scheme === 'http:' || scheme === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -236,6 +280,9 @@ export function validateBugReport(data: {
   if (data.url) {
     const err = enforceMaxLength(data.url, 2000, 'url', 'URL');
     if (err) errors.push(err);
+    else if (!isSafeHttpUrl(data.url.trim())) {
+      errors.push({ field: 'url', message: 'URL must start with http:// or https://.' });
+    }
   }
 
   return errors;

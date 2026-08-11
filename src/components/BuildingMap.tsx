@@ -244,39 +244,52 @@ export default function BuildingMap({
         const scoreLabel = getMarkerLabel(building.avgScore);
         const scoreColor = getMarkerHex(building.avgScore);
 
-        const content = `
-          <div style="padding: 8px; max-width: 250px;">
-            <h3 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600;">${building.address}</h3>
-            ${building.neighborhood ? `<p style="margin: 0 0 8px 0; font-size: 12px; color: #666;">${building.neighborhood}</p>` : ''}
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-              <span style="
-                display: inline-block;
-                padding: 2px 8px;
-                border-radius: 12px;
-                font-size: 12px;
-                font-weight: 500;
-                background: ${scoreColor}20;
-                color: ${scoreColor};
-              ">${scoreLabel}</span>
-              ${building.avgScore !== null ? `<span style="font-size: 14px; font-weight: 600;">${building.avgScore.toFixed(1)}/5</span>` : ''}
-            </div>
-            <p style="margin: 0 0 8px 0; font-size: 12px; color: #666;">
-              ${building.reviewCount} ${building.reviewCount === 1 ? 'review' : 'reviews'}
-            </p>
-            <a href="/building/${building.slug}" style="
-              display: inline-block;
-              padding: 6px 12px;
-              background: #1A9A7D;
-              color: white;
-              text-decoration: none;
-              border-radius: 6px;
-              font-size: 12px;
-              font-weight: 500;
-            ">View Details</a>
-          </div>
-        `;
+        // Build the InfoWindow with DOM nodes + textContent rather than an HTML
+        // string. building.address / .neighborhood are user-supplied (created via
+        // POST /api/buildings, unmoderated) and setContent() parses a string as
+        // HTML — interpolating them raw was a stored-XSS sink. textContent never
+        // parses markup. scoreColor is a SCORE_HEX constant (safe to inline).
+        const container = document.createElement('div');
+        container.style.cssText = 'padding: 8px; max-width: 250px;';
 
-        infoWindowRef.current?.setContent(content);
+        const heading = document.createElement('h3');
+        heading.style.cssText = 'margin: 0 0 4px 0; font-size: 14px; font-weight: 600;';
+        heading.textContent = building.address;
+        container.appendChild(heading);
+
+        if (building.neighborhood) {
+          const neighborhood = document.createElement('p');
+          neighborhood.style.cssText = 'margin: 0 0 8px 0; font-size: 12px; color: #666;';
+          neighborhood.textContent = building.neighborhood;
+          container.appendChild(neighborhood);
+        }
+
+        const scoreRow = document.createElement('div');
+        scoreRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 8px;';
+        const scoreBadge = document.createElement('span');
+        scoreBadge.style.cssText = `display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; background: ${scoreColor}20; color: ${scoreColor};`;
+        scoreBadge.textContent = scoreLabel;
+        scoreRow.appendChild(scoreBadge);
+        if (building.avgScore !== null) {
+          const scoreNumber = document.createElement('span');
+          scoreNumber.style.cssText = 'font-size: 14px; font-weight: 600;';
+          scoreNumber.textContent = `${building.avgScore.toFixed(1)}/5`;
+          scoreRow.appendChild(scoreNumber);
+        }
+        container.appendChild(scoreRow);
+
+        const reviewCountLine = document.createElement('p');
+        reviewCountLine.style.cssText = 'margin: 0 0 8px 0; font-size: 12px; color: #666;';
+        reviewCountLine.textContent = `${building.reviewCount} ${building.reviewCount === 1 ? 'review' : 'reviews'}`;
+        container.appendChild(reviewCountLine);
+
+        const detailsLink = document.createElement('a');
+        detailsLink.href = `/building/${encodeURIComponent(building.slug)}`;
+        detailsLink.style.cssText = 'display: inline-block; padding: 6px 12px; background: #1A9A7D; color: white; text-decoration: none; border-radius: 6px; font-size: 12px; font-weight: 500;';
+        detailsLink.textContent = 'View Details';
+        container.appendChild(detailsLink);
+
+        infoWindowRef.current?.setContent(container);
         infoWindowRef.current?.open(mapInstanceRef.current, marker);
       });
 
