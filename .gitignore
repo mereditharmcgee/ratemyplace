@@ -33,3 +33,13 @@ playwright/.auth/
 
 # GSD tools (symlink to home install)
 .claude/get-shit-done
+
+# Claude Code worktrees
+.claude/worktrees/
+
+# Google Drive sync artifacts
+.tmp.driveupload/
+
+# personal documents kept alongside the repo, not part of the app
+Org Docs/
+just-tech-application/
