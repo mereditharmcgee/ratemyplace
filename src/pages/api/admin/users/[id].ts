@@ -1,5 +1,7 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
+import { createAuditLog } from '../../../../lib/audit';
+import { getClientIP } from '../../../../lib/rateLimit';
 
 export async function PATCH(context: APIContext): Promise<Response> {
   // Require authentication
@@ -47,8 +49,9 @@ export async function PATCH(context: APIContext): Promise<Response> {
 
     const db = getDB(context);
 
-    // Check if user exists
-    const user = await db.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+    // Check if user exists (and capture the old value for the audit trail)
+    const user = await db.prepare('SELECT id, is_admin FROM users WHERE id = ?')
+      .bind(userId).first<{ id: string; is_admin: number }>();
     if (!user) {
       return new Response(JSON.stringify({ error: 'User not found' }), {
         status: 404,
@@ -62,6 +65,18 @@ export async function PATCH(context: APIContext): Promise<Response> {
       SET is_admin = ?, updated_at = unixepoch()
       WHERE id = ?
     `).bind(is_admin, userId).run();
+
+    // Audit log — granting/revoking admin is the most privilege-sensitive action
+    // on the platform and must leave a trail.
+    await createAuditLog(db, {
+      adminUserId: context.locals.user.id,
+      adminIp: getClientIP(context),
+      actionType: is_admin === 1 ? 'admin_granted' : 'admin_revoked',
+      entityType: 'user',
+      entityId: userId,
+      oldValue: { is_admin: user.is_admin },
+      newValue: { is_admin },
+    });
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }

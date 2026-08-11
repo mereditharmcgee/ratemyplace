@@ -2,6 +2,8 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
 import { recencyWeightedOverallSql, currentReviewYear } from '../../../../lib/scoring-sql';
 import { generateIdFromEntropySize } from 'lucia';
+import { createAuditLog } from '../../../../lib/audit';
+import { getClientIP } from '../../../../lib/rateLimit';
 
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
@@ -142,6 +144,15 @@ export async function POST(context: APIContext): Promise<Response> {
       body.phone || null,
       body.email || null
     ).run();
+
+    await createAuditLog(db, {
+      adminUserId: context.locals.user.id,
+      adminIp: getClientIP(context),
+      actionType: 'landlord_created',
+      entityType: 'landlord',
+      entityId: id,
+      newValue: { name, slug },
+    });
 
     return new Response(JSON.stringify({
       landlord: { id, name, slug, building_count: 0, review_count: 0, avg_score: null }

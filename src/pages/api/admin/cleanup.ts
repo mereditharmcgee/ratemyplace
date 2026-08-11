@@ -1,5 +1,7 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
+import { createAuditLog } from '../../../lib/audit';
+import { getClientIP } from '../../../lib/rateLimit';
 
 // Admin endpoint to cleanup buildings with no reviews
 export async function POST(context: APIContext): Promise<Response> {
@@ -48,6 +50,17 @@ export async function POST(context: APIContext): Promise<Response> {
     const placeholders = ids.map(() => '?').join(',');
 
     await db.prepare(`DELETE FROM buildings WHERE id IN (${placeholders})`).bind(...ids).run();
+
+    // Audit log — one entry for the whole bulk delete, recording the count and
+    // the addresses removed (a single admin click can delete many rows).
+    await createAuditLog(db, {
+      adminUserId: context.locals.user.id,
+      adminIp: getClientIP(context),
+      actionType: 'buildings_bulk_deleted',
+      entityType: 'building',
+      entityId: ids.join(','),
+      oldValue: { deleted: buildingsToDelete.length, addresses: buildingsToDelete.map((b) => b.address) },
+    });
 
     return new Response(JSON.stringify({
       success: true,

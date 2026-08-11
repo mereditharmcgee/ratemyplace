@@ -327,26 +327,22 @@ export default function BuildingMap({
         </div>
       )}
 
-      {/* Legend */}
+      {/* Legend — color + label pulled from the canonical scoring-colors source
+          so the swatches always match the marker fills (all four bands). */}
       <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-3 text-sm">
         <div className="font-medium mb-2">Score Legend</div>
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full" style={{ background: '#2D9B83' }}></span>
-            <span>Good (4-5)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full" style={{ background: '#E8B44A' }}></span>
-            <span>Mixed (3-4)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full" style={{ background: '#D97356' }}></span>
-            <span>Concerning (1-3)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full" style={{ background: '#6B7280' }}></span>
-            <span>No reviews</span>
-          </div>
+          {[
+            { score: 4.5, range: '4–5' },
+            { score: 3.5, range: '3–3.9' },
+            { score: 2.5, range: '2–2.9' },
+            { score: 1.5, range: '1–1.9' },
+          ].map(({ score, range }) => (
+            <div key={range} className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full" style={{ background: getScoreHex(score) }}></span>
+              <span>{getScoreColor(score).label} ({range})</span>
+            </div>
+          ))}
         </div>
       </div>
 

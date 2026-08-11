@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { getScoreBgTint, getScoreTextColor } from '../lib/scoring-colors';
 
 interface DbResult {
   id: string;
@@ -236,11 +237,7 @@ export default function HomeSearch() {
                         </div>
                         <div className="flex-shrink-0 flex items-center gap-2">
                           {item.data.avgScore !== null && (
-                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                              item.data.avgScore >= 4 ? 'bg-emerald-100 text-emerald-700' :
-                              item.data.avgScore >= 3 ? 'bg-amber-100 text-amber-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getScoreBgTint(item.data.avgScore)} ${getScoreTextColor(item.data.avgScore)}`}>
                               {item.data.avgScore.toFixed(1)}
                             </span>
                           )}

@@ -70,7 +70,7 @@ export async function GET(context: APIContext): Promise<Response> {
         `SELECT b.slug, b.address, b.neighborhood, b.city, b.state,
                 COUNT(r.id) as review_count, ${recencyWeightedOverallSql('r', currentYear)} as avg_overall, l.name as landlord_name
          ${baseQuery}
-         ORDER BY COUNT(r.id) DESC, AVG(r.overall_score) DESC
+         ORDER BY COUNT(r.id) DESC, avg_overall DESC, b.id ASC
          LIMIT ? OFFSET ?`
       ).bind(...binds, limit, offset).all();
 
@@ -106,7 +106,7 @@ export async function GET(context: APIContext): Promise<Response> {
       const rows = await db.prepare(
         `SELECT l.slug, l.name, COUNT(DISTINCT b.id) as building_count, COUNT(r.id) as review_count, ${recencyWeightedOverallSql('r', currentYear)} as avg_overall
          ${baseQuery}
-         ORDER BY COUNT(r.id) DESC, l.name ASC
+         ORDER BY COUNT(r.id) DESC, l.name ASC, l.id ASC
          LIMIT ? OFFSET ?`
       ).bind(...binds, limit, offset).all();
 

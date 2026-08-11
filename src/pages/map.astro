@@ -1,8 +1,18 @@
 ---
 import BaseLayout from '../components/layout/BaseLayout.astro';
 import BuildingMap from '../components/BuildingMap';
+import { getScoreHex, getScoreColor } from '../lib/scoring-colors';
 
 const apiKey = Astro.locals.runtime.env.GOOGLE_MAPS_API_KEY || '';
+
+// Score-band explainer cards. Color + label come from the canonical
+// scoring-colors source so they match the map markers (all four bands).
+const scoreBands = [
+  { score: 4.5, range: '4–5', blurb: 'Highly rated by tenants', detail: 'Positive experiences reported. Most tenants would recommend.' },
+  { score: 3.5, range: '3–3.9', blurb: 'Average ratings', detail: 'A mix of positive and negative feedback. Check specific reviews for details.' },
+  { score: 2.5, range: '2–2.9', blurb: 'Issues reported', detail: 'Notable concerns raised by tenants. Review carefully before renting.' },
+  { score: 1.5, range: '1–1.9', blurb: 'Serious problems', detail: 'Significant problems reported by tenants across multiple reviews.' },
+];
 ---
 
 <BaseLayout title="Map" description="Explore rental buildings on an interactive map. Find apartments with color-coded scores from tenant reviews.">
@@ -29,51 +39,21 @@ const apiKey = Astro.locals.runtime.env.GOOGLE_MAPS_API_KEY || '';
         </div>
       )}
 
-      <div class="mt-8 grid md:grid-cols-3 gap-6">
-        <div class="bg-white p-6 rounded-[6px] border border-slate-200 hover:shadow-sm transition-shadow">
-          <div class="flex items-center gap-3 mb-3">
-            <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: #2D9B8320;">
-              <div class="w-4 h-4 rounded-full" style="background: #2D9B83;"></div>
+      <div class="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {scoreBands.map((band) => (
+          <div class="bg-white p-6 rounded-[6px] border border-slate-200 hover:shadow-sm transition-shadow">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-full flex items-center justify-center" style={`background: ${getScoreHex(band.score)}20;`}>
+                <div class="w-4 h-4 rounded-full" style={`background: ${getScoreHex(band.score)};`}></div>
+              </div>
+              <div>
+                <h3 class="font-semibold text-gray-900">{getScoreColor(band.score).label} ({band.range})</h3>
+                <p class="text-sm text-gray-600">{band.blurb}</p>
+              </div>
             </div>
-            <div>
-              <h3 class="font-semibold text-gray-900">Good (4-5)</h3>
-              <p class="text-sm text-gray-600">Highly rated by tenants</p>
-            </div>
+            <p class="text-sm text-gray-500">{band.detail}</p>
           </div>
-          <p class="text-sm text-gray-500">
-            Buildings with positive experiences reported. Most tenants would recommend.
-          </p>
-        </div>
-
-        <div class="bg-white p-6 rounded-[6px] border border-slate-200 hover:shadow-sm transition-shadow">
-          <div class="flex items-center gap-3 mb-3">
-            <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: #E8B44A20;">
-              <div class="w-4 h-4 rounded-full" style="background: #E8B44A;"></div>
-            </div>
-            <div>
-              <h3 class="font-semibold text-gray-900">Mixed (3-4)</h3>
-              <p class="text-sm text-gray-600">Average ratings</p>
-            </div>
-          </div>
-          <p class="text-sm text-gray-500">
-            Buildings with some positive and negative feedback. Check specific reviews for details.
-          </p>
-        </div>
-
-        <div class="bg-white p-6 rounded-[6px] border border-slate-200 hover:shadow-sm transition-shadow">
-          <div class="flex items-center gap-3 mb-3">
-            <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: #D9735620;">
-              <div class="w-4 h-4 rounded-full" style="background: #D97356;"></div>
-            </div>
-            <div>
-              <h3 class="font-semibold text-gray-900">Concerning (1-3)</h3>
-              <p class="text-sm text-gray-600">Issues reported</p>
-            </div>
-          </div>
-          <p class="text-sm text-gray-500">
-            Buildings with significant concerns reported by tenants. Review carefully before renting.
-          </p>
-        </div>
+        ))}
       </div>
 
       <div class="mt-8 text-center">

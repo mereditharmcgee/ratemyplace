@@ -1,5 +1,7 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
+import { createAuditLog } from '../../../../lib/audit';
+import { getClientIP } from '../../../../lib/rateLimit';
 
 export async function PATCH(context: APIContext): Promise<Response> {
   if (!context.locals.user) {
@@ -38,7 +40,16 @@ export async function PATCH(context: APIContext): Promise<Response> {
 
     const db = getDB(context);
 
-    const resolvedAt = (status === 'resolved' || status === 'wont_fix') ? 'unixepoch()' : 'NULL';
+    // Existence check — without it, a PATCH to a nonexistent id updates 0 rows but
+    // returns success, and the client optimistically shows a change that never
+    // persisted.
+    const existing = await db.prepare('SELECT id FROM bug_reports WHERE id = ?').bind(id).first();
+    if (!existing) {
+      return new Response(JSON.stringify({ error: 'Bug report not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     await db.prepare(`
       UPDATE bug_reports
@@ -52,6 +63,15 @@ export async function PATCH(context: APIContext): Promise<Response> {
       status || '',
       id
     ).run();
+
+    await createAuditLog(db, {
+      adminUserId: context.locals.user.id,
+      adminIp: getClientIP(context),
+      actionType: 'bug_report_updated',
+      entityType: 'bug_report',
+      entityId: id,
+      newValue: { status: status || undefined },
+    });
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }
