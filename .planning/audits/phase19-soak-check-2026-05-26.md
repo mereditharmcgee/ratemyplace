@@ -2,8 +2,9 @@
 audit_topic: d1-indexes-soak-check
 scheduled: 2026-05-26
 phase: 19
-status: manual-run-required
-auth_gap: cloudflare-credentials-not-present-in-remote-env
+status: pass
+completed: 2026-08-12
+auth_gap: resolved-via-scoped-api-token
 baseline_doc: d1-indexes-2026-04-28.md
 ---
 
@@ -48,7 +49,7 @@ USE TEMP B-TREE FOR ORDER BY
 **PASS if:** `SEARCH r USING INDEX idx_reviews_building_status` is present for the reviews join.
 **FAIL if:** `SEARCH r USING INDEX idx_reviews_status` (reverted to single-column) or `SCAN TABLE reviews` (no index at all).
 
-- [ ] Q1 PASS
+- [x] Q1 PASS (2026-08-12)
 
 ---
 
@@ -73,7 +74,7 @@ Note: The `BLOOM FILTER ON r` line is a bonus optimization the production planne
 **PASS if:** `SEARCH r USING INDEX idx_reviews_building_status` is present for the reviews join.
 **FAIL if:** `SEARCH r USING INDEX idx_reviews_status` or `SCAN TABLE reviews`.
 
-- [ ] Q2 PASS
+- [x] Q2 PASS (2026-08-12)
 
 ---
 
@@ -95,7 +96,7 @@ Note: `SCAN b USING INDEX sqlite_autoindex_buildings_1` is expected — the `LIK
 **PASS if:** `SEARCH r USING INDEX idx_reviews_building_status` is present for the reviews join.
 **FAIL if:** `SEARCH r USING INDEX idx_reviews_status` or `SCAN TABLE reviews`.
 
-- [ ] Q3 PASS
+- [x] Q3 PASS (2026-08-12)
 
 ---
 
@@ -117,6 +118,37 @@ Note: `SCAN b USING INDEX sqlite_autoindex_buildings_1` is expected — the `LIK
 
 No PR needed. Record the green soak check date here and close this file out:
 
-- **Soak check date:** _(fill in)_
-- **Result:** PASS / FAIL
-- **Checked by:** _(your name)_
+- **Soak check date:** 2026-08-12
+- **Result:** PASS (all 4 checks)
+- **Checked by:** Claude Code (local terminal, scoped `CLOUDFLARE_API_TOKEN`)
+
+### Recorded output (2026-08-12, served_by v3-prod/ENAM)
+
+**Step 0:** 1 row returned — `idx_reviews_building_status` exists.
+
+**Q1** — exact match to baseline:
+```
+SCAN b USING INDEX sqlite_autoindex_buildings_1
+SEARCH r USING INDEX idx_reviews_building_status (building_id=? AND status=?) LEFT-JOIN
+SEARCH l USING INDEX sqlite_autoindex_landlords_1 (id=?) LEFT-JOIN
+USE TEMP B-TREE FOR ORDER BY
+```
+
+**Q2** — exact match to baseline, bloom filter present:
+```
+SCAN l USING INDEX sqlite_autoindex_landlords_1
+SEARCH b USING INDEX idx_buildings_landlord (landlord_id=?) LEFT-JOIN
+BLOOM FILTER ON r (building_id=? AND status=?)
+SEARCH r USING INDEX idx_reviews_building_status (building_id=? AND status=?) LEFT-JOIN
+USE TEMP B-TREE FOR count(DISTINCT)
+USE TEMP B-TREE FOR ORDER BY
+```
+
+**Q3** — exact match to baseline:
+```
+SCAN b USING INDEX sqlite_autoindex_buildings_1
+SEARCH r USING INDEX idx_reviews_building_status (building_id=? AND status=?) LEFT-JOIN
+USE TEMP B-TREE FOR ORDER BY
+```
+
+No regression. No follow-up PR required.
