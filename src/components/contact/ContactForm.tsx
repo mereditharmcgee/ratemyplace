@@ -1,4 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: HTMLElement, options: {
+        sitekey: string;
+        theme?: string;
+        callback?: (token: string) => void;
+        'expired-callback'?: () => void;
+      }) => string;
+      reset: (widgetId: string) => void;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
 
 interface ContactFormProps {
   turnstileSitekey?: string;
@@ -9,6 +24,43 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
+
+  // Explicit render instead of the declarative cf-turnstile div: the island
+  // hydrates after Turnstile's auto-scan, so implicit rendering is a race
+  // (widget missing, or injected pre-hydration and wiped by React).
+  useEffect(() => {
+    const renderWidget = () => {
+      if (!turnstileRef.current || !window.turnstile || widgetIdRef.current) return;
+      widgetIdRef.current = window.turnstile.render(turnstileRef.current, {
+        sitekey: turnstileSitekey,
+        theme: 'light',
+        callback: (token: string) => setTurnstileToken(token),
+        'expired-callback': () => setTurnstileToken(null),
+      });
+    };
+
+    if (window.turnstile) {
+      renderWidget();
+    } else {
+      const interval = setInterval(() => {
+        if (window.turnstile) {
+          clearInterval(interval);
+          renderWidget();
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+
+    return () => {
+      if (widgetIdRef.current && window.turnstile) {
+        window.turnstile.remove(widgetIdRef.current);
+        widgetIdRef.current = null;
+      }
+    };
+  }, [turnstileSitekey]);
 
   const validateForm = (name: string, email: string, message: string): boolean => {
     const errors: Record<string, string> = {};
@@ -47,6 +99,13 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
       return;
     }
 
+    if (!turnstileToken) {
+      setError('Please complete the bot verification below before submitting.');
+      return;
+    }
+
+    formData.set('cf-turnstile-response', turnstileToken);
+
     setLoading(true);
 
     try {
@@ -59,13 +118,21 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
 
       if (response.ok) {
         setSubmitted(true);
-      } else if (response.status === 429) {
+        return;
+      }
+
+      if (response.status === 429) {
         setError('Too many submissions. Please wait an hour before trying again.');
       } else {
         setError(result.error || 'Something went wrong. Please try again.');
       }
+      // Turnstile tokens are single-use — reset the widget for a retry.
+      if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
+      setTurnstileToken(null);
     } catch {
       setError('An error occurred. Please try again.');
+      if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
+      setTurnstileToken(null);
     } finally {
       setLoading(false);
     }
@@ -171,12 +238,12 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
         <p className="mt-1 text-xs text-gray-500">At least 10 characters, max 3000.</p>
       </div>
 
-      {/* Turnstile widget */}
-      <div className="cf-turnstile" data-sitekey={turnstileSitekey} data-theme="light" />
+      {/* Turnstile widget (rendered explicitly in the effect above) */}
+      <div ref={turnstileRef} />
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || !turnstileToken}
         className="w-full flex justify-center py-2 px-4 border border-transparent rounded-[4px] text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? 'Sending...' : 'Send Message'}
