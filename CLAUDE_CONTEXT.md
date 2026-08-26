@@ -1,6 +1,19 @@
 # RateMyPlace - Claude Context Document
 
-> **Purpose:** This document provides complete project context for new Claude instances working on this codebase. It contains everything needed to understand the project architecture, current state, and how to work effectively with the code.
+> ## ⚠️ STALE — do not trust for current state
+>
+> This document reflects the **v1.1.0-alpha era (January 2026)** and has not been
+> maintained since. It still describes dropped columns, a score cache that no longer
+> exists, and a worktree workflow that is no longer used.
+>
+> **Read [`AGENTS.md`](AGENTS.md) instead** — it is the canonical agent instruction file,
+> with nested guides in `src/lib/`, `src/pages/api/`, `src/components/`, and `migrations/`.
+> For product context read [`MASTER.md`](MASTER.md); for architecture, [`ARCHITECTURE.md`](ARCHITECTURE.md).
+>
+> Kept for historical reference only. Verify anything here against the source before
+> relying on it.
+
+> **Original purpose:** This document provides complete project context for new Claude instances working on this codebase. It contains everything needed to understand the project architecture, current state, and how to work effectively with the code.
 
 ---
 

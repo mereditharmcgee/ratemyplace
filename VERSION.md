@@ -1,5 +1,15 @@
 # RateMyPlace Version History
 
+> ## ⚠️ STALE — last updated January 2026
+>
+> This file stops at **v1.1.0-alpha**. Five milestones have shipped since (v1.2.1, v1.2.2,
+> v1.3.0, v1.4.0, v1.5.0 "Closed Loops", April 2026), plus ad-hoc work through August 2026.
+>
+> For actual release history see [`.planning/ROADMAP.md`](.planning/ROADMAP.md) and the
+> per-milestone audits in `.planning/milestones/`. For current state, `git log`.
+>
+> Kept for historical reference.
+
 ## Version Naming Convention
 
 **Format:** `v{major}.{minor}.{patch}-{stage}`

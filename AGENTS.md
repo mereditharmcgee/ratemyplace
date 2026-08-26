@@ -1,307 +1,269 @@
-# RateMyPlace Boston - Coding Conventions
+# RateMyPlace Boston — Agent Guide
 
-> **Doc map:** [`MASTER.md`](MASTER.md) is the canonical product spec (mission, ethics, rating instrument, privacy, schema). [`ARCHITECTURE.md`](ARCHITECTURE.md) is the technical architecture reference. [`brand.md`](brand.md) is the voice and visual brand bible. [`CLAUDE_CONTEXT.md`](CLAUDE_CONTEXT.md) is the orientation doc for Codex agents. This file is coding conventions only.
+This is the canonical instruction file for AI coding agents working in this repo
+(Codex, Claude Code, and anything else that reads `AGENTS.md`). `CLAUDE.md` points here.
 
-## Quick Reference
+Directory-specific rules live in nested `AGENTS.md` files and override this one where they overlap:
 
-| Item | Convention |
-|------|------------|
-| Framework | Astro 5.x SSR + React islands |
-| Database | Cloudflare D1 (SQLite) |
-| Auth | Lucia v3 with D1 adapter |
-| Styling | Tailwind CSS 4.x |
+| Path | Covers |
+|------|--------|
+| [`src/lib/AGENTS.md`](src/lib/AGENTS.md) | Scoring, survey items, validation — the load-bearing logic |
+| [`src/components/AGENTS.md`](src/components/AGENTS.md) | Astro vs React, brand tokens, islands |
+| [`migrations/AGENTS.md`](migrations/AGENTS.md) | Schema changes and the production migration trap |
+
+> **Never put an `AGENTS.md` (or any `.md`) inside `src/pages/`.** Astro's file-based
+> routing turns Markdown in `src/pages/` into a public page — a guide at
+> `src/pages/api/AGENTS.md` ships as `ratemyplace.org/api/AGENTS`, publishing internal
+> security notes. API route guidance lives in the "API routes" section below instead.
+
+---
+
+## What this project is
+
+RateMyPlace is **a public record of rental housing, from the people who know it best** —
+a tenant housing review platform grounded in public health research. Renters rate their
+unit, building, and landlord on a 32-item survey (27 scored + 5 ancillary) adapted from
+three validated instruments: OHQS, PHQS, and WHO LARES.
+
+It is not Yelp for apartments. It is closer to a public health department with a comment
+section. Housing is a social determinant of health, and rental markets have severe
+information asymmetry — landlords pull credit reports and tenant blacklists, tenants get
+a walkthrough. The product exists to close that gap.
+
+Live at **ratemyplace.org**. Single maintainer. ~51 reviews in production across Boston
+and New Haven.
+
+## Non-negotiables
+
+These are product commitments, not preferences. Do not trade them away for convenience,
+and flag it explicitly if a requested change would erode one.
+
+1. **Tenant anonymity is a safety feature.** Retaliation is the risk being designed
+   against. Exact timestamps and tenure are collected but **never displayed** — public
+   surfaces show fuzzy buckets only (`src/lib/privacy.ts`). No IP addresses are stored.
+   No per-user analytics.
+2. **Scoring changes are retroactive and require sign-off.** Touching `ITEM_WEIGHTS`,
+   `RECENCY_BANDS`, or the aggregation formula silently rewrites every score in the
+   database. Never adjust them as a side effect of another change.
+3. **The methodology is public and must stay true.** `/methodology` publishes every item,
+   weight, and citation. Code and page must not drift apart.
+4. **Landlords get due process, not veto power.** Reviews are moderated and disputable.
+   A negative review is never removed because someone disagrees with it.
+5. **Admin actions are audited.** Every destructive admin action writes an audit log entry.
+
+## Stack
+
+| Layer | Choice |
+|-------|--------|
+| Framework | Astro 5 SSR (`output: 'server'`) + React 18 islands |
+| Hosting | Cloudflare Pages — auto-deploys from `main` |
+| Database | Cloudflare D1 (SQLite), binding `DB` |
+| File storage | Cloudflare R2, binding `VERIFICATION_BUCKET` |
+| Auth | Lucia v3 + D1 adapter; password (Oslo crypto) and Google OAuth |
+| Styling | Tailwind CSS 4 via Vite plugin |
+| Email | Resend |
+| Bot defense | Cloudflare Turnstile |
 | Types | TypeScript strict mode |
+| Tests | Vitest (unit) + Playwright (E2E) |
 
-## File Patterns
+Runtime env vars are reached through `getEnv(context)` in `src/lib/runtime.ts` — **never**
+`(context.locals as any).runtime`. v1.5.0 removed 89 such casts; do not reintroduce them.
 
-### Pages (Astro)
-- **Public pages**: `src/pages/*.astro` - SSR, no client JS unless needed
-- **Dynamic routes**: `src/pages/[slug].astro` - Use `Astro.params.slug`
-- **Admin pages**: `src/pages/admin/*.astro` - Always check `locals.user?.isAdmin`
+## Commands
 
-### API Routes
-- **Location**: `src/pages/api/**/*.ts`
-- **Auth check pattern**:
-```typescript
-if (!context.locals.user) {
-  return new Response(JSON.stringify({ error: 'Authentication required' }), {
-    status: 401,
-    headers: { 'Content-Type': 'application/json' }
-  });
-}
-```
-- **Admin check pattern**:
-```typescript
-if (!context.locals.user?.isAdmin) {
-  return new Response(JSON.stringify({ error: 'Admin access required' }), {
-    status: 403,
-    headers: { 'Content-Type': 'application/json' }
-  });
-}
+```bash
+npm run dev        # Astro dev server
+npm test           # Vitest — 389 tests, ~13s
+npm test -- scoring   # filter by name
+npm run build      # production build
+npm run e2e        # fresh local D1 + seed + build + Playwright
+npm run db:setup   # db:fresh then db:seed (local D1 only)
 ```
 
-### Components
-- **Astro components**: Static/SSR rendering, use for layouts and data display
-- **React components**: Interactive islands only (forms, maps, dynamic UI)
-- **React directive**: Always use `client:load` for immediate interactivity
+Run `npm test` and `npm run build` before declaring work complete. Both are fast.
 
-```astro
-<!-- Astro component with React island -->
-<ReviewForm client:load buildingId={building.id} />
-```
+## Conventions
 
-### Library Files (`src/lib/`)
-- **Single responsibility**: One concern per file
-- **Export types**: Always export interfaces for consumers
-- **Critical files**:
-  - `scoring.ts` - All scoring logic (weights, calculations)
-  - `surveyItems.ts` - Survey questions and help text
-  - `validation.ts` - Input validation
-  - `audit.ts` - Admin action logging
+- **Business logic lives in `src/lib/`, never in components.** Components render.
+- **Every API route handles auth explicitly.** No implicit protection anywhere.
+- **Parameterized queries always.** Never string-interpolate user input into SQL.
+- **Timestamps are `unixepoch()`**, never `datetime('now')`. Column type
+  `INTEGER DEFAULT (unixepoch())`.
+- **No `any` types.** Define interfaces in `src/lib/types.ts`.
+- **Score colors come from `src/lib/scoring-colors.ts`.** Never hardcode a band color.
+- React islands use `client:load`; everything else stays server-rendered.
 
-## Database Patterns
+### Git
 
-### Getting DB Connection
+Commit prefixes: `feat:` `fix:` `docs:` `chore:` `refactor:`.
+`main` is production and auto-deploys — work on feature branches.
+
+## API routes (`src/pages/api/`)
+
+47 endpoints. Nothing is protected implicitly — every route handles its own auth,
+validation, and rate limiting. A missing check is a live vulnerability, not a style issue.
+
+### Checklist for every new endpoint
+
+- [ ] Auth check if it needs one (`context.locals.user`)
+- [ ] Admin check if admin-only (`context.locals.user?.isAdmin`)
+- [ ] Content-type guard if it accepts JSON
+- [ ] Rate limiting if it is public
+- [ ] Turnstile if it is an unauthenticated public POST
+- [ ] Input validation before any processing
+- [ ] Parameterized queries — never string interpolation
+- [ ] Audit log if it is a destructive admin action
+
+### Getting the database
+
 ```typescript
 import { getDB } from '../../lib/db';
 
-const db = getDB((context.locals as any).runtime);
+const db = getDB(context);
 ```
 
-### Query Patterns
+`getDB` takes the `APIContext` itself. It does **not** take `context.locals.runtime`, and
+it needs no cast. Older docs showed `getDB((context.locals as any).runtime)` — that is
+wrong, does not compile, and reintroduces the `as any` pattern v1.5.0 removed from 89 sites.
+
+### Auth
+
 ```typescript
-// Single row
-const user = await db.prepare('SELECT * FROM users WHERE id = ?')
-  .bind(userId)
-  .first<User>();
+if (!context.locals.user) {
+  return new Response(JSON.stringify({ error: 'Authentication required' }), {
+    status: 401, headers: { 'Content-Type': 'application/json' }
+  });
+}
 
-// Multiple rows
-const { results } = await db.prepare('SELECT * FROM reviews WHERE building_id = ?')
-  .bind(buildingId)
-  .all<Review>();
-
-// Insert with generated ID
-import { generateIdFromEntropySize } from 'lucia';
-const id = generateIdFromEntropySize(10);
-await db.prepare('INSERT INTO reviews (id, ...) VALUES (?, ...)')
-  .bind(id, ...)
-  .run();
+if (!context.locals.user?.isAdmin) {
+  return new Response(JSON.stringify({ error: 'Admin access required' }), {
+    status: 403, headers: { 'Content-Type': 'application/json' }
+  });
+}
 ```
 
-### Timestamps
-- Use `unixepoch()` for SQLite timestamps (not `datetime('now')`)
-- Column type: `INTEGER DEFAULT (unixepoch())`
+Ownership is a separate check from authentication. A signed-in user editing a review must
+be verified as the *author* of that review, not merely logged in.
 
-## Scoring System (Critical)
+### Responses
 
-### Modifying Weights
-1. Edit `ITEM_WEIGHTS` in `src/lib/scoring.ts`
-2. Document justification with academic citation
-3. Update `src/pages/methodology.astro`
+Success `{ data }` / client error `{ error, details }` / server error `{ error }`, all with
+`Content-Type: application/json`. Never return a stack trace, file path, SQL fragment, or
+internal field name — log detail server-side with `logError` from `lib/logger.ts`.
 
-### Adding Survey Items
-1. Add column in new migration (`migrations/XXXX_name.sql`)
-2. Add to `src/lib/surveyItems.ts` with help text
-3. Add to domain array in `src/lib/scoring.ts` (UNIT_FIELDS, BUILDING_FIELDS, or LANDLORD_FIELDS)
-4. Set weight in `ITEM_WEIGHTS`
-5. Update `ReviewForm.tsx` and `ReviewCard.astro`
+Select columns explicitly on anything public-facing. `admin_notes` leaked through a search
+endpoint once because the query used `SELECT *`.
 
-### Weight Guidelines
-| Weight | Use For |
-|--------|---------|
-| 1.5x | Major health hazards (pests, mold) |
-| 1.3x | Safety hazards (structural, climate) |
-| 1.2x | Health-adjacent (plumbing, security) |
-| 1.0x | Standard quality factors |
+### Rate limiting
 
-## Error Handling
-
-### API Responses
 ```typescript
-// Success
-return new Response(JSON.stringify({ data: result }), {
-  status: 200,
-  headers: { 'Content-Type': 'application/json' }
-});
+import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../lib/rateLimit';
 
-// Client error
-return new Response(JSON.stringify({ error: 'Validation failed', details: errors }), {
-  status: 400,
-  headers: { 'Content-Type': 'application/json' }
-});
+const clientIP = getClientIP(context);
+const rateLimit = await checkRateLimit(db, clientIP, 'dispute', 3, 3600); // 3 per hour
 
-// Server error
-return new Response(JSON.stringify({ error: 'Internal server error' }), {
-  status: 500,
-  headers: { 'Content-Type': 'application/json' }
-});
+if (!rateLimit.allowed) {
+  const status = rateLimit.error ? 503 : 429;   // fail closed: limiter error → 503, not open
+  return new Response(JSON.stringify({ error: 'Too many requests. Please try again later.' }), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 3) }
+  });
+}
 ```
 
-### Audit Logging (Admin Actions)
-```typescript
-import { createAuditLog } from '../../lib/audit';
+Rate limiting is **fail-closed**. If the limiter itself errors, the request is refused, not
+allowed through. Preserve that.
 
-// Best-effort logging - failures don't break the action
-await createAuditLog(db, {
-  adminUserId: context.locals.user.id,
-  actionType: 'review_approved',
-  entityType: 'review',
-  entityId: reviewId,
-  oldValue: { status: 'pending' },
-  newValue: { status: 'approved' }
-});
+### CSRF — read before adding any endpoint
+
+No CSRF token implementation, deliberately. Protection is three layers (audited 2026-04-28,
+`.planning/audits/csrf-2026-04.md`):
+
+1. **SameSite=Lax** on the session cookie (`src/middleware.ts`) and the OAuth state cookie
+   — cross-site POSTs carry no session, so authenticated endpoints are inherently covered.
+2. **Cloudflare Turnstile** on every unauthenticated public POST form.
+3. **Astro `security.checkOrigin`** (default `true` for SSR) — rejects cross-origin POSTs
+   with form content types.
+
+**The caveat that matters:** `checkOrigin` does **not** cover `application/json` POSTs. An
+unauthenticated endpoint accepting JSON gets nothing from layers 1 or 3, so it must wire
+all three of: a content-type guard, a rate limit, and Turnstile.
+
+`src/pages/api/disputes.ts` is the reference implementation. Read it before writing a new
+public endpoint. Its order matters:
+
+```
+content-type guard → rate limit → request.json() → Turnstile → validation → logic
 ```
 
-## Styling
+The content-type guard must come **before** `request.json()`, which throws a raw
+`SyntaxError` on non-JSON input.
 
-### Score Colors
+Re-audit triggers: Astro major upgrade, replacing Lucia, a new OAuth provider, or a new
+non-form content-type endpoint.
 
-**Single source of truth: [`src/lib/scoring-colors.ts`](src/lib/scoring-colors.ts).** Always import from there. Do not roll your own thresholds or labels.
+### Turnstile and email
 
-Canonical four-band system (mirrors `brand.md` §4.2):
+`verifyTurnstile(token, getEnv(context).TURNSTILE_SECRET_KEY, clientIP)` — required on
+signup, forgot-password, contact, disputes, bug reports. It cannot be tested on preview or
+locally; verify on production.
 
-| Band | Range | Label | Fill | Text | Hex |
-|------|-------|-------|------|------|-----|
-| Good | 4.0–5.0 | `Good` | `bg-emerald-600` | `text-emerald-700` | `#059669` |
-| Mixed | 3.0–3.9 | `Mixed` | `bg-amber-500` | `text-amber-700` | `#F59E0B` |
-| Concerning | 2.0–2.9 | `Concerning` | `bg-amber-700` | `text-red-700` | `#A16207` |
-| Poor | 1.0–1.9 | `Poor` | `bg-red-700` | `text-red-700` | `#B91C1C` |
+Email templates live in `lib/email.ts`, never in route handlers, and every interpolated
+user value goes through that module's local `escapeHtml`. Send with
+`fireAndForget(context, promise)`, never a bare `await`.
 
-Available helpers:
-- `getScoreColor(score)` → `{ bg, text, label }` for filled badges/pills
-- `getScoreTextColor(score)` → Tailwind class for colored score numbers
-- `getScoreBgTint(score)` → soft-tinted background class for score detail tiles
-- `getScoreHex(score)` / `SCORE_HEX` → hex strings for non-Tailwind contexts (Google Maps markers, OG images, PDF exports)
+## Traps
 
-If you're adding a new surface that displays a score, reach for one of these. Never hardcode `text-teal-600` or `bg-orange-500` for score-band display.
+Things that have already cost time. Read before debugging.
 
-### Brand Colors
-- **Primary**: `text-teal-600` / `bg-teal-600`
-- **Stars**: `text-amber-400`
-- **Danger**: `text-red-600`
+- **Preview deploys cannot exercise Turnstile or the map.** The Turnstile sitekey is not
+  allowlisted for `pages.dev`, and preview has no Maps key. Verify those widgets on
+  production only — a failure in preview is expected, not a bug.
+- **Production migrations 0025–0027 were applied via the Cloudflare dashboard**, not
+  wrangler, so wrangler does not know they ran. `0027` is a non-idempotent `DROP COLUMN`
+  batch. Never blindly run `migrations apply --remote`. See `migrations/AGENTS.md`.
+- **The domain is `ratemyplace.org`.** `ratemyplace.boston` does not resolve.
+- **Remote D1 CLI needs `CLOUDFLARE_API_TOKEN`** in the environment, or you get a 7403.
+- **`bg-coral-*` is not a Tailwind class.** Use `bg-red-*`.
+- **The repo lives in a Google Drive synced folder.** The Vite watcher ignores
+  `.tmp.driveupload/` so dev doesn't reload-loop. Don't remove that config.
+- **Google OAuth on production is historically flaky** (Workers bot detection) while fine
+  locally. Status unverified since May 2026 — see `GOOGLE_OAUTH_TROUBLESHOOTING.md`.
 
-## Testing
+## Pre-deploy QA
 
-### Run Tests
-```bash
-npm test              # All tests
-npm test -- scoring   # Filter by name
-```
+Before any production deploy, walk every user-facing flow the change touches. If the
+change affects displayed data, check **every** view that data appears in — search results,
+property detail, admin panel, user profile — not just the page you edited.
 
-### Test Location
-- Unit tests: `src/lib/__tests__/*.test.ts`
-- E2E tests: `e2e/*.spec.ts`
+1. **Display & UI** — overflow, leaked snake_case field names, `undefined`/`null`/`NaN`,
+   layout at 375 / 768 / 1280px.
+2. **Data consistency** — same counts and scores everywhere; spot-check three properties;
+   confirm all views update after an add/edit/delete.
+3. **Empty & edge states** — no results, empty query, zero-review property, invalid form
+   input, very long text.
+4. **Security** — exposed keys or internal IDs in HTML/JS, direct-URL access to auth and
+   admin routes, parameterized queries, error responses that leak internals.
+5. **Search & filter** — expected results, correct narrowing, sorting, pagination,
+   accurate counts.
 
-## Pre-Deploy QA Process
+Always run this after changes to database queries, scoring, search, shared components, or
+when adding an endpoint.
 
-**Run this before every deploy. No exceptions.**
+*(Claude Code has this wired as the `/qa` skill. Other agents: run the checklist manually.)*
 
-Before pushing any change to production, walk through every user-facing flow affected by the change and check all five categories below. If the change touches data display, check ALL pages where that data appears, not just the page you modified.
+## Documentation map
 
-### 1. Display & UI Check
-- Does any content overflow its container?
-- Are internal variable names, database field names, or snake_case values visible to users?
-- Do all counts, labels, and text display correctly (no "undefined", "null", "NaN", or empty strings where data should be)?
-- Does the layout hold on mobile (375px), tablet (768px), and desktop (1280px)?
+| Doc | Role |
+|-----|------|
+| [`MASTER.md`](MASTER.md) | **Canonical product spec** — mission, ethics, full rating instrument, privacy model, verification, moderation policy |
+| [`brand.md`](brand.md) | Brand handbook v1.4 — voice, color, typography, component fingerprint. Accurate and implemented. A separate brand bible v1.0 outranks it where they disagree |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Technical architecture reference |
+| [`SECURITY.md`](SECURITY.md) | Security policy |
+| `.planning/` | Milestone system — `STATE.md`, `ROADMAP.md`, `PROJECT.md`, per-milestone requirements and audits |
+| `.planning/audits/csrf-2026-04.md` | The CSRF posture audit. Read before adding any endpoint |
 
-### 2. Data Consistency Check
-- Does the same data (review counts, averages, scores, property details) show correctly across EVERY view where it appears (search results, property detail, admin panel, user profile)?
-- Are calculated values (averages, aggregate scores) mathematically correct? Spot-check at least 3 properties.
-- After adding/editing/deleting a review, do all views update to reflect the change?
-
-### 3. Empty & Edge State Check
-- What happens when search returns no results? Is the message helpful?
-- What happens with an empty search query?
-- What happens when a property has zero reviews?
-- What happens when a user submits a form with missing or invalid data?
-- What happens with extremely long text inputs?
-
-### 4. Security Audit
-- Are any API keys, database field names, or internal IDs exposed in the frontend HTML/JS?
-- Can a non-authenticated user access authenticated routes by navigating directly to the URL?
-- Can a non-admin user access admin routes?
-- Are all database queries parameterized (no string interpolation with user input)?
-- Do API error responses avoid leaking server details, file paths, or stack traces?
-- Can the database be queried directly from the browser console or by manipulating frontend requests?
-
-### 5. Search & Filter Logic
-- Does search return the expected results for common queries?
-- Does filtering narrow results correctly?
-- Are results sorted as expected?
-- Does pagination work (if applicable)?
-- Is the result count accurate and consistent with what's displayed?
-
-### When to Run a Full QA Pass
-- Before every deploy to production
-- After any change to database queries, scoring logic, or search
-- After any change to components that appear on multiple pages
-- After adding a new API endpoint
-
-### QA Slash Command
-Use `/qa` to run this checklist. Prompt: "Walk through every user-facing page and flow in this app. For each, check for display bugs, data consistency across views, empty/edge states, security vulnerabilities, and search/filter logic. Report everything you find, organized by category."
-
-## Migrations
-
-### Create Migration
-```bash
-# Create new migration file
-touch migrations/XXXX_description.sql
-
-# Apply locally
-npx wrangler d1 migrations apply ratemyplace-db --local
-
-# Apply to production
-npx wrangler d1 migrations apply ratemyplace-db --remote
-```
-
-### Migration Naming
-- Format: `XXXX_description.sql` (e.g., `0015_add_feature.sql`)
-- Next number: Check existing migrations and increment
-
-## Security Checklist
-
-When adding new endpoints:
-- [ ] Auth check if needed (`context.locals.user`)
-- [ ] Admin check if admin-only (`context.locals.user?.isAdmin`)
-- [ ] Input validation before processing
-- [ ] Parameterized queries (never string interpolation)
-- [ ] Rate limiting for public endpoints
-- [ ] Audit logging for admin actions
-
-### CSRF Protection
-
-CSRF protection comes from three layers — no token implementation required (audited 2026-04-28):
-
-- **SameSite=Lax** on session cookies (`src/middleware.ts`) and the OAuth state cookie (`src/pages/api/auth/google.ts`) — cross-site POSTs do not carry the session cookie, so authenticated endpoints are inherently protected
-- **Cloudflare Turnstile** on every unauthenticated public POST form (signup, forgot-password, contact, disputes, bug-reports)
-- **Astro `security.checkOrigin`** (default `true` for SSR) — rejects cross-origin form-content-type POSTs
-
-**Important caveat:** `checkOrigin` does NOT cover `application/json` POSTs. `/api/disputes` accepts JSON, so its CSRF protection is Turnstile + rate limit + Phase 17 content-type guard, NOT checkOrigin. When adding a new JSON-accepting endpoint, ensure these three controls are wired.
-
-Full audit: `.planning/audits/csrf-2026-04.md`. Re-audit triggers: Astro major version upgrade, Lucia replacement, new OAuth provider, or new non-form content-type endpoint.
-
-## Common Mistakes to Avoid
-
-1. **Don't use `datetime('now')`** - Use `unixepoch()` for timestamps
-2. **Don't skip auth checks** - Every API route needs explicit auth handling
-3. **Don't modify scoring without documentation** - Update methodology page
-4. **Don't use `any` types** - Define interfaces in `types.ts`
-5. **Don't put business logic in components** - Use `lib/` files
-6. **Don't deploy without running `/qa`** - The QA process exists for a reason
-7. **Don't assume one page is the only place data appears** - Always check all views that show the same data
-
-## Git Workflow
-
-### Commit Prefixes
-- `feat:` - New feature
-- `fix:` - Bug fix
-- `docs:` - Documentation
-- `chore:` - Maintenance
-- `refactor:` - Code restructuring
-
-### Branch Strategy
-- `main` - Production (auto-deploys to Cloudflare)
-- Feature branches for development
-
----
-*See `CLAUDE_CONTEXT.md` for full project context and architecture.*
+**Staleness warning:** `CLAUDE_CONTEXT.md` and `VERSION.md` are stale (v1.1.0-alpha era,
+January 2026) and `.planning/STATE.md` is accurate only through April 2026. Trust the code
+and this file over those. When a doc and the source disagree, **the source wins** — verify
+before relying on any line-level specific in a doc.
