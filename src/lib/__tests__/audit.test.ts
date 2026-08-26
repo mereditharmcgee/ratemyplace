@@ -65,8 +65,21 @@ describe('createAuditLog', () => {
     // Should not throw
     await expect(createAuditLog(db, entry)).resolves.toBeUndefined();
 
-    // Should log the error
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to create audit log:', expect.any(Error));
+    // Should log the failure structurally, naming the action that was dropped.
+    // A CHECK-constraint violation here silently loses an audit row while the
+    // admin action still succeeds (that is how admin_granted / verification_*
+    // went unlogged between migrations 0014 and 0028), so the log must carry
+    // enough to identify the gap without a repro.
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
+    const logged = JSON.parse(consoleSpy.mock.calls[0][0] as string);
+    expect(logged).toMatchObject({
+      level: 'error',
+      event: 'audit_log_write_failed',
+      actionType: 'review_approved',
+      entityType: 'review',
+      entityId: 'review-456',
+      error: 'DB error',
+    });
 
     consoleSpy.mockRestore();
   });

@@ -77,9 +77,13 @@ Dropping a column that deployed code still reads takes the site down.
 | `contact_messages`, `bug_reports` | Inbound forms with admin queues |
 | `password_reset_tokens` | Reset flow |
 
-Scores are **computed on read, never cached**. The `building_scores`, `landlord_scores`,
-and `property_manager_scores` cache tables were dropped in `0025`. Do not reintroduce a
-score cache without a deliberate decision — the previous one drifted from the live data.
+The `building_scores`, `landlord_scores`, and `property_manager_scores` cache tables were
+dropped in `0025` — do not reintroduce a table-level score cache without a deliberate
+decision, the previous one drifted from live data.
+
+`reviews.overall_score` is a different thing and **still exists**: a stored per-review
+value that aggregate queries read. See [`src/lib/AGENTS.md`](../src/lib/AGENTS.md) for why
+that makes a weight change diverge rather than propagate.
 
 ## Adding a survey column
 

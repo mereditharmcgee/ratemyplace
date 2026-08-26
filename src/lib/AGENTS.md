@@ -9,9 +9,19 @@ Rules: one concern per file, always export the interfaces consumers need, no `an
 
 ## Scoring is load-bearing — read this before touching it
 
-Scoring changes are **retroactive**. There is no score cache (the `*_scores` tables were
-dropped in migration 0025); every score is computed on read. Change a weight and every
-score on the site changes on the next page load, including scores users have already seen.
+Scoring changes are **retroactive, and they land unevenly** — which is worse than uniform.
+
+Migration 0025 dropped the `*_scores` cache tables, but `reviews.overall_score` is still a
+stored per-review column, written at submission and on edit. Two paths read differently:
+
+- **Domain sub-scores and review cards** recompute from the individual answers, so they
+  adopt new weights immediately.
+- **Aggregate overall scores** consume the stored `overall_score` (see the comment at
+  `scoring.ts` — "the single source of truth"), so the SQL and JS paths agree with each other.
+
+So changing a weight makes cards and aggregates **diverge**, and makes old reviews disagree
+with new ones, until you backfill `overall_score`. Backfilling then genuinely rewrites
+public historical scores. Either way it needs explicit sign-off — never as a side effect.
 
 Never adjust scoring as a side effect of another change. It needs explicit sign-off.
 
@@ -84,8 +94,7 @@ stays alive after the response is sent, and swallows rejections into structured 
 unhandled rejection inside `waitUntil` crashes the isolate in production, so the internal
 `.catch` is not optional. It returns `void` specifically so callers cannot `await` it.
 
-Use it for every outbound email. One known holdout: `pages/api/disputes/[id].ts` still
-blocks on `await sendDisputeUpheldEmail` — convert it if you are in that file.
+Use it for every outbound email.
 
 ### `privacy.ts` — fuzzing is a safety control
 
@@ -103,8 +112,7 @@ precision here — the imprecision is the point.
 session — that was a real finding. Any user-supplied URL that will be rendered as a link
 must pass through it.
 
-Known drift to fix if you are nearby: `pages/api/auth/signup.ts` uses an inline
-`email.includes('@')` instead of `isValidEmail`, and `disputes.ts` exports a duplicate
+Known drift to fix if you are nearby: `disputes.ts` exports a duplicate
 `validateDisputeForm` consumed only by its own test (production imports the one here).
 
 ### `audit.ts` — every destructive admin action

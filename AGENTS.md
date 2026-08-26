@@ -40,8 +40,11 @@ and flag it explicitly if a requested change would erode one.
 
 1. **Tenant anonymity is a safety feature.** Retaliation is the risk being designed
    against. Exact timestamps and tenure are collected but **never displayed** — public
-   surfaces show fuzzy buckets only (`src/lib/privacy.ts`). No IP addresses are stored.
-   No per-user analytics.
+   surfaces show fuzzy buckets only (`src/lib/privacy.ts`). No per-user analytics.
+   *Accurate scope:* reviewer IPs are never stored. IPs **are** persisted in two
+   operational places — `rate_limits` keys on client IP, and `audit_logs.admin_ip`
+   records the acting admin. Don't widen that, and don't state "no IPs are stored"
+   in public copy.
 2. **Scoring changes are retroactive and require sign-off.** Touching `ITEM_WEIGHTS`,
    `RECENCY_BANDS`, or the aggregation formula silently rewrites every score in the
    database. Never adjust them as a side effect of another change.
@@ -89,7 +92,9 @@ Run `npm test` and `npm run build` before declaring work complete. Both are fast
 - **Parameterized queries always.** Never string-interpolate user input into SQL.
 - **Timestamps are `unixepoch()`**, never `datetime('now')`. Column type
   `INTEGER DEFAULT (unixepoch())`.
-- **No `any` types.** Define interfaces in `src/lib/types.ts`.
+- **No new `any` types.** Define interfaces in `src/lib/types.ts`. This is a direction, not
+  a finished state — `audit.ts`, `rateLimit.ts`, and several pages still use `any`. Don't
+  add more; clean up what you touch.
 - **Score colors come from `src/lib/scoring-colors.ts`.** Never hardcode a band color.
 - React islands use `client:load`; everything else stays server-rendered.
 
