@@ -92,6 +92,10 @@ RateMyPlace Boston is a tenant-powered housing review platform that allows rente
 
 5. **Honesty about limitations**: We cannot solve housing affordability, supply, or discrimination. We don't overpromise.
 
+**Implementation status key:**
+- **Built today** — Implemented in the current application source.
+- **Planned** — An intended product commitment that is not yet implemented and should not be read as a current capability or protection.
+
 ### Specific commitments
 
 **To tenants:**
@@ -208,6 +212,8 @@ The weighting reflects how strongly each instrument's items have been associated
 - Building scores: shown with 1+ approved review
 - Landlord aggregate: shown only with 3+ approved reviews across the landlord's portfolio
 
+> **Known gap being closed:** The live site currently displays landlord aggregate scores with only one approved review. The code will be changed to enforce the three-review requirement above.
+
 Items where the reviewer chose "Not rated" do not contribute to any average and are surfaced on review cards as a muted "Not rated" row so readers can distinguish a skipped item from a low score.
 
 For the full methodology including weighting tables, item-level rationale, and academic citations, see the live methodology page (`src/pages/methodology.astro`) and `src/lib/scoring.ts`.
@@ -303,7 +309,11 @@ Must show address matching the reviewed building:
 - Spam or advertising
 - Admission of not living at the property
 
-**Edit (with user notification) if review contains:**
+**Built today — current path for content that needs changes:**
+- Moderators can reject a review.
+- The reviewer can edit and resubmit a rejected review, which returns it to the pending moderation queue.
+
+**Planned — limited moderator editing with user notification if review contains:**
 - Accidental PII (phone numbers, emails, names)
 - Information that could identify the reviewer
 
@@ -315,24 +325,33 @@ Must show address matching the reviewed building:
 
 ### Moderation queue triggers
 
-Automatic flags:
+**Built today:**
+- Every submitted or edited review enters the pending moderation queue before publication.
+- Moderators can manually approve, reject, flag, or return a review to pending.
+- Landlord disputes enter a private admin review process.
+
+**Planned — automatic prioritization signals:**
 - PII patterns detected
 - Profanity or slurs
 - User has previous removed content
 - Multiple reviews for same building quickly
 
-Manual flags:
+These signals will prioritize human review; they will not make publication or removal decisions automatically.
+
+**Planned — additional manual intake:**
 - User reports
-- Landlord disputes
 
 ### Landlord dispute process
 
 **Landlords cannot respond publicly.** They can submit a dispute form.
 
-**Dispute form collects:**
+**Built today — dispute form collects:**
 - Contact information
 - Which review and why
-- Supporting documentation (optional)
+- An optional written explanation
+
+**Planned:**
+- Supporting documentation uploads (optional)
 
 **Dispute review process:**
 1. Received within 5 business days
@@ -344,7 +363,9 @@ Manual flags:
 
 ### User notifications
 
-When content is removed or edited, users receive email explaining what happened, why, and how to appeal or resubmit.
+**Built today:** Review approval or rejection attempts to create an in-app notification. When email delivery is configured, rejection also queues an email with any supplied moderator reason and a link to the edit-and-resubmit flow.
+
+**Planned:** When a moderator edits or redacts content, the user will receive an email explaining what changed, why, and how to appeal or resubmit.
 
 ---
 
@@ -702,17 +723,21 @@ ratemyplace-boston/
 
 ### Fraud prevention
 
-**Rate limits:**
-- 1 review per building per account (forever)
-- 5 reviews per account per 24 hours
-- 3 accounts per IP per 24 hours
+**Built today:**
+- Review submissions are limited to 10 per account per hour.
+- Account creation is limited to 3 per IP per hour.
+- The server validates Cloudflare Turnstile on signup, sign-in, forgot-password, contact, dispute, bug-report, and review-submission forms.
 
-**Velocity alerts** (flag for human review):
+**Planned — tighter limits and integrity controls:**
+- Enforce 1 review per building per account (forever).
+- Tighten review submissions to 5 per account per 24 hours.
+- Tighten account creation to 3 per IP per 24 hours.
+
+**Planned — velocity alerts that flag for human review:**
 - 5+ reviews for same building in 24 hours
 - 10+ reviews for same landlord in 24 hours
 
-**Bot detection:**
-- Cloudflare Turnstile on every unauthenticated public POST form
+**Planned — additional bot detection:**
 - Honeypot fields where applicable
 - Minimum-time submission check
 
