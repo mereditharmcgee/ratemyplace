@@ -3,7 +3,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
 import SearchResults from '../components/search/SearchResults';
 import EmptyState from '../components/ui/EmptyState.astro';
 import { escapeLikePattern } from '../lib/validation';
-import { recencyWeightedOverallSql, currentReviewYear } from '../lib/scoring-sql';
+import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../lib/scoring-sql';
 
 const query = (Astro.url.searchParams.get('q') || '').trim();
 const type = Astro.url.searchParams.get('type') || 'all';
@@ -79,7 +79,7 @@ if (query) {
           SELECT l.slug, l.name,
             COUNT(DISTINCT b.id) as building_count,
             COUNT(r.id) as review_count,
-            ${recencyWeightedOverallSql('r', currentYear)} as avg_overall
+            ${namedPartyOverallSql('r', currentYear)} as avg_overall
           FROM landlords l
           LEFT JOIN buildings b ON b.landlord_id = l.id
           LEFT JOIN reviews r ON r.building_id = b.id AND r.status = 'approved'
@@ -143,7 +143,7 @@ if (query) {
         SELECT l.slug, l.name,
           COUNT(DISTINCT b.id) as building_count,
           COUNT(r.id) as review_count,
-          ${recencyWeightedOverallSql('r', currentYear)} as avg_overall
+          ${namedPartyOverallSql('r', currentYear)} as avg_overall
         FROM landlords l
         LEFT JOIN buildings b ON b.landlord_id = l.id
         LEFT JOIN reviews r ON r.building_id = b.id AND r.status = 'approved'

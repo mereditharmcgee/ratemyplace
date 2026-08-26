@@ -1,9 +1,18 @@
-import { defineConfig } from 'vitest/config';
+/// <reference types="vitest/config" />
 
-export default defineConfig({
-  test: {
-    environment: 'happy-dom',
-    include: ['src/**/*.test.{ts,tsx}'],
-    exclude: ['node_modules', 'dist'],
+import { getViteConfig } from 'astro/config';
+import react from '@astrojs/react';
+
+export default getViteConfig(
+  {
+    test: {
+      environment: 'happy-dom',
+      include: ['src/**/*.test.{ts,tsx}'],
+      exclude: ['node_modules', 'dist'],
+    },
   },
-});
+  {
+    configFile: false,
+    integrations: [react()],
+  },
+);

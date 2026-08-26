@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getScoreTextColor } from '../../lib/scoring-colors';
+import { getNamedPartyScoreState, NAMED_PARTY_MIN_REVIEWS } from '../../lib/scoring';
 
 interface Building {
   slug: string;
@@ -63,6 +64,8 @@ function BuildingCard({ building }: { building: Building }) {
 }
 
 function LandlordCard({ landlord }: { landlord: Landlord }) {
+  const scoreState = getNamedPartyScoreState(landlord.review_count, landlord.avg_overall);
+
   return (
     <a
       href={`/landlord/${landlord.slug}`}
@@ -76,10 +79,20 @@ function LandlordCard({ landlord }: { landlord: Landlord }) {
           )}
         </div>
         <div className="text-right">
-          {landlord.avg_overall ? (
+          {scoreState === 'available' ? (
             <div>
               <div className={`text-2xl font-bold ${getScoreTextColor(Number(landlord.avg_overall))}`}>{Number(landlord.avg_overall).toFixed(1)}</div>
               <div className="text-sm text-gray-500">{landlord.review_count} review{landlord.review_count !== 1 ? 's' : ''}</div>
+            </div>
+          ) : scoreState === 'below-threshold' ? (
+            <div>
+              <div className="text-sm text-gray-500">Score after {NAMED_PARTY_MIN_REVIEWS} reviews</div>
+              <div className="text-sm text-gray-500">{landlord.review_count} review{landlord.review_count !== 1 ? 's' : ''}</div>
+            </div>
+          ) : scoreState === 'unavailable' ? (
+            <div>
+              <div className="text-sm text-gray-500">Score unavailable</div>
+              <div className="text-sm text-gray-500">{landlord.review_count} reviews</div>
             </div>
           ) : (
             <span className="text-sm text-gray-400">No reviews yet</span>

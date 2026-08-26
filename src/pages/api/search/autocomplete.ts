@@ -2,7 +2,7 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { validateSearch, escapeLikePattern } from '../../../lib/validation';
-import { recencyWeightedOverallSql, currentReviewYear } from '../../../lib/scoring-sql';
+import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../../../lib/scoring-sql';
 
 export async function GET(context: APIContext): Promise<Response> {
   const db = getDB(context);
@@ -65,7 +65,7 @@ export async function GET(context: APIContext): Promise<Response> {
       SELECT
         l.id, l.name, l.slug,
         COUNT(r.id) as review_count,
-        ${recencyWeightedOverallSql('r', currentYear)} as avg_overall
+        ${namedPartyOverallSql('r', currentYear)} as avg_overall
       FROM landlords l
       LEFT JOIN buildings b ON b.landlord_id = l.id
       LEFT JOIN reviews r ON r.building_id = b.id AND r.status = 'approved'

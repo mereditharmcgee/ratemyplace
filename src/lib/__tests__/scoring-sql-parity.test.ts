@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
-import { recencyWeightedOverallSql } from '../scoring-sql';
+import { namedPartyOverallSql, recencyWeightedOverallSql } from '../scoring-sql';
 import { calculateAggregatedScores } from '../scoring';
 
 // --- Synchronous availability probe (decides describe vs describe.skip) ---
@@ -73,6 +73,14 @@ suite('recencyWeightedOverallSql ⇄ calculateAggregatedScores parity (real SQLi
   /** Run the emitted SQL fragment for one building and return the scalar (number | null). */
   function sqlAvg(db: any, buildingId: string): number | null {
     const sql = `SELECT ${recencyWeightedOverallSql('r', CURRENT_YEAR)} as avg
+      FROM reviews r
+      WHERE r.building_id = ? AND r.status = 'approved'`;
+    const row = db.prepare(sql).get(buildingId) as { avg: number | null } | undefined;
+    return row?.avg ?? null;
+  }
+
+  function namedPartySqlAvg(db: any, buildingId: string): number | null {
+    const sql = `SELECT ${namedPartyOverallSql('r', CURRENT_YEAR)} as avg
       FROM reviews r
       WHERE r.building_id = ? AND r.status = 'approved'`;
     const row = db.prepare(sql).get(buildingId) as { avg: number | null } | undefined;
@@ -161,6 +169,45 @@ suite('recencyWeightedOverallSql ⇄ calculateAggregatedScores parity (real SQLi
     try {
       expect(sqlAvg(db, 'b3')).toBeNull();
       expect(jsAvg(rows, 'b3')).toBeNull();
+    } finally {
+      db.close();
+    }
+  });
+
+  it('withholds a named-party aggregate below three approved reviews', () => {
+    const rows: FixtureRow[] = [
+      { id: 'p1', building_id: 'party', status: 'approved', overall_score: 4.0, move_out_year_new: '2026', created_at: midYearUnix(2026) },
+      { id: 'p2', building_id: 'party', status: 'approved', overall_score: 2.0, move_out_year_new: '2026', created_at: midYearUnix(2026) },
+    ];
+    const db = makeDb(rows);
+    try {
+      expect(namedPartySqlAvg(db, 'party')).toBeNull();
+    } finally {
+      db.close();
+    }
+  });
+
+  it('publishes a named-party aggregate at three approved reviews', () => {
+    const rows: FixtureRow[] = [
+      { id: 'p1', building_id: 'party', status: 'approved', overall_score: 4.0, move_out_year_new: '2026', created_at: midYearUnix(2026) },
+      { id: 'p2', building_id: 'party', status: 'approved', overall_score: 4.0, move_out_year_new: '2026', created_at: midYearUnix(2026) },
+      { id: 'p3', building_id: 'party', status: 'approved', overall_score: 4.0, move_out_year_new: '2026', created_at: midYearUnix(2026) },
+    ];
+    const db = makeDb(rows);
+    try {
+      expect(namedPartySqlAvg(db, 'party')).toBe(4);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('keeps a building aggregate available at one approved review', () => {
+    const rows: FixtureRow[] = [
+      { id: 'b1', building_id: 'building', status: 'approved', overall_score: 4.0, move_out_year_new: '2026', created_at: midYearUnix(2026) },
+    ];
+    const db = makeDb(rows);
+    try {
+      expect(sqlAvg(db, 'building')).toBe(4);
     } finally {
       db.close();
     }

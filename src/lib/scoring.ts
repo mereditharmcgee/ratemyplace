@@ -111,6 +111,20 @@ export const RECENCY_BANDS: ReadonlyArray<{ maxAge: number; weight: number }> = 
   { maxAge: Infinity, weight: 0.85 },
 ];
 
+/** Minimum approved reviews before publishing a named-party aggregate score. */
+export const NAMED_PARTY_MIN_REVIEWS = 3;
+
+export type NamedPartyScoreState = 'no-reviews' | 'below-threshold' | 'available' | 'unavailable';
+
+export function getNamedPartyScoreState(
+  reviewCount: number,
+  score: number | null | undefined,
+): NamedPartyScoreState {
+  if (reviewCount <= 0) return 'no-reviews';
+  if (reviewCount < NAMED_PARTY_MIN_REVIEWS) return 'below-threshold';
+  return score == null ? 'unavailable' : 'available';
+}
+
 export function getRecencyWeight(
   reviewYear: number | null,
   currentYear: number = new Date().getUTCFullYear()
@@ -365,6 +379,7 @@ export function calculateBuildingAverages(reviews: any[]): Record<string, number
  */
 export function calculateLandlordAverages(reviews: any[]): Record<string, number | null> {
   const aggregated = calculateAggregatedScores(reviews);
+  const canPublishAggregate = reviews.length >= NAMED_PARTY_MIN_REVIEWS;
 
   let depositCount = 0;
   for (const review of reviews) {
@@ -372,10 +387,10 @@ export function calculateLandlordAverages(reviews: any[]): Record<string, number
   }
 
   return {
-    avg_overall: aggregated.avgOverall,
-    avg_landlord: aggregated.avgLandlord,
-    pct_would_recommend: aggregated.pctWouldRecommend,
-    pct_deposit_issues: reviews.length > 0 ? Math.round((depositCount / reviews.length) * 100) : null,
+    avg_overall: canPublishAggregate ? aggregated.avgOverall : null,
+    avg_landlord: canPublishAggregate ? aggregated.avgLandlord : null,
+    pct_would_recommend: canPublishAggregate ? aggregated.pctWouldRecommend : null,
+    pct_deposit_issues: canPublishAggregate ? Math.round((depositCount / reviews.length) * 100) : null,
     review_count: reviews.length,
   };
 }

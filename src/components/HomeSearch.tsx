@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getScoreBgTint, getScoreTextColor } from '../lib/scoring-colors';
+import { getNamedPartyScoreState, NAMED_PARTY_MIN_REVIEWS } from '../lib/scoring';
 
 interface DbResult {
   id: string;
@@ -220,6 +221,11 @@ export default function HomeSearch() {
               {items.map((item, index) => {
                 const highlighted = highlightedIndex === index;
                 if (item.source === 'local') {
+                  const score = item.data.avgScore;
+                  const namedPartyScoreState = item.data.type === 'landlord'
+                    ? getNamedPartyScoreState(item.data.reviewCount, score)
+                    : null;
+
                   return (
                     <button
                       key={`db-${item.data.id}`}
@@ -236,10 +242,18 @@ export default function HomeSearch() {
                           <div className="text-sm text-gray-500 truncate">{item.data.subtitle}</div>
                         </div>
                         <div className="flex-shrink-0 flex items-center gap-2">
-                          {item.data.avgScore !== null && (
-                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getScoreBgTint(item.data.avgScore)} ${getScoreTextColor(item.data.avgScore)}`}>
-                              {item.data.avgScore.toFixed(1)}
+                          {score !== null && (item.data.type === 'building' || namedPartyScoreState === 'available') && (
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getScoreBgTint(score)} ${getScoreTextColor(score)}`}>
+                              {score.toFixed(1)}
                             </span>
+                          )}
+                          {namedPartyScoreState === 'below-threshold' && (
+                            <span className="text-xs text-gray-500">
+                              Score after {NAMED_PARTY_MIN_REVIEWS}
+                            </span>
+                          )}
+                          {namedPartyScoreState === 'unavailable' && (
+                            <span className="text-xs text-gray-500">Score unavailable</span>
                           )}
                           {item.data.reviewCount > 0 && (
                             <span className="text-xs text-gray-400">

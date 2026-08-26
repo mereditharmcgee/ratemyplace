@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../components/layout/BaseLayout.astro';
 import { getScoreColor, getScoreTextColor, getScoreBgTint } from '../lib/scoring-colors';
+import { NAMED_PARTY_MIN_REVIEWS } from '../lib/scoring';
 
 // Drive the four-card legend from the canonical helper so any future band-name
 // or color change propagates here automatically. Range and qualifier text stay
@@ -490,6 +491,9 @@ const realExamples = [
             );
           })}
         </div>
+        <p class="text-sm text-gray-600 mt-5">
+          Building scores appear once a building has one approved review. Landlord and property manager aggregate scores appear once the named party reaches {NAMED_PARTY_MIN_REVIEWS} approved reviews across their portfolio.
+        </p>
         <p class="text-sm text-gray-600 mt-5 pt-5 border-t border-gray-100">
           Treat a score as a starting point, not a verdict. Every review comes from a tenant's own experience, and we can't independently verify each one, so use your own judgment. The written reviews matter as much as the number, so read them alongside it; they carry the context a score can't.
         </p>

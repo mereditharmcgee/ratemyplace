@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getScoreTextColor } from '../../lib/scoring-colors';
+import { NAMED_PARTY_MIN_REVIEWS } from '../../lib/scoring';
 
 interface PropertyManager {
   id: string;
@@ -286,7 +287,11 @@ export default function ManagersTable() {
         </div>
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">
-            {managers.filter((m) => m.avg_score && m.avg_score >= 4).length}
+            {managers.filter((m) => (
+              m.review_count >= NAMED_PARTY_MIN_REVIEWS
+              && m.avg_score !== null
+              && m.avg_score >= 4
+            )).length}
           </div>
           <div className="text-sm text-gray-500">High rated (4+)</div>
         </div>
@@ -322,6 +327,11 @@ export default function ManagersTable() {
                       {manager.avg_score?.toFixed(1) || 'N/A'}
                     </div>
                     <div className="text-xs text-gray-500">avg score</div>
+                    {manager.review_count > 0 && manager.review_count < NAMED_PARTY_MIN_REVIEWS && (
+                      <div className="text-xs text-amber-700">
+                        Below {NAMED_PARTY_MIN_REVIEWS}-review public threshold
+                      </div>
+                    )}
                   </div>
                   <svg
                     className={`w-5 h-5 text-gray-400 transition-transform ${

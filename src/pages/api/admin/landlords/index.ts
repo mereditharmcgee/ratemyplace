@@ -1,6 +1,7 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
 import { recencyWeightedOverallSql, currentReviewYear } from '../../../../lib/scoring-sql';
+import { NAMED_PARTY_MIN_REVIEWS } from '../../../../lib/scoring';
 import { generateIdFromEntropySize } from 'lucia';
 import { createAuditLog } from '../../../../lib/audit';
 import { getClientIP } from '../../../../lib/rateLimit';
@@ -42,12 +43,19 @@ export async function GET(context: APIContext): Promise<Response> {
         COUNT(DISTINCT l.id) as total_landlords,
         COUNT(DISTINCT b.id) as total_buildings,
         COUNT(DISTINCT r.id) as total_reviews,
-        COUNT(DISTINCT CASE WHEN per_landlord.avg_score >= 4 THEN per_landlord.id END) as high_rated
+        COUNT(DISTINCT CASE
+          WHEN per_landlord.review_count >= ${NAMED_PARTY_MIN_REVIEWS}
+            AND per_landlord.avg_score >= 4
+          THEN per_landlord.id
+        END) as high_rated
       FROM landlords l
       LEFT JOIN buildings b ON l.id = b.landlord_id
       LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
       LEFT JOIN (
-        SELECT l2.id, ${recencyWeightedOverallSql('r2', currentYear)} as avg_score
+        SELECT
+          l2.id,
+          COUNT(DISTINCT r2.id) as review_count,
+          ${recencyWeightedOverallSql('r2', currentYear)} as avg_score
         FROM landlords l2
         LEFT JOIN buildings b2 ON l2.id = b2.landlord_id
         LEFT JOIN reviews r2 ON b2.id = r2.building_id AND r2.status = 'approved'

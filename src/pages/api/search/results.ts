@@ -2,7 +2,7 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { validateSearch, escapeLikePattern } from '../../../lib/validation';
-import { recencyWeightedOverallSql, currentReviewYear } from '../../../lib/scoring-sql';
+import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../../../lib/scoring-sql';
 
 export async function GET(context: APIContext): Promise<Response> {
   const db = getDB(context);
@@ -104,7 +104,7 @@ export async function GET(context: APIContext): Promise<Response> {
 
       // Explicit column list — never `l.*` (leaks admin_notes, owner_entity).
       const rows = await db.prepare(
-        `SELECT l.slug, l.name, COUNT(DISTINCT b.id) as building_count, COUNT(r.id) as review_count, ${recencyWeightedOverallSql('r', currentYear)} as avg_overall
+        `SELECT l.slug, l.name, COUNT(DISTINCT b.id) as building_count, COUNT(r.id) as review_count, ${namedPartyOverallSql('r', currentYear)} as avg_overall
          ${baseQuery}
          ORDER BY COUNT(r.id) DESC, l.name ASC, l.id ASC
          LIMIT ? OFFSET ?`

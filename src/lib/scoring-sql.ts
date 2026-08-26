@@ -9,7 +9,7 @@
  * an integer here — it is never user input. (Same category as the ALL_SCORE_FIELDS
  * column-list interpolation already used elsewhere.)
  */
-import { RECENCY_BANDS } from './scoring';
+import { NAMED_PARTY_MIN_REVIEWS, RECENCY_BANDS } from './scoring';
 
 function safeYear(currentYear: number): number {
   const y = Math.trunc(Number(currentYear));
@@ -49,6 +49,15 @@ export function recencyWeightedOverallSql(alias: string, currentYear: number): s
     SUM(CASE WHEN ${alias}.overall_score IS NOT NULL THEN ${alias}.overall_score * (${w}) ELSE 0 END)
     / NULLIF(SUM(CASE WHEN ${alias}.overall_score IS NOT NULL THEN (${w}) ELSE 0 END), 0)
   , 1)`;
+}
+
+/** Recency-weighted overall score, published only once a named party has enough reviews. */
+export function namedPartyOverallSql(alias: string, currentYear: number): string {
+  return `CASE
+    WHEN COUNT(DISTINCT ${alias}.id) >= ${NAMED_PARTY_MIN_REVIEWS}
+    THEN ${recencyWeightedOverallSql(alias, currentYear)}
+    ELSE NULL
+  END`;
 }
 
 /** Current year for recency (UTC, to match strftime 'unixepoch'). */

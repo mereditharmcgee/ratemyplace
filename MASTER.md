@@ -210,9 +210,7 @@ The weighting reflects how strongly each instrument's items have been associated
 
 **Minimum thresholds for display:**
 - Building scores: shown with 1+ approved review
-- Landlord aggregate: shown only with 3+ approved reviews across the landlord's portfolio
-
-> **Known gap being closed:** The live site currently displays landlord aggregate scores with only one approved review. The code will be changed to enforce the three-review requirement above.
+- Named-party aggregates (landlords and property managers): shown only with 3+ approved reviews across the named party's portfolio
 
 Items where the reviewer chose "Not rated" do not contribute to any average and are surfaced on review cards as a muted "Not rated" row so readers can distinguish a skipped item from a low score.
 

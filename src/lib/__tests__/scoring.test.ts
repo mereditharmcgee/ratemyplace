@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   RECENCY_BANDS,
+  getNamedPartyScoreState,
   getRecencyWeight,
   getReviewYear,
   calculateDomainScores,
@@ -335,6 +336,11 @@ describe('calculateAggregatedScores uses the stored overall_score', () => {
 // ═══════════════════════════════════════════════════
 
 describe('calculateBuildingAverages', () => {
+  it('publishes a building score from one approved review', () => {
+    const result = calculateBuildingAverages([allScores(4)]);
+    expect(result.avg_overall).toBe(4);
+  });
+
   it('returns review_count', () => {
     const reviews = [allScores(3), allScores(4)];
     const result = calculateBuildingAverages(reviews);
@@ -369,13 +375,33 @@ describe('calculateLandlordAverages', () => {
     expect(result.review_count).toBe(1);
   });
 
-  it('calculates deposit issue percentage', () => {
+  it('withholds named-party aggregate signals below three approved reviews', () => {
     const reviews = [
-      { ...allScores(3), had_security_deposit_issues: true },
-      { ...allScores(3), had_security_deposit_issues: false },
+      { ...allScores(4), would_recommend_new: 'yes', had_security_deposit_issues: true },
+      { ...allScores(2), would_recommend_new: 'no', had_security_deposit_issues: false },
     ];
     const result = calculateLandlordAverages(reviews);
-    expect(result.pct_deposit_issues).toBe(50);
+
+    expect(result.review_count).toBe(2);
+    expect(result.avg_overall).toBeNull();
+    expect(result.avg_landlord).toBeNull();
+    expect(result.pct_would_recommend).toBeNull();
+    expect(result.pct_deposit_issues).toBeNull();
+  });
+
+  it('publishes named-party aggregate signals at three approved reviews', () => {
+    const reviews = [
+      { ...allScores(4), would_recommend_new: 'yes', had_security_deposit_issues: true },
+      { ...allScores(4), would_recommend_new: 'yes', had_security_deposit_issues: true },
+      { ...allScores(4), would_recommend_new: 'no', had_security_deposit_issues: false },
+    ];
+    const result = calculateLandlordAverages(reviews);
+
+    expect(result.review_count).toBe(3);
+    expect(result.avg_overall).toBe(4);
+    expect(result.avg_landlord).toBe(4);
+    expect(result.pct_would_recommend).toBe(67);
+    expect(result.pct_deposit_issues).toBe(67);
   });
 
   it('handles empty reviews', () => {
@@ -383,6 +409,17 @@ describe('calculateLandlordAverages', () => {
     expect(result.review_count).toBe(0);
     expect(result.avg_overall).toBeNull();
     expect(result.pct_deposit_issues).toBeNull();
+  });
+});
+
+describe('getNamedPartyScoreState', () => {
+  it.each([
+    { reviewCount: 0, score: null, expected: 'no-reviews' },
+    { reviewCount: 2, score: 4.8, expected: 'below-threshold' },
+    { reviewCount: 3, score: 4.8, expected: 'available' },
+    { reviewCount: 3, score: null, expected: 'unavailable' },
+  ] as const)('returns $expected for $reviewCount reviews and score $score', ({ reviewCount, score, expected }) => {
+    expect(getNamedPartyScoreState(reviewCount, score)).toBe(expected);
   });
 });
 

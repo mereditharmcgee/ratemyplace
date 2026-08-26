@@ -4,7 +4,7 @@ import StarRating from '../../components/ratings/StarRating.astro';
 import ScoreCard from '../../components/ratings/ScoreCard.astro';
 import ReviewCard from '../../components/reviews/ReviewCard.astro';
 import UGCDisclaimer from '../../components/reviews/UGCDisclaimer.astro';
-import { calculateLandlordAverages } from '../../lib/scoring';
+import { calculateLandlordAverages, getNamedPartyScoreState, NAMED_PARTY_MIN_REVIEWS } from '../../lib/scoring';
 import { recencyWeightedOverallSql, currentReviewYear } from '../../lib/scoring-sql';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 
@@ -14,6 +14,7 @@ let landlord: any = null;
 let scores: any = null;
 let buildings: any[] = [];
 let recentReviews: any[] = [];
+let approvedReviewCount = 0;
 
 try {
   const db = Astro.locals.runtime.env.DB;
@@ -63,6 +64,7 @@ try {
         WHERE b.landlord_id = ? AND r.status = 'approved'
       `).bind(landlord.id).all();
       const allReviews = allReviewsResult.results || [];
+      approvedReviewCount = allReviews.length;
       if (allReviews.length > 0) {
         scores = { ...calculateLandlordAverages(allReviews), building_count: buildings.filter(b => (b.review_count || 0) > 0).length };
       }
@@ -76,8 +78,8 @@ if (!landlord) {
   return Astro.rewrite('/404');
 }
 
-// Calculate aggregated issue percentages from building scores
-const totalReviews = buildings.reduce((sum, b) => sum + (b.review_count || 0), 0);
+const namedPartyScoreState = getNamedPartyScoreState(approvedReviewCount, scores?.avg_overall);
+const hasNamedPartyBreakdown = scores?.avg_landlord != null;
 ---
 
 <BaseLayout title={landlord.name} description={`Reviews for landlord ${landlord.name}`}>
@@ -137,13 +139,27 @@ const totalReviews = buildings.reduce((sum, b) => sum + (b.review_count || 0), 0
         </div>
 
         <div class="text-right">
-          {scores?.avg_overall ? (
+          {namedPartyScoreState === 'available' ? (
             <div>
               <div class={`text-4xl font-bold ${getScoreTextColor(scores.avg_overall)}`}>{scores.avg_overall.toFixed(1)}</div>
               <StarRating rating={scores.avg_overall} />
               <p class="text-sm text-gray-500 mt-1">
                 {scores.review_count} review{scores.review_count !== 1 ? 's' : ''} across {scores.building_count} building{scores.building_count !== 1 ? 's' : ''}
               </p>
+            </div>
+          ) : namedPartyScoreState === 'below-threshold' ? (
+            <div class="max-w-xs text-right">
+              <p class="text-sm text-gray-600">
+                {approvedReviewCount} approved review{approvedReviewCount !== 1 ? 's' : ''}
+              </p>
+              <p class="text-sm text-gray-400">
+                Aggregate score appears after {NAMED_PARTY_MIN_REVIEWS} approved reviews
+              </p>
+            </div>
+          ) : namedPartyScoreState === 'unavailable' ? (
+            <div class="max-w-xs text-right">
+              <p class="text-sm text-gray-600">{approvedReviewCount} approved reviews</p>
+              <p class="text-sm text-gray-400">Overall score unavailable</p>
             </div>
           ) : (
             <p class="text-gray-400">No reviews yet</p>
@@ -224,7 +240,7 @@ const totalReviews = buildings.reduce((sum, b) => sum + (b.review_count || 0), 0
 
       <!-- Sidebar -->
       <div class="lg:col-span-1">
-        {scores && <ScoreCard scores={scores} type="landlord" />}
+        {hasNamedPartyBreakdown && <ScoreCard scores={scores} type="landlord" />}
 
         {scores && scores.pct_would_recommend !== null && (
           <div class="bg-white rounded-[6px] border border-gray-200 p-6 mt-6">

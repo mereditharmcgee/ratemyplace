@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getScoreTextColor } from '../../lib/scoring-colors';
+import { NAMED_PARTY_MIN_REVIEWS } from '../../lib/scoring';
 
 interface Landlord {
   id: string;
@@ -353,6 +354,11 @@ export default function LandlordsTable() {
                       {landlord.avg_score?.toFixed(1) || 'N/A'}
                     </div>
                     <div className="text-xs text-gray-500">avg score</div>
+                    {landlord.review_count > 0 && landlord.review_count < NAMED_PARTY_MIN_REVIEWS && (
+                      <div className="text-xs text-amber-700">
+                        Below {NAMED_PARTY_MIN_REVIEWS}-review public threshold
+                      </div>
+                    )}
                   </div>
                   <svg
                     className={`w-5 h-5 text-gray-400 transition-transform ${
