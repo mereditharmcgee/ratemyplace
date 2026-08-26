@@ -6,9 +6,11 @@ Cloudflare D1 (SQLite). 27 migrations, `0001` through `0027`.
 
 ## Read this before running anything against production
 
-**Migrations `0025`, `0026`, and `0027` were applied to production through the Cloudflare
-dashboard console, not through wrangler.** Wrangler's migration tracking does not know
-they ran.
+**Migrations `0025`–`0028` were applied to production outside wrangler's migration
+tracking** — `0025`–`0027` through the Cloudflare dashboard console, and `0028` via
+`wrangler d1 execute --remote --file` (deliberately, because `migrations apply --remote`
+would have tried to re-run the dashboard-applied ones). Wrangler does not know any of them
+ran.
 
 `0027` is a non-idempotent `DROP COLUMN` batch — 15 columns. Re-running it fails, and
 running `migrations apply --remote` blindly may attempt exactly that.
@@ -77,9 +79,13 @@ Dropping a column that deployed code still reads takes the site down.
 | `contact_messages`, `bug_reports` | Inbound forms with admin queues |
 | `password_reset_tokens` | Reset flow |
 
-Scores are **computed on read, never cached**. The `building_scores`, `landlord_scores`,
-and `property_manager_scores` cache tables were dropped in `0025`. Do not reintroduce a
-score cache without a deliberate decision — the previous one drifted from the live data.
+The `building_scores`, `landlord_scores`, and `property_manager_scores` cache tables were
+dropped in `0025` — do not reintroduce a table-level score cache without a deliberate
+decision, the previous one drifted from live data.
+
+`reviews.overall_score` is a different thing and **still exists**: a stored per-review
+value that aggregate queries read. See [`src/lib/AGENTS.md`](../src/lib/AGENTS.md) for why
+that makes a weight change diverge rather than propagate.
 
 ## Adding a survey column
 

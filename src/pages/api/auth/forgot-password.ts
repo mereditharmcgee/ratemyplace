@@ -5,6 +5,7 @@ import { createPasswordResetToken } from '../../../lib/tokens';
 import { sendPasswordResetEmail } from '../../../lib/email';
 import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { logError } from '../../../lib/logger';
+import { verifyTurnstile } from '../../../lib/turnstile';
 
 interface User {
   id: string;
@@ -44,6 +45,23 @@ export async function POST(context: APIContext): Promise<Response> {
 
   try {
     const formData = await context.request.formData();
+
+    // Turnstile — this is an unauthenticated public POST that sends mail to an
+    // address the caller supplies, so it needs the same bot control as signup and
+    // contact. The rate limit alone only caps volume per IP; Turnstile is what
+    // makes distributed enumeration and mail-bombing expensive.
+    const turnstileResult = await verifyTurnstile(
+      formData.get('cf-turnstile-response') as string,
+      getEnv(context).TURNSTILE_SECRET_KEY,
+      clientIP
+    );
+    if (!turnstileResult.success) {
+      return new Response(
+        JSON.stringify({ error: turnstileResult.error || 'Bot verification failed. Please try again.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     const email = formData.get('email')?.toString().toLowerCase().trim();
 
     if (!email) {
