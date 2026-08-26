@@ -23,7 +23,11 @@
 --
 -- PRODUCTION NOTE: migrations 0025-0027 were applied via the Cloudflare dashboard
 -- console, so wrangler's migration tracking is not authoritative for this database.
--- Apply this one deliberately and verify the row count survives the copy.
+--
+-- APPLIED TO PRODUCTION 2026-08-26 via `wrangler d1 execute --remote --file`, NOT
+-- `migrations apply --remote` (which would have attempted to re-run the
+-- dashboard-applied 0025-0027, including the non-idempotent DROP COLUMN batch).
+-- 55 rows backed up beforehand; verified 55 rows and ids 1-55 intact afterward.
 
 CREATE TABLE IF NOT EXISTS audit_logs_v3 (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

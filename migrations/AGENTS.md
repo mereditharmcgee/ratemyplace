@@ -6,9 +6,11 @@ Cloudflare D1 (SQLite). 27 migrations, `0001` through `0027`.
 
 ## Read this before running anything against production
 
-**Migrations `0025`, `0026`, and `0027` were applied to production through the Cloudflare
-dashboard console, not through wrangler.** Wrangler's migration tracking does not know
-they ran.
+**Migrations `0025`–`0028` were applied to production outside wrangler's migration
+tracking** — `0025`–`0027` through the Cloudflare dashboard console, and `0028` via
+`wrangler d1 execute --remote --file` (deliberately, because `migrations apply --remote`
+would have tried to re-run the dashboard-applied ones). Wrangler does not know any of them
+ran.
 
 `0027` is a non-idempotent `DROP COLUMN` batch — 15 columns. Re-running it fails, and
 running `migrations apply --remote` blindly may attempt exactly that.
