@@ -4,6 +4,7 @@ import { getEnv } from '../../../../lib/runtime';
 import { getVerificationImage, deleteVerificationImage } from '../../../../lib/storage';
 import { createAuditLog } from '../../../../lib/audit';
 import { getClientIP } from '../../../../lib/rateLimit';
+import { logError } from '../../../../lib/logger';
 
 // GET - Stream the verification image
 export async function GET(context: APIContext): Promise<Response> {
@@ -162,7 +163,14 @@ export async function POST(context: APIContext): Promise<Response> {
 
       // Delete image from R2 (no longer needed after approval)
       if (bucket) {
-        await deleteVerificationImage(bucket, verification.r2_key);
+        const deleted = await deleteVerificationImage(bucket, verification.r2_key);
+        if (!deleted) {
+          logError('verification_document_delete_failed', {
+            endpoint: '/api/admin/verification/[id]',
+            r2_key: verification.r2_key,
+            decision: 'approve',
+          });
+        }
       }
 
       // Audit log — approval flips the review's is_verified trust signal AND
@@ -190,8 +198,19 @@ export async function POST(context: APIContext): Promise<Response> {
         WHERE id = ?
       `).bind(now, context.locals.user.id, rejection_reason || null, id).run();
 
-      // Keep the image for 30 days so user can see why it was rejected
-      // (Could add cleanup job later)
+      // Delete image from R2 immediately after the decision. Verification
+      // documents are temporary evidence and are never retained after review,
+      // regardless of whether the submission is approved or rejected.
+      if (bucket) {
+        const deleted = await deleteVerificationImage(bucket, verification.r2_key);
+        if (!deleted) {
+          logError('verification_document_delete_failed', {
+            endpoint: '/api/admin/verification/[id]',
+            r2_key: verification.r2_key,
+            decision: 'reject',
+          });
+        }
+      }
 
       await createAuditLog(db, {
         adminUserId: context.locals.user.id,
