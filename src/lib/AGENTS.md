@@ -147,7 +147,8 @@ is never auto-saved.
 
 ## Tests
 
-Unit tests live in `__tests__/` alongside the modules. 389 tests, ~13s — run them.
+Unit tests live in `__tests__/` alongside the modules. Run the full Vitest suite before
+declaring work complete.
 
 ```bash
 npm test
