@@ -5,6 +5,16 @@ import { describe, expect, it } from 'vitest';
 const workflowPath = (...parts: string[]) => resolve(process.cwd(), '.github', 'workflows', ...parts);
 const readWorkflow = (name: string) => readFileSync(workflowPath(name), 'utf8');
 
+const getWorkflowJob = (workflow: string, name: string) => {
+  const jobsStart = workflow.indexOf('jobs:\n');
+  const start = workflow.indexOf(`  ${name}:\n`, jobsStart);
+  expect(start).toBeGreaterThanOrEqual(0);
+
+  const afterJob = workflow.slice(start + `  ${name}:\n`.length);
+  const nextJob = afterJob.search(/^  [A-Za-z0-9_-]+:\s*$/m);
+  return nextJob === -1 ? afterJob : afterJob.slice(0, nextJob);
+};
+
 interface PermissionsDeclaration {
   indent: number;
   line: number;
@@ -95,27 +105,34 @@ describe('release workflow contracts', () => {
     expect(commandPositions).toEqual([...commandPositions].sort((a, b) => a - b));
   });
 
-  it('fails visibly for unsuccessful internal main CI and smokes the exact deployed commit', () => {
-    const smoke = readWorkflow('post-deploy-smoke.yml');
+  it('keeps every qualifying main completion visible while only successful releases smoke', () => {
+    const workflow = readWorkflow('post-deploy-smoke.yml');
+    const beforeJobs = workflow.slice(0, workflow.indexOf('jobs:\n'));
+    const sentinel = getWorkflowJob(workflow, 'sentinel');
+    const smoke = getWorkflowJob(workflow, 'smoke');
 
-    expect(smoke).toMatch(/^name: Post-deploy smoke$/m);
-    expect(smoke).toMatch(/^  workflow_run:\n    workflows: \[CI\]\n    types: \[completed\]$/m);
-    assertLeastPrivilege(smoke);
-    expect(smoke).toMatch(/^concurrency:\n  group: production-smoke\n  cancel-in-progress: true$/m);
-    expect(smoke).toMatch(/github\.event\.workflow_run\.event == 'push'/);
-    expect(smoke).toMatch(/github\.event\.workflow_run\.head_branch == 'main'/);
-    expect(smoke).toMatch(/github\.event\.workflow_run\.head_repository\.full_name == github\.repository/);
-    const jobGuard = smoke.match(/name: production sentinel and smoke\n    if: >-\n([\s\S]*?)\n    runs-on:/)?.[1];
-    expect(jobGuard).toBeDefined();
-    expect(jobGuard).not.toContain('conclusion');
-    expect(smoke).toMatch(/if: github\.event\.workflow_run\.conclusion != 'success'/);
-    expect(smoke).toMatch(/if: github\.event\.workflow_run\.conclusion != 'success'\n        run: \|\n[\s\S]*?exit 1/);
+    expect(workflow).toMatch(/^name: Post-deploy smoke$/m);
+    expect(workflow).toMatch(/^  workflow_run:\n    workflows: \[CI\]\n    types: \[completed\]$/m);
+    assertLeastPrivilege(workflow);
+    expect(beforeJobs).not.toMatch(/^concurrency:/m);
 
-    const sentinel = smoke.indexOf("github.event.workflow_run.conclusion != 'success'");
+    expect(sentinel).toMatch(/github\.event\.workflow_run\.event == 'push'/);
+    expect(sentinel).toMatch(/github\.event\.workflow_run\.head_branch == 'main'/);
+    expect(sentinel).toMatch(/github\.event\.workflow_run\.head_repository\.full_name == github\.repository/);
+    expect(sentinel).not.toMatch(/concurrency:/);
+    expect(sentinel).toMatch(/if: github\.event\.workflow_run\.conclusion != 'success'\n        run: \|\n[\s\S]*?exit 1/);
+    expect(sentinel).toMatch(/if: github\.event\.workflow_run\.conclusion == 'success'\n        run: echo/);
+    expect(sentinel).not.toMatch(/actions\/checkout|run: npm ci|npm run smoke/);
+
+    expect(smoke).toMatch(/^    needs: sentinel$/m);
+    expect(smoke).toMatch(/needs\.sentinel\.result == 'success'/);
+    expect(smoke).toMatch(/github\.event\.workflow_run\.conclusion == 'success'/);
+    expect(smoke).toMatch(/^    concurrency:\n      group: production-smoke\n      cancel-in-progress: true$/m);
+    expect(workflow.match(/group: production-smoke/g)).toHaveLength(1);
+
     const checkout = smoke.indexOf('uses: actions/checkout@v6');
     const smokeCommand = smoke.indexOf('npm run smoke --');
-    expect(sentinel).toBeGreaterThanOrEqual(0);
-    expect(checkout).toBeGreaterThan(sentinel);
+    expect(checkout).toBeGreaterThanOrEqual(0);
     expect(smokeCommand).toBeGreaterThan(checkout);
     expect(smoke).toMatch(/ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
     expect(smoke).toMatch(/uses: actions\/checkout@v6\n        with:\n          ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}\n          persist-credentials: false/);
