@@ -87,6 +87,7 @@ describe('smoke target authority', () => {
     expect(() => validateSmokeTarget('production', 'https://ratemyplace.org/search')).toThrow();
     expect(() => validateSmokeTarget('production', 'https://ratemyplace.org/.')).toThrow();
     expect(() => validateSmokeTarget('production', 'https://ratemyplace.org:443')).toThrow();
+    expect(() => validateSmokeTarget('production', 'https://ratemyplace.org:')).toThrow();
   });
 
   it('rejects noncanonical raw target forms before URL normalization', () => {
@@ -106,6 +107,7 @@ describe('smoke target authority', () => {
     expect(() => validateSmokeTarget('preview', 'https://attacker.pages.dev')).toThrow();
     expect(() => validateSmokeTarget('preview', 'https://1a2b3c4d.ratemyplace-64y.pages.dev:8443')).toThrow();
     expect(() => validateSmokeTarget('preview', 'https://1a2b3c4d.ratemyplace-64y.pages.dev:443')).toThrow();
+    expect(() => validateSmokeTarget('preview', 'https://1a2b3c4d.ratemyplace-64y.pages.dev:')).toThrow();
   });
 
   it('requires a full SHA outside local mode', () => {
@@ -118,6 +120,7 @@ describe('smoke target authority', () => {
   it('allows an explicit local development port', () => {
     expect(validateSmokeTarget('local', 'http://127.0.0.1:8788').origin)
       .toBe('http://127.0.0.1:8788');
+    expect(() => validateSmokeTarget('local', 'http://127.0.0.1:')).toThrow();
   });
 
   it('accepts local localhost and IPv6 loopback origins', () => {
@@ -197,6 +200,25 @@ describe('smoke probes', () => {
       });
       const results = await runSmoke(config, dependencies(fetch));
       expect(results.find((result) => result.path === '/profile')?.ok).toBe(false);
+    }
+  });
+
+  it('resolves protected redirect locations against the requested URL', async () => {
+    for (const { location, ok } of [
+      { location: '/auth/signin?next=%2Freview%2Fnew', ok: true },
+      { location: '../../auth/signin?next=%2Freview%2Fnew', ok: true },
+      { location: 'auth/signin', ok: false },
+    ]) {
+      const fetch = successResponses();
+      const standard = successResponses();
+      vi.mocked(fetch).mockImplementation(async (input: URL | RequestInfo) => {
+        if (requestUrl(input).pathname === '/review/new') {
+          return response('', { status: 302, headers: { location } });
+        }
+        return standard(input);
+      });
+      const results = await runSmoke(config, dependencies(fetch));
+      expect(results.find((result) => result.path === '/review/new')?.ok).toBe(ok);
     }
   });
 

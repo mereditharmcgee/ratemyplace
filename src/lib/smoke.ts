@@ -97,6 +97,9 @@ export function validateSmokeTarget(environment: SmokeEnvironment, value: string
   if (!rawTarget) {
     throw new Error('--base-url must be an origin without credentials, path, query, or fragment');
   }
+  if (rawTarget[2].endsWith(':')) {
+    throw new Error('--base-url must not contain an empty port');
+  }
 
   let target: URL;
   try {
@@ -356,8 +359,9 @@ async function probeProtected(
   dependencies: SmokeDependencies,
 ): Promise<SmokeProbeResult> {
   const start = dependencies.now();
+  const requestedUrl = probeUrl(options, probe.path);
   const fetched = await requestWithTimeout(
-    probeUrl(options, probe.path),
+    requestedUrl,
     dependencies,
     options.requestTimeoutMs,
     async () => undefined,
@@ -371,7 +375,7 @@ async function probeProtected(
     return result(probe.name, probe.path, start, dependencies.now, response.status, false, 'Expected sign-in redirect');
   }
   try {
-    const destination = new URL(location, options.baseUrl);
+    const destination = new URL(location, requestedUrl);
     const allowed = destination.origin === options.baseUrl.origin && destination.pathname === '/auth/signin';
     return result(probe.name, probe.path, start, dependencies.now, response.status, allowed, allowed ? '' : 'Invalid sign-in redirect');
   } catch {
