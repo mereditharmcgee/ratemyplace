@@ -5,11 +5,46 @@ import { describe, expect, it } from 'vitest';
 const workflowPath = (...parts: string[]) => resolve(process.cwd(), '.github', 'workflows', ...parts);
 const readWorkflow = (name: string) => readFileSync(workflowPath(name), 'utf8');
 
+interface PermissionsDeclaration {
+  indent: number;
+  line: number;
+  value: string;
+}
+
+const findPermissionsDeclarations = (lines: string[]): PermissionsDeclaration[] => lines.flatMap((line, index) => {
+  const match = line.match(/^([ \t]*)(?:"permissions"|'permissions'|permissions)[ \t]*:(.*)$/);
+  if (!match) return [];
+
+  return [{ indent: match[1].length, line: index, value: match[2].trim() }];
+});
+
+const assertReadOnlyPermissionsBlock = (workflow: string) => {
+  const lines = workflow.split(/\r?\n/);
+  const declarations = findPermissionsDeclarations(lines);
+
+  expect(declarations).toHaveLength(1);
+  const [topLevel] = declarations;
+  expect(topLevel.indent).toBe(0);
+
+  if (topLevel.value) {
+    expect(topLevel.value).toMatch(/^\{[ \t]*contents[ \t]*:[ \t]*read[ \t]*\}[ \t]*(?:#.*)?$/);
+    return;
+  }
+
+  const blockEntries: string[] = [];
+  for (let index = topLevel.line + 1; index < lines.length; index++) {
+    const line = lines[index];
+    if (!line.trim() || line.trimStart().startsWith('#')) continue;
+    if (!/^[ \t]+/.test(line)) break;
+    blockEntries.push(line);
+  }
+
+  expect(blockEntries).toHaveLength(1);
+  expect(blockEntries[0]).toMatch(/^[ \t]+contents[ \t]*:[ \t]*read[ \t]*(?:#.*)?$/);
+};
+
 const assertLeastPrivilege = (workflow: string) => {
-  expect(workflow).toMatch(/^permissions:\n  contents: read$/m);
-  expect([...workflow.matchAll(/^permissions:/gm)]).toHaveLength(1);
-  expect(workflow).not.toMatch(/^[ \t]+permissions:/gm);
-  expect(workflow).not.toMatch(/^[ \t]*[^#:\n]+:[ \t]*write(?:[ \t]+#.*)?$/gmi);
+  assertReadOnlyPermissionsBlock(workflow);
   expect(workflow).not.toMatch(/\bwrangler\b/i);
   expect(workflow).not.toMatch(/\b(?:d1|r2)\b/i);
   expect(workflow).not.toMatch(/(?:CLOUDFLARE|CF)_[A-Z_]*TOKEN/i);
@@ -88,5 +123,50 @@ describe('release workflow contracts', () => {
       expect(dangerousWorkflow).not.toBe(ci);
       expect(() => assertLeastPrivilege(dangerousWorkflow)).toThrow();
     }
+  });
+
+  it('rejects an unquoted spaced inline job permissions key', () => {
+    const dangerousWorkflow = readWorkflow('ci.yml').replace(
+      '  quality:\n',
+      '  quality:\n    permissions : { contents: write }\n',
+    );
+
+    expect(() => assertLeastPrivilege(dangerousWorkflow)).toThrow();
+  });
+
+  it('rejects a double-quoted inline job permissions key', () => {
+    const dangerousWorkflow = readWorkflow('ci.yml').replace(
+      '  quality:\n',
+      '  quality:\n    "permissions": { contents: write }\n',
+    );
+
+    expect(() => assertLeastPrivilege(dangerousWorkflow)).toThrow();
+  });
+
+  it('rejects a single-quoted block job permissions key', () => {
+    const dangerousWorkflow = readWorkflow('ci.yml').replace(
+      '  quality:\n',
+      "  quality:\n    'permissions':\n      contents: read\n",
+    );
+
+    expect(() => assertLeastPrivilege(dangerousWorkflow)).toThrow();
+  });
+
+  it('rejects an extra top-level write capability', () => {
+    const dangerousWorkflow = readWorkflow('ci.yml').replace(
+      '  contents: read',
+      '  contents: read\n  id-token: write',
+    );
+
+    expect(() => assertLeastPrivilege(dangerousWorkflow)).toThrow();
+  });
+
+  it('allows harmless write-like shell text inside a run block', () => {
+    const harmlessWorkflow = readWorkflow('ci.yml').replace(
+      'run: npm ci',
+      'run: |\n          echo contents: write',
+    );
+
+    expect(() => assertLeastPrivilege(harmlessWorkflow)).not.toThrow();
   });
 });
