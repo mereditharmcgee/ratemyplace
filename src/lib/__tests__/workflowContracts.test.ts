@@ -11,12 +11,34 @@ interface PermissionsDeclaration {
   value: string;
 }
 
-const findPermissionsDeclarations = (lines: string[]): PermissionsDeclaration[] => lines.flatMap((line, index) => {
-  const match = line.match(/^([ \t]*)(?:"permissions"|'permissions'|permissions)[ \t]*:(.*)$/);
-  if (!match) return [];
+const findPermissionsDeclarations = (lines: string[]): PermissionsDeclaration[] => {
+  const declarations: PermissionsDeclaration[] = [];
+  let blockScalarIndent: number | undefined;
 
-  return [{ indent: match[1].length, line: index, value: match[2].trim() }];
-});
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const indent = line.match(/^[ \t]*/)?.[0].length ?? 0;
+    const trimmed = line.trim();
+
+    if (blockScalarIndent !== undefined) {
+      if (!trimmed || trimmed.startsWith('#') || indent > blockScalarIndent) continue;
+      blockScalarIndent = undefined;
+    }
+
+    const blockScalar = line.match(/^[ \t]*[^#:\n][^:\n]*:[ \t]*(?:\||>)[+-]?[ \t]*(?:#.*)?$/);
+    if (blockScalar) {
+      blockScalarIndent = indent;
+      continue;
+    }
+
+    const match = line.match(/^([ \t]*)(?:"permissions"|'permissions'|permissions)[ \t]*:(.*)$/);
+    if (match) {
+      declarations.push({ indent: match[1].length, line: index, value: match[2].trim() });
+    }
+  }
+
+  return declarations;
+};
 
 const assertReadOnlyPermissionsBlock = (workflow: string) => {
   const lines = workflow.split(/\r?\n/);
@@ -168,5 +190,32 @@ describe('release workflow contracts', () => {
     );
 
     expect(() => assertLeastPrivilege(harmlessWorkflow)).not.toThrow();
+  });
+
+  it('allows an unquoted permissions-looking line inside a literal run block', () => {
+    const harmlessWorkflow = readWorkflow('ci.yml').replace(
+      'run: npm ci',
+      'run: |\n          permissions: { contents: write }\n          # script comment\n          echo done',
+    );
+
+    expect(() => assertLeastPrivilege(harmlessWorkflow)).not.toThrow();
+  });
+
+  it('allows a quoted permissions-looking line inside a folded run block', () => {
+    const harmlessWorkflow = readWorkflow('ci.yml').replace(
+      'run: npm ci',
+      'run: >-\n          "permissions" : { contents: write }\n\n          echo done',
+    );
+
+    expect(() => assertLeastPrivilege(harmlessWorkflow)).not.toThrow();
+  });
+
+  it('resumes scanning and rejects a real job permission after a run block', () => {
+    const dangerousWorkflow = readWorkflow('ci.yml').replace(
+      'run: npm ci',
+      'run: |\n          permissions: { contents: write }\n          echo done\n    permissions: { contents: write }',
+    );
+
+    expect(() => assertLeastPrivilege(dangerousWorkflow)).toThrow();
   });
 });
