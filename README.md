@@ -28,11 +28,14 @@ Tenants rate their apartment unit, building, and landlord using a structured sur
 ## Development
 
 ```bash
-# Install dependencies
-npm install
+# Install the locked dependency set
+npm ci
 
 # Start dev server
 npm run dev
+
+# Run Astro/TypeScript diagnostics
+npm run check
 
 # Run tests
 npm test
