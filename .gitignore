@@ -37,6 +37,9 @@ playwright/.auth/
 # Claude Code worktrees
 .claude/worktrees/
 
+# Agent implementation worktrees
+.worktrees/
+
 # Google Drive sync artifacts
 .tmp.driveupload/
 
