@@ -4,6 +4,8 @@ import {
   runSmoke,
   validateSmokeTarget,
   type SmokeDependencies,
+  type SmokeOptions,
+  type SmokeProbeResult,
 } from '../smoke';
 
 const RELEASE = '0123456789abcdef0123456789abcdef01234567';
@@ -58,6 +60,21 @@ function dependencies(fetch: SmokeDependencies['fetch'], now = () => 0): SmokeDe
   return { fetch, now, sleep: vi.fn(async () => undefined) };
 }
 
+function deferredBodyResponse(method: 'json' | 'text', headers: HeadersInit): {
+  response: Response;
+  resolve: (body: unknown) => void;
+} {
+  let resolve: (body: unknown) => void = () => undefined;
+  const body = new Promise<unknown>((bodyResolve) => { resolve = bodyResolve; });
+  const response = {
+    status: 200,
+    headers: new Headers(headers),
+    json: () => method === 'json' ? body : Promise.resolve(undefined),
+    text: () => method === 'text' ? body.then(String) : Promise.resolve(''),
+  } as unknown as Response;
+  return { response, resolve };
+}
+
 describe('smoke target authority', () => {
   it('has no implicit target', () => {
     expect(() => parseSmokeArgs([])).toThrow('Missing --environment');
@@ -70,6 +87,15 @@ describe('smoke target authority', () => {
     expect(() => validateSmokeTarget('production', 'https://ratemyplace.org/search')).toThrow();
     expect(() => validateSmokeTarget('production', 'https://ratemyplace.org/.')).toThrow();
     expect(() => validateSmokeTarget('production', 'https://ratemyplace.org:443')).toThrow();
+  });
+
+  it('rejects noncanonical raw target forms before URL normalization', () => {
+    for (const target of [
+      'https:ratemyplace.org',
+      'https://ratemyplace.org?',
+      'https://ratemyplace.org#',
+      'https://ratemyplace.org/.',
+    ]) expect(() => validateSmokeTarget('production', target)).toThrow();
   });
 
   it('restricts preview to this Pages project', () => {
@@ -140,14 +166,24 @@ describe('smoke target authority', () => {
 });
 
 describe('smoke probes', () => {
-  const config = parseSmokeArgs([
+  const config: SmokeOptions = parseSmokeArgs([
     '--environment', 'local', '--base-url', 'http://127.0.0.1:8788', '--expected-release', RELEASE,
   ]);
 
   it('allows only same-origin sign-in redirects for protected paths', async () => {
     const fetch = successResponses();
     const results = await runSmoke(config, dependencies(fetch));
+    const first: SmokeProbeResult = results[0];
     expect(results.every((result) => result.ok)).toBe(true);
+    expect(Object.keys(config).sort()).toEqual(['baseUrl', 'environment', 'expectedRelease', 'requestTimeoutMs', 'waitForReleaseMs']);
+    expect(first).toEqual(expect.objectContaining({
+      name: 'health', path: '/api/health', status: 200, ok: true, detail: '', durationMs: expect.any(Number),
+    }));
+    expect(results.map((result) => result.name)).toEqual([
+      'health', 'home', 'about', 'contact', 'guidelines', 'map', 'methodology', 'privacy', 'search', 'terms', 'signin', 'signup',
+      'profile-auth', 'new-review-auth', 'admin-auth', 'buildings-search', 'user-reviews-auth', 'admin-reviews-auth',
+    ]);
+    expect(results.every((result) => Object.keys(result).sort().join(',') === 'detail,durationMs,name,ok,path,status')).toBe(true);
     expect(fetch).toHaveBeenCalledWith(expect.any(URL), expect.objectContaining({ cache: 'no-store', redirect: 'manual' }));
   });
 
@@ -210,6 +246,70 @@ describe('smoke probes', () => {
     } finally {
       if (!settled) await vi.advanceTimersByTimeAsync(25_000);
       await expect(running).resolves.toMatchObject([{ path: '/api/health', ok: false }]);
+      vi.useRealTimers();
+    }
+  });
+
+  it('caps a hanging health JSON body at the positive release-wait deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const deferred = deferredBodyResponse('json', { 'content-type': 'application/json' });
+    let aborted = false;
+    const fetch = vi.fn(async (_input: URL | RequestInfo, init?: RequestInit) => {
+      init?.signal?.addEventListener('abort', () => { aborted = true; });
+      return deferred.response;
+    }) as unknown as SmokeDependencies['fetch'];
+    const running = runSmoke(
+      { ...config, waitForReleaseMs: 5_000, requestTimeoutMs: 30_000 },
+      dependencies(fetch, Date.now),
+    );
+    let settled = false;
+    void running.then(() => { settled = true; });
+    try {
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(settled).toBe(true);
+      expect(aborted).toBe(true);
+    } finally {
+      deferred.resolve({ status: 'ok', release: RELEASE });
+      await expect(running).resolves.toMatchObject([{
+        name: 'health',
+        status: 200,
+        ok: false,
+        detail: expect.stringContaining('Request timed out'),
+      }]);
+      vi.useRealTimers();
+    }
+  });
+
+  it('caps a hanging HTML body at the ordinary request timeout', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const deferred = deferredBodyResponse('text', {
+      'content-type': 'text/html',
+      'x-content-type-options': 'nosniff',
+      'x-frame-options': 'DENY',
+      'content-security-policy': "default-src 'self'",
+      'referrer-policy': 'strict-origin-when-cross-origin',
+    });
+    const standard = successResponses();
+    let aborted = false;
+    const fetch = vi.fn((input: URL | RequestInfo, init?: RequestInit) => {
+      init?.signal?.addEventListener('abort', () => { aborted = true; });
+      if (requestUrl(input).pathname === '/') return Promise.resolve(deferred.response);
+      return standard(input);
+    }) as unknown as SmokeDependencies['fetch'];
+    const running = runSmoke({ ...config, requestTimeoutMs: 1_000 }, dependencies(fetch, Date.now));
+    let settled = false;
+    void running.then(() => { settled = true; });
+    try {
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(settled).toBe(true);
+      expect(aborted).toBe(true);
+    } finally {
+      deferred.resolve(HTML);
+      await expect(running).resolves.toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'home', path: '/', status: 200, ok: false, detail: 'Request timed out' }),
+      ]));
       vi.useRealTimers();
     }
   });

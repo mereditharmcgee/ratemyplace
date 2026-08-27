@@ -1,7 +1,7 @@
-import { parseSmokeArgs, runSmoke } from '../src/lib/smoke';
+import { parseSmokeArgs, runSmoke, type SmokeOptions } from '../src/lib/smoke';
 
 async function main(): Promise<void> {
-  let config;
+  let config: SmokeOptions;
   try {
     config = parseSmokeArgs(process.argv.slice(2));
   } catch (error) {
