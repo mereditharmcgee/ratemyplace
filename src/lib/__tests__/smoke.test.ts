@@ -68,6 +68,7 @@ describe('smoke target authority', () => {
       .toBe('https://ratemyplace.org');
     expect(() => validateSmokeTarget('production', 'https://example.com')).toThrow();
     expect(() => validateSmokeTarget('production', 'https://ratemyplace.org/search')).toThrow();
+    expect(() => validateSmokeTarget('production', 'https://ratemyplace.org/.')).toThrow();
     expect(() => validateSmokeTarget('production', 'https://ratemyplace.org:443')).toThrow();
   });
 
@@ -93,6 +94,11 @@ describe('smoke target authority', () => {
       .toBe('http://127.0.0.1:8788');
   });
 
+  it('accepts local localhost and IPv6 loopback origins', () => {
+    expect(validateSmokeTarget('local', 'https://localhost:8788').hostname).toBe('localhost');
+    expect(validateSmokeTarget('local', 'http://[::1]:8788').hostname).toBe('[::1]');
+  });
+
   it('rejects duplicate, unknown, and unsafe CLI arguments', () => {
     expect(() => parseSmokeArgs(['--environment', 'local', '--environment', 'local', '--base-url', 'http://localhost:8788']))
       .toThrow('Duplicate --environment');
@@ -104,10 +110,31 @@ describe('smoke target authority', () => {
       .toThrow();
   });
 
+  it.each([
+    ['--environment', ['--environment']],
+    ['--base-url', ['--environment', 'local', '--base-url']],
+    ['--expected-release', ['--environment', 'local', '--expected-release']],
+    ['--wait-for-release-ms', ['--environment', 'local', '--wait-for-release-ms']],
+    ['--request-timeout-ms', ['--environment', 'local', '--request-timeout-ms']],
+  ])('rejects a missing value for %s', (flag, args) => {
+    expect(() => parseSmokeArgs(args)).toThrow(`Missing value for ${flag}`);
+  });
+
+  it('rejects invalid release values', () => {
+    expect(() => parseSmokeArgs(['--environment', 'preview', '--base-url', 'https://1a2b3c4d.ratemyplace-64y.pages.dev', '--expected-release', 'a'.repeat(39)]))
+      .toThrow('--expected-release must be a 40-character hexadecimal SHA');
+    expect(() => parseSmokeArgs(['--environment', 'production', '--base-url', 'https://ratemyplace.org', '--expected-release', 'z'.repeat(40)]))
+      .toThrow('--expected-release must be a 40-character hexadecimal SHA');
+  });
+
   it('bounds wait and request timeout configuration', () => {
     expect(() => parseSmokeArgs(['--environment', 'local', '--base-url', 'http://localhost:8788', '--wait-for-release-ms', '600001']))
       .toThrow();
     expect(() => parseSmokeArgs(['--environment', 'local', '--base-url', 'http://localhost:8788', '--request-timeout-ms', '30001']))
+      .toThrow();
+    expect(() => parseSmokeArgs(['--environment', 'local', '--base-url', 'http://localhost:8788', '--wait-for-release-ms', '-1']))
+      .toThrow();
+    expect(() => parseSmokeArgs(['--environment', 'local', '--base-url', 'http://localhost:8788', '--request-timeout-ms', '999']))
       .toThrow();
   });
 });
@@ -162,7 +189,29 @@ describe('smoke probes', () => {
     const results = await runSmoke({ ...config, waitForReleaseMs: 20_000 }, deps);
     const release = results.find((result) => result.path === '/api/health');
     expect(release).toMatchObject({ ok: false, detail: expect.stringContaining(RELEASE) });
-    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('caps a hanging health request at the positive release-wait deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const fetch = vi.fn((_input: URL | RequestInfo, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('Timed out', 'AbortError')));
+    })) as unknown as SmokeDependencies['fetch'];
+    const running = runSmoke(
+      { ...config, waitForReleaseMs: 5_000, requestTimeoutMs: 30_000 },
+      dependencies(fetch, Date.now),
+    );
+    let settled = false;
+    void running.then(() => { settled = true; });
+    try {
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(settled).toBe(true);
+    } finally {
+      if (!settled) await vi.advanceTimersByTimeAsync(25_000);
+      await expect(running).resolves.toMatchObject([{ path: '/api/health', ok: false }]);
+      vi.useRealTimers();
+    }
   });
 
   it.each([

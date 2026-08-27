@@ -52,10 +52,15 @@ export function validateSmokeTarget(environment: SmokeEnvironment, value: string
   } catch {
     throw new Error('Invalid --base-url');
   }
-  if (target.username || target.password || target.hash || target.search || target.pathname !== '/') {
+  const rawTarget = value.slice(value.indexOf('//') + 2);
+  const suffixIndex = rawTarget.search(/[/?#]/);
+  const authority = suffixIndex === -1 ? rawTarget : rawTarget.slice(0, suffixIndex);
+  const rawPath = suffixIndex === -1 || rawTarget[suffixIndex] !== '/'
+    ? ''
+    : rawTarget.slice(suffixIndex).split(/[?#]/, 1)[0];
+  if (target.username || target.password || target.hash || target.search || target.pathname !== '/' || (rawPath !== '' && rawPath !== '/')) {
     throw new Error('--base-url must be an origin without credentials, path, query, or fragment');
   }
-  const authority = value.slice(value.indexOf('//') + 2).split(/[/?#]/, 1)[0];
   const hasExplicitPort = /:\d+$/.test(authority);
   const isProduction = target.protocol === 'https:' && target.hostname === 'ratemyplace.org' && target.port === '' && !hasExplicitPort;
   const isPreview = target.protocol === 'https:' && target.port === '' && !hasExplicitPort && PREVIEW_HOST.test(target.hostname);
@@ -106,9 +111,9 @@ function result(path: string, start: number, now: () => number, status: number, 
   return { path, status, ok, durationMs: Math.max(0, now() - start), ...(detail ? { detail } : {}) };
 }
 
-async function fetchWithTimeout(url: URL, config: SmokeConfig, dependencies: SmokeDependencies): Promise<{ response?: Response; error?: 'Request timed out' | 'Request failed' }> {
+async function fetchWithTimeout(url: URL, config: SmokeConfig, dependencies: SmokeDependencies, timeoutMs = config.requestTimeoutMs): Promise<{ response?: Response; error?: 'Request timed out' | 'Request failed' }> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), config.requestTimeoutMs);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return { response: await dependencies.fetch(url, { cache: 'no-store', redirect: 'manual', signal: controller.signal }) };
   } catch {
@@ -124,10 +129,17 @@ function probeUrl(config: SmokeConfig, path: string): URL {
 
 interface HealthCheck { result: SmokeResult; release?: string; }
 
-async function probeHealth(config: SmokeConfig, dependencies: SmokeDependencies): Promise<HealthCheck> {
+async function probeHealth(config: SmokeConfig, dependencies: SmokeDependencies, deadline?: number): Promise<HealthCheck> {
   const path = '/api/health';
   const start = dependencies.now();
-  const fetched = await fetchWithTimeout(probeUrl(config, path), config, dependencies);
+  const remainingBudget = deadline === undefined ? undefined : deadline - start;
+  if (remainingBudget !== undefined && remainingBudget <= 0) {
+    return { result: result(path, start, dependencies.now, 0, false, 'Release wait deadline reached') };
+  }
+  const timeoutMs = remainingBudget === undefined
+    ? config.requestTimeoutMs
+    : Math.max(1, Math.min(config.requestTimeoutMs, remainingBudget));
+  const fetched = await fetchWithTimeout(probeUrl(config, path), config, dependencies, timeoutMs);
   if (!fetched.response) return { result: result(path, start, dependencies.now, 0, false, fetched.error) };
   const { response } = fetched;
   if (response.status !== 200 || isRedirect(response.status) || !isJson(response)) return { result: result(path, start, dependencies.now, response.status, false, 'Expected health JSON response') };
@@ -200,10 +212,14 @@ async function probeApi(probe: { path: string; status: number; key: string }, co
 export async function runSmoke(config: SmokeConfig, injected?: SmokeDependencies): Promise<SmokeResult[]> {
   const dependencies = injected ?? DEFAULT_DEPENDENCIES;
   const deadline = dependencies.now() + config.waitForReleaseMs;
-  let health = await probeHealth(config, dependencies);
-  while (!health.result.ok && config.expectedRelease && dependencies.now() < deadline) {
-    await dependencies.sleep(Math.min(10_000, deadline - dependencies.now()));
-    health = await probeHealth(config, dependencies);
+  const healthDeadline = config.waitForReleaseMs > 0 ? deadline : undefined;
+  let health = await probeHealth(config, dependencies, healthDeadline);
+  while (!health.result.ok && config.expectedRelease) {
+    const remainingBudget = deadline - dependencies.now();
+    if (config.waitForReleaseMs === 0 || remainingBudget <= 0) break;
+    await dependencies.sleep(Math.min(10_000, remainingBudget));
+    if (dependencies.now() >= deadline) break;
+    health = await probeHealth(config, dependencies, deadline);
   }
   if (!health.result.ok) {
     if (config.expectedRelease) health.result.detail = `Release mismatch: expected ${config.expectedRelease}, actual ${health.release ?? 'unavailable'}`;
