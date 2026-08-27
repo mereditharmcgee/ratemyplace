@@ -4,6 +4,8 @@
 type D1Database = import('@cloudflare/workers-types').D1Database;
 type R2Bucket = import('@cloudflare/workers-types').R2Bucket;
 
+declare const __RMP_BUILD_RELEASE_ID__: string;
+
 declare namespace App {
   interface Platform {
     env: {
