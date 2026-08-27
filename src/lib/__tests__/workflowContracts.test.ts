@@ -5,6 +5,20 @@ import { describe, expect, it } from 'vitest';
 const workflowPath = (...parts: string[]) => resolve(process.cwd(), '.github', 'workflows', ...parts);
 const readWorkflow = (name: string) => readFileSync(workflowPath(name), 'utf8');
 
+const assertLeastPrivilege = (workflow: string) => {
+  expect(workflow).toMatch(/^permissions:\n  contents: read$/m);
+  expect([...workflow.matchAll(/^permissions:/gm)]).toHaveLength(1);
+  expect(workflow).not.toMatch(/^[ \t]+permissions:/gm);
+  expect(workflow).not.toMatch(/^[ \t]*[^#:\n]+:[ \t]*write(?:[ \t]+#.*)?$/gmi);
+  expect(workflow).not.toMatch(/\bwrangler\b/i);
+  expect(workflow).not.toMatch(/\b(?:d1|r2)\b/i);
+  expect(workflow).not.toMatch(/(?:CLOUDFLARE|CF)_[A-Z_]*TOKEN/i);
+  expect(workflow).not.toMatch(/secrets\./i);
+  expect(workflow).not.toMatch(/pull_request_target/i);
+  expect(workflow).not.toMatch(/permissions:\s*write-all/i);
+  expect(workflow).not.toMatch(/continue-on-error:\s*true/i);
+};
+
 describe('release workflow contracts', () => {
   it('runs the least-privilege CI quality gate for pull requests and main pushes', () => {
     const ci = readWorkflow('ci.yml');
@@ -12,8 +26,7 @@ describe('release workflow contracts', () => {
     expect(ci).toMatch(/^name: CI$/m);
     expect(ci).toMatch(/^\s{2}pull_request:\s*$/m);
     expect(ci).toMatch(/^\s{2}push:\n\s{4}branches: \[main\]$/m);
-    expect(ci).toMatch(/^permissions:\n  contents: read$/m);
-    expect([...ci.matchAll(/^permissions:/gm)]).toHaveLength(1);
+    assertLeastPrivilege(ci);
     expect(ci).toMatch(/^concurrency:\n  group: ci-\$\{\{ github\.workflow \}\}-\$\{\{ github\.event\.pull_request\.number \|\| github\.ref \}\}\n  cancel-in-progress: true$/m);
     expect(ci).toMatch(/^  quality:\n    name: quality\n    runs-on: ubuntu-latest\n    timeout-minutes: 20\n    env:\n      ASTRO_TELEMETRY_DISABLED: "1"$/m);
     expect(ci).toMatch(/uses: actions\/checkout@v6\n        with:\n          persist-credentials: false/);
@@ -30,8 +43,7 @@ describe('release workflow contracts', () => {
 
     expect(smoke).toMatch(/^name: Post-deploy smoke$/m);
     expect(smoke).toMatch(/^  workflow_run:\n    workflows: \[CI\]\n    types: \[completed\]$/m);
-    expect(smoke).toMatch(/^permissions:\n  contents: read$/m);
-    expect([...smoke.matchAll(/^permissions:/gm)]).toHaveLength(1);
+    assertLeastPrivilege(smoke);
     expect(smoke).toMatch(/^concurrency:\n  group: production-smoke\n  cancel-in-progress: true$/m);
     expect(smoke).toMatch(/github\.event\.workflow_run\.event == 'push'/);
     expect(smoke).toMatch(/github\.event\.workflow_run\.head_branch == 'main'/);
@@ -60,15 +72,21 @@ describe('release workflow contracts', () => {
 
   it('keeps Cloudflare deployment and privileged operations out of repository workflows', () => {
     for (const name of ['ci.yml', 'post-deploy-smoke.yml']) {
-      const workflow = readWorkflow(name);
+      assertLeastPrivilege(readWorkflow(name));
+    }
+  });
 
-      expect(workflow).not.toMatch(/\bwrangler\b/i);
-      expect(workflow).not.toMatch(/\b(?:d1|r2)\b/i);
-      expect(workflow).not.toMatch(/(?:CLOUDFLARE|CF)_[A-Z_]*TOKEN/i);
-      expect(workflow).not.toMatch(/secrets\./i);
-      expect(workflow).not.toMatch(/pull_request_target/i);
-      expect(workflow).not.toMatch(/permissions:\s*write-all/i);
-      expect(workflow).not.toMatch(/continue-on-error:\s*true/i);
+  it('rejects every job-level permissions declaration and write capability', () => {
+    const ci = readWorkflow('ci.yml');
+
+    for (const permission of ['contents: write', 'id-token: write']) {
+      const dangerousWorkflow = ci.replace(
+        '  quality:\n',
+        `  quality:\n    permissions:\n      ${permission}\n`,
+      );
+
+      expect(dangerousWorkflow).not.toBe(ci);
+      expect(() => assertLeastPrivilege(dangerousWorkflow)).toThrow();
     }
   });
 });
