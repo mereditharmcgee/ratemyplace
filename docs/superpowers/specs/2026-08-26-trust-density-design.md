@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-26
 **Milestone:** v1.6.0 "Trust + Density"
-**Status:** Proposed for owner review
+**Status:** Approved by owner 2026-08-27
 **Requirements:** `.planning/milestones/v1.6.0-REQUIREMENTS.md`
 **Roadmap:** `.planning/milestones/v1.6.0-ROADMAP.md`
 
@@ -36,23 +36,23 @@ The design is based on the current source, not the older claims in `MASTER.md`:
 3. Reviewer rate-limit identifiers are stored as endpoint-purpose-scoped HMACs, not raw IPs. Reviewer IP remains request-local for Turnstile and is not retained; an acting admin's IP is separately retained for authorized admin-action auditing under the disclosed retention policy.
 4. Verification deletion is attempted immediately. A remote-storage failure does not undo the moderation decision; it creates durable, visible retry work until absence is confirmed.
 5. Verification documents have no backup or restoration path. A lost pending document is re-uploaded rather than restored from a private copy.
-6. Ordinary users receive working export and permanent deletion paths rather than unqualified promises for unbuilt capabilities.
+6. Ordinary users receive working export, individual-review deletion, and account-deletion paths rather than unqualified promises for unbuilt capabilities. Account deletion retains score-bearing reviews as permanently ownerless records.
 7. One account/building review authority and an edit-existing path prevent duplicate contribution.
 8. Automated PII, prohibited-language, and velocity signals prioritize human moderation only.
 9. v1.6 introduces no per-user behavioral analytics and no external review-text classifier.
 10. The density pilot uses one bounded Boston geography/building list and launches only after the full trust/accessibility gate.
 11. A destructive admin D1 mutation never commits without its required audit row; remote side effects remain durable post-commit work and do not roll back an already audited decision.
 
-### Proposed defaults requiring owner approval
+### Approved owner decisions (2026-08-27)
 
-- the owner may see/edit/export their own unit number after submission, while authorized admins may view it for moderation;
-- Google OAuth drops `profile` scope and existing reviewer name/avatar data is removed;
+- the owner may see, edit, and export their own unit number after submission, while authorized admins may view it for moderation;
+- Google OAuth drops `profile` scope and stops writing new Google-sourced reviewer name/avatar data; existing profile values and manual display-name behavior remain unchanged unless separately approved;
 - undecided verification documents enter deletion after 30 days;
 - admin audit IP is cleared after 180 days;
-- five new claims per account per 24 hours, with human-review velocity flags at five building or ten landlord submissions;
+- five new claims per account daily, with human-review velocity flags at the fifth building or tenth landlord submission; this design interprets "daily" as a rolling 24-hour window for deterministic enforcement;
 - an account/building claim survives individual review deletion but is removed with the account;
-- account deletion hard-deletes its reviews, with short-lived external erasure receipts protecting both review and account deletion from Time Travel resurrection.
-- identified legacy audit JSON is either minimized through a separately approved, itself-audited operation or retained under an explicit bounded exception; the owner must choose which contract outranks the current immutable-audit rule.
+- account deletion hard-deletes the account and private account-owned data but retains each review with `user_id = NULL`, unchanged content, private unit number, moderation state, and score contribution; the retained review is permanently ownerless and cannot be reclaimed or owner-edited;
+- identified legacy audit JSON is minimized through a separately action-time-approved, itself-audited operation that preserves non-identifying action evidence.
 
 ## Cross-cutting invariants
 
@@ -74,8 +74,8 @@ The design is based on the current source, not the older claims in `MASTER.md`:
 | Context | Read | Write | Status and notes |
 |---|---:|---:|---|
 | Review create form for signed-in reviewer | Yes | Yes | Confirmed; optional input is necessary to collect it |
-| Owner's authenticated review edit flow | Proposed | Proposed | Decision gate; ownership is checked before any response/update |
-| Owner's authenticated data export | Proposed | No | Decision gate; included only if owner redisplay is approved |
+| Owner's authenticated review edit flow | Yes | Yes | Approved; ownership is checked before any response/update |
+| Owner's authenticated data export | Yes | No | Approved; response is private/no-store |
 | Authorized admin review detail | Yes | No | Confirmed moderation purpose; explicit admin check |
 | Public HTML/API/search/map/OG/JSON-LD | No | No | Confirmed; property is absent, not present as `null` |
 | Logs, analytics, integrity flags, audit old/new JSON | No | No | Confirmed; audit may record that a private field changed, never its value |
@@ -83,11 +83,11 @@ The design is based on the current source, not the older claims in `MASTER.md`:
 
 ### Normalization
 
-Shared library logic trims the value, converts blank/whitespace-only input to `NULL`, rejects control characters, and caps length at 32 characters. Create—and, if approved, edit—routes use that one helper. The field remains unrelated to scoring and review-claim uniqueness.
+Shared library logic trims the value, converts blank/whitespace-only input to `NULL`, rejects control characters, and caps length at 32 characters. Create and edit routes use that one helper. The field remains unrelated to scoring and review-claim uniqueness.
 
 Public regression tests inspect complete JSON objects and complete rendered SSR HTML—including serialized island props, scripts, metadata, map payloads, and structured data—for both the `unit_number` property name and a distinctive fixture value. This makes the privacy boundary enforceable rather than dependent on today's templates.
 
-Retention is tied to the review/account lifecycle. The value is deleted with the review or account and is never copied into an immutable audit snapshot.
+Retention is tied to the review lifecycle. Individual review deletion removes the value. Account deletion retains it with the otherwise unchanged ownerless review, after which it is admin-only because no account can satisfy ownership. It is never copied into an immutable audit snapshot.
 
 ## 2. IP pseudonymization and profile minimization
 
@@ -106,13 +106,13 @@ Add a Worker-compatible shared helper that produces:
 
 Production behavior is fail-closed: an absent or malformed secret returns service unavailable rather than falling back to a raw identifier. Rotation uses a new version prefix and intentionally resets active windows at an approved off-peak time; dual-key lookup is unnecessary at current scale.
 
-Raw reviewer IPs are removed from structured application logs. Log events keep request ID, endpoint, subsystem, outcome, and normalized error category. Under the proposed retention default, `audit_logs.admin_ip` becomes nullable and remains an access-controlled accountability field for 180 days, after which scheduled maintenance clears the IP while retaining the admin user, action, entity, and timestamp.
+Raw reviewer IPs are removed from structured application logs. Log events keep request ID, endpoint, subsystem, outcome, and normalized error category. `audit_logs.admin_ip` becomes nullable and remains an access-controlled accountability field for 180 days, after which scheduled maintenance clears the IP while retaining the admin user, action, entity, and timestamp.
 
 Legacy raw `rate_limits` rows are purged only after HMAC code is live. Expired HMAC rows continue to be removed opportunistically and receive a daily physical cleanup.
 
 ### Google profile data
 
-If approved, Google OAuth requests `openid email`, verifies Google's `email_verified` claim, and stores only the provider ID and normalized email required for authentication. Name/avatar writes and display-name editing are removed. Existing name/avatar values are purged only after a deployed release has no remaining readers or writers.
+Google OAuth requests `openid email`, verifies Google's `email_verified` claim, and writes only the provider ID and normalized email required for authentication. New Google-sourced name/avatar writes stop. Existing profile values and manual display-name behavior are unchanged by this approval; any later retention, migration, or deletion decision for them requires separate owner approval.
 
 ## 3. Verification-document lifecycle
 
@@ -148,9 +148,9 @@ They contain no user ID, review ID, address, email, or filename. R2 custom metad
 7. Conditionally promote the row to `stored`.
 8. Return success only after `stored` is durable.
 
-A D1 insert failure performs no R2 write. An R2 failure marks `upload_failed` and permits retry. A conditional-put precondition failure means deletion already fenced the key; it never retries against that key. The request retains the opaque key until the final compare-and-set succeeds. If that promotion does not update exactly one pending-upload row—because of a concurrent review/building/account deletion, replacement, or D1 error—the request attempts to upsert a deletion job and immediately delete; regardless of that request's fate, the independent registry remains durable for reconciliation. A crash immediately after PUT therefore leaves `pending_upload`, not untracked document bytes. The Workers binding's conditional-put result is checked explicitly rather than assuming success: [R2 Workers API conditional operations](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/#conditional-operations).
+A D1 insert failure performs no R2 write. An R2 failure marks `upload_failed` and permits retry. A conditional-put precondition failure means deletion already fenced the key; it never retries against that key. The request retains the opaque key until the final compare-and-set succeeds. If that promotion does not update exactly one pending-upload row—because of a concurrent review/building deletion, account-unlink quarantine, replacement, or D1 error—the request attempts to upsert a deletion job and immediately delete; regardless of that request's fate, the independent registry remains durable for reconciliation. A crash immediately after PUT therefore leaves `pending_upload`, not untracked document bytes. The Workers binding's conditional-put result is checked explicitly rather than assuming success: [R2 Workers API conditional operations](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/#conditional-operations).
 
-Parent deletion marks the registry `delete_pending` but cannot cascade it away. If a PUT might still be in flight, the worker conditionally creates a zero-byte upload-fence object **at the exact opaque key** with fixed non-sensitive metadata. If the fence wins, every real conditional PUT loses. If conditional fence creation loses because document bytes won first, the worker deletes those bytes and retries until a head read confirms the fence; it never treats a transient absence as terminal. Upload completion observes the deletion request and deletes rather than promoting for moderation. Once the fence is confirmed, sensitive bytes are gone and cannot reappear; the tenant-linked moderation record clears its object metadata, while an unlinked fence-cleanup job retains only the opaque key. The fence remains for 30 days—far beyond an invocation—and is then removed by application cleanup plus the prefix lifecycle/reconciliation backstop. Replacement uploads always receive a new random key. Fence-win, document-win, immediate-post-PUT crash, retry, and cleanup are required concurrency tests against real R2 semantics before activation.
+Review/building deletion or account-unlink preparation marks the registry `delete_pending` but cannot cascade it away. If a PUT might still be in flight, the worker conditionally creates a zero-byte upload-fence object **at the exact opaque key** with fixed non-sensitive metadata. If the fence wins, every real conditional PUT loses. If conditional fence creation loses because document bytes won first, the worker deletes those bytes and retries until a head read confirms the fence; it never treats a transient absence as terminal. Upload completion observes the deletion request and deletes rather than promoting for moderation. Once the fence is confirmed, sensitive bytes are gone and cannot reappear; the tenant-linked moderation record clears its object metadata, while an unlinked fence-cleanup job retains only the opaque key. The fence remains for 30 days—far beyond an invocation—and is then removed by application cleanup plus the prefix lifecycle/reconciliation backstop. Replacement uploads always receive a new random key. Fence-win, document-win, immediate-post-PUT crash, retry, and cleanup are required concurrency tests against real R2 semantics before activation.
 
 ### Decision and deletion flow
 
@@ -161,7 +161,7 @@ The decision path commits one D1 batch containing the required audit row, two-st
 - A transient failure keeps the decision, marks `delete_pending`, and returns HTTP 202 with explicit deletion-pending state. Request `waitUntil` may finish only work already attempted in that invocation; the persisted outbox—not the execution context—is the authority for every later retry.
 - A concurrent stale decision or a decision against `pending_upload` returns 409 and creates no audit event.
 
-Review, building, and account deletion include both their required audit row and every associated deletion key in the same D1 batch before cascades can remove verification lookup rows. The independent registry/upload tombstone survives those cascades until sensitive bytes are absent, the exact key is fenced where necessary, and bounded fence cleanup is confirmed.
+Review/building deletion and account deletion/unlink include every associated deletion key in durable D1 work before cascades can remove verification lookup rows; destructive admin variants include their required audit row in the same batch. The independent registry/upload tombstone survives until sensitive bytes are absent, the exact key is fenced where necessary, and bounded fence cleanup is confirmed.
 
 ### Retry and reconciliation
 
@@ -173,7 +173,7 @@ The separately deployed maintenance Worker is scaffolded in Phase 22 with a narr
 
 Retries are idempotent with exponential backoff capped at 24 hours. Three failed attempts or 60 minutes pending creates an admin-visible warning and critical operational event. Document-deletion jobs remain active until sensitive bytes are absent or replaced by a confirmed fence. Fence-cleanup jobs retain only the opaque key until lifecycle/application deletion and confirmed absence; completed rows then discard the key and retain only non-identifying outcome/timing fields for 30 days.
 
-If the default is approved, undecided documents enter deletion after 30 days and move to `expired`; the reviewer may submit a replacement. Before a lifecycle rule is enabled, the project inventories current `users/...` keys, reconciles every legacy row/object (especially anything already older than 30 days), deploys missing-object handling, and obtains separate approval for the exact affected set. New opaque `verifications/...` keys receive a prefix-scoped 30-day lifecycle rule only after those preconditions pass; legacy prefixes are handled deliberately rather than exposed to a surprise bucket-wide expiry. Because R2 lifecycle removal is asynchronous, public copy describes 30 days as the application retention limit and says physical deletion may complete shortly afterward. R2 document bytes are never copied into backups, D1 exports, incident archives, or analytics.
+Undecided documents enter deletion after 30 days and move to `expired`; the reviewer may submit a replacement. Before a lifecycle rule is enabled, the project inventories current `users/...` keys, reconciles every legacy row/object (especially anything already older than 30 days), deploys missing-object handling, and obtains separate approval for the exact affected set. New opaque `verifications/...` keys receive a prefix-scoped 30-day lifecycle rule only after those preconditions pass; legacy prefixes are handled deliberately rather than exposed to a surprise bucket-wide expiry. Because R2 lifecycle removal is asynchronous, public copy describes 30 days as the application retention limit and says physical deletion may complete shortly afterward. R2 document bytes are never copied into backups, D1 exports, incident archives, or analytics.
 
 ### Strictly journaled, no-store viewing
 
@@ -187,7 +187,7 @@ authenticate -> require moderation=pending and object=stored
 -> stream private/no-store response
 ```
 
-A dedicated verification-access journal and strict helper do not swallow errors. The initial row means authorization was granted, not that bytes were viewed. A successful R2 fetch is updated to `served` before the response can stream; missing/error outcomes are recorded accurately. If the pre-fetch insert or pre-stream served update fails, no bytes are returned and the route responds 503. Processed, upload-incomplete, expired, or deletion-pending documents return 410. Missing records return 404. The journal stores admin user ID, admin IP (until its retention expiry), verification ID, request ID, outcome, and timestamps only—never filename, R2 key, tenant email, unit number, or contents.
+A dedicated verification-access journal and strict helper do not swallow errors. The initial row means authorization was granted, not that bytes were viewed. A successful R2 fetch is updated to `served` before the response can stream; missing/error outcomes are recorded accurately. If the pre-fetch insert or pre-stream served update fails, no bytes are returned and the route responds 503. Processed, upload-incomplete, expired, or deletion-pending documents return 410. Missing records return 404. The journal stores admin user ID, admin IP for 180 days, verification ID, request ID, outcome, and timestamps only—never filename, R2 key, tenant email, unit number, or contents. Scheduled maintenance clears the IP while retaining the remaining access evidence.
 
 Responses include `Cache-Control: private, no-store, max-age=0`, `Pragma: no-cache`, `X-Content-Type-Options: nosniff`, and a restrictive document CSP. Active formats download as attachments; inline images remain no-store.
 
@@ -236,16 +236,16 @@ building_id -> buildings(id) ON DELETE CASCADE
 created_at INTEGER NOT NULL DEFAULT (unixepoch())
 ```
 
-If the default is approved, the claim remains if the review is individually deleted, preventing resubmission under the same account; account deletion removes it. A 409 for a claim with a live `review_id` includes the authorized edit-existing route. A tombstoned claim with `review_id = NULL` returns a distinct consumed-claim explanation and never links to a missing review. Before backfill, a read-only production query identifies every duplicate pair; any result blocks migration until the owner explicitly decides which content remains. No duplicate is silently deleted. Backfilled claims copy `reviews.created_at`, never the migration timestamp, so the rolling 24-hour allowance and historical reporting are not distorted.
+The claim remains if the review is individually deleted, preventing resubmission under the same account; account deletion removes it even though the review remains ownerless. A 409 for a claim with a live `review_id` includes the authorized edit-existing route. A tombstoned claim with `review_id = NULL` returns a distinct consumed-claim explanation and never links to a missing review. Before backfill, a read-only production query identifies every duplicate pair among user-linked reviews; any result blocks migration until the owner explicitly decides which content remains. No duplicate is silently deleted. Backfilled claims copy `reviews.created_at`, never the migration timestamp, so the rolling 24-hour allowance and historical reporting are not distorted. Reviews whose `user_id` is already `NULL` receive no claim and cannot be reclaimed.
 
 ### Zero-gap production cutover
 
 The claim/scan transition uses two compatible deploys plus brief, explicitly approved submission and approval gates:
 
 1. Add claim, integrity-job, flag, and feature-gate tables without enabling enforcement.
-2. Deploy compatibility code that honors both gates. Transitional submission atomically checks `review_claims` **and** live reviews, counts both claims and not-yet-backfilled recent reviews for the allowance, and writes the claim/job for every accepted review. If the lifetime-claim default is approved, every review-deletion path materializes that claim before removing a legacy review. The approval path immediately blocks approval unless that review has a completed scan; rejection and diagnosis remain available.
-3. Backfill all historical reviews into claims using original review timestamps; enqueue every existing pending review for a content scan. Velocity backfill is bounded to the preceding 24 hours.
-4. Close new/edit submissions briefly, wait for in-flight requests, run final idempotent catch-up, and require parity: every review has the intended claim, no claim maps to multiple reviews, and every pending review has a completed or pending scan job. Approval remains scan-gated throughout.
+2. Deploy compatibility code that honors both gates. Transitional submission atomically checks `review_claims` **and** live user-linked reviews, counts both claims and not-yet-backfilled recent reviews for the allowance, and writes the claim/job for every accepted review. Every review-deletion path materializes that claim before removing a legacy review. The approval path immediately blocks approval unless that review has a completed scan; rejection and diagnosis remain available.
+3. Backfill all historical user-linked reviews into claims using original review timestamps; leave ownerless reviews unclaimed and enqueue every existing pending review for a content scan. Velocity backfill is bounded to the preceding 24 hours.
+4. Close new/edit submissions briefly, wait for in-flight requests, run final idempotent catch-up, and require parity: every user-linked review has the intended claim, every ownerless review has none, no claim maps to multiple reviews, and every pending review has a completed or pending scan job. Approval remains scan-gated throughout.
 5. Deploy/enable the final atomic claim writer, drain or account for every legacy pending scan, rerun parity, and reopen submissions only after separate action-time approval. No review approval is reopened separately because the completed-scan invariant has already been continuously enforced.
 
 If compatibility writing or backfill fails, the gate remains closed only for review submission/editing; public browsing, auth, admin diagnosis/rejection, and receipt-safe deletion remain available. Approval stays blocked for unscanned reviews. Rollback returns to the compatible writer without dropping the expanded tables.
@@ -260,7 +260,7 @@ Creation uses one D1 batch and D1's sequential transactional semantics:
 
 If the first statement inserts nothing, later statements also insert nothing; post-batch classification returns 409 for an existing claim or 429 for the allowance. Any unexpected constraint failure rolls the whole batch back. Concurrent batches serialize, so exactly one review/claim wins without a SQL trigger.
 
-The proposed allowance is five new claims per account in a rolling 24-hour window. Exported shared constants define the limit/window and are bound into the conditional statement; there is no second literal in migration SQL. A friendly preflight improves UX but is not authoritative. Editing/resubmitting the claimed review consumes no new allowance. The existing hourly endpoint limiter remains a technical flood guard.
+The approved allowance is five new claims per account daily. For deterministic enforcement across time zones and reset boundaries, this design interprets "daily" as a rolling 24-hour window; that window shape is an implementation assumption, not an additional owner-approved product decision. Exported shared constants define the limit/window and are bound into the conditional statement; there is no second literal in migration SQL. A friendly preflight improves UX but is not authoritative. Editing/resubmitting the claimed review consumes no new allowance. The existing hourly endpoint limiter remains a technical flood guard.
 
 ### Moderation signals
 
@@ -294,7 +294,7 @@ Single-use reauthentication records are hashed in D1, expire automatically, and 
 
 `POST /api/user/export` accepts no target user ID. It generates a `schema_version: 1` JSON response directly, uses a non-identifying filename, and sets private/no-store headers. No export artifact is written to D1 or R2.
 
-The allowlist contains account fields, the owner's reviews, saved buildings, notifications, votes, prospectively linked authenticated contact/bug reports, and verification decision metadata. Private unit number is included only if owner redisplay/export is approved. It excludes password hashes, sessions, tokens, rate-limit rows, raw IPs, audit internals, R2 keys, admin notes, unrelated records, and verification bytes.
+The allowlist contains account fields, the owner's reviews including private unit number, saved buildings, notifications, votes, prospectively linked authenticated contact/bug reports, and verification decision metadata. It excludes password hashes, sessions, tokens, rate-limit rows, raw IPs, audit internals, R2 keys, admin notes, unrelated records, and verification bytes.
 
 Historic email-only contact/bug-report records are handled manually rather than attributed by email matching. Future authenticated submissions link prospectively by user ID.
 
@@ -304,54 +304,56 @@ The deletion migration does not rely on today's accidental foreign-key behavior:
 
 | Data relationship | Own-review deletion | Account deletion |
 |---|---|---|
-| Review and user-authored review content | Hard-delete selected review | Hard-delete all owned reviews |
-| Account/building claim | Preserve with `review_id = NULL` if the proposed lifetime-claim rule is approved | Cascade with account |
+| Review and user-authored review content | Hard-delete selected review | Retain unchanged except set `user_id = NULL`; content, status, private unit number, and score contribution remain; no reclaim or owner edit/export |
+| Account/building claim | Preserve with `review_id = NULL` | Cascade with account; the retained ownerless review has no claim |
 | Sessions and auth/verification/reset/reauth tokens | Unchanged | Cascade/invalidate all; clear session cookie |
-| Votes cast, saved buildings, notifications | Delete review-dependent rows as applicable | Cascade all account-owned rows |
-| Verification document bytes and metadata | Copy opaque keys to non-cascading outbox, then delete metadata | Same for every owned review before user cascade |
-| Integrity flags and scan jobs | Cascade with review | Cascade through reviews/account |
+| Votes cast, saved buildings, notifications | Delete review-dependent rows as applicable | Delete account-owned rows; other users' votes on retained reviews remain |
+| Verification document bytes and metadata | Copy opaque keys to non-cascading outbox, then delete metadata | Enqueue every pending object before account deletion; retain only non-sensitive review decision/badge state |
+| Integrity flags and scan jobs | Cascade with review | Retain with the retained review |
 | Prospectively linked authenticated contact/bug reports | Unchanged unless review-linked | Delete; historic email-only submissions remain manual because they are not attributed by email matching |
-| Landlord disputes | Retain the independently submitted dispute, set `review_id = NULL`, and retain no copied review text, address, unit, or reviewer identity | Same |
+| Landlord disputes | Retain the independently submitted dispute, set `review_id = NULL`, and retain no copied review text, address, unit, or reviewer identity | Retain linked to the ownerless review; no reviewer identity is available |
 | `verified_by`, `reviewed_by`, `resolved_by` moderator references | Unchanged | `ON DELETE SET NULL`; an admin must first lose privileges through the audited admin flow |
-| Audit/action history | Retain action/entity/status evidence; no unit number or new user-authored text | Decision gate: either separately approve and audit minimization of identified legacy target-user IDs/title/free text while preserving non-identifying evidence, or document a bounded retention exception; clear admin IP after the approved period |
+| Audit/action history | Retain action/entity/status evidence; no unit number or new user-authored text | Preserve non-identifying evidence; separately inventory and action-time approve one idempotent, itself-audited minimization of legacy target-user IDs/title/free text; clear admin IP after 180 days |
 
-Row-count, foreign-key, export, and public-leak tests cover every line of the matrix. Any table added later must choose one of these behaviors in its migration and account-rights tests.
+Current source is incompatible with this matrix: `reviews.user_id` is `NOT NULL REFERENCES users(id) ON DELETE CASCADE`, multiple admin queries inner-join `users`, and several TypeScript interfaces require a string author. Phase 27 first deploys nullable-author-compatible readers, owner checks, notifications, exports, moderation, and admin labels; it then rebuilds `reviews` with `user_id TEXT NULL REFERENCES users(id) ON DELETE SET NULL`, preserving every column, constraint, and index. Row counts, `PRAGMA foreign_key_check`, export/ownership denial, aggregate parity, and public-leak tests cover the rebuild and every line of the matrix. No shared “deleted user” sentinel is created, and any table added later must choose an explicit behavior in its migration and account-rights tests.
+
+Legacy audit minimization is not implied by this design approval. The implementation first produces a read-only inventory and digest of affected rows/fields, defines the exact idempotent transformation that removes target-user IDs, titles, and free text while preserving action type, non-identifying entity/status evidence, actor accountability, and timestamps, and displays that scope for separate production action approval. The mutation runs only after atomic audit infrastructure is live, records its own required audit event without copying the removed values, verifies post-state against the approved digest, and never rewrites unrelated immutable history.
 
 ### Own-review deletion
 
-The owner delete path requires ownership and recent reauthentication. Under the approved deletion matrix, it first creates the versioned erasure intent/write quarantine described below, then prepares a review-level receipt, enqueues verification-object cleanup, deletes the frozen review and dependent private rows, and—if approved—preserves the account/building claim. Public aggregates recompute from remaining approved reviews. Repeated deletion is idempotent and non-enumerating. The receipt prevents Time Travel from restoring the deleted review, its private unit number, or its live claim link.
+The owner delete path requires ownership and recent reauthentication. Under the approved deletion matrix, it first creates the versioned erasure intent/write quarantine described below, then prepares a review-level receipt, enqueues verification-object cleanup, deletes the frozen review and dependent private rows, and preserves the account/building claim with `review_id = NULL`. Public aggregates recompute from remaining approved reviews. Repeated deletion is idempotent and non-enumerating. The receipt prevents Time Travel from restoring the deleted review or its private unit number; the lifetime claim remains until account deletion.
 
 ### Account deletion
 
-Account deletion requires recent reauthentication and typed confirmation. Admin accounts receive 409 until privileges are revoked through the audited admin path. Under the approved deletion matrix, the account and its descendant set are first versioned and write-quarantined. The deletion batch revalidates that frozen set, enqueues every verification object into non-cascading work, writes local erasure jobs for the account and each descendant review, and deletes the user according to the matrix. A D1 failure leaves the quarantined account intact for conclusive abort/completion rather than reopening it implicitly. After commit, every session is invalidated, the cookie is cleared, and immediate R2 cleanup is attempted; pending document cleanup does not resurrect the account.
+Account deletion requires recent reauthentication, typed confirmation, and clear pre-confirmation copy that reviews remain public/score-bearing, lose their owner, keep private moderation fields, and cannot later be edited; a user who wants a review removed must delete it first. Admin accounts receive 409 until privileges are revoked through the audited admin path. The account and frozen set of owned reviews are first versioned and write-quarantined. The commit batch revalidates that set, enqueues every verification object into non-cascading work, writes one local account-unlink job, sets every frozen review's `user_id = NULL`, deletes private account-owned rows and claims, then deletes the user. It writes no descendant review-deletion job because those reviews remain live. A D1 failure leaves the quarantined account intact for conclusive abort/completion rather than reopening it implicitly. After commit, every session is invalidated, the cookie is cleared, and immediate R2 cleanup is attempted; pending document cleanup does not resurrect the account or author link.
 
 ### Coverage across deletion paths
 
-The erasure protocol is a shared prerequisite for every operation that can delete a review or account: owner review deletion, account deletion, admin review deletion, admin building deletion, and any future parent cascade. A first D1 batch creates a non-cascading `erasure_intent`, captures the target version and complete descendant digest, and marks the target `erasure_pending` so every mutating route rejects new edits/children for that request. Only then are external receipts prepared. The deletion batch requires the same intent, version, quarantine token, and descendant digest; a changed set produces no deletion. For an authorized replacement set, the old intent must be explicitly aborted and a newly displayed set separately approved rather than inheriting stale authorization. The batch also includes the required admin audit row and every verification-object deletion intent where applicable.
+The receipt protocol is a shared prerequisite for every operation that can delete a review or delete an account/remove author links: owner review deletion, account deletion, admin review deletion, admin building deletion, and any future parent cascade. A first D1 batch creates a non-cascading `erasure_intent`, captures the target version and complete descendant digest, and marks the target `erasure_pending` so every mutating route rejects new edits/children for that request. Only then are external receipts prepared. The commit batch requires the same intent, version, quarantine token, and descendant digest; a changed set produces no operation. Review-kind intents authorize review deletion. Account-kind intents authorize only account deletion plus unlinking the frozen reviews, never deleting those reviews. For an authorized replacement set, the old intent must be explicitly aborted and a newly displayed set separately approved rather than inheriting stale authorization. The batch also includes the required admin audit row where applicable and every verification-object deletion intent.
 
 Receipt instrumentation deploys to all existing deletion paths before the restore guarantee is advertised. The project then waits one full currently configured Time Travel window plus the two-day safety margin—or separately proves complete receipt coverage for every still-restorable legacy deletion—before calling the guarantee active. During that warm-up, a production restore remains a closed, incident-specific manual decision.
 
 ### Crash-consistent erasure ledger
 
-Every covered deletion uses the same external protocol. A separate private R2 bucket stores markers under `erasure/v1/{key-version}/{request-id}/{state}`. Each marker contains only `kind` (`review` or `account`), `HMAC(versioned ERASURE_LEDGER_KEY, kind + internal_id)`, request ID, state, and timestamps—never the raw ID, email, review text, address, or unit number. Marker writes use conditional create (`If-None-Match: *` or the Workers API equivalent), and a prefix-scoped [R2 Bucket Lock](https://developers.cloudflare.com/r2/buckets/bucket-locks/) for the reverified Time Travel window plus two days prevents overwrite or early deletion even if application code is wrong.
+Every covered review deletion or account-unlink operation uses the same external state protocol with type-specific replay semantics. A separate private R2 bucket stores markers under `erasure/v1/{key-version}/{request-id}/{state}`. Each marker contains only `kind` (`review` or `account`), `HMAC(versioned ERASURE_LEDGER_KEY, kind + internal_id)`, request ID, state, and timestamps—never the raw ID, email, review text, address, or unit number. `review` means delete that review; `account` means delete that account and ensure its frozen reviews have null authors. Marker writes use conditional create (`If-None-Match: *` or the Workers API equivalent), and a prefix-scoped [R2 Bucket Lock](https://developers.cloudflare.com/r2/buckets/bucket-locks/) for the reverified Time Travel window plus two days prevents overwrite or early deletion even if application code is wrong.
 
-1. In D1, atomically create the erasure intent/quarantine with request ID, target version, and descendant digest. Every relevant mutation path checks the quarantine. If this batch fails, no external marker or deletion runs.
-2. Write `prepared` externally. If this fails, no deletion runs; a conclusive absence check lets a separate D1 batch abort the intent and remove quarantine.
-3. In the D1 deletion batch, require the exact intent/quarantine/version/descendant digest, write a non-cascading local erasure job with the same request ID/digest, include the required admin audit where applicable, and commit the deletion. Zero-match is unresolved—not permission to unfreeze.
-4. After D1 commit, write the immutable `committed` marker containing `deletion_committed_at` from the local job. If that write fails, return accepted/pending and let the local job plus scheduled Worker retry until it exists; a later successful marker upload only extends physical lock coverage beyond the required deadline.
-5. Write `aborted` and remove quarantine in one D1 batch only after a consistent read proves the deletion did not commit and the target still matches the frozen version/set. Timeout, conflict, or unverifiable outcome leaves `prepared` plus quarantine in place rather than guessing.
-6. Internal user/review IDs are never reused. For a committed deletion, `protect_until = deletion_committed_at + reverified Time Travel maximum + two days` (currently 32 days); only then does application cleanup begin. Terminal-prefix lifecycle rules and daily reconciliation provide asynchronous backstops until absence is confirmed. There is intentionally no renewable marker state. A `prepared` marker has no expiry rule until resolved: one hour unresolved is critical, 24 hours requires manual incident ownership, and within seven days a resolver must produce `committed` or `aborted`. Forced completion or manual abort requires separate action-time approval and atomically revalidates the frozen target version/descendant set; an admin-origin completion writes the required recovery audit in that batch. A mismatch never inherits the stale authorization: it remains quarantined until a replacement set is shown and separately approved. Missing the seven-day terminal deadline closes affected deletion/recovery operations and pages the maintainer rather than allowing normal writes around an indefinite tombstone. Retain each marker key version and verification secret until cleanup plus bucket inventory confirm no live marker for that version remains; then destroy the retired secret. Rotation creates a new version and never rewrites live receipts.
+1. In D1, atomically create the erasure intent/quarantine with request ID, target version, and descendant digest. Every relevant mutation path checks the quarantine. If this batch fails, no external marker or type-specific operation runs.
+2. Write `prepared` externally. If this fails, no type-specific operation runs; a conclusive absence check lets a separate D1 batch abort the intent and remove quarantine.
+3. In the D1 commit batch, require the exact intent/quarantine/version/descendant digest, write a non-cascading local erasure/unlink job with the same request ID/digest, include the required admin audit where applicable, and commit the type-specific operation. Zero-match is unresolved—not permission to unfreeze.
+4. After D1 commit, write the immutable `committed` marker containing `operation_committed_at` from the local job. If that write fails, return accepted/pending and let the local job plus scheduled Worker retry until it exists; a later successful marker upload only extends physical lock coverage beyond the required deadline.
+5. Write `aborted` and remove quarantine in one D1 batch only after a consistent read proves the type-specific deletion/unlink operation did not commit and the target still matches the frozen version/set. Timeout, conflict, or unverifiable outcome leaves `prepared` plus quarantine in place rather than guessing.
+6. Internal user/review IDs are never reused. For a committed operation, `protect_until = operation_committed_at + reverified Time Travel maximum + two days` (currently 32 days); only then does receipt cleanup begin. Terminal-prefix lifecycle rules and daily reconciliation provide asynchronous backstops until absence of deleted data and removed account links is confirmed. There is intentionally no renewable marker state. A `prepared` marker has no expiry rule until resolved: one hour unresolved is critical, 24 hours requires manual incident ownership, and within seven days a resolver must produce `committed` or `aborted`. Forced completion or manual abort requires separate action-time approval and atomically revalidates the frozen target version/descendant set; an admin-origin completion writes the required recovery audit in that batch. A mismatch never inherits the stale authorization: it remains quarantined until a replacement set is shown and separately approved. Missing the seven-day terminal deadline closes affected deletion/recovery operations and pages the maintainer rather than allowing normal writes around an indefinite tombstone. Retain each marker key version and verification secret until cleanup plus bucket inventory confirm no live marker for that version remains; then destroy the retired secret. Rotation creates a new version and never rewrites live receipts.
 
 Production restore is an ordered maintenance procedure with an external-to-D1 write fence:
 
 1. Obtain separate action-time approval for the target bookmark and maintenance window. Enable a temporary deny-all maintenance policy at Cloudflare's edge for every custom, production `pages.dev`, and preview hostname that can reach production; pause the maintenance Worker, deploy hooks, and every other scheduled writer.
 2. Verify mutation probes fail on every hostname, wait for in-flight requests to drain, and confirm the write watermark is stable. A crash leaves the external fence enabled.
 3. Before the destructive restore, write a minimized pre-restore manifest to a separate private R2 prefix. It contains only release/schema/bookmark metadata, purpose-scoped HMAC membership for live accounts/reviews, still-live receipt states, and deletion-job digests—never raw IDs or user data. Conditional create plus a prefix-scoped seven-day lock/lifecycle makes the manifest immutable for the runbook and bounded afterward; a day-five alert requires resolution or a separately approved replacement before expiry.
-4. Restore D1, then replay before any public traffic: `committed` wins; `aborted` without `committed` permits the target; the only nonterminal state, `prepared`, is resolved against the manifest and the same seven-day terminal rule; and any restored account/review absent from the frozen live-membership set is removed or quarantined according to the deletion matrix. Any unknown state/key shape fails closed.
+4. Restore D1, apply the current migration chain, and verify `reviews.user_id` is nullable with `ON DELETE SET NULL` before receipt replay. Then replay before any public traffic: `committed` review receipts remove the review; `committed` account receipts remove any restored account and re-null ownership across the frozen review set without deleting those reviews; `aborted` without `committed` permits the target; and the only nonterminal state, `prepared`, is resolved against the manifest and the same seven-day terminal rule. Anonymous reviews remain in the live-membership set. Any restored account/review absent from that set is handled according to the type-specific matrix, and any unknown state/key shape fails closed.
 5. Run migration/schema/FK checks, row/digest reconciliation, deletion-outbox replay, R2 missing-object reconciliation, and read-only production smoke through an emergency maintainer path.
 6. Obtain separate approval to reopen, remove the write fence, resume scheduled writers/deploys, run post-open smoke, and confirm the manifest is queued for lifecycle expiry. If evidence conflicts, the manifest expires before resolution, or the pre-restore database could not be captured, traffic stays closed for manual incident resolution—ambiguity never silently reactivates data.
 
-Crash-injection tests stop execution after marker preparation, immediately before/after D1 commit, during committed/aborted writes, during retry registration, while writing the response, during receipt/manifest expiry, at every maintenance-fence transition, and during replay. Committed logical retention ends at `deletion_committed_at + platform window + two days`; unresolved preparation becomes a terminal state within seven days, and terminal asynchronous deletion remains observable/retriable until bucket absence is confirmed. Receipts and manifests are never used for analytics or account matching. No indefinite email tombstone or general-purpose identity hash is created.
+Crash-injection tests stop execution after marker preparation, immediately before/after D1 commit, during committed/aborted writes, during retry registration, while writing the response, during receipt/manifest expiry, at every maintenance-fence transition, and during type-specific replay—including a pre-change-schema restore upgraded before account replay. Committed logical retention ends at `operation_committed_at + platform window + two days`; unresolved preparation becomes a terminal state within seven days, and terminal asynchronous cleanup remains observable/retriable until deleted bytes/data are absent and removed links are confirmed. Receipts and manifests are never used for analytics or account matching. No indefinite email tombstone or general-purpose identity hash is created.
 
 ## 7. Release, observability, recovery, and admin perimeter
 
@@ -387,7 +389,7 @@ Before migration `0029`, inspect live `d1_migrations`, `sqlite_master`, PRAGMA c
 
 Each subsystem follows its own expand/deploy/verify/contract cycle. The milestone does not accumulate all additive schemas and then perform one large code deploy. Table rebuilds preserve all rows/indexes/constraints and pass row counts plus `PRAGMA foreign_key_check`. Destructive production migration or restore always has a separate explicit approval.
 
-D1 restore is rehearsed only on a synthetic remote database, whose creation, restore, and deletion are separate external-action gates. Phase 22 rehearses the external write fence, durable minimized manifest, crash-closed behavior, synthetic receipt fixtures, and ordered reopen steps. Phase 27 reruns the full drill with the implemented receipt writer/replayer and warm-up rules before the restore guarantee activates. Verification documents have no R2 recovery: deleted or lost bytes are never recreated. A D1 restore that resurrects metadata pointing to an absent document is reconciled to missing/deleted, not repopulated; review/account erasure receipts are replayed before production traffic can resume.
+D1 restore is rehearsed only on a synthetic remote database, whose creation, restore, and deletion are separate external-action gates. Phase 22 rehearses the external write fence, durable minimized manifest, crash-closed behavior, synthetic receipt fixtures, and ordered reopen steps. Phase 27 reruns the full drill with the implemented receipt writer/replayer and warm-up rules before the restore guarantee activates. Verification documents have no R2 recovery: deleted or lost bytes are never recreated. A D1 restore that resurrects metadata pointing to an absent document is reconciled to missing/deleted, not repopulated. The restored database is migrated to nullable `reviews.user_id ... ON DELETE SET NULL` before review-erasure/account-unlink receipts are replayed and before production traffic resumes.
 
 These retention assumptions are tied to current platform behavior: Cloudflare documents a 30-day D1 Time Travel window on Workers Paid (7 days on Free), while R2 lifecycle deletion is asynchronous and typically completes within 24 hours of expiry. The implementation plan must re-verify both limits immediately before configuring retention: [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) and [R2 object lifecycles](https://developers.cloudflare.com/r2/buckets/object-lifecycles/).
 
@@ -454,7 +456,7 @@ Outreach pauses if moderation age exceeds the approved guardrail, integrity sign
 - Expected client conflicts use stable typed reasons and never expose SQL or internal column names.
 - Moderation decisions may succeed while R2 cleanup remains pending, but the pending state is persisted, returned, observable, and retried.
 - Sensitive-document access fails if its required access journal cannot be written; a destructive admin mutation fails atomically if its required audit row cannot be written.
-- Review/account deletion never rolls back solely because post-commit verification-object cleanup is pending.
+- Review deletion or account deletion/unlink never rolls back solely because post-commit verification-object cleanup is pending.
 - Missing R2 objects are deletion success, never a reason to reconstruct private bytes.
 - Claim/limit enforcement fails closed. Advisory-signal failure leaves a pending review plus durable scan job and never creates an automated content decision.
 - Best-effort metrics and operational notification delivery never block signup, review submission, moderation, export, or deletion.
@@ -467,7 +469,7 @@ Exact filenames are assigned only after Phase 22 makes production history author
 2. For each subsystem, add only its compatible schema/configuration and tests.
 3. Deploy dual-compatible code for that subsystem, verify production behavior/data distribution, and only then apply its separate contract migration if needed.
 4. Repeat the expand/deploy/verify/contract cycle for the next subsystem; never batch all v1.6 schema expansion into one release.
-5. Profile-column removal and nullable/cleared audit metadata land only after all readers/writers and retention jobs have switched.
+5. Nullable/cleared audit metadata lands only after all readers/writers and retention jobs have switched. Existing profile columns/values remain unchanged unless a future owner approval adds a separately planned migration. The Phase 27 review-table rebuild likewise lands only after every reader, writer, ownership check, notification path, admin view, and type accepts a null author; row counts, indexes, constraints, and `PRAGMA foreign_key_check` must pass.
 
 No migration drops `reviews.unit_number`.
 
@@ -483,7 +485,7 @@ v1.6 is complete only when:
 6. Unverified email cannot create or edit a review.
 7. Concurrent duplicate submissions produce one account/building claim and one review.
 8. Daily/velocity/content rules prioritize human moderation without changing review status automatically.
-9. A reauthenticated owner can export and delete data across D1/R2, the table-by-table retention contract passes, and restore procedures replay both review and account erasures.
+9. A reauthenticated owner can export data, hard-delete an owned review, or delete the account while retaining ownerless score-bearing reviews; the table-by-table contract passes, and restore procedures replay review erasure separately from account deletion/author unlinking.
 10. CI, production smoke, independently backed alert delivery, atomic destructive auditing, a crash-closed recovery drill, and hostname-complete Cloudflare Access protect the single-maintainer release/admin path.
 11. The critical contribution flow passes automated and manual accessibility gates.
 12. Social image, canonicals, sitemap, and structured data work without private or under-threshold leakage.
@@ -502,17 +504,17 @@ v1.6 is complete only when:
 - Broad component refactors unrelated to a touched v1.6 surface.
 - Legal certification; public policy receives separate legal review when available.
 
-## Review notes
+## Approval record
 
-The owner should confirm these consequential defaults during spec review:
+On 2026-08-27 the owner approved:
 
-1. “not displayed on the front” means never public, while the submitting reviewer may redisplay/edit/export their own unit number; if it instead means admin-only after submission, those owner reads stay disabled;
-2. undecided verification documents enter deletion after 30 days, with honest copy about asynchronous R2 removal;
-3. Google profile name/avatar collection is removed rather than merely documented;
-4. admin audit IP is cleared after 180 days;
-5. limits are five new review claims per account per 24 hours, with human-review flags at five building submissions or ten landlord submissions per 24 hours;
-6. an account/building claim survives deletion of the individual review but is removed with the account;
-7. account deletion hard-deletes reviews and HMAC erasure receipts protect every direct/cascading deletion from actual deletion commit through the reverified Time Travel window plus two days (currently 32 days);
-8. identified legacy audit payloads are either minimized through a separately approved, audited operation or retained for an explicit bounded period; privacy minimization does not silently rewrite the immutable trail.
+1. reviewer read/edit/export of their own unit number, with admin-only access after the review becomes ownerless;
+2. a 30-day application expiry for undecided verification documents, with honest copy about asynchronous R2 removal;
+3. removal of Google profile name/avatar collection for new OAuth writes, with existing profile values and manual display-name behavior left unchanged pending any separate decision;
+4. clearing admin audit IP after 180 days while retaining non-IP evidence;
+5. five new review claims per account daily, with human-review velocity flags at the fifth building or tenth landlord submission; the rolling 24-hour implementation interpretation is documented separately rather than treated as an additional owner-approved choice;
+6. lifetime account/building claims that survive individual review deletion and disappear with the account;
+7. account deletion that removes the account and author links while retaining each review, its private unit number, moderation state, and score contribution as a permanently ownerless record; and
+8. a separately action-time-approved and itself-audited minimization of identified legacy audit payloads rather than indefinite retention.
 
-After approval, implementation is decomposed into separate task-by-task plans matching the roadmap's subsystem boundaries. No implementation plan may combine migration-ledger reconciliation with a feature migration or bundle a production/external action into an implicit step.
+Implementation is decomposed into separate task-by-task plans matching the roadmap's subsystem boundaries. No implementation plan may combine migration-ledger reconciliation with a feature migration or bundle a production/external action into an implicit step. Approval of a policy choice does not authorize its production data mutation or external configuration; those remain action-time gates.

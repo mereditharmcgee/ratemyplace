@@ -9,7 +9,7 @@
 - ✅ **v1.3.0 Battle Tested** — Phases 4-9 (shipped 2026-03-10)
 - ✅ **v1.4.0 Open Doors** — Phases 10-15 (shipped 2026-03-22)
 - ✅ **v1.5.0 Closed Loops** — Phases 16-21 (shipped 2026-04-29)
-- 📝 **v1.6.0 Trust + Density** — Phases 22-30 (planned; design review pending)
+- 📝 **v1.6.0 Trust + Density** — Phases 22-30 (design approved; implementation planning)
 
 ## Phases
 
@@ -130,4 +130,4 @@ See: `.planning/milestones/v1.5.0-ROADMAP.md`
 | 30. Review-Density Pilot | v1.6.0 | — | Planned | — |
 
 ---
-*Roadmap updated: 2026-08-26 — v1.6.0 "Trust + Density" proposed for design review*
+*Roadmap updated: 2026-08-27 — v1.6.0 "Trust + Density" design approved; implementation planning in progress*

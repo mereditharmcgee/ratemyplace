@@ -51,7 +51,7 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 
 ### Active
 
-- [ ] Review and approve the v1.6.0 "Trust + Density" design.
+- [x] Review and approve the v1.6.0 "Trust + Density" design — approved 2026-08-27.
 - [ ] Decompose approved v1.6 phases into reviewable implementation plans.
 - [ ] Execute trust controls before the bounded review-density pilot.
 
@@ -78,11 +78,11 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 
 ## Next Milestone
 
-**v1.6.0 "Trust + Density"** — Proposed phases 22–30 close release, privacy, verification-document, contribution, review-integrity, account-rights, accessibility, and discoverability gaps before a bounded review-density pilot. Apartment/unit numbers remain optional private moderation data entered by the reviewer and visible to authorized admins, never on public surfaces; owner edit/export redisplay is a pending design decision.
+**v1.6.0 "Trust + Density"** — Approved phases 22–30 close release, privacy, verification-document, contribution, review-integrity, account-rights, accessibility, and discoverability gaps before a bounded review-density pilot. Apartment/unit numbers remain optional private moderation data entered by the reviewer, owner-editable/exportable while the review is owned, and visible to authorized admins, never on public surfaces. Account deletion removes the user link but retains reviews, their private unit numbers, and their score contribution as permanently ownerless records.
 
 - Roadmap: `.planning/milestones/v1.6.0-ROADMAP.md`
 - Requirements: `.planning/milestones/v1.6.0-REQUIREMENTS.md`
-- Design for review: `docs/superpowers/specs/2026-08-26-trust-density-design.md`
+- Approved design: `docs/superpowers/specs/2026-08-26-trust-density-design.md`
 
 ## Context
 
@@ -126,4 +126,4 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 | EmptyState .astro + .tsx byte-identical twins | Same DOM from SSR and React-island consumers | ✓ Good (v1.5.0) |
 
 ---
-*Last updated: 2026-08-26 for v1.6.0 "Trust + Density" design review*
+*Last updated: 2026-08-27 after v1.6.0 "Trust + Density" design approval*
