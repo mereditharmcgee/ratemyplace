@@ -4,7 +4,7 @@
 
 **Goal:** Make type-checking and tests mandatory before merge, expose a minimal non-sensitive deployed-release health contract, and replace the unsafe implicit smoke target with a deterministic read-only suite that verifies the exact deployed commit.
 
-**Architecture:** Cloudflare Pages remains the only deployer. A stable GitHub Actions `quality` job verifies every pull request and `main` push; a second workflow always reports on an internal `main` completion, becomes red if quality failed, and otherwise polls a cookie-free public release endpoint until Pages serves the same commit SHA before executing the read-only smoke contract. The Pages build injects a sanitized release constant explicitly through Vite `define`; the smoke runner accepts only an explicit environment, allowlisted origin, and—for non-local targets—40-character release SHA, so it cannot silently hit an obsolete preview or mistake the previous production release for the new one.
+**Architecture:** Cloudflare Pages remains the only deployer. A stable GitHub Actions `quality` job verifies every pull request and `main` push. For each qualifying internal `main` completion, a second workflow runs a non-cancellable `sentinel` job that explicitly fails red for unsuccessful quality or explicitly passes when quality succeeds; a separate success-only `smoke` job needs that sentinel and alone owns cancellable `production-smoke` concurrency while it polls a cookie-free public release endpoint until Pages serves the same commit SHA before executing the read-only smoke contract. The Pages build injects a sanitized release constant explicitly through Vite `define`; the smoke runner accepts only an explicit environment, allowlisted origin, and—for non-local targets—40-character release SHA, so it cannot silently hit an obsolete preview or mistake the previous production release for the new one.
 
 **Tech Stack:** Astro 5 SSR, TypeScript strict mode, Cloudflare Pages, GitHub Actions, Node.js 22.16.0, Vitest 4, native `fetch`.
 
@@ -593,6 +593,12 @@ git commit -m "test: make smoke targets explicit"
 
 ## Task 4: Add least-privilege CI and post-deploy commit verification
 
+> **Final-review RULING-002 — documentation correction:** The originally planned
+> single-job, workflow-level `production-smoke` concurrency model was corrected after
+> final review. The verified implementation keeps the sentinel outside cancellable
+> concurrency and gives that concurrency only to the successful smoke job. This preserves
+> visibility for failed CI completions; it is not a new product feature.
+
 **Files:**
 
 - Create: `.github/workflows/ci.yml`
@@ -604,7 +610,13 @@ git commit -m "test: make smoke targets explicit"
 Create `src/lib/__tests__/workflowContracts.test.ts` using `readFileSync` and `resolve(process.cwd(), ...)`. Assert:
 
 - `.github/workflows/ci.yml` exists, is named `CI`, has a `quality` job named `quality`, triggers on pull request and `main` push, grants only `contents: read`, disables checkout credential persistence, and runs `npm ci`, `npm run check`, `npm test`, and `npm run build`;
-- `.github/workflows/post-deploy-smoke.yml` uses `workflow_run` for `CI`, runs a sentinel for every internal `main` push completion, explicitly fails when quality did not succeed, and only on success passes `workflow_run.head_sha` as `--expected-release` while targeting exactly `https://ratemyplace.org`;
+- `.github/workflows/post-deploy-smoke.yml` uses `workflow_run` for `CI`. Its
+  non-cancellable `sentinel` job runs for every qualifying internal `main` push
+  completion, explicitly fails red when quality did not succeed, explicitly passes on
+  success, and never checks out, installs dependencies, or smokes. A separate success-only
+  `smoke` job needs the sentinel, alone owns cancellable `production-smoke` concurrency,
+  and passes `workflow_run.head_sha` as `--expected-release` while targeting exactly
+  `https://ratemyplace.org`;
 - neither workflow contains `wrangler pages deploy`, `CLOUDFLARE_API_TOKEN`, `pull_request_target`, or `permissions: write-all`.
 
 Run:
@@ -678,25 +690,36 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: production-smoke
-  cancel-in-progress: true
-
 jobs:
-  smoke:
-    name: production sentinel and smoke
+  sentinel:
+    name: production sentinel
     if: >-
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - name: Refuse an unverified main deployment
         if: github.event.workflow_run.conclusion != 'success'
         run: |
           echo "CI quality did not succeed for this main commit. Pages may still have attempted deployment."
           exit 1
+      - name: Confirm verified main CI
+        if: github.event.workflow_run.conclusion == 'success'
+        run: echo "CI quality succeeded for this main commit."
+  smoke:
+    name: production smoke
+    needs: sentinel
+    if: >-
+      needs.sentinel.result == 'success' &&
+      github.event.workflow_run.conclusion == 'success'
+    concurrency:
+      group: production-smoke
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
       - name: Check out deployed commit
         uses: actions/checkout@v6
         with:
@@ -718,7 +741,7 @@ jobs:
           --wait-for-release-ms 600000
 ```
 
-The workflow does not deploy. Cloudflare Pages Git integration can attempt a deployment independently for every `main` push, so a failed quality run must produce a red sentinel rather than a skipped post-deploy result. On success, the health-SHA poll proves which commit is being tested. Cloudflare documents that Git integration owns automatic Pages deployments and check runs: <https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/>.
+The workflow does not deploy. Cloudflare Pages Git integration can attempt a deployment independently for every `main` push, so a failed quality run must produce a red, non-cancellable sentinel rather than a skipped post-deploy result. Only after that sentinel explicitly passes can the separate, cancellable smoke job run; on success, its health-SHA poll proves which commit is being tested. Cloudflare documents that Git integration owns automatic Pages deployments and check runs: <https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/>.
 
 - [ ] **Step 4: Run the workflow contract and full local gates**
 
@@ -761,7 +784,10 @@ git commit -m "chore: add CI and post-deploy verification"
 - exact local, preview, and production smoke commands;
 - accepted hostnames, including the current hash-based atomic preview form, and why no default exists;
 - the `quality` required-check name;
-- the post-deploy sequence: every internal `main` CI completion creates a sentinel result; failure makes it red, while success proceeds through Pages deploy → release-SHA match → full smoke;
+- the post-deploy sequence: every qualifying internal `main` CI completion runs a
+  non-cancellable sentinel; failure makes it red, success explicitly passes it, and the
+  separate success-only smoke job then proceeds through Pages deploy → release-SHA match →
+  full smoke under its own cancellable `production-smoke` concurrency;
 - that smoke is read-only and excludes Turnstile submission/Maps interaction;
 - that post-deploy failure stops the release from being called healthy but does not trigger automatic rollback;
 - triage order: compare expected/actual SHA, inspect Pages deployment, inspect failed probe, rerun read-only smoke, then request separate approval for any rollback;
@@ -952,7 +978,9 @@ Because this evidence commit occurs after the first production merge, it require
 - [ ] Names are consistent: workflow `CI`, required job/check `quality`, endpoint `/api/health`, fields `status` and `release`, flag `--expected-release`.
 - [ ] A built Worker, not only a unit import, exposes the synthetic SHA injected through `astro.config.mjs`.
 - [ ] Preview validation rejects the production Pages hostname, branch aliases, credentials, and non-default ports; every ordinary probe rejects redirects.
-- [ ] Every internal `main` quality completion creates a post-deploy sentinel result, including an explicitly red result on quality failure.
+- [ ] Every qualifying internal `main` quality completion runs a non-cancellable sentinel,
+  including an explicitly red result on quality failure; only the separate success-only
+  smoke job owns cancellable `production-smoke` concurrency.
 - [ ] No workflow has write permission, deployment credentials, `pull_request_target`, or a Cloudflare deployment command.
 - [ ] No step treats a successful redirect follow, old release, mutable marketing phrase, or preview-only widget failure as production proof.
 - [ ] No external action appears before an explicit action-time approval step.

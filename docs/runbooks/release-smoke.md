@@ -70,11 +70,16 @@ unit tests, and a production build for pull requests and `main` pushes. This wor
 exists in the repository, but this runbook does not claim that a `main` ruleset or required
 check has been activated; that is an external verification and approval task.
 
-For every internal `main` CI completion, the post-deploy workflow creates a sentinel
-result. If CI did not succeed, the sentinel is red. If it did, the workflow waits for
-Cloudflare Pages deployment, verifies that `/api/health` reports the triggering release
-SHA, then runs the full read-only smoke suite. A failed post-deploy smoke means the release
-must not be called healthy. It does not cause an automatic rollback.
+For every qualifying internal `main` CI completion, the post-deploy workflow runs a
+non-cancellable `sentinel` job. A non-successful CI completion explicitly makes that job
+red; a successful completion explicitly passes it. The sentinel has no checkout,
+dependency installation, or smoke step, so failed CI never performs those actions.
+
+Only the separate, success-gated `smoke` job needs the passing sentinel. It alone owns the
+cancellable `production-smoke` concurrency group, then waits for Cloudflare Pages,
+verifies that `/api/health` reports the triggering release SHA, and runs the full
+read-only smoke suite. A failed post-deploy smoke means the release must not be called
+healthy. It does not cause an automatic rollback.
 
 ## Failure triage and approval boundary
 

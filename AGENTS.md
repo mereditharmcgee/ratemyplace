@@ -77,7 +77,7 @@ Runtime env vars are reached through `getEnv(context)` in `src/lib/runtime.ts` â
 ```bash
 npm run dev        # Astro dev server
 npm run check      # Astro/TypeScript diagnostics
-npm test           # Vitest â€” 389 tests, ~13s
+npm test           # Vitest unit suite
 npm test -- scoring   # filter by name
 npm run build      # production build
 npm run e2e        # fresh local D1 + seed + build + Playwright
