@@ -65,6 +65,14 @@ describe('resolvePagesDeploymentOrigin', () => {
     );
   });
 
+  it('rejects a malformed branch alias even when the same summary has a valid immutable URL', async () => {
+    const summary = `${ORIGIN} https://branch-.ratemyplace-64y.pages.dev`;
+
+    await expect(resolve(dependencies([apiResponse([trustedCheck({ output: { summary } })])]))).rejects.toThrow(
+      /invalid Pages hostname/i,
+    );
+  });
+
   it.each([
     ['missing trusted check', [apiResponse([]), apiResponse([trustedCheck()])]],
     ['queued trusted check', [apiResponse([trustedCheck({ status: 'queued', conclusion: null })]), apiResponse([trustedCheck()])]],
