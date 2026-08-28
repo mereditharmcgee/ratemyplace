@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  checks: read
 
 jobs:
   sentinel:
@@ -50,10 +51,9 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Wait for deployed SHA and smoke production
-        run: >-
-          npm run smoke --
-          --environment production
-          --base-url https://ratemyplace.org
-          --expected-release ${{ github.event.workflow_run.head_sha }}
-          --wait-for-release-ms 600000
+      - name: Resolve trusted immutable Pages deployment and smoke it
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          deployment_origin="$(npx tsx scripts/pages-deployment-url.ts --repository "${{ github.repository }}" --sha "${{ github.event.workflow_run.head_sha }}" --wait-ms 600000)"
+          npm run smoke -- --environment preview --base-url "$deployment_origin" --expected-release ${{ github.event.workflow_run.head_sha }} --wait-for-release-ms 600000

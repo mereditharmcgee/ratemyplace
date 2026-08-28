@@ -133,8 +133,16 @@
   explicitly fails red when `quality` did not succeed and explicitly passes on success;
   it never checks out, installs dependencies, or runs smoke. The separate, success-only
   `smoke` job needs that sentinel and alone owns cancellable `production-smoke`
-  concurrency. It then waits for Cloudflare Pages to serve the exact commit SHA and runs
-  the read-only production smoke suite.
+  concurrency. With only `contents: read`, `checks: read`, and the built-in GitHub token,
+  it resolves the exact commit's single successful `Cloudflare Pages` check from
+  `cloudflare-workers-and-pages`, validates the advertised immutable eight-hex
+  `ratemyplace-64y.pages.dev` deployment origin, and runs the read-only preview smoke suite
+  against that exact release SHA. The canonical `ratemyplace.org` smoke remains a separate
+  manual check: Free-plan Bot Fight Mode can managed-challenge GitHub-hosted runners at its
+  health route, and this workflow neither changes Bot Fight Mode nor uses a Cloudflare API
+  credential. Future Cloudflare synthetic monitoring, if configured, is auxiliary
+  availability monitoring rather than an exact-release gate; a future machine-health
+  boundary must stay separately specified from exact-release verification.
 - The repository workflows do not deploy or roll back Cloudflare Pages. A `main` branch
   ruleset/required-check activation is not asserted here; Task 7 must verify that external
   configuration separately.

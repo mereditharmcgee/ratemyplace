@@ -25,7 +25,9 @@ $prHeadSha = (git rev-parse HEAD).Trim()
 npm run smoke -- --environment preview --base-url $previewOrigin --expected-release $prHeadSha
 ```
 
-For production, use the merged `main` SHA and the canonical production origin.
+For an independent manual check of the canonical production domain, use the merged `main`
+SHA and the canonical production origin. This is deliberately separate from the automated
+exact-release gate.
 
 ```powershell
 npm ci
@@ -76,10 +78,29 @@ red; a successful completion explicitly passes it. The sentinel has no checkout,
 dependency installation, or smoke step, so failed CI never performs those actions.
 
 Only the separate, success-gated `smoke` job needs the passing sentinel. It alone owns the
-cancellable `production-smoke` concurrency group, then waits for Cloudflare Pages,
-verifies that `/api/health` reports the triggering release SHA, and runs the full
-read-only smoke suite. A failed post-deploy smoke means the release must not be called
-healthy. It does not cause an automatic rollback.
+cancellable `production-smoke` concurrency group. Using the built-in GitHub token with
+read-only `checks: read`, it polls the triggering commit's GitHub check runs for exactly
+one successful `Cloudflare Pages` check from `cloudflare-workers-and-pages`. The resolver
+accepts only the immutable `https://<8-hex>.ratemyplace-64y.pages.dev` origin advertised by
+that check, then verifies `/api/health` reports the triggering release SHA and runs the
+full read-only smoke suite there. It fails closed for an untrusted, ambiguous, incomplete,
+or malformed resolution and never deploys, rolls back, mutates Cloudflare configuration, or
+uses a Cloudflare credential.
+
+Cloudflare Free-plan Bot Fight Mode may managed-challenge GitHub-hosted runners at the
+canonical `/api/health` route. It remains unchanged: the automated exact-release gate uses
+the trusted immutable Pages deployment instead. After an automated pass, perform the
+separate manual canonical-domain command above from an independent network when the
+canonical routing check is needed. Cloudflare synthetic monitoring may be added later as
+auxiliary availability monitoring, but it is not an exact-release gate.
+
+Keep the machine-health boundary narrow: this release smoke proves public responses from a
+specific immutable deployment. Any future machine-health endpoint or synthetic monitor must
+be designed and documented as separate availability telemetry, not treated as evidence that
+the canonical domain served a particular release.
+
+A failed post-deploy smoke means the release must not be called healthy. It does not cause
+an automatic rollback.
 
 ## Failure triage and approval boundary
 
