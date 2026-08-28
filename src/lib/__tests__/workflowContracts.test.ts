@@ -83,7 +83,7 @@ const assertLeastPrivilege = (workflow: string, allowedReadPermissions?: string[
   assertReadOnlyPermissionsBlock(workflow, allowedReadPermissions);
   expect(workflow).not.toMatch(/\bwrangler\b/i);
   expect(workflow).not.toMatch(/\b(?:d1|r2)\b/i);
-  expect(workflow).not.toMatch(/(?:CLOUDFLARE|CF)_[A-Z_]*TOKEN/i);
+  expect(workflow).not.toMatch(/(?:CLOUDFLARE|CF)_[A-Z_]*(?:TOKEN|KEY)\b/i);
   expect(workflow).not.toMatch(/secrets\./i);
   expect(workflow).not.toMatch(/pull_request_target/i);
   expect(workflow).not.toMatch(/permissions:\s*write-all/i);
@@ -206,6 +206,15 @@ describe('release workflow contracts', () => {
     const dangerousWorkflow = readWorkflow('ci.yml').replace(
       '  contents: read',
       '  contents: read\n  id-token: write',
+    );
+
+    expect(() => assertLeastPrivilege(dangerousWorkflow)).toThrow();
+  });
+
+  it('rejects a Cloudflare API key credential', () => {
+    const dangerousWorkflow = readWorkflow('ci.yml').replace(
+      '  quality:\n',
+      '  quality:\n    env:\n      CLOUDFLARE_API_KEY: unsafe\n',
     );
 
     expect(() => assertLeastPrivilege(dangerousWorkflow)).toThrow();

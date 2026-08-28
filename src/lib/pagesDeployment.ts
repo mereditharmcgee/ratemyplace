@@ -168,7 +168,7 @@ function extractOrigin(summary: unknown): string {
       throw new Error('Malformed Pages deployment origin');
     }
     try {
-      origins.add(validateSmokeTarget('preview', url.origin).origin);
+      origins.add(validateSmokeTarget('preview', match[0]).origin);
     } catch {
       throw new Error('Invalid Pages hostname');
     }

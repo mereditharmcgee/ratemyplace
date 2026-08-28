@@ -75,6 +75,7 @@ describe('resolvePagesDeploymentOrigin', () => {
     ['missing summary', apiResponse([trustedCheck({ output: {} })]), /missing check summary/i],
     ['malformed summary', apiResponse([trustedCheck({ output: { summary: 7 } })]), /malformed check summary/i],
     ['invalid project hostname', apiResponse([trustedCheck({ output: { summary: 'https://a1b2c3d4.wrong-project.pages.dev' } })]), /invalid Pages hostname/i],
+    ['explicit default Pages port', apiResponse([trustedCheck({ output: { summary: 'https://a1b2c3d4.ratemyplace-64y.pages.dev:443' } })]), /invalid Pages hostname/i],
     ['multiple deployment origins', apiResponse([trustedCheck({ output: { summary: `${ORIGIN} https://b2c3d4e5.ratemyplace-64y.pages.dev` } })]), /multiple immutable deployment origins/i],
   ])('fails closed for %s', async (_name, response, expected) => {
     await expect(resolve(dependencies([response]))).rejects.toThrow(expected);
