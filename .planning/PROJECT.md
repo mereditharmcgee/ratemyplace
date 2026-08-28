@@ -47,13 +47,20 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 - ✓ Cross-view data consistency E2E (search ↔ detail ↔ profile) — v1.5.0
 - ✓ Standardized rate-limit response headers (Retry-After, X-RateLimit-*) — v1.5.0
 - ✓ Shared EmptyState component for consistent messaging — v1.5.0
+- ✓ Landlord and property-manager aggregate scores withheld until three approved reviews, from one shared threshold constant — post-v1.5.0
 
 ### Active
 
-- [ ] Component refactors (3 files >700 LOC: ReviewEditForm, BuildingsTable, ReviewsTable)
-- [ ] Convert admin dispute-upheld email to fireAndForget (`disputes/[id].ts` follow-up from v1.5.0)
-- [ ] Apply `isValidEmail` primitive to signup.ts (consistency follow-up)
-- [ ] Email unsubscribe management before scaling notification emails
+- [x] Review and approve the v1.6.0 "Trust + Density" design — approved 2026-08-27.
+- [ ] Decompose approved v1.6 phases into reviewable implementation plans.
+- [ ] Execute trust controls before the bounded review-density pilot.
+
+### Preserved carry-over backlog
+
+- [ ] Convert the admin dispute-upheld email path to `fireAndForget`.
+- [ ] Apply the shared `isValidEmail` primitive to signup while Phase 25 touches that flow.
+- [ ] Specify unsubscribe/opt-out behavior before any new non-transactional notification-email program.
+- [ ] Revisit the large-component refactors after v1.6 unless a touched phase makes a smaller extraction necessary.
 
 ### Out of Scope
 
@@ -61,7 +68,8 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 - Delayed posting — deferred
 - Landlord response features (direct rebuttals on reviews) — explicitly excluded from MVP
 - Real-time push notifications — Cloudflare Workers stateless; polling sufficient
-- Email unsubscribe management — track in v1.5.0 before scaling notification emails
+- New non-transactional notification-email programs until opt-out and unsubscribe behavior is separately specified
+- Component refactors unrelated to a touched v1.6 surface
 - Stress testing — deferred from v1.3.0, lower priority than user-facing features
 
 ## Latest Shipped: v1.5.0 "Closed Loops" (2026-04-29)
@@ -70,23 +78,27 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 
 ## Next Milestone
 
-**v1.6.0** — Planning to be initiated via `/gsd:new-milestone`. Carry-over candidates: component refactors (>700 LOC files: ReviewEditForm, BuildingsTable, ReviewsTable); admin `disputes/[id].ts` fireAndForget conversion; signup.ts validation consistency; email unsubscribe management.
+**v1.6.0 "Trust + Density"** — Approved phases 22–30 close release, privacy, verification-document, contribution, review-integrity, account-rights, accessibility, and discoverability gaps before a bounded review-density pilot. Apartment/unit numbers remain optional private moderation data entered by the reviewer, owner-editable/exportable while the review is owned, and visible to authorized admins, never on public surfaces. Account deletion removes the user link but retains reviews, their private unit numbers, and their score contribution as permanently ownerless records.
+
+- Roadmap: `.planning/milestones/v1.6.0-ROADMAP.md`
+- Requirements: `.planning/milestones/v1.6.0-REQUIREMENTS.md`
+- Approved design: `docs/superpowers/specs/2026-08-26-trust-density-design.md`
 
 ## Context
 
 - **Tech stack**: Astro 5 + Cloudflare Pages + D1 (SQLite) + Lucia Auth + Tailwind CSS 4 + Resend
 - **Current version**: v1.5.0 "Closed Loops" (shipped 2026-04-29)
 - **Production URL**: ratemyplace.org
-- **Codebase**: ~28,000 LOC (TypeScript/TSX/Astro), 322+ unit tests, 18 test files
-- **Database tables**: 14 (users, sessions, reviews, buildings, landlords, property_managers, email_verification_tokens, rate_limits, disputes, audit_logs, contact_messages, notifications, saved_buildings, bug_reports)
-- **Migrations**: 24 (most recent: 0024_perf_indexes.sql for hot-path index)
+- **Codebase**: Strict TypeScript/TSX/Astro with Vitest unit tests and Playwright E2E tests
+- **Database**: Cloudflare D1; inspect the current schema rather than relying on a copied table count
+- **Migrations**: Source-controlled through 0028; production 0025–0027 were dashboard-applied and 0028 was executed remotely outside Wrangler migration tracking, so ledger reconciliation is required before any new remote migration
 - **Admin pages**: Dashboard, Users, Reviews, Buildings, Landlords, Managers, Verification, Disputes, Audit Log, Contact
 - **Survey items**: 32 total — 27 scored rating items (Unit 10 + Building 9 + Landlord 8, OHQS/PHQS-adapted) + 5 ancillary items (would_recommend, tenure_months, move_out_year, accepts_housing_vouchers, safely_lit_at_night)
 - **Runtime typing**: All Cloudflare Pages secrets declared in `App.Platform.env`; zero `(context.locals as any).runtime` casts in `src/`
 
 ## Constraints
 
-- **Platform**: Cloudflare Workers (no Node.js APIs, React 18 only)
+- **Platform**: Cloudflare Pages SSR on the Workers runtime (no Node.js APIs, React 18 only), plus a separately deployed scheduled Worker where v1.6 requires Cron Triggers
 - **Email**: Resend (selected and integrated)
 - **Database**: D1 (SQLite) — single-region, no transactions across requests
 
@@ -100,7 +112,7 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 | Web Crypto API for tokens | Cross-environment compatibility (Workers + Node.js) | ✓ Good |
 | 64-char alphanumeric tokens | 381 bits entropy, URL-safe | ✓ Good |
 | Graceful email failure | Signup succeeds even if email fails | ✓ Good |
-| Best-effort audit logging | Audit failures don't break admin actions | ✓ Good |
+| Atomic destructive-action audit logging | Current helper is best-effort; v1.6 makes every destructive admin D1 mutation, required audit row, and durable external-cleanup intent one batch, while remote cleanup remains non-blocking | ⚠ Planned; closes a non-negotiable audit gap |
 | UNIQUE constraint on dispute review_id | One dispute per review, enforced at DB level | ✓ Good |
 | Structured JSON logging | Machine-parseable logs for Cloudflare dashboard | ✓ Good |
 | CityAdapter pattern for enrichment | Extensible multi-city support without modifying dispatcher | ✓ Good (v1.4.0) |
@@ -114,4 +126,4 @@ Tenants can submit honest, anonymous reviews and see aggregated scores for build
 | EmptyState .astro + .tsx byte-identical twins | Same DOM from SSR and React-island consumers | ✓ Good (v1.5.0) |
 
 ---
-*Last updated: 2026-04-29 after v1.5.0 "Closed Loops" milestone*
+*Last updated: 2026-08-27 after v1.6.0 "Trust + Density" design approval*

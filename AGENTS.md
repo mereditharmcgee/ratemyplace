@@ -76,14 +76,19 @@ Runtime env vars are reached through `getEnv(context)` in `src/lib/runtime.ts` �
 
 ```bash
 npm run dev        # Astro dev server
-npm test           # Vitest — 389 tests, ~13s
+npm run check      # Astro/TypeScript diagnostics
+npm test           # Vitest unit suite
 npm test -- scoring   # filter by name
 npm run build      # production build
 npm run e2e        # fresh local D1 + seed + build + Playwright
 npm run db:setup   # db:fresh then db:seed (local D1 only)
 ```
 
-Run `npm test` and `npm run build` before declaring work complete. Both are fast.
+`npm run smoke` has no default target. Supply an explicit `--environment` and
+`--base-url`; preview and production also require a 40-character
+`--expected-release` SHA. See [`docs/runbooks/release-smoke.md`](docs/runbooks/release-smoke.md).
+
+Run `npm run check`, `npm test`, and `npm run build` before declaring work complete.
 
 ## Conventions
 
@@ -105,7 +110,7 @@ Commit prefixes: `feat:` `fix:` `docs:` `chore:` `refactor:`.
 
 ## API routes (`src/pages/api/`)
 
-47 endpoints. Nothing is protected implicitly — every route handles its own auth,
+Nothing is protected implicitly — every route handles its own auth,
 validation, and rate limiting. A missing check is a live vulnerability, not a style issue.
 
 ### Checklist for every new endpoint
@@ -118,6 +123,11 @@ validation, and rate limiting. A missing check is a live vulnerability, not a st
 - [ ] Input validation before any processing
 - [ ] Parameterized queries — never string interpolation
 - [ ] Audit log if it is a destructive admin action
+
+**Narrow exception:** the input-free, read-only `GET`/`HEAD /api/health` endpoint has no
+D1-backed application limiter, so cookie-free release monitoring stays independent of D1.
+This exception applies to no other public endpoint and does not authorize a custom edge
+rate rule; any such edge configuration needs separate approval.
 
 ### Getting the database
 

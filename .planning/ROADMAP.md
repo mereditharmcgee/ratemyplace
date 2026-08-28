@@ -9,6 +9,7 @@
 - ✅ **v1.3.0 Battle Tested** — Phases 4-9 (shipped 2026-03-10)
 - ✅ **v1.4.0 Open Doors** — Phases 10-15 (shipped 2026-03-22)
 - ✅ **v1.5.0 Closed Loops** — Phases 16-21 (shipped 2026-04-29)
+- 📝 **v1.6.0 Trust + Density** — Phases 22-30 (design approved; implementation planning)
 
 ## Phases
 
@@ -74,6 +75,25 @@ See: `.planning/milestones/v1.5.0-ROADMAP.md`
 
 </details>
 
+<details open>
+<summary>📝 v1.6.0 Trust + Density (Phases 22-30) — PLANNED</summary>
+
+- [ ] Phase 22: Release, Operations, and Migration Safety
+- [ ] Phase 23: Privacy Contract and Data Minimization
+- [ ] Phase 24: Verification-Document Lifecycle
+- [ ] Phase 25: Contribution Continuity and Trust Copy
+- [ ] Phase 26: Review Integrity and Moderation Priority
+- [ ] Phase 27: Account Rights and Erasure Recovery
+- [ ] Phase 28: Accessible Contribution
+- [ ] Phase 29: Discoverability Baseline
+- [ ] Phase 30: Review-Density Pilot
+
+- Roadmap: `.planning/milestones/v1.6.0-ROADMAP.md`
+- Requirements: `.planning/milestones/v1.6.0-REQUIREMENTS.md`
+- Design: `docs/superpowers/specs/2026-08-26-trust-density-design.md`
+
+</details>
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -99,6 +119,15 @@ See: `.planning/milestones/v1.5.0-ROADMAP.md`
 | 19. D1 Index Migration | v1.5.0 | 2/2 | Complete | 2026-04-29 |
 | 20. Critical-Flow E2E Coverage | v1.5.0 | 2/2 | Complete | 2026-04-29 |
 | 21. Quality Cleanup | v1.5.0 | 2/2 | Complete | 2026-04-29 |
+| 22. Release, Operations, and Migration Safety | v1.6.0 | — | Planned | — |
+| 23. Privacy Contract and Data Minimization | v1.6.0 | — | Planned | — |
+| 24. Verification-Document Lifecycle | v1.6.0 | — | Planned | — |
+| 25. Contribution Continuity and Trust Copy | v1.6.0 | — | Planned | — |
+| 26. Review Integrity and Moderation Priority | v1.6.0 | — | Planned | — |
+| 27. Account Rights and Erasure Recovery | v1.6.0 | — | Planned | — |
+| 28. Accessible Contribution | v1.6.0 | — | Planned | — |
+| 29. Discoverability Baseline | v1.6.0 | — | Planned | — |
+| 30. Review-Density Pilot | v1.6.0 | — | Planned | — |
 
 ---
-*Roadmap updated: 2026-04-29 — v1.5.0 "Closed Loops" milestone complete*
+*Roadmap updated: 2026-08-27 — v1.6.0 "Trust + Density" design approved; implementation planning in progress*

@@ -125,8 +125,20 @@
   - Custom domain: `ratemyplace.org` (DNS CNAME to Cloudflare)
 
 **CI Pipeline:**
-- Not detected - No GitHub Actions, GitLab CI, or other CI service configured
-- Local npm scripts for build/test: `npm run build`, `npm test`, `npm run e2e`
+- **Workflow 1 — CI** (`.github/workflows/ci.yml`): runs for pull requests and pushes to
+  `main`. Its stable check name is **`quality`** and it runs `npm ci`, `npm run check`,
+  `npm test`, and `npm run build` with read-only repository permissions.
+- **Workflow 2 — Post-deploy smoke** (`.github/workflows/post-deploy-smoke.yml`): every
+  qualifying internal `main` CI completion runs a non-cancellable `sentinel` job. It
+  explicitly fails red when `quality` did not succeed and explicitly passes on success;
+  it never checks out, installs dependencies, or runs smoke. The separate, success-only
+  `smoke` job needs that sentinel and alone owns cancellable `production-smoke`
+  concurrency. It then waits for Cloudflare Pages to serve the exact commit SHA and runs
+  the read-only production smoke suite.
+- The repository workflows do not deploy or roll back Cloudflare Pages. A `main` branch
+  ruleset/required-check activation is not asserted here; Task 7 must verify that external
+  configuration separately.
+- Local checks use `npm ci`, `npm run check`, `npm test`, and `npm run build`.
 
 ## Environment Configuration
 
