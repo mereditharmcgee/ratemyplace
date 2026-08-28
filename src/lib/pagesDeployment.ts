@@ -8,6 +8,7 @@ const RETRY_INTERVAL_MS = 10_000;
 const TRUSTED_APP_SLUG = 'cloudflare-workers-and-pages';
 const TRUSTED_CHECK_NAME = 'Cloudflare Pages';
 const URL_IN_SUMMARY = /https:\/\/[^\s<>()[\]{}"']+/gi;
+const SAME_PROJECT_BRANCH_ALIAS = /^https:\/\/[a-z0-9](?:[a-z0-9-]{0,62})\.ratemyplace-64y\.pages\.dev$/i;
 
 export interface PagesDeploymentOptions {
   repository: string;
@@ -170,6 +171,7 @@ function extractOrigin(summary: unknown): string {
     try {
       origins.add(validateSmokeTarget('preview', match[0]).origin);
     } catch {
+      if (SAME_PROJECT_BRANCH_ALIAS.test(match[0])) continue;
       throw new Error('Invalid Pages hostname');
     }
   }

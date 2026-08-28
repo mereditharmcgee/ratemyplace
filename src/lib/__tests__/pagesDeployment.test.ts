@@ -54,6 +54,17 @@ describe('resolvePagesDeploymentOrigin', () => {
     await expect(resolve(dependencies([apiResponse([trustedCheck()])]))).resolves.toBe(ORIGIN);
   });
 
+  it('selects the immutable URL from a trusted Pages summary that also advertises its branch alias', async () => {
+    const summary = [
+      'Preview URL: https://0d4541c6.ratemyplace-64y.pages.dev',
+      'Branch Preview URL: https://codex-phase-22a-smoke-delive.ratemyplace-64y.pages.dev',
+    ].join('\n');
+
+    await expect(resolve(dependencies([apiResponse([trustedCheck({ output: { summary } })])]))).resolves.toBe(
+      'https://0d4541c6.ratemyplace-64y.pages.dev',
+    );
+  });
+
   it.each([
     ['missing trusted check', [apiResponse([]), apiResponse([trustedCheck()])]],
     ['queued trusted check', [apiResponse([trustedCheck({ status: 'queued', conclusion: null })]), apiResponse([trustedCheck()])]],
@@ -76,6 +87,8 @@ describe('resolvePagesDeploymentOrigin', () => {
     ['malformed summary', apiResponse([trustedCheck({ output: { summary: 7 } })]), /malformed check summary/i],
     ['invalid project hostname', apiResponse([trustedCheck({ output: { summary: 'https://a1b2c3d4.wrong-project.pages.dev' } })]), /invalid Pages hostname/i],
     ['explicit default Pages port', apiResponse([trustedCheck({ output: { summary: 'https://a1b2c3d4.ratemyplace-64y.pages.dev:443' } })]), /invalid Pages hostname/i],
+    ['wrong-project branch alias', apiResponse([trustedCheck({ output: { summary: 'https://codex-phase-22a-smoke-delive.wrong-project.pages.dev' } })]), /invalid Pages hostname/i],
+    ['branch alias with explicit default port', apiResponse([trustedCheck({ output: { summary: 'https://codex-phase-22a-smoke-delive.ratemyplace-64y.pages.dev:443' } })]), /invalid Pages hostname/i],
     ['multiple deployment origins', apiResponse([trustedCheck({ output: { summary: `${ORIGIN} https://b2c3d4e5.ratemyplace-64y.pages.dev` } })]), /multiple immutable deployment origins/i],
   ])('fails closed for %s', async (_name, response, expected) => {
     await expect(resolve(dependencies([response]))).rejects.toThrow(expected);
