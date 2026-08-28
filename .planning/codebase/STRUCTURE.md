@@ -92,7 +92,7 @@ ratemyplace-boston/
   - Public: `index.astro` (home), `search.astro`, `[slug].astro` (building detail), `profile.astro`, `about.astro`, `methodology.astro`
   - Auth: `auth/signin.astro`, `signup.astro`, `forgot-password.astro`
   - Admin: `admin/index.astro`, `admin/reviews.astro`, `admin/buildings.astro`, `admin/landlords.astro`, `admin/users.astro`, `admin/disputes.astro`, `admin/audit.astro`
-  - API: 47 endpoints total (auth, reviews, admin CRUD, disputes, contact, bug reports)
+  - API: Auth, reviews, admin CRUD, disputes, contact, bug reports, and read-only release health
 
 **`src/components/`**
 - Purpose: Reusable React islands and Astro static components

@@ -99,6 +99,27 @@ describe('smoke target authority', () => {
     ]) expect(() => validateSmokeTarget('production', target)).toThrow();
   });
 
+  it.each([
+    ['production credential delimiter', 'production', 'https://@ratemyplace.org'],
+    ['preview credential delimiter', 'preview', 'https://@1a2b3c4d.ratemyplace-64y.pages.dev'],
+    ['local credential delimiter', 'local', 'http://@localhost:8788'],
+    ['production backslash', 'production', 'https://ratemyplace.org\\'],
+    ['preview backslash', 'preview', 'https://1a2b3c4d.ratemyplace-64y.pages.dev\\'],
+    ['local backslash', 'local', 'http://localhost:8788\\'],
+  ] as const)('rejects a raw %s before URL normalization', (_label, environment, target) => {
+    expect(() => validateSmokeTarget(environment, target)).toThrow();
+  });
+
+  it.each([
+    ['space', 'production', 'https://ratemyplace.org '],
+    ['tab', 'preview', 'https://1a2b3c4d.ratemyplace-64y.pages.dev\t'],
+    ['carriage return', 'local', 'http://127.0.0.1:8788\r'],
+    ['newline', 'local', 'http://[::1]:8788\n'],
+    ['delete control', 'production', 'https://ratemyplace.org\u007f'],
+  ] as const)('rejects a raw ASCII %s before URL normalization', (_label, environment, target) => {
+    expect(() => validateSmokeTarget(environment, target)).toThrow();
+  });
+
   it('restricts preview to this Pages project', () => {
     expect(validateSmokeTarget('preview', 'https://1a2b3c4d.ratemyplace-64y.pages.dev').hostname)
       .toBe('1a2b3c4d.ratemyplace-64y.pages.dev');

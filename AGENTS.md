@@ -110,7 +110,7 @@ Commit prefixes: `feat:` `fix:` `docs:` `chore:` `refactor:`.
 
 ## API routes (`src/pages/api/`)
 
-47 endpoints. Nothing is protected implicitly — every route handles its own auth,
+Nothing is protected implicitly — every route handles its own auth,
 validation, and rate limiting. A missing check is a live vulnerability, not a style issue.
 
 ### Checklist for every new endpoint

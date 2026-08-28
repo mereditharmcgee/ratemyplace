@@ -53,6 +53,7 @@ interface HealthCheck {
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const PREVIEW_HOST = /^[0-9a-f]{8}\.ratemyplace-64y\.pages\.dev$/;
 const RAW_TARGET = /^(https?):\/\/([^/?#]+)(\/?)$/i;
+const FORBIDDEN_RAW_TARGET_SYNTAX = /[@\\\u0000-\u0020\u007f]/;
 const HTML_PROBES: HtmlProbe[] = [
   { name: 'home', path: '/' },
   { name: 'about', path: '/about' },
@@ -93,6 +94,9 @@ function parseMilliseconds(value: string, flag: string, minimum: number, maximum
 }
 
 export function validateSmokeTarget(environment: SmokeEnvironment, value: string): URL {
+  if (FORBIDDEN_RAW_TARGET_SYNTAX.test(value)) {
+    throw new Error('--base-url must be an origin without credentials, path, query, or fragment');
+  }
   const rawTarget = RAW_TARGET.exec(value);
   if (!rawTarget) {
     throw new Error('--base-url must be an origin without credentials, path, query, or fragment');
