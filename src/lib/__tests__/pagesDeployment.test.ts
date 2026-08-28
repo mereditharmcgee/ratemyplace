@@ -84,6 +84,57 @@ describe('resolvePagesDeploymentOrigin', () => {
     await expect(resolve(dependencies([new Error('network unavailable')]))).rejects.toThrow(/GitHub check-run request failed/i);
   });
 
+  it('rejects a trusted response delivered after the resolver deadline', async () => {
+    let now = 0;
+    const delayedResponse: PagesDeploymentDependencies = {
+      fetch: vi.fn(async () => {
+        now = 11;
+        return apiResponse([trustedCheck()]);
+      }),
+      now: () => now,
+      sleep: vi.fn(async () => undefined),
+    };
+
+    await expect(resolve(delayedResponse, 10)).rejects.toThrow(/deadline/i);
+  });
+
+  it('aborts an unresolved GitHub request when the resolver deadline expires', async () => {
+    vi.useFakeTimers();
+    try {
+      let now = 0;
+      let outcome: unknown;
+      const unresolvedRequest: PagesDeploymentDependencies = {
+        fetch: vi.fn((_input, init) => new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            now = 10;
+            reject(new Error('request aborted'));
+          });
+        })),
+        now: () => now,
+        sleep: vi.fn(async () => undefined),
+      };
+      void resolve(unresolvedRequest, 10).then(
+        () => { outcome = 'resolved'; },
+        (error: unknown) => { outcome = error; },
+      );
+
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(outcome).toBeInstanceOf(Error);
+      expect((outcome as Error).message).toMatch(/deadline/i);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    ['missing trusted head SHA', trustedCheck({ head_sha: undefined })],
+    ['missing trusted status', trustedCheck({ status: undefined })],
+  ])('fails immediately for %s', async (_name, malformedTrustedCheck) => {
+    await expect(resolve(dependencies([apiResponse([malformedTrustedCheck])]), 10_000))
+      .rejects.toThrow(/malformed trusted Cloudflare Pages check/i);
+  });
+
   it('fails after the bounded deadline while a trusted check remains pending', async () => {
     const pending = apiResponse([trustedCheck({ status: 'queued', conclusion: null })]);
     await expect(resolve(dependencies([pending]), 10_000)).rejects.toThrow(/deadline/i);
