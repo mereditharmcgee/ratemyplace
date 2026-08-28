@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const workflowPath = (...parts: string[]) => resolve(process.cwd(), '.github', 'workflows', ...parts);
-const readWorkflow = (name: string) => readFileSync(workflowPath(name), 'utf8');
+const readWorkflow = (name: string) => readFileSync(workflowPath(name), 'utf8').replace(/\r\n/g, '\n');
 
 const getWorkflowJob = (workflow: string, name: string) => {
   const jobsStart = workflow.indexOf('jobs:\n');
@@ -50,7 +50,7 @@ const findPermissionsDeclarations = (lines: string[]): PermissionsDeclaration[] 
   return declarations;
 };
 
-const assertReadOnlyPermissionsBlock = (workflow: string) => {
+const assertReadOnlyPermissionsBlock = (workflow: string, allowedReadPermissions: string[] = ['contents']) => {
   const lines = workflow.split(/\r?\n/);
   const declarations = findPermissionsDeclarations(lines);
 
@@ -71,15 +71,19 @@ const assertReadOnlyPermissionsBlock = (workflow: string) => {
     blockEntries.push(line);
   }
 
-  expect(blockEntries).toHaveLength(1);
-  expect(blockEntries[0]).toMatch(/^[ \t]+contents[ \t]*:[ \t]*read[ \t]*(?:#.*)?$/);
+  expect(blockEntries).toHaveLength(allowedReadPermissions.length);
+  expect(blockEntries).toEqual(expect.arrayContaining(
+    allowedReadPermissions.map((permission) => expect.stringMatching(
+      new RegExp(`^[ \\t]+${permission}[ \\t]*:[ \\t]*read[ \\t]*(?:#.*)?$`),
+    )),
+  ));
 };
 
-const assertLeastPrivilege = (workflow: string) => {
-  assertReadOnlyPermissionsBlock(workflow);
+const assertLeastPrivilege = (workflow: string, allowedReadPermissions?: string[]) => {
+  assertReadOnlyPermissionsBlock(workflow, allowedReadPermissions);
   expect(workflow).not.toMatch(/\bwrangler\b/i);
   expect(workflow).not.toMatch(/\b(?:d1|r2)\b/i);
-  expect(workflow).not.toMatch(/(?:CLOUDFLARE|CF)_[A-Z_]*TOKEN/i);
+  expect(workflow).not.toMatch(/(?:CLOUDFLARE|CF)_[A-Z_]*(?:TOKEN|KEY)\b/i);
   expect(workflow).not.toMatch(/secrets\./i);
   expect(workflow).not.toMatch(/pull_request_target/i);
   expect(workflow).not.toMatch(/permissions:\s*write-all/i);
@@ -113,7 +117,7 @@ describe('release workflow contracts', () => {
 
     expect(workflow).toMatch(/^name: Post-deploy smoke$/m);
     expect(workflow).toMatch(/^  workflow_run:\n    workflows: \[CI\]\n    types: \[completed\]$/m);
-    assertLeastPrivilege(workflow);
+    assertLeastPrivilege(workflow, ['contents', 'checks']);
     expect(beforeJobs).not.toMatch(/^concurrency:/m);
 
     expect(sentinel).toMatch(/github\.event\.workflow_run\.event == 'push'/);
@@ -139,14 +143,21 @@ describe('release workflow contracts', () => {
     expect(smoke).toMatch(/uses: actions\/setup-node@v7\n        with:\n          node-version-file: \.node-version\n          cache: npm/);
     expect(smoke.indexOf('run: npm ci')).toBeGreaterThan(checkout);
     expect(smoke.indexOf('run: npm ci')).toBeLessThan(smokeCommand);
-    expect(smoke).toMatch(/--base-url https:\/\/ratemyplace\.org/);
+    expect(smoke).toMatch(/GITHUB_TOKEN: \$\{\{ github\.token \}\}/);
+    expect(smoke).toMatch(/scripts\/pages-deployment-url\.ts/);
+    expect(smoke).toMatch(/--repository \"\$\{\{ github\.repository \}\}\"/);
+    expect(smoke).toMatch(/--sha \"\$\{\{ github\.event\.workflow_run\.head_sha \}\}\"/);
+    expect(smoke).toMatch(/--wait-ms 600000/);
+    expect(smoke).toMatch(/--environment preview/);
+    expect(smoke).toMatch(/--base-url "\$deployment_origin"/);
+    expect(smoke).not.toMatch(/--base-url https:\/\/ratemyplace\.org/);
     expect(smoke).toMatch(/--expected-release \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
     expect(smoke).toMatch(/--wait-for-release-ms 600000/);
   });
 
   it('keeps Cloudflare deployment and privileged operations out of repository workflows', () => {
     for (const name of ['ci.yml', 'post-deploy-smoke.yml']) {
-      assertLeastPrivilege(readWorkflow(name));
+      assertLeastPrivilege(readWorkflow(name), name === 'post-deploy-smoke.yml' ? ['contents', 'checks'] : undefined);
     }
   });
 
@@ -195,6 +206,15 @@ describe('release workflow contracts', () => {
     const dangerousWorkflow = readWorkflow('ci.yml').replace(
       '  contents: read',
       '  contents: read\n  id-token: write',
+    );
+
+    expect(() => assertLeastPrivilege(dangerousWorkflow)).toThrow();
+  });
+
+  it('rejects a Cloudflare API key credential', () => {
+    const dangerousWorkflow = readWorkflow('ci.yml').replace(
+      '  quality:\n',
+      '  quality:\n    env:\n      CLOUDFLARE_API_KEY: unsafe\n',
     );
 
     expect(() => assertLeastPrivilege(dangerousWorkflow)).toThrow();
