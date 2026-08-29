@@ -17,7 +17,8 @@
     "db:migrate:local": "npx tsx scripts/db-migrate.ts",
     "db:fresh": "npx tsx scripts/db-fresh.ts",
     "db:seed": "npx tsx scripts/db-seed.ts",
-    "db:setup": "npm run db:fresh && npm run db:seed"
+    "db:setup": "npm run db:fresh && npm run db:seed",
+    "ops:metrics": "tsx scripts/ops-metrics.ts"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.12",
