@@ -1,7 +1,9 @@
 # Dependency security refresh implementation plan
 
-**Approved:** 2026-08-29  
-**Branch:** `codex/dependency-security-refresh`  
+**Approved:** 2026-08-29
+
+**Branch:** `codex/dependency-security-refresh`
+
 **Base:** `origin/main` at `a18254a89132ff8ed4da4ef4ae40af3677a12795`
 
 ## Goal
