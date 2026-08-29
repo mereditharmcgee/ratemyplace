@@ -49,7 +49,7 @@ const parseYamlMapping = (line: string): YamlMapping | undefined => {
   if (!activeLine.trim()) return undefined;
 
   const indent = activeLine.match(/^ */)?.[0].length ?? 0;
-  const mapping = activeLine.slice(indent).match(/^(?:"([^"]+)"|'([^']+)'|([^:#][^:]*?))\s*:\s*(.*)$/);
+  const mapping = activeLine.slice(indent).replace(/^-\s+/, '').match(/^(?:"([^"]+)"|'([^']+)'|([^:#][^:]*?))\s*:\s*(.*)$/);
   if (!mapping) return undefined;
 
   return {
@@ -351,6 +351,15 @@ describe('release workflow contracts', () => {
     const dangerousDependabot = readRepositoryFile('.github', 'dependabot.yml').replace(
       '    directory: /\n',
       '    directory: /\n    "registries":\n      - private\n',
+    );
+
+    expect(() => assertDependabotPolicy(dangerousDependabot)).toThrow();
+  });
+
+  it('rejects a quoted active registries key as the first list-item mapping', () => {
+    const dangerousDependabot = readRepositoryFile('.github', 'dependabot.yml').replace(
+      '  - package-ecosystem: npm\n',
+      '  - "registries":\n      - private\n    package-ecosystem: npm\n',
     );
 
     expect(() => assertDependabotPolicy(dangerousDependabot)).toThrow();
