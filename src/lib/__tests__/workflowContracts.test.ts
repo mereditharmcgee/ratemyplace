@@ -4,6 +4,74 @@ import { describe, expect, it } from 'vitest';
 
 const workflowPath = (...parts: string[]) => resolve(process.cwd(), '.github', 'workflows', ...parts);
 const readWorkflow = (name: string) => readFileSync(workflowPath(name), 'utf8').replace(/\r\n/g, '\n');
+const readRepositoryFile = (...parts: string[]) => readFileSync(resolve(process.cwd(), ...parts), 'utf8')
+  .replace(/\r\n/g, '\n');
+
+const yamlScalar = (value: string) => {
+  const normalized = value.replace(/\s+#.*$/, '').trim();
+  const quote = normalized[0];
+  return (quote === '"' || quote === "'") && normalized.at(-1) === quote
+    ? normalized.slice(1, -1)
+    : normalized;
+};
+
+const getYamlBlock = (lines: string[], key: string, indent: number) => {
+  const header = `${' '.repeat(indent)}${key}:`;
+  const start = lines.findIndex((line) => line.replace(/\s+$/, '') === header);
+  expect(start).toBeGreaterThanOrEqual(0);
+
+  const block: string[] = [];
+  for (let index = start + 1; index < lines.length; index++) {
+    const line = lines[index];
+    if (!line.trim() || line.trimStart().startsWith('#')) continue;
+    const lineIndent = line.match(/^ */)?.[0].length ?? 0;
+    if (lineIndent <= indent) break;
+    block.push(line);
+  }
+  return block;
+};
+
+const getYamlScalar = (lines: string[], key: string, indent: number) => {
+  const prefix = `${' '.repeat(indent)}${key}:`;
+  const line = lines.find((candidate) => candidate.startsWith(prefix));
+  return line === undefined ? undefined : yamlScalar(line.slice(prefix.length));
+};
+
+interface DependabotGroup {
+  name: string;
+  appliesTo?: string;
+  patterns: string[];
+}
+
+const getDependabotGroups = (entry: string[]) => {
+  const groupsBlock = getYamlBlock(entry, 'groups', 4);
+  const groups: DependabotGroup[] = [];
+
+  for (let index = 0; index < groupsBlock.length; index++) {
+    const match = groupsBlock[index].match(/^ {6}([^\s:#][^:#]*):\s*(?:#.*)?$/);
+    if (!match) continue;
+
+    const groupLines: string[] = [];
+    for (let child = index + 1; child < groupsBlock.length; child++) {
+      const line = groupsBlock[child];
+      const indent = line.match(/^ */)?.[0].length ?? 0;
+      if (indent <= 6) break;
+      groupLines.push(line);
+    }
+
+    const patternsBlock = getYamlBlock(groupLines, 'patterns', 8);
+    groups.push({
+      name: yamlScalar(match[1]),
+      appliesTo: getYamlScalar(groupLines, 'applies-to', 8),
+      patterns: patternsBlock
+        .map((line) => line.match(/^ {10}-\s+(.+)$/)?.[1])
+        .filter((value): value is string => value !== undefined)
+        .map(yamlScalar),
+    });
+  }
+
+  return groups;
+};
 
 const getWorkflowJob = (workflow: string, name: string) => {
   const jobsStart = workflow.indexOf('jobs:\n');
@@ -103,10 +171,57 @@ describe('release workflow contracts', () => {
     expect(ci).toMatch(/uses: actions\/checkout@v6\n        with:\n          persist-credentials: false/);
     expect(ci).toMatch(/uses: actions\/setup-node@v7\n        with:\n          node-version-file: \.node-version\n          cache: npm/);
 
-    const commandPositions = ['npm ci', 'npm run check', 'npm test', 'npm run build']
+    const auditCommand = 'npm audit --audit-level=critical';
+    expect(ci.split(auditCommand)).toHaveLength(2);
+    expect(ci.match(/^\s*run: npm audit --audit-level=critical\s*$/gm) ?? []).toHaveLength(1);
+
+    const commandPositions = [
+      'npm ci',
+      auditCommand,
+      'npm run check',
+      'npm test',
+      'npm run build',
+    ]
       .map((command) => ci.indexOf(command));
     expect(commandPositions.every((position) => position >= 0)).toBe(true);
     expect(commandPositions).toEqual([...commandPositions].sort((a, b) => a - b));
+  });
+
+  it('keeps npm version and security updates separately grouped without elevated authority', () => {
+    const dependabot = readRepositoryFile('.github', 'dependabot.yml');
+    const lines = dependabot.split('\n');
+
+    expect(getYamlScalar(lines, 'version', 0)).toBe('2');
+
+    const updates = getYamlBlock(lines, 'updates', 0);
+    const entries: string[][] = [];
+    for (let index = 0; index < updates.length; index++) {
+      if (!/^ {2}-\s+/.test(updates[index])) continue;
+      const entry = [updates[index].replace(/^ {2}-\s+/, '    ')];
+      for (let child = index + 1; child < updates.length; child++) {
+        if (/^ {2}-\s+/.test(updates[child])) break;
+        entry.push(updates[child]);
+      }
+      entries.push(entry);
+    }
+
+    const npmEntries = entries.filter((entry) => getYamlScalar(entry, 'package-ecosystem', 4) === 'npm');
+    expect(npmEntries).toHaveLength(1);
+    const [npmEntry] = npmEntries;
+    expect(getYamlScalar(npmEntry, 'directory', 4)).toBe('/');
+    expect(getYamlScalar(getYamlBlock(npmEntry, 'schedule', 4), 'interval', 6)).toBe('monthly');
+    expect(getYamlScalar(npmEntry, 'open-pull-requests-limit', 4)).not.toBe('0');
+
+    const groups = getDependabotGroups(npmEntry);
+    const versionGroup = groups.find((group) => group.appliesTo === 'version-updates');
+    const securityGroup = groups.find((group) => group.appliesTo === 'security-updates');
+    expect(versionGroup?.patterns).toContain('*');
+    expect(securityGroup?.patterns).toContain('*');
+    expect(versionGroup?.name).not.toBe(securityGroup?.name);
+
+    expect(dependabot).not.toMatch(/^\s*registries\s*:/m);
+    expect(dependabot).not.toMatch(/\bsecrets?\s*[.:]/i);
+    expect(dependabot).not.toMatch(/\bauto(?:-|_)?merge\b/i);
   });
 
   it('keeps every qualifying main completion visible while only successful releases smoke', () => {
