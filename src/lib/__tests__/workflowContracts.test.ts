@@ -7,23 +7,93 @@ const readWorkflow = (name: string) => readFileSync(workflowPath(name), 'utf8').
 const readRepositoryFile = (...parts: string[]) => readFileSync(resolve(process.cwd(), ...parts), 'utf8')
   .replace(/\r\n/g, '\n');
 
+const stripYamlComment = (line: string) => {
+  let quote: '"' | "'" | undefined;
+
+  for (let index = 0; index < line.length; index++) {
+    const character = line[index];
+    if (quote === '"' && character === '\\') {
+      index++;
+      continue;
+    }
+    if (quote === "'" && character === "'" && line[index + 1] === "'") {
+      index++;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = quote === character ? undefined : quote ?? character;
+      continue;
+    }
+    if (character === '#' && quote === undefined) return line.slice(0, index);
+  }
+
+  return line;
+};
+
 const yamlScalar = (value: string) => {
-  const normalized = value.replace(/\s+#.*$/, '').trim();
+  const normalized = stripYamlComment(value).trim();
   const quote = normalized[0];
   return (quote === '"' || quote === "'") && normalized.at(-1) === quote
     ? normalized.slice(1, -1)
     : normalized;
 };
 
+interface YamlMapping {
+  indent: number;
+  key: string;
+  value: string;
+}
+
+const parseYamlMapping = (line: string): YamlMapping | undefined => {
+  const activeLine = stripYamlComment(line).replace(/\s+$/, '');
+  if (!activeLine.trim()) return undefined;
+
+  const indent = activeLine.match(/^ */)?.[0].length ?? 0;
+  const mapping = activeLine.slice(indent).match(/^(?:"([^"]+)"|'([^']+)'|([^:#][^:]*?))\s*:\s*(.*)$/);
+  if (!mapping) return undefined;
+
+  return {
+    indent,
+    key: (mapping[1] ?? mapping[2] ?? mapping[3]).trim(),
+    value: mapping[4],
+  };
+};
+
+const getActiveYamlLines = (lines: string[]) => {
+  const activeLines: string[] = [];
+  let blockScalarIndent: number | undefined;
+
+  for (const line of lines) {
+    const withoutComment = stripYamlComment(line).replace(/\s+$/, '');
+    const indent = withoutComment.match(/^ */)?.[0].length ?? 0;
+
+    if (blockScalarIndent !== undefined) {
+      if (!withoutComment.trim() || indent > blockScalarIndent) continue;
+      blockScalarIndent = undefined;
+    }
+    if (!withoutComment.trim()) continue;
+
+    activeLines.push(withoutComment);
+    const mapping = parseYamlMapping(withoutComment);
+    if (mapping && /^(?:\||>)[+-]?$/.test(mapping.value.trim())) {
+      blockScalarIndent = mapping.indent;
+    }
+  }
+
+  return activeLines;
+};
+
 const getYamlBlock = (lines: string[], key: string, indent: number) => {
-  const header = `${' '.repeat(indent)}${key}:`;
-  const start = lines.findIndex((line) => line.replace(/\s+$/, '') === header);
+  const activeLines = getActiveYamlLines(lines);
+  const start = activeLines.findIndex((line) => {
+    const mapping = parseYamlMapping(line);
+    return mapping?.indent === indent && mapping.key === key && mapping.value === '';
+  });
   expect(start).toBeGreaterThanOrEqual(0);
 
   const block: string[] = [];
-  for (let index = start + 1; index < lines.length; index++) {
-    const line = lines[index];
-    if (!line.trim() || line.trimStart().startsWith('#')) continue;
+  for (let index = start + 1; index < activeLines.length; index++) {
+    const line = activeLines[index];
     const lineIndent = line.match(/^ */)?.[0].length ?? 0;
     if (lineIndent <= indent) break;
     block.push(line);
@@ -32,9 +102,10 @@ const getYamlBlock = (lines: string[], key: string, indent: number) => {
 };
 
 const getYamlScalar = (lines: string[], key: string, indent: number) => {
-  const prefix = `${' '.repeat(indent)}${key}:`;
-  const line = lines.find((candidate) => candidate.startsWith(prefix));
-  return line === undefined ? undefined : yamlScalar(line.slice(prefix.length));
+  const mapping = getActiveYamlLines(lines)
+    .map(parseYamlMapping)
+    .find((candidate) => candidate?.indent === indent && candidate.key === key);
+  return mapping === undefined ? undefined : yamlScalar(mapping.value);
 };
 
 interface DependabotGroup {
@@ -81,6 +152,92 @@ const getWorkflowJob = (workflow: string, name: string) => {
   const afterJob = workflow.slice(start + `  ${name}:\n`.length);
   const nextJob = afterJob.search(/^  [A-Za-z0-9_-]+:\s*$/m);
   return nextJob === -1 ? afterJob : afterJob.slice(0, nextJob);
+};
+
+const getWorkflowRunCommands = (workflow: string, jobName: string) => {
+  const lines = getWorkflowJob(workflow, jobName).split('\n');
+  const commands: string[] = [];
+
+  for (let index = 0; index < lines.length; index++) {
+    const mapping = parseYamlMapping(lines[index]);
+    if (mapping?.indent !== 8 || mapping.key !== 'run') continue;
+
+    const value = yamlScalar(mapping.value);
+    if (!/^(?:\||>)[+-]?$/.test(value)) {
+      commands.push(value);
+      continue;
+    }
+
+    for (let child = index + 1; child < lines.length; child++) {
+      const line = lines[child];
+      const indent = line.match(/^ */)?.[0].length ?? 0;
+      if (line.trim() && indent <= mapping.indent) break;
+      const command = line.trim();
+      if (command && !command.startsWith('#')) commands.push(command);
+    }
+  }
+
+  return commands;
+};
+
+const assertCiAuditGate = (ci: string) => {
+  const auditCommand = 'npm audit --audit-level=critical';
+  const runCommands = getWorkflowRunCommands(ci, 'quality');
+  expect(runCommands.filter((command) => command.includes(auditCommand))).toEqual([auditCommand]);
+
+  const commandPositions = [
+    'npm ci',
+    auditCommand,
+    'npm run check',
+    'npm test',
+    'npm run build',
+  ].map((command) => runCommands.indexOf(command));
+  expect(commandPositions.every((position) => position >= 0)).toBe(true);
+  expect(commandPositions).toEqual([...commandPositions].sort((a, b) => a - b));
+};
+
+const assertDependabotPolicy = (dependabot: string) => {
+  const lines = dependabot.split('\n');
+
+  expect(getYamlScalar(lines, 'version', 0)).toBe('2');
+
+  const updates = getYamlBlock(lines, 'updates', 0);
+  const entries: string[][] = [];
+  for (let index = 0; index < updates.length; index++) {
+    if (!/^ {2}-\s+/.test(updates[index])) continue;
+    const entry = [updates[index].replace(/^ {2}-\s+/, '    ')];
+    for (let child = index + 1; child < updates.length; child++) {
+      if (/^ {2}-\s+/.test(updates[child])) break;
+      entry.push(updates[child]);
+    }
+    entries.push(entry);
+  }
+
+  const npmEntries = entries.filter((entry) => getYamlScalar(entry, 'package-ecosystem', 4) === 'npm');
+  expect(npmEntries).toHaveLength(1);
+  const [npmEntry] = npmEntries;
+  expect(getYamlScalar(npmEntry, 'directory', 4)).toBe('/');
+  expect(getYamlScalar(getYamlBlock(npmEntry, 'schedule', 4), 'interval', 6)).toBe('monthly');
+  const pullRequestLimit = getYamlScalar(npmEntry, 'open-pull-requests-limit', 4);
+  if (pullRequestLimit !== undefined) {
+    const numericLimit = Number(pullRequestLimit);
+    expect(Number.isFinite(numericLimit)).toBe(true);
+    expect(numericLimit).toBeGreaterThan(0);
+  }
+
+  const groups = getDependabotGroups(npmEntry);
+  const versionGroup = groups.find((group) => group.appliesTo === 'version-updates');
+  const securityGroup = groups.find((group) => group.appliesTo === 'security-updates');
+  expect(versionGroup?.patterns).toContain('*');
+  expect(securityGroup?.patterns).toContain('*');
+  expect(versionGroup?.name).not.toBe(securityGroup?.name);
+
+  const activeMappings = getActiveYamlLines(lines)
+    .map(parseYamlMapping)
+    .filter((mapping): mapping is YamlMapping => mapping !== undefined);
+  const forbiddenKeys = new Set(['registries', 'secret', 'secrets', 'automerge', 'auto-merge', 'auto_merge']);
+  expect(activeMappings.some((mapping) => forbiddenKeys.has(mapping.key.toLowerCase()))).toBe(false);
+  expect(activeMappings.some((mapping) => /\bsecrets?\s*\./i.test(yamlScalar(mapping.value)))).toBe(false);
 };
 
 interface PermissionsDeclaration {
@@ -171,57 +328,67 @@ describe('release workflow contracts', () => {
     expect(ci).toMatch(/uses: actions\/checkout@v6\n        with:\n          persist-credentials: false/);
     expect(ci).toMatch(/uses: actions\/setup-node@v7\n        with:\n          node-version-file: \.node-version\n          cache: npm/);
 
-    const auditCommand = 'npm audit --audit-level=critical';
-    expect(ci.split(auditCommand)).toHaveLength(2);
-    expect(ci.match(/^\s*run: npm audit --audit-level=critical\s*$/gm) ?? []).toHaveLength(1);
-
-    const commandPositions = [
-      'npm ci',
-      auditCommand,
-      'npm run check',
-      'npm test',
-      'npm run build',
-    ]
-      .map((command) => ci.indexOf(command));
-    expect(commandPositions.every((position) => position >= 0)).toBe(true);
-    expect(commandPositions).toEqual([...commandPositions].sort((a, b) => a - b));
+    assertCiAuditGate(ci);
   });
 
   it('keeps npm version and security updates separately grouped without elevated authority', () => {
-    const dependabot = readRepositoryFile('.github', 'dependabot.yml');
-    const lines = dependabot.split('\n');
+    assertDependabotPolicy(readRepositoryFile('.github', 'dependabot.yml'));
+  });
 
-    expect(getYamlScalar(lines, 'version', 0)).toBe('2');
+  it.each(['00', '0x0', '+0', '0.0'])(
+    'rejects open-pull-requests-limit numeric zero form %s',
+    (zero) => {
+      const dangerousDependabot = readRepositoryFile('.github', 'dependabot.yml').replace(
+        '    directory: /\n',
+        `    directory: /\n    open-pull-requests-limit: ${zero}\n`,
+      );
 
-    const updates = getYamlBlock(lines, 'updates', 0);
-    const entries: string[][] = [];
-    for (let index = 0; index < updates.length; index++) {
-      if (!/^ {2}-\s+/.test(updates[index])) continue;
-      const entry = [updates[index].replace(/^ {2}-\s+/, '    ')];
-      for (let child = index + 1; child < updates.length; child++) {
-        if (/^ {2}-\s+/.test(updates[child])) break;
-        entry.push(updates[child]);
-      }
-      entries.push(entry);
-    }
+      expect(() => assertDependabotPolicy(dangerousDependabot)).toThrow();
+    },
+  );
 
-    const npmEntries = entries.filter((entry) => getYamlScalar(entry, 'package-ecosystem', 4) === 'npm');
-    expect(npmEntries).toHaveLength(1);
-    const [npmEntry] = npmEntries;
-    expect(getYamlScalar(npmEntry, 'directory', 4)).toBe('/');
-    expect(getYamlScalar(getYamlBlock(npmEntry, 'schedule', 4), 'interval', 6)).toBe('monthly');
-    expect(getYamlScalar(npmEntry, 'open-pull-requests-limit', 4)).not.toBe('0');
+  it('rejects a quoted active registries key', () => {
+    const dangerousDependabot = readRepositoryFile('.github', 'dependabot.yml').replace(
+      '    directory: /\n',
+      '    directory: /\n    "registries":\n      - private\n',
+    );
 
-    const groups = getDependabotGroups(npmEntry);
-    const versionGroup = groups.find((group) => group.appliesTo === 'version-updates');
-    const securityGroup = groups.find((group) => group.appliesTo === 'security-updates');
-    expect(versionGroup?.patterns).toContain('*');
-    expect(securityGroup?.patterns).toContain('*');
-    expect(versionGroup?.name).not.toBe(securityGroup?.name);
+    expect(() => assertDependabotPolicy(dangerousDependabot)).toThrow();
+  });
 
-    expect(dependabot).not.toMatch(/^\s*registries\s*:/m);
-    expect(dependabot).not.toMatch(/\bsecrets?\s*[.:]/i);
-    expect(dependabot).not.toMatch(/\bauto(?:-|_)?merge\b/i);
+  it('allows harmless YAML comments mentioning secrets or auto-merge', () => {
+    const harmlessDependabot = [
+      '# secrets: are not configured here',
+      '# auto-merge remains disabled',
+      readRepositoryFile('.github', 'dependabot.yml'),
+    ].join('\n');
+
+    expect(() => assertDependabotPolicy(harmlessDependabot)).not.toThrow();
+  });
+
+  it('rejects audit text left only in a YAML comment', () => {
+    const ciWithoutAudit = readWorkflow('ci.yml').replace(
+      '      - name: Audit critical vulnerabilities\n        run: npm audit --audit-level=critical\n',
+      '      # run: npm audit --audit-level=critical\n',
+    );
+
+    expect(() => assertCiAuditGate(ciWithoutAudit)).toThrow();
+  });
+
+  it('rejects audit text left only in a non-executable block scalar', () => {
+    const ciWithoutAudit = readWorkflow('ci.yml').replace(
+      '      - name: Audit critical vulnerabilities\n        run: npm audit --audit-level=critical\n',
+      [
+        '      - name: Preserve audit command as data',
+        '        env:',
+        '          NOTE: |',
+        '            run: npm audit --audit-level=critical',
+        '        run: echo "$NOTE"',
+        '',
+      ].join('\n'),
+    );
+
+    expect(() => assertCiAuditGate(ciWithoutAudit)).toThrow();
   });
 
   it('keeps every qualifying main completion visible while only successful releases smoke', () => {
