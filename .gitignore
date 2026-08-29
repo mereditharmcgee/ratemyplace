@@ -46,3 +46,8 @@ playwright/.auth/
 # personal documents kept alongside the repo, not part of the app
 Org Docs/
 just-tech-application/
+
+# non-code working files that name individuals or record private conversations
+# (see ops/AGENTS.md — this is a safety rule, not tidiness)
+ops/private/*
+!ops/private/README.md

@@ -10,6 +10,7 @@ Directory-specific rules live in nested `AGENTS.md` files and override this one 
 | [`src/lib/AGENTS.md`](src/lib/AGENTS.md) | Scoring, survey items, validation — the load-bearing logic |
 | [`src/components/AGENTS.md`](src/components/AGENTS.md) | Astro vs React, brand tokens, islands |
 | [`migrations/AGENTS.md`](migrations/AGENTS.md) | Schema changes and the production migration trap |
+| [`ops/AGENTS.md`](ops/AGENTS.md) | Non-code work: growth, funding, partnerships, content |
 
 > **Never put an `AGENTS.md` (or any `.md`) inside `src/pages/`.** Astro's file-based
 > routing turns Markdown in `src/pages/` into a public page — a guide at
@@ -82,6 +83,7 @@ npm test -- scoring   # filter by name
 npm run build      # production build
 npm run e2e        # fresh local D1 + seed + build + Playwright
 npm run db:setup   # db:fresh then db:seed (local D1 only)
+npm run ops:metrics   # regenerate ops/METRICS.md from production (read-only)
 ```
 
 `npm run smoke` has no default target. Supply an explicit `--environment` and
