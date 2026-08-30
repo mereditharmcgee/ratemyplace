@@ -49,6 +49,20 @@ advisories. A live standard, non-forced `npm audit fix --dry-run --json` reporte
 zero packages added, changed, or removed. Further audit remediation therefore
 crosses the approved Stage 1 major-version boundaries.
 
+## Dependabot external gate (post-merge)
+
+As verified 2026-08-30, GitHub reports Dependabot security updates (automated
+security fixes) disabled for this repository. `.github/dependabot.yml` defines
+the reviewed update-grouping policy, but that file cannot enable the separate
+repository setting. Advisory-triggered Dependabot updates must not be described
+as active while GitHub continues to report the setting disabled.
+
+This is intentionally a post-merge external gate: the default branch must first
+contain the reviewed grouping policy before activation. After this branch
+reaches the default branch, separately authorize enabling Dependabot security
+updates, enable the repository setting, and verify that GitHub reports it as
+enabled. This record does not authorize or claim that external change.
+
 ## Direct residual advisories
 
 The live audit reports the following direct Astro and Cloudflare-adapter
