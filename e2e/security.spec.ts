@@ -1,11 +1,6 @@
 import { test, expect, clearRateLimits } from './fixtures';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
+import { executeLocalD1, TURNSTILE_TEST_TOKEN } from './test-harness';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const PROJECT_ROOT = path.resolve(__dirname, '..');
 const BASE_URL = process.env.BASE_URL || 'http://localhost:8788';
 
 // Remove any disputes created by previous security test runs for the reserved review IDs.
@@ -13,10 +8,7 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:8788';
 function clearSecurityTestDisputes() {
   const reviewIds = ['review-030', 'review-040', 'review-060', 'review-070'];
   const idList = reviewIds.map((id) => `'${id}'`).join(', ');
-  execSync(
-    `npx wrangler d1 execute ratemyplace-db --local --command "DELETE FROM disputes WHERE review_id IN (${idList})"`,
-    { cwd: PROJECT_ROOT, stdio: 'pipe' }
-  );
+  executeLocalD1(`DELETE FROM disputes WHERE review_id IN (${idList})`);
 }
 
 // Dispute payload helper — each test uses a different reviewId to avoid UNIQUE constraint.
@@ -27,25 +19,26 @@ function makeDisputePayload(reviewId: string, explanation: string) {
     landlordName: 'Test Landlord',
     landlordEmail: `sec-test-${reviewId}@test.local`,
     landlordPhone: '555-0000',
-    disputeReasons: ['inaccurate_info'],
+    disputeReasons: ['Factually incorrect information'],
     disputeExplanation: explanation,
+    turnstileToken: TURNSTILE_TEST_TOKEN,
   };
 }
 
 // Expand the dispute card matching a given landlord email and return whether it was found
 async function expandDisputeByEmail(adminPage: import('@playwright/test').Page, email: string): Promise<boolean> {
-  const allCards = adminPage.locator('.bg-white.rounded-xl');
-  const count = await allCards.count();
+  const disputeHeaders = adminPage.locator('.cursor-pointer');
+  const count = await disputeHeaders.count();
   for (let i = 0; i < count; i++) {
-    const card = allCards.nth(i);
-    await card.click();
+    const header = disputeHeaders.nth(i);
+    await header.click();
     await adminPage.waitForTimeout(400);
     const emailVisible = await adminPage.locator(`text=${email}`).isVisible().catch(() => false);
     if (emailVisible) {
       return true;
     }
     // Collapse this card before trying the next
-    await card.click();
+    await header.click();
     await adminPage.waitForTimeout(200);
   }
   return false;
@@ -116,12 +109,12 @@ test.describe('Rate Limiting (SEC-06)', () => {
     const wrongPassword = 'wrongpassword';
     for (let i = 0; i < 5; i++) {
       await request.post('/api/auth/signin', {
-        form: { email, password: wrongPassword },
+        form: { email, password: wrongPassword, 'cf-turnstile-response': TURNSTILE_TEST_TOKEN },
         headers: { Origin: ORIGIN },
       });
     }
     const blocked = await request.post('/api/auth/signin', {
-      form: { email, password: wrongPassword },
+      form: { email, password: wrongPassword, 'cf-turnstile-response': TURNSTILE_TEST_TOKEN },
       headers: { Origin: ORIGIN },
     });
     expect(blocked.status()).toBe(429);
@@ -137,6 +130,7 @@ test.describe('Rate Limiting (SEC-06)', () => {
           email: `ratelimit-signup-${i}-${ts}@fake.local`,
           password: 'TestPassword123!',
           confirmPassword: 'TestPassword123!',
+          'cf-turnstile-response': TURNSTILE_TEST_TOKEN,
         },
         headers: { Origin: ORIGIN },
       });
@@ -146,6 +140,7 @@ test.describe('Rate Limiting (SEC-06)', () => {
         email: `ratelimit-signup-3-${ts}@fake.local`,
         password: 'TestPassword123!',
         confirmPassword: 'TestPassword123!',
+        'cf-turnstile-response': TURNSTILE_TEST_TOKEN,
       },
       headers: { Origin: ORIGIN },
     });
@@ -275,7 +270,7 @@ test.describe('Phase 17: Public Endpoint Security', () => {
     for (let i = 0; i < 5; i++) {
       const res = await request.post('/api/bug-reports', {
         multipart: {
-          'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX',
+          'cf-turnstile-response': TURNSTILE_TEST_TOKEN,
           description: `bug report number ${i} with enough characters to pass length check`,
           category: 'bug',
         },
@@ -287,7 +282,7 @@ test.describe('Phase 17: Public Endpoint Security', () => {
     // 6th attempt — must be 429
     const sixth = await request.post('/api/bug-reports', {
       multipart: {
-        'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX',
+        'cf-turnstile-response': TURNSTILE_TEST_TOKEN,
         description: 'sixth attempt should be rate-limited',
         category: 'bug',
       },
@@ -422,7 +417,7 @@ test.describe('Phase 21: Rate Limit Headers', () => {
           email: 'test@example.com',
           category: 'general',
           message: 'Phase 21 header test message',
-          'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX',
+          'cf-turnstile-response': TURNSTILE_TEST_TOKEN,
         },
         headers: { Origin: BASE_URL },
       });
@@ -434,7 +429,7 @@ test.describe('Phase 21: Rate Limit Headers', () => {
         email: 'test@example.com',
         category: 'general',
         message: 'Phase 21 header test message fourth',
-        'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX',
+        'cf-turnstile-response': TURNSTILE_TEST_TOKEN,
       },
       headers: { Origin: BASE_URL },
     });
@@ -461,7 +456,7 @@ test.describe('Phase 21: Rate Limit Headers', () => {
   test('SEC-08: POST /api/bug-reports under limit returns x-ratelimit-limit=5 and x-ratelimit-remaining on success', async ({ request }) => {
     const res = await request.post('/api/bug-reports', {
       multipart: {
-        'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX',
+        'cf-turnstile-response': TURNSTILE_TEST_TOKEN,
         description: 'Phase 21 header test bug report with enough characters to pass length check',
         category: 'bug',
       },

@@ -1,11 +1,6 @@
 import { test, expect } from './fixtures';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
+import { executeLocalD1, TURNSTILE_TEST_TOKEN } from './test-harness';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const PROJECT_ROOT = path.resolve(__dirname, '..');
 const BASE_URL = process.env.BASE_URL || 'http://localhost:8788';
 
 // ─── Phase 20 reservations ──────────────────────────────────────────────────
@@ -25,14 +20,10 @@ const TEST_BUILDING_SLUG = 'test-cross-view-consistency';
 function cleanupPhase20Reviews(): void {
   // Find any reviews for the test building and delete their audit_logs first,
   // then the reviews themselves. Uses subquery to avoid needing IDs upfront.
-  execSync(
-    `npx wrangler d1 execute ratemyplace-db --local --command "DELETE FROM audit_logs WHERE entity_id IN (SELECT id FROM reviews WHERE building_id = 'building-e2e-01')"`,
-    { cwd: PROJECT_ROOT, stdio: 'pipe' }
+  executeLocalD1(
+    "DELETE FROM audit_logs WHERE entity_id IN (SELECT id FROM reviews WHERE building_id = 'building-e2e-01')"
   );
-  execSync(
-    `npx wrangler d1 execute ratemyplace-db --local --command "DELETE FROM reviews WHERE building_id = 'building-e2e-01'"`,
-    { cwd: PROJECT_ROOT, stdio: 'pipe' }
-  );
+  executeLocalD1("DELETE FROM reviews WHERE building_id = 'building-e2e-01'");
 }
 
 /**
@@ -42,10 +33,7 @@ function cleanupPhase20Reviews(): void {
  */
 function countAuditLogEntries(reviewId: string, actionType: string): number {
   const sql = `SELECT COUNT(*) as c FROM audit_logs WHERE entity_id = '${reviewId}' AND action_type = '${actionType}'`;
-  const raw = execSync(
-    `npx wrangler d1 execute ratemyplace-db --local --command "${sql}" --json`,
-    { cwd: PROJECT_ROOT, encoding: 'utf8', stdio: 'pipe' }
-  );
+  const raw = executeLocalD1(sql);
   const parsed = JSON.parse(raw);
   return parsed[0].results[0].c as number;
 }
@@ -54,7 +42,7 @@ function countAuditLogEntries(reviewId: string, actionType: string): number {
  * Submit a review via POST /api/reviews using the authed user's session.
  * Returns the generated reviewId from the response body.
  * Posts minimal-but-valid form data: required building_id, all 27 score fields
- * set to 4, and the dummy Turnstile token (verify fails open in local dev).
+ * set to 4, and Cloudflare's documented always-pass Turnstile test token.
  */
 async function submitReviewAsAuthedUser(
   authedPage: import('@playwright/test').Page,
@@ -75,7 +63,7 @@ async function submitReviewAsAuthedUser(
     'landlord_fee_transparency', 'landlord_safety_response',
   ];
   const formFields: Record<string, string> = {
-    'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX',
+    'cf-turnstile-response': TURNSTILE_TEST_TOKEN,
     building_id: buildingId,
     bedrooms: '1',
     bathrooms: '1',
@@ -128,16 +116,12 @@ test.describe('Phase 20: Critical Flows', () => {
     await adminPage.goto('/admin/reviews?status=pending');
     await adminPage.waitForLoadState('networkidle');
 
-    // Scope to the outer card container (bg-white rounded-xl) which contains both
-    // the header (cursor-pointer) and the expanded details panel with the Approve button.
-    // Use .first() for strict mode safety if multiple test reviews exist (e.g., from
-    // a previous run's afterEach failure). The beforeEach cleanup handles stale reviews,
-    // but .first() prevents strict-mode errors if a race leaves extras.
-    const reviewCard = adminPage.locator('.bg-white.rounded-xl', { hasText: TEST_BUILDING_ADDRESS }).first();
-    await expect(reviewCard).toBeVisible({ timeout: 10000 });
+    // Select the review's semantic header, then scope actions to its parent card.
+    const reviewHeader = adminPage.locator('.cursor-pointer', { hasText: TEST_BUILDING_ADDRESS }).first();
+    await expect(reviewHeader).toBeVisible({ timeout: 10000 });
+    const reviewCard = reviewHeader.locator('..');
 
-    // Click the cursor-pointer header to expand the card and load full review details.
-    const reviewHeader = reviewCard.locator('.cursor-pointer').first();
+    // Expand the card and load full review details.
     await reviewHeader.click();
 
     // Wait for the Approve button to be visible inside the expanded card before clicking.
@@ -198,10 +182,9 @@ test.describe('Phase 20: Critical Flows', () => {
     await adminPage.goto('/admin/reviews?status=pending');
     await adminPage.waitForLoadState('networkidle');
 
-    const reviewCard = adminPage.locator('.bg-white.rounded-xl', { hasText: TEST_BUILDING_ADDRESS }).first();
-    await expect(reviewCard).toBeVisible({ timeout: 10000 });
-
-    const reviewHeader = reviewCard.locator('.cursor-pointer').first();
+    const reviewHeader = adminPage.locator('.cursor-pointer', { hasText: TEST_BUILDING_ADDRESS }).first();
+    await expect(reviewHeader).toBeVisible({ timeout: 10000 });
+    const reviewCard = reviewHeader.locator('..');
     await reviewHeader.click();
 
     const approveButton = reviewCard.locator('button', { hasText: 'Approve' }).first();
@@ -242,8 +225,11 @@ test.describe('Phase 20: Critical Flows', () => {
     //    the path for building-e2e-01 (no pre-seeded building_scores row).
     await authedPage.goto(`/building/${TEST_BUILDING_SLUG}`);
     await authedPage.waitForLoadState('networkidle');
-    const detailScoreText = await authedPage
-      .locator('.text-4xl.font-bold.text-teal-600')
+    const detailReviewCount = authedPage.getByText(/\d+\s+reviews?/).first();
+    await expect(detailReviewCount).toBeVisible({ timeout: 10000 });
+    const detailScoreText = await detailReviewCount
+      .locator('..')
+      .locator(':scope > div')
       .first()
       .textContent();
     expect(detailScoreText, 'Detail page must render score').toBeTruthy();
