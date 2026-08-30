@@ -6,7 +6,7 @@ import { test, expect } from './fixtures';
 test.describe('Admin Page Navigation', () => {
   test('admin navigation bar contains all page links', async ({ adminPage }) => {
     await adminPage.goto('/admin');
-    await expect(adminPage.locator('h1')).toContainText('Dashboard Overview');
+    await expect(adminPage.locator('h1')).toContainText('Dashboard overview');
 
     // Assert all 9 nav links are present
     await expect(adminPage.locator('nav a[href="/admin"]').first()).toBeVisible();
@@ -27,24 +27,24 @@ test.describe('Admin Dashboard', () => {
     await adminPage.goto('/admin');
 
     // Heading
-    await expect(adminPage.locator('h1')).toContainText('Dashboard Overview');
+    await expect(adminPage.locator('h1')).toContainText('Dashboard overview');
 
     // Stats card labels
-    await expect(adminPage.locator('text=Total Users')).toBeVisible();
-    await expect(adminPage.locator('text=Total Reviews')).toBeVisible();
+    await expect(adminPage.locator('text=Total users')).toBeVisible();
+    await expect(adminPage.locator('text=Total reviews')).toBeVisible();
     await expect(adminPage.locator('p.text-sm.font-medium', { hasText: 'Buildings' })).toBeVisible();
     await expect(adminPage.locator('text=Verifications')).toBeVisible();
 
     // Section headings on dashboard
-    await expect(adminPage.locator('text=Review Status Breakdown')).toBeVisible();
-    await expect(adminPage.locator('text=Recent Reviews')).toBeVisible();
+    await expect(adminPage.locator('text=Review status breakdown')).toBeVisible();
+    await expect(adminPage.locator('text=Recent reviews')).toBeVisible();
   });
 });
 
 test.describe('Admin Pages Render', () => {
   test('users page renders', async ({ adminPage }) => {
     await adminPage.goto('/admin/users');
-    await expect(adminPage.locator('h1')).toContainText('User Management');
+    await expect(adminPage.locator('h1')).toContainText('Users');
     await adminPage.waitForLoadState('networkidle');
     // React island rendered — table or content should be present
     await expect(adminPage.locator('h1')).toBeVisible();
@@ -52,7 +52,7 @@ test.describe('Admin Pages Render', () => {
 
   test('reviews page renders', async ({ adminPage }) => {
     await adminPage.goto('/admin/reviews');
-    await expect(adminPage.locator('h1')).toContainText('Review Management');
+    await expect(adminPage.locator('h1')).toContainText('Reviews');
     await adminPage.waitForLoadState('networkidle');
     // Status filter buttons should be visible after React island loads
     await expect(adminPage.locator('button').filter({ hasText: /All \(/ })).toBeVisible();
@@ -60,35 +60,35 @@ test.describe('Admin Pages Render', () => {
 
   test('buildings page renders', async ({ adminPage }) => {
     await adminPage.goto('/admin/buildings');
-    await expect(adminPage.locator('h1')).toContainText('Building Management');
+    await expect(adminPage.locator('h1')).toContainText('Buildings');
     await adminPage.waitForLoadState('networkidle');
     await expect(adminPage.locator('h1')).toBeVisible();
   });
 
   test('landlords page renders', async ({ adminPage }) => {
     await adminPage.goto('/admin/landlords');
-    await expect(adminPage.locator('h1')).toContainText('Landlord Management');
+    await expect(adminPage.locator('h1')).toContainText('Landlords');
     await adminPage.waitForLoadState('networkidle');
     await expect(adminPage.locator('h1')).toBeVisible();
   });
 
   test('managers page renders', async ({ adminPage }) => {
     await adminPage.goto('/admin/managers');
-    await expect(adminPage.locator('h1')).toContainText('Property Manager Management');
+    await expect(adminPage.locator('h1')).toContainText('Property managers');
     await adminPage.waitForLoadState('networkidle');
     await expect(adminPage.locator('h1')).toBeVisible();
   });
 
   test('verification page renders', async ({ adminPage }) => {
     await adminPage.goto('/admin/verify');
-    await expect(adminPage.locator('h1')).toContainText('Verification Queue');
+    await expect(adminPage.locator('h1')).toContainText('Verification');
     await adminPage.waitForLoadState('networkidle');
     await expect(adminPage.locator('h1')).toBeVisible();
   });
 
   test('disputes page renders', async ({ adminPage }) => {
     await adminPage.goto('/admin/disputes');
-    await expect(adminPage.locator('h1')).toContainText('Dispute Queue');
+    await expect(adminPage.locator('h1')).toContainText('Disputes');
     await adminPage.waitForLoadState('networkidle');
     // Filter buttons: Pending, Resolved, All
     const pendingBtn = adminPage.locator('button').filter({ hasText: 'Pending' });
@@ -103,7 +103,7 @@ test.describe('Admin Pages Render', () => {
 
   test('audit page renders', async ({ adminPage }) => {
     await adminPage.goto('/admin/audit');
-    await expect(adminPage.locator('h1')).toContainText('Audit Log');
+    await expect(adminPage.locator('h1')).toContainText('Audit log');
     await adminPage.waitForLoadState('networkidle');
     // Either audit log table thead is visible or "No audit logs found" message appears
     const hasTable = await adminPage.locator('table thead').count();
@@ -116,8 +116,8 @@ test.describe('Admin Access Control', () => {
   test('non-admin user is redirected from admin pages', async ({ authedPage }) => {
     // SSR redirect — use waitUntil: 'commit' so Playwright resolves when the 302 is sent
     await authedPage.goto('/admin', { waitUntil: 'commit' });
-    // Dashboard Overview heading must NOT be visible — user was redirected
-    await expect(authedPage.locator('h1').filter({ hasText: 'Dashboard Overview' })).not.toBeVisible();
+    // Dashboard overview heading must NOT be visible — user was redirected
+    await expect(authedPage.locator('h1').filter({ hasText: 'Dashboard overview' })).not.toBeVisible();
   });
 
   test('unauthenticated user is redirected to signin', async ({ page }) => {
@@ -127,7 +127,7 @@ test.describe('Admin Access Control', () => {
     const isOnAdmin = page.url().includes('/admin') && !page.url().includes('/auth');
     if (isOnAdmin) {
       // Verify no admin dashboard content is accessible
-      await expect(page.locator('h1').filter({ hasText: 'Dashboard Overview' })).not.toBeVisible();
+      await expect(page.locator('h1').filter({ hasText: 'Dashboard overview' })).not.toBeVisible();
     } else {
       await expect(page).toHaveURL(/auth\/signin/);
     }

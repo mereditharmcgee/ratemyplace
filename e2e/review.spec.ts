@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { test, expect } from './fixtures';
+import { installTurnstileStub } from './test-harness';
 
 // Derive Page type from the fixture to avoid importing from @playwright/test directly
 type Page = Parameters<Parameters<typeof test>[1]>[0]['authedPage'];
@@ -246,6 +247,10 @@ test.describe('Concurrent Submissions', () => {
     ]);
     const page1 = await ctx1.newPage();
     const page2 = await ctx2.newPage();
+    await Promise.all([
+      installTurnstileStub(page1),
+      installTurnstileStub(page2),
+    ]);
 
     // Helper to navigate through all review steps up to (but not including) the Submit click
     async function fillReviewToSubmit(page: Page) {

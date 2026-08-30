@@ -1,7 +1,7 @@
 import { test as base, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
+import { executeLocalD1, installTurnstileStub } from './test-harness';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,11 +15,16 @@ type CustomFixtures = {
 };
 
 export const test = base.extend<CustomFixtures>({
+  page: async ({ page }, use) => {
+    await installTurnstileStub(page);
+    await use(page);
+  },
   authedPage: async ({ browser }, use) => {
     const context = await browser.newContext({
       storageState: USER_AUTH_FILE,
     });
     const page = await context.newPage();
+    await installTurnstileStub(page);
     await use(page);
     await context.close();
   },
@@ -28,6 +33,7 @@ export const test = base.extend<CustomFixtures>({
       storageState: ADMIN_AUTH_FILE,
     });
     const page = await context.newPage();
+    await installTurnstileStub(page);
     await use(page);
     await context.close();
   },
@@ -43,8 +49,5 @@ export { expect };
  * Always operates on --local (no params); remote support is YAGNI.
  */
 export function clearRateLimits(): void {
-  execSync(
-    'npx wrangler d1 execute ratemyplace-db --local --command "DELETE FROM rate_limits"',
-    { cwd: path.resolve(__dirname, '..'), stdio: 'pipe' }
-  );
+  executeLocalD1('DELETE FROM rate_limits');
 }
