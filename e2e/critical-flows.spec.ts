@@ -1,7 +1,11 @@
 import { test, expect } from './fixtures';
-import { executeLocalD1, TURNSTILE_TEST_TOKEN } from './test-harness';
+import {
+  executeLocalD1,
+  resolveLocalE2EBaseURL,
+  TURNSTILE_TEST_TOKEN,
+} from './test-harness';
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:8788';
+const BASE_URL = resolveLocalE2EBaseURL();
 
 // ─── Phase 20 reservations ──────────────────────────────────────────────────
 // Test-only building: building-e2e-01 (slug test-cross-view-consistency, addr "999 E2E Test Way").

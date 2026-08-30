@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
-import { buildLocalPagesCommand, resolveLocalE2EBaseURL } from './e2e/test-harness';
+import { buildLocalPagesCommand, validateLocalE2EEnvironment } from './e2e/test-harness';
 
-const baseURL = resolveLocalE2EBaseURL();
+const baseURL = validateLocalE2EEnvironment();
 
 export default defineConfig({
   testDir: './e2e',

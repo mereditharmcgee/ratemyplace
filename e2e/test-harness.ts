@@ -15,6 +15,12 @@ const TURNSTILE_SCRIPT = /^https:\/\/challenges\.cloudflare\.com\/turnstile\/v0\
 export const TURNSTILE_TEST_TOKEN = 'XXXX.DUMMY.TOKEN.XXXX';
 const LOCAL_E2E_ORIGIN = 'http://localhost:8788';
 
+export interface LocalE2EEnvironment {
+  BASE_URL?: string;
+  D1_REMOTE?: string;
+  SEED_REVIEWS_ONLY?: string;
+}
+
 export function resolveLocalE2EBaseURL(configuredBaseURL = process.env.BASE_URL): string {
   const candidate = configuredBaseURL ?? LOCAL_E2E_ORIGIN;
   let parsed: URL;
@@ -41,6 +47,23 @@ export function resolveLocalE2EBaseURL(configuredBaseURL = process.env.BASE_URL)
   }
 
   return LOCAL_E2E_ORIGIN;
+}
+
+export function validateLocalE2EEnvironment(
+  environment: LocalE2EEnvironment = process.env
+): string {
+  const baseURL = resolveLocalE2EBaseURL(environment.BASE_URL);
+  const unsafeFlags = ['D1_REMOTE', 'SEED_REVIEWS_ONLY'] as const;
+
+  for (const flag of unsafeFlags) {
+    if (environment[flag] !== undefined) {
+      throw new Error(
+        `[E2E safety] Refusing to run with ${flag} set. Unset it before running local E2E tests.`
+      );
+    }
+  }
+
+  return baseURL;
 }
 
 // Cloudflare documents this token for automated tests. The matching public

@@ -1,7 +1,11 @@
 import { test, expect, clearRateLimits } from './fixtures';
-import { executeLocalD1, TURNSTILE_TEST_TOKEN } from './test-harness';
+import {
+  executeLocalD1,
+  resolveLocalE2EBaseURL,
+  TURNSTILE_TEST_TOKEN,
+} from './test-harness';
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:8788';
+const BASE_URL = resolveLocalE2EBaseURL();
 
 // Remove any disputes created by previous security test runs for the reserved review IDs.
 // This makes injection/XSS tests re-runnable without a full db:setup.
