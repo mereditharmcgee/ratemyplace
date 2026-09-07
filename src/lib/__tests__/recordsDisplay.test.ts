@@ -78,19 +78,27 @@ describe('showMailingAddress', () => {
     expect(showMailingAddress('KELLEHER FAMILY LP MASS LP')).toBe(true);
   });
 
+  it('returns true for a condo trust owner spelled with a bare TR suffix', () => {
+    expect(showMailingAddress('GRAND LANARK CONDO TR')).toBe(true);
+  });
+
+  it('returns true for a realty trust owner', () => {
+    expect(showMailingAddress('LANARK ROAD REALTY TRUST')).toBe(true);
+  });
+
   it('returns false for an individual owner', () => {
     expect(showMailingAddress('PASCUCCI CARLO')).toBe(false);
   });
 
-  // NOTE: inferOwnerEntity (src/lib/enrichment/helpers.ts) only recognizes 'TRUST',
-  // 'TRUSTEE', or 'TRSTEE' as trust indicators, not a bare 'TR' suffix. A condo-trust
-  // owner spelled with just "TR" therefore falls through to 'individual' in the current
-  // helper, so showMailingAddress is false here even though the name reads as an entity.
-  // Flagging this as a possible gap in inferOwnerEntity rather than working around it,
-  // since that file is out of scope for this task.
-  it('returns false for a condo trust owner spelled with a bare TR suffix (current inferOwnerEntity limitation)', () => {
-    expect(showMailingAddress('GRAND LANARK CONDO TR')).toBe(false);
-  });
+  // The privacy failure this gate exists to prevent: a substring test for entity tokens
+  // matches INC inside PRINCE, LP inside no surname here but CORP inside CORPUS, and
+  // would publish a private individual's home address as a "business" mailing address.
+  it.each(['PRINCE JOHN P', 'VINCENT MARIA', 'HINCKLEY SARAH', 'CORPUS DANIEL'])(
+    'returns false for %s, whose name merely contains an entity token',
+    (owner) => {
+      expect(showMailingAddress(owner)).toBe(false);
+    },
+  );
 });
 
 describe('formatDollars', () => {
@@ -100,6 +108,11 @@ describe('formatDollars', () => {
 
   it('returns "Not recorded" for null', () => {
     expect(formatDollars(null)).toBe('Not recorded');
+  });
+
+  it('returns "Not recorded" for a non-finite number', () => {
+    expect(formatDollars(Number.NaN)).toBe('Not recorded');
+    expect(formatDollars(Number.POSITIVE_INFINITY)).toBe('Not recorded');
   });
 });
 
@@ -126,18 +139,30 @@ describe('formatRecordDate', () => {
 });
 
 describe('permitSummary', () => {
-  it('counts permits, sums declared valuation treating null as 0, and finds earliest/latest issued dates', () => {
+  it('counts permits, sums only the declared valuations present, and finds earliest/latest issued dates', () => {
     const permits = [
       permit({ permitNumber: 'A', declaredValuation: 1000, issuedDate: '2020-01-01' }),
       permit({ permitNumber: 'B', declaredValuation: null, issuedDate: '2022-06-15' }),
       permit({ permitNumber: 'C', declaredValuation: 500, issuedDate: null }),
     ];
 
-    expect(permitSummary(permits)).toEqual({ count: 3, declaredTotal: 1500, earliest: '2020-01-01', latest: '2022-06-15' });
+    expect(permitSummary(permits)).toEqual({
+      count: 3,
+      declaredTotal: 1500,
+      declaredCount: 2,
+      earliest: '2020-01-01',
+      latest: '2022-06-15',
+    });
   });
 
-  it('returns zeros and nulls for an empty list', () => {
-    expect(permitSummary([])).toEqual({ count: 0, declaredTotal: 0, earliest: null, latest: null });
+  it('reports a null total when no permit carried a declared valuation', () => {
+    const permits = [permit({ permitNumber: 'A' }), permit({ permitNumber: 'B' })];
+
+    expect(permitSummary(permits)).toMatchObject({ count: 2, declaredTotal: null, declaredCount: 0 });
+  });
+
+  it('returns a null total and null dates for an empty list', () => {
+    expect(permitSummary([])).toEqual({ count: 0, declaredTotal: null, declaredCount: 0, earliest: null, latest: null });
   });
 });
 
@@ -180,6 +205,22 @@ describe('rentSmartDisagreement', () => {
     expect(rentSmartDisagreement(rows, 1)).toBe(
       "The city's RentSmart summary reports 2 housing complaints for this address; the 311 records above show 1.",
     );
+  });
+
+  it('writes the singular noun for a single complaint', () => {
+    const rows = [rentSmartRow({ violationType: 'Housing Complaints' })];
+    expect(rentSmartDisagreement(rows, 0)).toBe(
+      "The city's RentSmart summary reports 1 housing complaint for this address; the 311 records above show 0.",
+    );
+  });
+
+  it('matches the violation type regardless of case and surrounding whitespace', () => {
+    const rows = [rentSmartRow({ violationType: '  housing complaints ' })];
+    expect(rentSmartDisagreement(rows, 0)).toContain('reports 1 housing complaint ');
+  });
+
+  it('stays silent when the RentSmart roll-up lags the 311 records', () => {
+    expect(rentSmartDisagreement([rentSmartRow({ violationType: 'Housing Complaints' })], 4)).toBeNull();
   });
 
   it('returns null for an empty RentSmart list', () => {

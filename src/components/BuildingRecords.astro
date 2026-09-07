@@ -203,7 +203,14 @@ const listClass = 'divide-y divide-gray-100 text-sm mt-2';
             {permits!.count} permit{permits!.count === 1 ? '' : 's'} on record from {PERMIT_COVERAGE_START}
             {permits!.earliest && permits!.latest && (
               <span> (earliest {formatRecordDate(permits!.earliest)}, latest {formatRecordDate(permits!.latest)})</span>
-            )}. Total declared valuation {formatDollars(permits!.declaredTotal)}.
+            )}.{' '}
+            {permits!.declaredTotal === null ? (
+              'No declared valuation recorded.'
+            ) : (
+              <>Total declared valuation {formatDollars(permits!.declaredTotal)}{permits!.declaredCount < permits!.count
+                ? ` (recorded for ${permits!.declaredCount} of ${permits!.count} permits)`
+                : ''}.</>
+            )}
           </p>
           <p class="text-xs text-gray-500 mt-1">{DECLARED_VALUATION_CAVEAT}</p>
           <ul class={listClass}>

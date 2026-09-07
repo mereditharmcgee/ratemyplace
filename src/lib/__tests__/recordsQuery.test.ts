@@ -70,11 +70,12 @@ async function insertPullRow(db: TestD1Database, overrides: PullRowOverrides): P
 
 async function insertBuildingRecord(
   db: TestD1Database,
-  args: { buildingId: string; pullId: string; kind: string; sourceKey: string; payload: unknown },
+  args: { buildingId: string; pullId: string; kind: string; sourceKey: string; payload?: unknown; rawPayload?: string },
 ): Promise<void> {
+  const payload = args.rawPayload ?? JSON.stringify(args.payload);
   await db
     .prepare('INSERT INTO building_records (id, building_id, pull_id, kind, source_key, payload, source_url) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .bind(randomUUID(), args.buildingId, args.pullId, args.kind, args.sourceKey, JSON.stringify(args.payload), null)
+    .bind(randomUUID(), args.buildingId, args.pullId, args.kind, args.sourceKey, payload, null)
     .run();
 }
 
@@ -148,12 +149,57 @@ suite('getBuildingRecords', () => {
     const buildingId = await insertBuilding(db);
     const pullId = await insertPullRow(db, { buildingId, sourceId: PERMITS_RESOURCE_ID, sourceLabel: 'Approved Building Permits' });
     await insertBuildingRecord(db, { buildingId, pullId, kind: 'permit', sourceKey: 'bad-1', payload: { nope: true } });
+    await insertBuildingRecord(db, {
+      buildingId,
+      pullId,
+      kind: 'permit',
+      sourceKey: 'good-1',
+      payload: { permitNumber: 'P-OK', issuedDate: '2020-01-01' },
+    });
+
+    const view = await getBuildingRecords(db, buildingId);
+
+    expect(view).not.toBeNull();
+    expect(view!.permits).toHaveLength(1);
+    expect(view!.permits[0].permitNumber).toBe('P-OK');
+    expect(view!.invalidKinds).toEqual(['permit']);
+  });
+
+  it('marks a kind invalid when its stored payload is not parseable JSON', async () => {
+    const db = await createDbWithAdmin();
+    const buildingId = await insertBuilding(db);
+    const pullId = await insertPullRow(db, { buildingId, sourceId: PERMITS_RESOURCE_ID, sourceLabel: 'Approved Building Permits' });
+    await insertBuildingRecord(db, { buildingId, pullId, kind: 'permit', sourceKey: 'torn-1', rawPayload: '{not json' });
 
     const view = await getBuildingRecords(db, buildingId);
 
     expect(view).not.toBeNull();
     expect(view!.permits).toEqual([]);
     expect(view!.invalidKinds).toEqual(['permit']);
+  });
+
+  it('breaks a tie on issued date with the permit number, whatever order the rows came back in', async () => {
+    const db = await createDbWithAdmin();
+    const buildingId = await insertBuilding(db);
+    const pullId = await insertPullRow(db, { buildingId, sourceId: PERMITS_RESOURCE_ID, sourceLabel: 'Approved Building Permits' });
+    await insertBuildingRecord(db, {
+      buildingId,
+      pullId,
+      kind: 'permit',
+      sourceKey: 'z-first',
+      payload: { permitNumber: 'B-2', issuedDate: '2021-05-05' },
+    });
+    await insertBuildingRecord(db, {
+      buildingId,
+      pullId,
+      kind: 'permit',
+      sourceKey: 'a-second',
+      payload: { permitNumber: 'A-1', issuedDate: '2021-05-05' },
+    });
+
+    const view = await getBuildingRecords(db, buildingId);
+
+    expect(view!.permits.map((p) => p.permitNumber)).toEqual(['A-1', 'B-2']);
   });
 
   it('surfaces only resolved source_mismatch_noted corrections that carry notes', async () => {
@@ -220,6 +266,27 @@ suite('getBuildingRecords', () => {
 
     it('rejects a permit payload missing permitNumber', () => {
       expect(validatePayload('permit', { nope: true })).toBeNull();
+    });
+
+    it('accepts a valid permit payload', () => {
+      expect(validatePayload('permit', { permitNumber: 'P1', issuedDate: '2020-01-01', declaredValuation: 1000 })).not.toBeNull();
+    });
+
+    it('rejects a permit payload whose declared valuation is not a number', () => {
+      expect(validatePayload('permit', { permitNumber: 'P1', declaredValuation: 'abc' })).toBeNull();
+    });
+
+    it('rejects a permit payload whose issued date is not a string', () => {
+      expect(validatePayload('permit', { permitNumber: 'P1', issuedDate: 5 })).toBeNull();
+    });
+
+    it('rejects an assessment payload whose total value is not a finite number', () => {
+      expect(validatePayload('assessment', { fiscalYear: 'FY2026', condominium: false, totalValue: '600000' })).toBeNull();
+      expect(validatePayload('assessment', { fiscalYear: 'FY2026', condominium: false, totalValue: Number.NaN })).toBeNull();
+    });
+
+    it('rejects a service_request payload whose system is not one of the two feeds', () => {
+      expect(validatePayload('service_request', { caseId: 'C1', system: 'other', classification: 'housing' })).toBeNull();
     });
 
     it('accepts a valid service_request payload', () => {

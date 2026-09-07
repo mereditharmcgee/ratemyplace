@@ -6,7 +6,6 @@
 // field from a record or a count of records. BANNED_WORDS is the guardrail a test
 // enforces against every exported copy constant so a future edit cannot smuggle in an
 // editorial reading of the data.
-import { inferOwnerEntity } from '../enrichment/helpers';
 import { PERMIT_COVERAGE_START } from './sources/boston/permits';
 import type { PermitPayload, RentSmartPayload, ServiceRequestPayload } from './types';
 
@@ -36,14 +35,17 @@ export const OTHER_REQUESTS_COPY =
 export const CONDOMINIUM_COPY =
   'This building is divided into individually owned condominium units. No single owner of record is shown.';
 
+/** Word-boundary entity tokens. A bare substring test (INC in PRINCE) would publish an individual's home address. */
+const ENTITY_TOKEN = /\b(LLC|L\.L\.C|INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|TRUST|TRUSTEE|TRUSTEES|TRSTEE|TRSTEES|TR|TRS|LP|L\.P|LLP|LLLP|PARTNERSHIP|PARTNERS|REIT|REALTY|ASSOC|ASSOCIATES|ASSOCIATION|CONDOMINIUM|CONDO|AUTHORITY|COMMONWEALTH|CITY OF|HOUSING|DEVELOPMENT|HOLDINGS|PROPERTIES|GROUP|FUND|BANK|CHURCH|UNIVERSITY|COLLEGE|HOSPITAL)\b/;
+
 /** No mailing address for an individual owner: it would be a home address, not a business one. */
 export function showMailingAddress(owner: string | null): boolean {
-  if (owner === null) return false;
-  return inferOwnerEntity(owner) !== 'individual';
+  if (!owner) return false;
+  return ENTITY_TOKEN.test(owner.toUpperCase().replace(/[.,]/g, ' '));
 }
 
 export function formatDollars(value: number | null): string {
-  if (value === null) return 'Not recorded';
+  if (value === null || !Number.isFinite(value)) return 'Not recorded';
   return `$${Math.round(value).toLocaleString('en-US')}`;
 }
 
@@ -72,39 +74,58 @@ export function formatRecordDate(value: string | null): string {
 
 export interface PermitSummary {
   count: number;
-  declaredTotal: number;
+  /** Sum of the permits that carried a declared valuation; null when none did. A missing figure is not $0. */
+  declaredTotal: number | null;
+  /** How many of `count` permits carried a declared valuation. */
+  declaredCount: number;
   earliest: string | null;
   latest: string | null;
 }
 
 export function permitSummary(permits: PermitPayload[]): PermitSummary {
-  let declaredTotal = 0;
+  let declaredTotal: number | null = null;
+  let declaredCount = 0;
   let earliest: string | null = null;
   let latest: string | null = null;
   for (const permit of permits) {
-    declaredTotal += permit.declaredValuation ?? 0;
+    if (typeof permit.declaredValuation === 'number' && Number.isFinite(permit.declaredValuation)) {
+      declaredTotal = (declaredTotal ?? 0) + permit.declaredValuation;
+      declaredCount += 1;
+    }
     if (permit.issuedDate) {
       if (earliest === null || permit.issuedDate < earliest) earliest = permit.issuedDate;
       if (latest === null || permit.issuedDate > latest) latest = permit.issuedDate;
     }
   }
-  return { count: permits.length, declaredTotal, earliest, latest };
+  return { count: permits.length, declaredTotal, declaredCount, earliest, latest };
 }
 
 export function splitServiceRequests(
   rows: ServiceRequestPayload[],
 ): { housing: ServiceRequestPayload[]; otherCount: number } {
+  // Plain string comparison, not localeCompare: these are ISO-ish date strings, and
+  // locale collation would make the order depend on the runtime's ICU data.
   const housing = rows
     .filter((row) => row.classification === 'housing')
-    .sort((a, b) => (b.openedAt ?? '').localeCompare(a.openedAt ?? ''));
+    .sort((a, b) => {
+      const left = a.openedAt ?? '';
+      const right = b.openedAt ?? '';
+      return left < right ? 1 : left > right ? -1 : 0;
+    });
   const otherCount = rows.filter((row) => row.classification === 'other').length;
   return { housing, otherCount };
 }
 
+/**
+ * One-directional by design. RentSmart is a periodic roll-up of the same city data, so it
+ * lagging the raw 311 feed is expected and unremarkable; only an excess — the roll-up
+ * claiming more housing complaints than the records above show — is worth a note.
+ */
 export function rentSmartDisagreement(rows: RentSmartPayload[], housingRequestCount: number): string | null {
-  const complaintCount = rows.filter((row) => row.violationType === 'Housing Complaints').length;
-  if (complaintCount > housingRequestCount) {
-    return `The city's RentSmart summary reports ${complaintCount} housing complaints for this address; the 311 records above show ${housingRequestCount}.`;
-  }
-  return null;
+  const complaintCount = rows.filter(
+    (row) => (row.violationType ?? '').trim().toLowerCase() === 'housing complaints',
+  ).length;
+  if (complaintCount <= housingRequestCount) return null;
+  const noun = complaintCount === 1 ? 'housing complaint' : 'housing complaints';
+  return `The city's RentSmart summary reports ${complaintCount} ${noun} for this address; the 311 records above show ${housingRequestCount}.`;
 }

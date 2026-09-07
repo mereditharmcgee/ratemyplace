@@ -4,14 +4,13 @@
 // below, so nothing here assumes a stored row still matches its current TypeScript type
 // (a source's mapping can change after rows were written).
 import { logError } from '../logger';
-import { sourcesForCity } from './jurisdictions';
-import { ASSESSOR_PAGE_URL } from './sources/boston/assessor';
+import { sourcesForCity, type Jurisdiction } from './jurisdictions';
 import type {
   AssessmentPayload,
   EnforcementTicketPayload,
+  PayloadByKind,
   PermitPayload,
   RecordKind,
-  RecordPayload,
   RecordsDb,
   RentSmartPayload,
   ServiceRequestPayload,
@@ -21,7 +20,8 @@ import type {
 export interface SourceStatus {
   sourceId: string;
   label: string;
-  pageUrl: string;
+  /** null when the stored source id is not one this build knows about, so no link is rendered. */
+  pageUrl: string | null;
   status: 'ok' | 'empty' | 'error';
   retrievedAt: number;
   errorMessage: string | null;
@@ -49,62 +49,101 @@ export interface BuildingRecordsView {
   corrections: CorrectionNote[];
 }
 
-/** Every source's dataset page, keyed by source id (CKAN resource id). Built lazily, once. */
-let pageUrlBySourceId: Map<string, string> | null = null;
+/** Dataset pages keyed by source id (CKAN resource id), one map per jurisdiction. Built lazily, once each. */
+const pageUrlsByJurisdiction = new Map<Jurisdiction, Map<string, string>>();
 
-function pageUrlForSource(sourceId: string): string {
-  if (!pageUrlBySourceId) {
-    pageUrlBySourceId = new Map(sourcesForCity('Boston').map((source) => [source.id, source.pageUrl]));
+function pageUrlForSource(jurisdiction: Jurisdiction, sourceId: string): string | null {
+  let byId = pageUrlsByJurisdiction.get(jurisdiction);
+  if (!byId) {
+    byId = new Map(sourcesForCity(jurisdiction).map((source) => [source.id, source.pageUrl]));
+    pageUrlsByJurisdiction.set(jurisdiction, byId);
   }
-  return pageUrlBySourceId.get(sourceId) ?? ASSESSOR_PAGE_URL;
+  // No fallback: citing the assessor's dataset page for a permits row would be a wrong citation.
+  return byId.get(sourceId) ?? null;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** An absent key and an explicit null both mean "not recorded"; anything else must be a string. */
+function nullableString(value: unknown): boolean {
+  return value === null || value === undefined || typeof value === 'string';
+}
+
+/** Same, for the numbers the panel formats: NaN or Infinity would render as garbage. */
+function nullableNumber(value: unknown): boolean {
+  return value === null || value === undefined || (typeof value === 'number' && Number.isFinite(value));
+}
+
+function all(value: Record<string, unknown>, keys: string[], check: (v: unknown) => boolean): boolean {
+  return keys.every((key) => check(value[key]));
+}
+
 /**
  * The only gate between whatever JSON landed in `building_records.payload` and a typed
- * payload the panel renders. Checks the fields a caller is likely to read without a null
- * guard (the ones the display layer keys logic on); everything else stays whatever shape
- * it was stored as, nullable fields included.
+ * payload the panel renders. Every field the panel sorts on, formats, or keys logic on is
+ * checked here; purely decorative strings stay whatever shape they were stored as.
+ * Generic in the kind, so a caller gets the concrete payload type back without a cast.
  */
-export function validatePayload(kind: RecordKind, value: unknown): RecordPayload | null {
+export function validatePayload<K extends RecordKind>(kind: K, value: unknown): PayloadByKind[K] | null {
   if (!isPlainObject(value)) return null;
 
   switch (kind) {
     case 'assessment':
       if (typeof value.fiscalYear !== 'string' || typeof value.condominium !== 'boolean') return null;
-      return value as unknown as AssessmentPayload;
-    case 'permit':
-      if (typeof value.permitNumber !== 'string') return null;
-      return value as unknown as PermitPayload;
-    case 'violation':
-      if (typeof value.caseNumber !== 'string') return null;
-      return value as unknown as ViolationPayload;
-    case 'enforcement_ticket':
-      if (typeof value.caseNumber !== 'string') return null;
-      return value as unknown as EnforcementTicketPayload;
-    case 'service_request':
+      if (!all(value, ['owner', 'mailAddressee', 'mailStreet', 'mailCity', 'mailState', 'mailZip'], nullableString)) return null;
       if (
-        typeof value.caseId !== 'string' ||
-        typeof value.system !== 'string' ||
-        (value.classification !== 'housing' && value.classification !== 'other')
+        !all(
+          value,
+          ['totalValue', 'landValue', 'buildingValue', 'yearBuilt', 'yearRemodel', 'residentialUnits', 'grossArea', 'livingArea'],
+          nullableNumber,
+        )
       ) {
         return null;
       }
-      return value as unknown as ServiceRequestPayload;
+      return value as unknown as PayloadByKind[K];
+    case 'permit':
+      if (typeof value.permitNumber !== 'string' || !nullableString(value.issuedDate)) return null;
+      if (!all(value, ['declaredValuation', 'totalFees'], nullableNumber)) return null;
+      return value as unknown as PayloadByKind[K];
+    case 'violation':
+    case 'enforcement_ticket':
+      if (typeof value.caseNumber !== 'string' || !nullableString(value.statusDate)) return null;
+      return value as unknown as PayloadByKind[K];
+    case 'service_request':
+      if (
+        typeof value.caseId !== 'string' ||
+        (value.system !== 'legacy' && value.system !== 'new') ||
+        (value.classification !== 'housing' && value.classification !== 'other') ||
+        !all(value, ['openedAt', 'closedAt'], nullableString)
+      ) {
+        return null;
+      }
+      return value as unknown as PayloadByKind[K];
     case 'rentsmart':
-      if (typeof value.rowId !== 'string') return null;
-      return value as unknown as RentSmartPayload;
+      if (typeof value.rowId !== 'string' || !all(value, ['date', 'violationType'], nullableString)) return null;
+      return value as unknown as PayloadByKind[K];
     default:
       return null;
   }
 }
 
-/** Descending string sort on an ISO-ish date column, nulls sorted last. */
-function byDateDesc<T>(dateOf: (row: T) => string | null): (a: T, b: T) => number {
-  return (a, b) => (dateOf(b) ?? '').localeCompare(dateOf(a) ?? '');
+/**
+ * Descending on an ISO-ish date column, nulls last, ties broken ascending on the record's
+ * natural key so two rows sharing a date always come out in the same order. Plain string
+ * comparison, not localeCompare: locale collation would make the order depend on the
+ * runtime's ICU data.
+ */
+function byDateDesc<T>(dateOf: (row: T) => string | null, keyOf: (row: T) => string): (a: T, b: T) => number {
+  return (a, b) => {
+    const left = dateOf(a) ?? '';
+    const right = dateOf(b) ?? '';
+    if (left !== right) return left < right ? 1 : -1;
+    const leftKey = keyOf(a);
+    const rightKey = keyOf(b);
+    return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+  };
 }
 
 interface PullRow {
@@ -127,8 +166,13 @@ interface CorrectionRow {
 }
 
 export async function getBuildingRecords(db: RecordsDb, buildingId: string): Promise<BuildingRecordsView | null> {
+  // Oldest first, rowid breaking a retrieved_at tie, so "later row wins" below is decided
+  // by storage order rather than by whatever order the engine happened to return.
   const pulls = await db
-    .prepare('SELECT source_id, source_label, status, error_message, retrieved_at FROM record_pulls WHERE building_id = ?')
+    .prepare(
+      'SELECT source_id, source_label, status, error_message, retrieved_at FROM record_pulls WHERE building_id = ? ' +
+        'ORDER BY retrieved_at ASC, rowid ASC',
+    )
     .bind(buildingId)
     .all<PullRow>();
 
@@ -139,11 +183,12 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
   for (const row of pulls.results) {
     if (row.retrieved_at > pulledAt) pulledAt = row.retrieved_at;
     const existing = sources[row.source_id];
-    if (!existing || row.retrieved_at > existing.retrievedAt) {
+    if (!existing || row.retrieved_at >= existing.retrievedAt) {
       sources[row.source_id] = {
         sourceId: row.source_id,
         label: row.source_label,
-        pageUrl: pageUrlForSource(row.source_id),
+        // Boston is the only jurisdiction with sources, so every record_pulls row is 'boston'.
+        pageUrl: pageUrlForSource('boston', row.source_id),
         status: row.status,
         retrievedAt: row.retrieved_at,
         errorMessage: row.error_message ?? null,
@@ -160,7 +205,7 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
   const invalidKinds = new Set<RecordKind>();
 
   const recordRows = await db
-    .prepare('SELECT kind, payload FROM building_records WHERE building_id = ?')
+    .prepare('SELECT kind, payload FROM building_records WHERE building_id = ? ORDER BY kind, source_key')
     .bind(buildingId)
     .all<RecordRowStorage>();
 
@@ -170,43 +215,65 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
       parsed = JSON.parse(row.payload);
     } catch {
       invalidKinds.add(row.kind);
-      logError('building_record_invalid_payload', { buildingId, kind: row.kind });
       continue;
     }
-    const payload = validatePayload(row.kind, parsed);
-    if (payload === null) {
-      invalidKinds.add(row.kind);
-      logError('building_record_invalid_payload', { buildingId, kind: row.kind });
-      continue;
-    }
+    // Switching on the kind before validating keeps the payload type concrete on each
+    // branch, so nothing here needs a cast to land in its bucket.
     switch (row.kind) {
-      case 'assessment':
-        assessments.push(payload as AssessmentPayload);
+      case 'assessment': {
+        const payload = validatePayload('assessment', parsed);
+        if (payload === null) invalidKinds.add('assessment');
+        else assessments.push(payload);
         break;
-      case 'permit':
-        permits.push(payload as PermitPayload);
+      }
+      case 'permit': {
+        const payload = validatePayload('permit', parsed);
+        if (payload === null) invalidKinds.add('permit');
+        else permits.push(payload);
         break;
-      case 'violation':
-        violations.push(payload as ViolationPayload);
+      }
+      case 'violation': {
+        const payload = validatePayload('violation', parsed);
+        if (payload === null) invalidKinds.add('violation');
+        else violations.push(payload);
         break;
-      case 'enforcement_ticket':
-        enforcement.push(payload as EnforcementTicketPayload);
+      }
+      case 'enforcement_ticket': {
+        const payload = validatePayload('enforcement_ticket', parsed);
+        if (payload === null) invalidKinds.add('enforcement_ticket');
+        else enforcement.push(payload);
         break;
-      case 'service_request':
-        serviceRequests.push(payload as ServiceRequestPayload);
+      }
+      case 'service_request': {
+        const payload = validatePayload('service_request', parsed);
+        if (payload === null) invalidKinds.add('service_request');
+        else serviceRequests.push(payload);
         break;
-      case 'rentsmart':
-        rentsmart.push(payload as RentSmartPayload);
+      }
+      case 'rentsmart': {
+        const payload = validatePayload('rentsmart', parsed);
+        if (payload === null) invalidKinds.add('rentsmart');
+        else rentsmart.push(payload);
         break;
+      }
+      default:
+        // A kind written by an older build that this one no longer knows about.
+        invalidKinds.add(row.kind);
     }
   }
 
-  assessments.sort(byDateDesc((r) => r.fiscalYear));
-  permits.sort(byDateDesc((r) => r.issuedDate));
-  violations.sort(byDateDesc((r) => r.statusDate));
-  enforcement.sort(byDateDesc((r) => r.statusDate));
-  serviceRequests.sort(byDateDesc((r) => r.openedAt));
-  rentsmart.sort(byDateDesc((r) => r.date));
+  const invalid = Array.from(invalidKinds).sort();
+  // One line per kind, not per row: a stale mapping invalidates every row of its kind at once.
+  for (const kind of invalid) {
+    logError('building_record_invalid_payload', { buildingId, kind });
+  }
+
+  assessments.sort(byDateDesc((r) => r.fiscalYear, (r) => r.fiscalYear));
+  permits.sort(byDateDesc((r) => r.issuedDate, (r) => r.permitNumber));
+  violations.sort(byDateDesc((r) => r.statusDate, (r) => r.caseNumber));
+  enforcement.sort(byDateDesc((r) => r.statusDate, (r) => r.caseNumber));
+  serviceRequests.sort(byDateDesc((r) => r.openedAt, (r) => r.caseId));
+  rentsmart.sort(byDateDesc((r) => r.date, (r) => r.rowId));
 
   const correctionRows = await db
     .prepare(
@@ -232,7 +299,7 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
     enforcement,
     serviceRequests,
     rentsmart,
-    invalidKinds: Array.from(invalidKinds).sort(),
+    invalidKinds: invalid,
     corrections,
   };
 }
