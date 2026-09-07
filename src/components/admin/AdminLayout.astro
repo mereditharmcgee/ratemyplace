@@ -3,7 +3,7 @@ import BaseLayout from '../layout/BaseLayout.astro';
 
 interface Props {
   title: string;
-  currentPage: 'dashboard' | 'users' | 'reviews' | 'buildings' | 'landlords' | 'managers' | 'verify' | 'disputes' | 'bugs' | 'contact' | 'audit';
+  currentPage: 'dashboard' | 'users' | 'reviews' | 'buildings' | 'landlords' | 'managers' | 'verify' | 'disputes' | 'records' | 'bugs' | 'contact' | 'audit';
 }
 
 const { title, currentPage } = Astro.props;
@@ -28,6 +28,7 @@ const navItems = [
   { id: 'managers', label: 'Managers', href: '/admin/managers', icon: 'people' },
   { id: 'verify', label: 'Verification', href: '/admin/verify', icon: 'check' },
   { id: 'disputes', label: 'Disputes', href: '/admin/disputes', icon: 'document' },
+  { id: 'records', label: 'Record corrections', href: '/admin/records', icon: 'document' },
   { id: 'bugs', label: 'Bug reports', href: '/admin/bug-reports', icon: 'bug' },
   { id: 'contact', label: 'Contact', href: '/admin/contact', icon: 'mail' },
   { id: 'audit', label: 'Audit log', href: '/admin/audit', icon: 'shield' },
