@@ -70,7 +70,7 @@ export class TestD1Database {
     return new TestD1Statement(this.database, sql);
   }
 
-  /** Schema bootstrap for tests. Not part of the D1 surface. */
+  /** Schema bootstrap for tests. D1's real exec is async and returns D1ExecResult; this is sync. */
   exec(sql: string): void {
     this.database.exec(sql);
   }
@@ -86,7 +86,11 @@ export class TestD1Database {
       this.database.exec('COMMIT');
       return results;
     } catch (error) {
-      this.database.exec('ROLLBACK');
+      try {
+        this.database.exec('ROLLBACK');
+      } catch {
+        // SQLite auto-rolls back on some errors; a second ROLLBACK then throws. Keep the original error.
+      }
       throw error;
     }
   }
