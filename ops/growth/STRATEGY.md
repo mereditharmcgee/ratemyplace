@@ -1,6 +1,6 @@
 # Growth strategy
 
-**Last reviewed:** 2026-08-29
+**Last reviewed:** 2026-09-07
 **Numbers:** see [`../METRICS.md`](../METRICS.md), generated from production. Don't quote figures from here.
 
 ## The constraint, stated plainly
@@ -83,3 +83,29 @@ Not a review count. A demonstration:
 **One landlord portfolio page with enough reviews across enough buildings that the pattern
 is visible and undeniable.** That page is the argument for the whole project, and it can
 be shown to funders, partners, and press. Nothing else on the site does that job.
+
+## Decision log
+
+### 2026-09-06: the reader-first rule is deliberately inverted, on a condition
+
+The rule above says: do not spend effort on reader acquisition until coverage supports it.
+Public building records change the arithmetic behind that rule, so it is being inverted on
+purpose, and the inversion is dated here so nobody later reads it as drift.
+
+A building page with no review is not empty once it carries the city's assessment, permit,
+violation, code enforcement, and 311 records. It is useful to the person standing at that
+address, and that person is also the one most likely to write the first review. Records
+make the reader visit worth something before a single review exists.
+
+The condition is coverage, and it lands in two steps:
+
+- **Sub-project A** ships the records panel for buildings already in the database. It adds
+  no new addresses, so on its own it does not change this strategy.
+- **Sub-project C** seeds a page for every whole-building residential parcel in Boston from
+  the assessor. That is the point at which reader acquisition becomes worth spending on,
+  because a reader arriving with a specific address will find something there.
+
+Until C ships, the rule above still holds. Depth beats breadth, and targeted reviewer
+recruitment comes first.
+
+See `docs/superpowers/specs/2026-09-06-building-records-design.md`.

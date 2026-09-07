@@ -280,7 +280,9 @@ export type AuditActionType =
   | 'dispute_dismissed'
   | 'dispute_partially_valid'
   | 'landlord_deleted'
-  | 'user_updated';
+  | 'user_updated'
+  | 'records_pulled'
+  | 'record_correction_resolved';
 
 export interface AuditLogEntry {
   id: number;

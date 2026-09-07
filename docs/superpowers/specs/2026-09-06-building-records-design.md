@@ -70,6 +70,8 @@ Courts (`masscourts.org`, reCAPTCHA-gated; the brief says a tenant-facing produc
 
 ## Section 1: Schema (migration `0029_building_records.sql`)
 
+> **Amended 2026-09-07, as built:** the milestone ships **two** migrations. `0030_audit_records_actions.sql` rebuilds `audit_logs` (the 0028 pattern) to widen its `action_type` CHECK for `records_pulled` and `record_correction_resolved`. SQLite cannot alter a CHECK constraint in place, so the audit action types could not ride along in `0029`. Both are non-idempotent and both are applied by hand; see `migrations/AGENTS.md`.
+
 ### `buildings` additions
 
 ```sql
@@ -153,6 +155,11 @@ Discriminated union on `kind`. A payload that fails validation on read renders t
 | `service_request` | `case_enquiry_id` | open/closed dates, case status, closure reason, title, subject, reason, type, source, classification (`housing` or `other`) |
 | `rentsmart` | address key | the roll-up fields as returned |
 
+> **Amended 2026-09-07, as built, two `source_key` corrections:**
+>
+> - **`violation` and `enforcement_ticket` keys are `case_no:code`, not `case_no` alone.** One case number carries several cited codes, each its own row, so keying on the case number would collapse them and lose every code but one.
+> - **`rentsmart` keys on the CKAN `_id`**, which the datastore reassigns on a wholesale reload of the resource. `UNIQUE (building_id, kind, source_key)` still holds within a pull, but the re-pull **diff compares payload content with `rowId` stripped**, not `source_key`. Diffing on the key would report the entire RentSmart section as replaced every time Boston reloads the dataset.
+
 `enrichment/types.ts` and `records/types.ts` stay separate in A. Converging them is a follow-up once records are trusted.
 
 ## Section 2: Pull pipeline and adapters (`src/lib/records/`)
@@ -184,12 +191,23 @@ Input: `BuildingIdentity`. Output: `{ sourceId, sourceLabel, query, rows: { kind
 2. For each source in the jurisdiction list, in order: run it, insert one `record_pulls` row, and if status is `ok` or `empty`, replace that building's rows for that source's kinds in one `db.batch`. A source that throws records `error`, keeps prior rows, and does not stop the remaining sources.
 3. Return a `PullSummary` (per-source status and row counts) for the admin UI.
 
+> **Amended 2026-09-07, as built:** the assessor resolves the **parcel id only**. The FY2026 assessor does not publish a SAM id, so `sam_id` is learned from the **violation and code-enforcement feeds**, which do carry it, and `pull.ts` writes it back to `buildings` the first time a source returns a non-blank value.
+
 ### Identity handling
 
 - **Parcel resolution:** assessor by exact `ST_NUM` and normalized `ST_NAME` using the existing helpers. Ranged addresses (`23-27`) try each number and the hyphenated form. Street names are matched exactly, never prefix-matched.
 - **Condo detection:** multiple assessor rows with different parcel ids for one address means a condominium building. A stores no `parcel_id`, stores an `assessment` row with `condominium: true` and no owner fields, and the admin summary says why.
+
+  > **Amended 2026-09-07, as built:** condominium detection is **by land-use code, not by counting parcel ids**. The whole-building query excludes `LU IN ('CD','CM')`; an address that returns no whole-building row and at least one `CD`/`CM` row is a condominium. Counting distinct parcel ids could not tell a condominium apart from an address that genuinely spans two whole-building parcels.
+
 - **Parcel id forms:** stored as the 10-digit form with the leading zero. Permits and violations query both forms.
+
+  > **Amended 2026-09-07, as built:** **permits query the numeric parcel form only.** That resource stores `parcel_id` as a number, so the leading-zero form can never match it. The violation and code-enforcement feeds do not carry a parcel column at all; they are keyed on SAM id and address.
+
 - **Permits:** by both parcel forms and every address form; deduplicated on permit number.
+
+  > **Amended 2026-09-07, as built:** every address predicate is a `LIKE ... ESCAPE '!'` clause, not `ESCAPE '\'`. CKAN's `datastore_search_sql` rejects a backslash escape with `HTTP 409 Query is not a single statement`; verified live 2026-09-07. See `src/lib/records/ckan.ts`.
+
 - **311:** each yearly resource queried per address form on `location`; deduplicated on `case_enquiry_id` across files. Classification into `housing` versus `other` is a published list of `reason` and `type` values in `serviceRequests.ts`, exported so the public page can link to it. The split is a fact about the list, not a judgment.
 - **Assessment history:** the six most recent fiscal years, each a separate resource with a per-year column map. A year whose columns do not match its map records as `empty`, never guesses.
 
@@ -231,9 +249,14 @@ Each section carries its own "as of" date and a "Source" link to the dataset pag
 
 A section whose latest pull is `error` and which has no prior rows renders "record unavailable" with the date of the failed attempt.
 
+> **Amended 2026-09-07, as built:** a section that has **never been queried** is a third state, distinct from both "empty" and "unavailable", and renders **"Not retrieved yet."** Rendering a never-queried section as an empty result would state a fact the site does not have: "no violations on record" and "we have not asked" are different claims, and only one of them is true. RentSmart's cross-check line is suppressed in that state too, since there is nothing above it to disagree with.
+
 ### Display rules (each enforced by a unit test where a test can enforce it)
 
 - **Owner mailing address is shown only when the owner of record is an entity**, decided by `inferOwnerEntity`. An individual's mailing address is never rendered, even though the assessor publishes it, because it is usually their home.
+
+  > **Amended 2026-09-07, as built:** the gate is `showMailingAddress` in `records/display.ts`, not `inferOwnerEntity`. It is a **word-boundary entity-token rule**: a bare substring test would match `INC` inside `PRINCE` and publish a person's home address. A trustee suffix alone is **not** an entity, so `SMITH JOHN TR` is treated as an individual and its address stays hidden; a trustee suffix clears the gate only alongside a trust or entity token (`SMITH FAMILY TR` does). The rule errs toward hiding: a withheld business address costs a reader one lookup, a published home address cannot be taken back. The same gate is applied to the mailing **addressee** line, because an entity can name a person there (`C/O ATT ...`), while the street and city lines are kept either way.
+
 - **Condominium buildings show no owner.** The Property section states that the building is divided into individually owned condominium units.
 - **Banned words cannot appear in panel copy:** cash-out, extracted, cross-collateralized, deferred maintenance, pattern, evasive, delay. A test scans the component's static strings.
 - **Every rendered value is a field from a record or a count of records.** No ratios, no comparisons, no color coding. Nothing from `scoring-colors.ts` appears in the panel.
@@ -295,6 +318,9 @@ No "edit this value" anywhere. No way to hide a section on request. No owner ver
 
 1. Feature branch off `main`.
 2. Migration `0029_building_records.sql` applied via the dashboard console per `migrations/AGENTS.md`; ledger reconciled per the same guide.
+
+   > **Amended 2026-09-07, as built:** `0030_audit_records_actions.sql` follows it. Apply both with `wrangler d1 execute --remote --file`, one file at a time, never `migrations apply --remote`; back up `audit_logs` before `0030` and verify the row count after.
+
 3. Deploy. Production shows no panel until a building is pulled.
 4. Pull Lanark first; compare to the brief by eye and with the live fixture script.
 5. Pull the remaining Boston buildings from the admin table.
