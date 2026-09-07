@@ -82,4 +82,111 @@ describe('RecordCorrectionForm', () => {
       turnstileToken: 'good-token',
     });
   });
+
+  it('shows the error text and resets the widget on a 429 response, keeping the form mounted', async () => {
+    stubTurnstile('good-token');
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({ error: 'Too many requests. Please try again later.' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const user = userEvent.setup();
+    render(<RecordCorrectionForm buildingId="building-1" />);
+
+    await waitFor(() => expect(screen.getByLabelText(/which record is wrong/i)).toBeTruthy());
+
+    await user.selectOptions(screen.getByLabelText(/which record is wrong/i), 'assessment');
+    await user.type(
+      screen.getByLabelText(/what's wrong with it/i),
+      'This assessment record has an incorrect owner name listed.'
+    );
+    await user.click(screen.getByRole('button', { name: /send report/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toMatch(/too many requests/i);
+
+    expect(screen.getByLabelText(/which record is wrong/i)).toBeTruthy();
+    expect(window.turnstile?.reset).toHaveBeenCalledWith('widget-1');
+  });
+
+  it('shows a field-level error and marks the claim textarea invalid on a 400 response', async () => {
+    stubTurnstile('good-token');
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        error: 'Validation failed.',
+        details: [{ field: 'claim', message: 'x' }],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const user = userEvent.setup();
+    render(<RecordCorrectionForm buildingId="building-1" />);
+
+    await waitFor(() => expect(screen.getByLabelText(/which record is wrong/i)).toBeTruthy());
+
+    await user.selectOptions(screen.getByLabelText(/which record is wrong/i), 'assessment');
+    await user.type(
+      screen.getByLabelText(/what's wrong with it/i),
+      'This assessment record has an incorrect owner name listed.'
+    );
+    await user.click(screen.getByRole('button', { name: /send report/i }));
+
+    expect(await screen.findByText('x')).toBeTruthy();
+    const claimField = screen.getByLabelText(/what's wrong with it/i);
+    expect(claimField.getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('shows the confirmation without a reference when the response body has no id', async () => {
+    stubTurnstile('good-token');
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({}),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const user = userEvent.setup();
+    render(<RecordCorrectionForm buildingId="building-1" />);
+
+    await waitFor(() => expect(screen.getByLabelText(/which record is wrong/i)).toBeTruthy());
+
+    await user.selectOptions(screen.getByLabelText(/which record is wrong/i), 'assessment');
+    await user.type(
+      screen.getByLabelText(/what's wrong with it/i),
+      'This assessment record has an incorrect owner name listed.'
+    );
+    await user.click(screen.getByRole('button', { name: /send report/i }));
+
+    expect(await screen.findByText(/report received/i)).toBeTruthy();
+    expect(screen.queryByText(/reference/i)).toBeNull();
+  });
+
+  it('renders the Turnstile widget once it loads late and removes it on unmount', async () => {
+    const renderFn = vi.fn((_container, options) => {
+      options.callback?.('late-token');
+      return 'widget-1';
+    });
+    const removeFn = vi.fn();
+    delete (window as { turnstile?: unknown }).turnstile;
+
+    const { unmount } = render(<RecordCorrectionForm buildingId="building-1" />);
+
+    await waitFor(() => expect(screen.getByLabelText(/which record is wrong/i)).toBeTruthy());
+
+    window.turnstile = {
+      render: renderFn,
+      reset: vi.fn(),
+      remove: removeFn,
+    };
+
+    await waitFor(() => expect(renderFn).toHaveBeenCalledTimes(1));
+
+    unmount();
+
+    expect(removeFn).toHaveBeenCalledWith('widget-1');
+  });
 });

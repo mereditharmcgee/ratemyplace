@@ -38,7 +38,12 @@ export default function RecordCorrectionForm({ buildingId }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [confirmationId, setConfirmationId] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [referenceId, setReferenceId] = useState<string | null>(null);
+  const [emailProvided, setEmailProvided] = useState(false);
+
+  const submittingRef = useRef(false);
+  const confirmationRef = useRef<HTMLDivElement>(null);
 
   // Turnstile bot verification (explicit render — see DisputeForm.tsx).
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -46,6 +51,8 @@ export default function RecordCorrectionForm({ buildingId }: Props) {
   const widgetIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+
     const renderWidget = () => {
       if (!turnstileRef.current || !window.turnstile || widgetIdRef.current) return;
       widgetIdRef.current = window.turnstile.render(turnstileRef.current, {
@@ -59,16 +66,17 @@ export default function RecordCorrectionForm({ buildingId }: Props) {
     if (window.turnstile) {
       renderWidget();
     } else {
-      const interval = setInterval(() => {
+      interval = setInterval(() => {
         if (window.turnstile) {
-          clearInterval(interval);
+          if (interval) clearInterval(interval);
+          interval = null;
           renderWidget();
         }
       }, 100);
-      return () => clearInterval(interval);
     }
 
     return () => {
+      if (interval) clearInterval(interval);
       if (widgetIdRef.current && window.turnstile) {
         window.turnstile.remove(widgetIdRef.current);
         widgetIdRef.current = null;
@@ -76,7 +84,13 @@ export default function RecordCorrectionForm({ buildingId }: Props) {
     };
   }, []);
 
-  const validate = (): boolean => {
+  useEffect(() => {
+    if (submitted) {
+      confirmationRef.current?.focus();
+    }
+  }, [submitted]);
+
+  const validate = (): Record<string, string> => {
     const errors: Record<string, string> = {};
 
     if (!recordKind) {
@@ -95,14 +109,29 @@ export default function RecordCorrectionForm({ buildingId }: Props) {
     }
 
     setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
+    return errors;
+  };
+
+  const FIELD_IDS: Record<string, string> = {
+    recordKind: 'record-kind',
+    claim: 'record-claim',
+    contactEmail: 'record-email',
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
 
-    if (!validate()) {
+    if (submittingRef.current) {
+      return;
+    }
+
+    const errors = validate();
+    if (Object.keys(errors).length > 0) {
+      const firstInvalid = ['recordKind', 'claim', 'contactEmail'].find((key) => errors[key]);
+      if (firstInvalid) {
+        document.getElementById(FIELD_IDS[firstInvalid])?.focus();
+      }
       return;
     }
 
@@ -111,17 +140,21 @@ export default function RecordCorrectionForm({ buildingId }: Props) {
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
 
     try {
+      const trimmedClaim = claim.trim();
+      const trimmedEmail = contactEmail.trim();
+
       const response = await fetch('/api/records/corrections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           buildingId,
           recordKind,
-          claim,
-          contactEmail: contactEmail || undefined,
+          claim: trimmedClaim,
+          contactEmail: trimmedEmail || undefined,
           turnstileToken,
         }),
       });
@@ -130,37 +163,46 @@ export default function RecordCorrectionForm({ buildingId }: Props) {
 
       if (!response.ok) {
         if (data.details && data.details.length > 0) {
-          const errors: Record<string, string> = {};
+          const apiErrors: Record<string, string> = {};
           for (const detail of data.details) {
-            errors[detail.field] = detail.message;
+            apiErrors[detail.field] = detail.message;
           }
-          setFieldErrors(errors);
+          setFieldErrors(apiErrors);
         }
         setError(data.error || 'Failed to submit report. Please try again.');
         // Turnstile tokens are single-use — reset the widget for a retry.
         if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
         setTurnstileToken(null);
-        setLoading(false);
         return;
       }
 
-      setConfirmationId(data.data?.id ?? null);
-      setLoading(false);
+      setEmailProvided(Boolean(trimmedEmail));
+      setReferenceId(data.data?.id ?? null);
+      setSubmitted(true);
     } catch {
       setError('An unexpected error occurred. Please try again.');
       if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
       setTurnstileToken(null);
+    } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
 
-  if (confirmationId) {
+  if (submitted) {
+    const recordNoun = recordKind === 'panel' ? 'these records' : 'this record';
     return (
-      <div className="bg-teal-50 border border-teal-200 rounded-[6px] p-6">
+      <div
+        ref={confirmationRef}
+        role="status"
+        tabIndex={-1}
+        className="bg-teal-50 border border-teal-200 rounded-[6px] p-6"
+      >
         <p className="font-semibold text-teal-800">Report received.</p>
         <p className="mt-1 text-sm text-teal-700">
-          Reference {confirmationId.slice(0, 8)}. We will re-pull this record from the primary source and, if
-          you gave an email, tell you the outcome.
+          {referenceId && <>Reference {referenceId.slice(0, 8)}. </>}
+          We will re-pull {recordNoun} from the primary source.
+          {emailProvided && ' We will email you the outcome.'}
         </p>
       </div>
     );
@@ -176,14 +218,24 @@ export default function RecordCorrectionForm({ buildingId }: Props) {
 
       <div>
         <label htmlFor="record-kind" className="block text-sm font-medium text-gray-700 mb-2">
-          Which record is wrong? <span className="text-red-500">*</span>
+          Which record is wrong? <span className="text-red-500" aria-hidden="true">*</span>
         </label>
         <select
           id="record-kind"
           value={recordKind}
-          onChange={(e) => setRecordKind(e.target.value)}
+          onChange={(e) => {
+            setRecordKind(e.target.value);
+            if (fieldErrors.recordKind) {
+              setFieldErrors((prev) => {
+                const next = { ...prev };
+                delete next.recordKind;
+                return next;
+              });
+            }
+          }}
           aria-invalid={fieldErrors.recordKind ? true : undefined}
           aria-describedby={fieldErrors.recordKind ? 'record-kind-error' : undefined}
+          aria-required="true"
           className={`${inputClass} ${fieldErrors.recordKind ? 'border-red-400' : 'border-gray-300'}`}
         >
           <option value="">Choose a record type</option>
@@ -202,16 +254,26 @@ export default function RecordCorrectionForm({ buildingId }: Props) {
 
       <div>
         <label htmlFor="record-claim" className="block text-sm font-medium text-gray-700 mb-2">
-          What's wrong with it? <span className="text-red-500">*</span>
+          What's wrong with it? <span className="text-red-500" aria-hidden="true">*</span>
         </label>
         <textarea
           id="record-claim"
           rows={4}
           maxLength={CLAIM_MAX}
           value={claim}
-          onChange={(e) => setClaim(e.target.value)}
+          onChange={(e) => {
+            setClaim(e.target.value);
+            if (fieldErrors.claim) {
+              setFieldErrors((prev) => {
+                const next = { ...prev };
+                delete next.claim;
+                return next;
+              });
+            }
+          }}
           aria-invalid={fieldErrors.claim ? true : undefined}
           aria-describedby={fieldErrors.claim ? 'record-claim-error' : undefined}
+          aria-required="true"
           className={`${inputClass} ${fieldErrors.claim ? 'border-red-400' : 'border-gray-300'}`}
         />
         <p className="mt-1 text-xs text-gray-500">
@@ -232,7 +294,16 @@ export default function RecordCorrectionForm({ buildingId }: Props) {
           type="email"
           id="record-email"
           value={contactEmail}
-          onChange={(e) => setContactEmail(e.target.value)}
+          onChange={(e) => {
+            setContactEmail(e.target.value);
+            if (fieldErrors.contactEmail) {
+              setFieldErrors((prev) => {
+                const next = { ...prev };
+                delete next.contactEmail;
+                return next;
+              });
+            }
+          }}
           aria-invalid={fieldErrors.contactEmail ? true : undefined}
           aria-describedby={fieldErrors.contactEmail ? 'record-email-error' : undefined}
           className={`${inputClass} ${fieldErrors.contactEmail ? 'border-red-400' : 'border-gray-300'}`}
