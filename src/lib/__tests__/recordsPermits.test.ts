@@ -19,7 +19,7 @@ describe('permitsSource', () => {
     expect(result.query).toContain('ORDER BY "issued_date" DESC');
   });
 
-  it('maps rows, parses money, and deduplicates on permit number', async () => {
+  it('maps rows, parses money, and deduplicates on permit number, keeping the first row', async () => {
     const fetchImpl = fixtureFetch([{ resourceId: PERMITS_RESOURCE_ID, records: positive }]);
     const result = await permitsSource.run(fiftyFive, fetchImpl);
     expect(result.rows.map((r) => r.sourceKey)).toEqual(['A1000569', 'E123']);
@@ -29,13 +29,34 @@ describe('permitsSource', () => {
       issuedDate: '2021-01-28T16:29:26', status: 'Closed', address: '55-65 Lanark RD',
     });
     expect(result.rows[0].kind).toBe('permit');
+    const second = result.rows[1].payload as PermitPayload;
+    expect(second.description).toBe('Electrical');
   });
 
   it('omits the parcel clause when the building has no parcel', async () => {
     const noParcel = { ...fiftyFive, parcelId: null, parcelNumeric: null };
     const fetchImpl = fixtureFetch([]);
     const result = await permitsSource.run(noParcel, fetchImpl);
-    expect(result.query).not.toContain('parcel_id');
+    expect(result.query).not.toContain('"parcel_id" =');
     expect(result.rows).toEqual([]);
+  });
+
+  it('qualifies the address arm by zip when the identity has a 5-digit zip', async () => {
+    const fetchImpl = fixtureFetch([{ resourceId: PERMITS_RESOURCE_ID, records: positive }]);
+    const result = await permitsSource.run(fiftyFive, fetchImpl);
+    expect(result.query).toContain(`("zip" IS NULL OR "zip" = '02135')`);
+  });
+
+  it('omits the zip qualifier when the identity has no zip', async () => {
+    const noZip = { ...fiftyFive, zip: null };
+    const fetchImpl = fixtureFetch([{ resourceId: PERMITS_RESOURCE_ID, records: positive }]);
+    const result = await permitsSource.run(noZip, fetchImpl);
+    expect(result.query).not.toContain('"zip"');
+  });
+
+  it('orders deterministically by issued_date, then permitnumber, then _id', async () => {
+    const fetchImpl = fixtureFetch([{ resourceId: PERMITS_RESOURCE_ID, records: positive }]);
+    const result = await permitsSource.run(fiftyFive, fetchImpl);
+    expect(result.query).toContain('ORDER BY "issued_date" DESC, "permitnumber", "_id" LIMIT 500');
   });
 });

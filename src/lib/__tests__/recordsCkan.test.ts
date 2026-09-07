@@ -1,6 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ckanSql, sqlLiteral, parseMoney, parseIntOrNull, ROW_CAP, FETCH_TIMEOUT_MS } from '../records/ckan';
-import { SourceError, type RecordRow } from '../records/types';
+import { addressLikeClauses, ckanSql, sqlLiteral, parseMoney, parseIntOrNull, ROW_CAP, FETCH_TIMEOUT_MS } from '../records/ckan';
+import { SourceError, type BuildingIdentity, type RecordRow } from '../records/types';
+
+/** Minimal BuildingIdentity stub — addressLikeClauses only reads the two address-form fields. */
+function identityWithForms(addressFormsShort: string[], addressFormsLong: string[] = []): BuildingIdentity {
+  return {
+    buildingId: 'b', numbers: [], rangeForm: null, streetShort: '', streetLong: '', streetBase: '',
+    streetForms: [], addressFormsShort, addressFormsLong, parcelId: null, parcelNumeric: null,
+    condominium: false, zip: null, samId: null,
+  };
+}
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -9,6 +18,26 @@ function jsonResponse(body: unknown, status = 200): Response {
 describe('sqlLiteral', () => {
   it('quotes and doubles embedded single quotes', () => {
     expect(sqlLiteral("O'BRIEN ST")).toBe("'O''BRIEN ST'");
+  });
+});
+
+describe('addressLikeClauses', () => {
+  it('escapes single quotes, percent, and underscore, then appends the LIKE wildcard', () => {
+    const [clause] = addressLikeClauses('address', identityWithForms([`O'BRIEN_50%`]));
+    expect(clause).toBe(`upper("address") LIKE 'O''BRIEN\\_50\\%%' ESCAPE '\\'`);
+  });
+
+  it('throws on a column name that is not a safe lowercase identifier', () => {
+    expect(() => addressLikeClauses('address; DROP TABLE x', identityWithForms(['55 LANARK RD']))).toThrow();
+    expect(() => addressLikeClauses('Address', identityWithForms(['55 LANARK RD']))).toThrow();
+  });
+
+  it('the emitted pattern is a true prefix match: matches an address extension, not a longer number sharing the prefix', () => {
+    const [clause] = addressLikeClauses('address', identityWithForms(['55 LANARK RD']));
+    const inner = clause.match(/LIKE '(.*)%' ESCAPE/)![1];
+    const regex = new RegExp('^' + inner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '.*$');
+    expect(regex.test('55 LANARK RD REAR')).toBe(true);
+    expect(regex.test('551 LANARK RD')).toBe(false);
   });
 });
 

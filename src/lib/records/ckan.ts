@@ -1,4 +1,5 @@
-import { SourceError, type FetchLike } from './types';
+import { escapeLikePattern } from '../validation';
+import { SourceError, type BuildingIdentity, type FetchLike } from './types';
 
 export const CKAN_SQL_ENDPOINT = 'https://data.boston.gov/api/3/action/datastore_search_sql';
 export const FETCH_TIMEOUT_MS = 10_000;
@@ -7,6 +8,23 @@ export const ROW_CAP = 500;
 /** Quote a string for embedding in CKAN SQL. Doubles single quotes. */
 export function sqlLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
+}
+
+/**
+ * `upper("<column>") LIKE '<form>%' ESCAPE '\'` for every unique short and long address
+ * form on `identity`. `column` must be a code constant, never user input — it is
+ * interpolated as an identifier and only checked against a conservative shape.
+ *
+ * The trailing `%` is intentionally loose: `'55 LANARK RD%'` also matches
+ * `55 LANARK RD REAR`, which is desired, but it cannot exclude an unrelated address that
+ * happens to share a short form, e.g. `10 UNION PARK ST` when the short form is
+ * `UNION PK`. That residual false-positive risk is accepted here; the correction
+ * workflow is how a wrongly attached record gets detached.
+ */
+export function addressLikeClauses(column: string, identity: BuildingIdentity): string[] {
+  if (!/^[a-z_]+$/.test(column)) throw new Error(`Unsafe column name for LIKE clause: ${column}`);
+  const forms = Array.from(new Set([...identity.addressFormsShort, ...identity.addressFormsLong]));
+  return forms.map((f) => `upper("${column}") LIKE ${sqlLiteral(`${escapeLikePattern(f)}%`)} ESCAPE '\\'`);
 }
 
 /**
