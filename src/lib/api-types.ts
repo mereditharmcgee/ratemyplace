@@ -350,3 +350,29 @@ export interface CleanupResponse {
   success: boolean;
   deleted: number;
 }
+
+// =============================================================================
+// Public Records Types
+// =============================================================================
+
+/**
+ * One row of GET /api/admin/records/corrections — a `record_corrections` row
+ * joined to its building. `record_kind` is null when the report was filed
+ * against the whole records panel rather than one record (see
+ * `fromStoredKind` in lib/records/corrections.ts).
+ */
+export interface RecordCorrection {
+  id: string;
+  building_id: string;
+  record_kind: string | null;
+  claim: string;
+  contact_email: string | null;
+  status: 'pending' | 'resolved';
+  resolution: 'repulled_unchanged' | 'repulled_updated' | 'source_mismatch_noted' | null;
+  resolution_notes: string | null;
+  resolved_by: string | null;
+  resolved_at: number | null;
+  created_at: number;
+  building_address: string;
+  building_slug: string;
+}
