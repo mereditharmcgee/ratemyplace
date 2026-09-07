@@ -8,5 +8,4 @@ export const enforcementSource = violationFeedSource({
   pageUrl: ENFORCEMENT_PAGE_URL,
   label: 'Public Works Code Enforcement',
   kind: 'enforcement_ticket',
-  withTicketNumber: true,
 });
