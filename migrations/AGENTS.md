@@ -26,6 +26,12 @@ Apply both with `wrangler d1 execute --remote --file`, one file at a time, never
 `migrations apply --remote`. Back up `audit_logs` before running `0030`, and verify the row
 count matches afterwards; the copy is the whole risk in a table rebuild.
 
+**APPLIED TO PRODUCTION 2026-09-07** via `wrangler d1 execute --remote --file`, `0029` then
+`0030`, in that order. `audit_logs` held 55 rows (ids 1 to 55) before and after; `parcel_id`
+and `sam_id` present; the three records tables and all four `idx_audit_*` indexes exist; no
+`audit_logs_v4` left behind. Like `0025` through `0028`, wrangler's migration tracking does
+not know these ran. Do not re-run either file.
+
 Before touching production schema: check the live schema directly, confirm what has
 actually been applied, and apply deliberately. Do not assume wrangler's state is accurate.
 
