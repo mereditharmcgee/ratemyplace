@@ -24,6 +24,14 @@ const MISSING_COLUMN_BODY = readFileSync(
 
 const yearFor = (fiscalYear: string) => ASSESSOR_YEARS.find((y) => y.fiscalYear === fiscalYear)!;
 
+/** The recorded body names "ZIPCODE"; swap in a different missing column for other cases. */
+function missingColumnBody(columnName: string): string {
+  const body = JSON.parse(MISSING_COLUMN_BODY) as { error: { query: string[]; info: { orig: string[] } } };
+  body.error.query[0] = body.error.query[0].replace(/ZIPCODE/g, columnName);
+  body.error.info.orig[0] = body.error.info.orig[0].replace(/ZIPCODE/g, columnName);
+  return JSON.stringify(body);
+}
+
 describe('resolveParcel', () => {
   it('finds one whole-building parcel, excluding condo rows in SQL, with one query', async () => {
     const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
@@ -95,6 +103,14 @@ describe('resolveParcel', () => {
     expect(await resolveParcel(lanark, fetchImpl)).toEqual({
       parcelId: null, condominium: false, wholeBuildingParcels: 0, condoRows: 0,
     });
+  });
+
+  it('no longer selects "LU" — the land-use filter lives entirely in the WHERE clause', async () => {
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
+    await resolveParcel(lanark, fetchImpl);
+    const sql = fetchImpl.calls[0];
+    expect(sql).not.toMatch(/SELECT[^F]*"LU"/);
+    expect(sql).toContain(`"LU" NOT IN ('CD','CM')`);
   });
 });
 
@@ -186,11 +202,33 @@ describe('assessorSource', () => {
     expect(fetchImpl.calls).toEqual([]);
   });
 
-  it('treats a missing-column error as empty, and rethrows any other error', async () => {
+  it('swallows a missing mail column, recording why in the returned query', async () => {
     const year = yearFor('FY2021');
-    const missing = fixtureFetch([{ resourceId: FY2021_RESOURCE_ID, errorStatus: 409, rawBody: MISSING_COLUMN_BODY }]);
-    expect((await assessorSource(year).run(withParcel, missing)).rows).toEqual([]);
+    const missing = fixtureFetch([
+      { resourceId: FY2021_RESOURCE_ID, errorStatus: 409, rawBody: missingColumnBody('MAIL_ZIPCODE') },
+    ]);
+    const result = await assessorSource(year).run(withParcel, missing);
+    expect(result.rows).toEqual([]);
+    expect(result.query).toContain('skipped: column "MAIL_ZIPCODE"');
+  });
 
+  it('rethrows when the missing column is not one of this year\'s mail columns', async () => {
+    const year = yearFor('FY2021');
+    // The recorded 409 body names "ZIPCODE", not FY2021's mail column ("MAIL_ZIPCODE").
+    const missing = fixtureFetch([{ resourceId: FY2021_RESOURCE_ID, errorStatus: 409, rawBody: MISSING_COLUMN_BODY }]);
+    await expect(assessorSource(year).run(withParcel, missing)).rejects.toThrow(/ZIPCODE/);
+  });
+
+  it('rethrows when a fixed column like BLDG_SEQ is missing', async () => {
+    const year = yearFor('FY2021');
+    const missing = fixtureFetch([
+      { resourceId: FY2021_RESOURCE_ID, errorStatus: 409, rawBody: missingColumnBody('BLDG_SEQ') },
+    ]);
+    await expect(assessorSource(year).run(withParcel, missing)).rejects.toThrow(/BLDG_SEQ/);
+  });
+
+  it('rethrows any other error, e.g. an outage', async () => {
+    const year = yearFor('FY2021');
     const outage = fixtureFetch([{ resourceId: FY2021_RESOURCE_ID, errorStatus: 503, errorMessage: 'gateway' }]);
     await expect(assessorSource(year).run(withParcel, outage)).rejects.toThrow(/503/);
   });

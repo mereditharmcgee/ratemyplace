@@ -101,6 +101,14 @@ describe('ckanSql', () => {
     await expect(ckanSql('SELECT 3b', fetchImpl)).rejects.toBeInstanceOf(SourceError);
   });
 
+  it('populates SourceError.detail with the parsed error object when success is false', async () => {
+    const errorObj = { info: { orig: ['column "ZIPCODE" does not exist'] } };
+    const fetchImpl = async () => jsonResponse({ success: false, error: errorObj }, 409);
+    const err = await ckanSql('SELECT 3d', fetchImpl).catch((e) => e);
+    expect(err).toBeInstanceOf(SourceError);
+    expect(err.detail).toEqual(errorObj);
+  });
+
   it('includes a snippet of the body when a 200 response is not JSON', async () => {
     const fetchImpl = async () => new Response('<html>nope</html>', { status: 200 });
     await expect(ckanSql('SELECT 3c', fetchImpl)).rejects.toThrow(/non-JSON body: <html/);

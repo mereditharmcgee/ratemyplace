@@ -100,7 +100,7 @@ export async function resolveParcel(identity: BuildingIdentity, fetchImpl: Fetch
   const resourceId = ASSESSOR_YEARS[0].resourceId;
   const where = addressPredicate(identity);
 
-  const sql = `SELECT "PID","LU" FROM "${resourceId}" WHERE ${where} AND "LU" NOT IN ('CD','CM') LIMIT 10`;
+  const sql = `SELECT "PID" FROM "${resourceId}" WHERE ${where} AND "LU" NOT IN ('CD','CM') LIMIT 10`;
   const rows = await ckanSql<Row>(sql, fetchImpl);
   const parcels = Array.from(
     new Set(rows.map((r) => toCanonicalParcel(text(r.PID))).filter((p): p is string => p !== null)),
@@ -180,15 +180,43 @@ function mapRow(row: Row, year: AssessorYear): AssessmentPayload {
   };
 }
 
+const MISSING_COLUMN_PATTERN = /column\s+"([^"]+)"\s+does not exist/i;
+
+/** `"ee73430d-96c0-423e-ad21-c4cfb54c8961.ZIPCODE"` -> `"ZIPCODE"`. CKAN qualifies a column name this way in some error variants. */
+function stripResourcePrefix(columnName: string): string {
+  const dot = columnName.lastIndexOf('.');
+  return dot === -1 ? columnName : columnName.slice(dot + 1);
+}
+
+function extractMissingColumn(text: string): string | null {
+  const match = MISSING_COLUMN_PATTERN.exec(text);
+  return match ? stripResourcePrefix(match[1]) : null;
+}
+
 /**
- * A year whose resource dropped or renamed a column we asked for. CKAN truncates its
- * message, so read the structured detail; the optional backslashes tolerate the
- * JSON escaping that JSON.stringify puts around the column name.
+ * A year whose resource dropped or renamed a column we asked for. CKAN's structured
+ * error puts the psycopg2 message in `detail.query[0]` and again (usually cleaner)
+ * in `detail.info.orig[0]`; `err.message` is only a truncated summary of that, so it
+ * is used as a fallback for callers that never got a structured `detail` at all.
  */
-function isMissingColumnError(err: unknown): boolean {
-  if (!(err instanceof SourceError)) return false;
-  const haystack = err.detail !== undefined ? JSON.stringify(err.detail) : err.message;
-  return /column\s+\\?"[^"\\]+\\?"\s+does not exist/i.test(haystack);
+function missingColumnName(err: unknown): string | null {
+  if (!(err instanceof SourceError)) return null;
+  const detail = err.detail;
+  if (detail !== undefined) {
+    const d = detail as { query?: unknown; info?: { orig?: unknown } } | null;
+    const candidates = [
+      Array.isArray(d?.query) ? d?.query[0] : undefined,
+      Array.isArray(d?.info?.orig) ? d?.info?.orig[0] : undefined,
+    ];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string') {
+        const name = extractMissingColumn(candidate);
+        if (name) return name;
+      }
+    }
+    return null;
+  }
+  return extractMissingColumn(err.message);
 }
 
 export function assessorSource(year: AssessorYear): RecordSource {
@@ -215,8 +243,13 @@ export function assessorSource(year: AssessorYear): RecordSource {
       try {
         rows = await ckanSql<Row>(sql, fetchImpl);
       } catch (err) {
-        if (isMissingColumnError(err)) {
-          return { query: sql, rows: [] };
+        const missingColumn = missingColumnName(err);
+        const mailColumnNames = Object.values(year.columns).filter((c): c is string => Boolean(c));
+        if (missingColumn && mailColumnNames.includes(missingColumn)) {
+          return {
+            query: `${sql} -- skipped: column "${missingColumn}" does not exist in ${year.fiscalYear}`,
+            rows: [],
+          };
         }
         throw err;
       }
