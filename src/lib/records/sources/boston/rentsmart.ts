@@ -6,6 +6,13 @@
 // RentSmart is the city's roll-up of housing-related complaints and requests, keyed on
 // `parcel` (text) rather than address, so unlike the address-matched feeds elsewhere in
 // this directory this source has nothing to query on when the building has no parcel.
+//
+// CKAN's `_id` is a row number assigned by the datastore, not a stable record key: a
+// wholesale reload of this resource reassigns `_id` for every row. That's fine for
+// storage — pull.ts replaces this source's rows wholesale on every pull, so nothing here
+// depends on `_id` surviving between pulls — but a re-pull diff must compare RentSmart
+// rows on payload content, not on `sourceKey` (which is `_id`), or every dataset reload
+// will look like an entirely new set of records.
 import { ckanSql, ROW_CAP, sqlLiteral } from '../../ckan';
 import type { RecordSource, RentSmartPayload, SourceResult } from '../../types';
 
@@ -28,7 +35,13 @@ export const rentsmartSource: RecordSource = {
   async run(identity, fetchImpl): Promise<SourceResult> {
     const parcelForms = Array.from(new Set([identity.parcelId, identity.parcelNumeric].filter((p): p is string => Boolean(p))));
     if (parcelForms.length === 0) {
-      return { query: 'no parcel: RentSmart skipped', rows: [] };
+      // An empty result still runs the delete side of pull.ts's replace-per-source write
+      // (see replaceStatements), so this is how a building that lost its parcel — or
+      // turned out to be a condo with no whole-building parcel — gets stale RentSmart
+      // rows from a previous pull cleared instead of left behind.
+      return identity.condominium
+        ? { query: 'condominium: no whole-building parcel, RentSmart skipped', rows: [] }
+        : { query: 'no parcel: RentSmart skipped', rows: [] };
     }
     const sql =
       `SELECT ${COLUMNS.map((c) => `"${c}"`).join(',')} FROM "${RENTSMART_RESOURCE_ID}" ` +

@@ -4,6 +4,7 @@ import { jurisdictionForCity, sourcesForCity } from '../records/jurisdictions';
 import { rentsmartSource, RENTSMART_RESOURCE_ID } from '../records/sources/boston/rentsmart';
 import type { RentSmartPayload } from '../records/types';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
+// Only `_id` is synthetic here — the rest is a shape-accurate real RentSmart response.
 import lanarkRows from './helpers/records/rentsmart-lanark.json';
 
 const lanark = buildIdentity({
@@ -44,6 +45,33 @@ describe('rentsmartSource', () => {
     expect(result.query).toBe('no parcel: RentSmart skipped');
     expect(fetchImpl.calls).toHaveLength(0);
   });
+
+  it('names the condominium skip distinctly from a plain missing parcel', async () => {
+    const condo = { ...lanark, parcelId: null, parcelNumeric: null, condominium: true };
+    const fetchImpl = fixtureFetch([{ resourceId: RENTSMART_RESOURCE_ID, records: lanarkRows }]);
+    const result = await rentsmartSource.run(condo, fetchImpl);
+    expect(result.rows).toEqual([]);
+    expect(result.query).toBe('condominium: no whole-building parcel, RentSmart skipped');
+    expect(fetchImpl.calls).toHaveLength(0);
+  });
+
+  it('dedupes a repeated _id, keeping the first row seen', async () => {
+    const withDuplicate = [...lanarkRows, { ...lanarkRows[0], description: 'Duplicate reload of the same row' }];
+    const fetchImpl = fixtureFetch([{ resourceId: RENTSMART_RESOURCE_ID, records: withDuplicate }]);
+    const result = await rentsmartSource.run(lanark, fetchImpl);
+    expect(result.rows).toHaveLength(4);
+    const first = result.rows[0].payload as RentSmartPayload;
+    expect(first.rowId).toBe('90001');
+    expect(first.description).toBe('Unsatisfactory Living Conditions');
+  });
+
+  it('drops a row with a null _id', async () => {
+    const withNullId = [...lanarkRows, { ...lanarkRows[0], _id: null, description: 'No row number' }];
+    const fetchImpl = fixtureFetch([{ resourceId: RENTSMART_RESOURCE_ID, records: withNullId }]);
+    const result = await rentsmartSource.run(lanark, fetchImpl);
+    expect(result.rows).toHaveLength(4);
+    expect(result.rows.some((r) => (r.payload as RentSmartPayload).description === 'No row number')).toBe(false);
+  });
 });
 
 describe('jurisdictionForCity', () => {
@@ -67,11 +95,19 @@ describe('sourcesForCity', () => {
     const assessmentOwners = sources.filter((s) => s.kinds.includes('assessment'));
     expect(assessmentOwners).toHaveLength(6);
     const labels = sources.map((s) => s.label);
-    expect(labels).toContain('RentSmart');
-    expect(labels).toContain('311 Service Requests');
-    expect(labels).toContain('Approved Building Permits');
-    expect(labels).toContain('Building and Property Violations');
-    expect(labels).toContain('Public Works Code Enforcement');
+    expect(labels).toEqual([
+      'Property Assessment FY2026',
+      'Property Assessment FY2025',
+      'Property Assessment FY2024',
+      'Property Assessment FY2023',
+      'Property Assessment FY2022',
+      'Property Assessment FY2021',
+      'Approved Building Permits',
+      'Building and Property Violations',
+      'Public Works Code Enforcement',
+      '311 Service Requests',
+      'RentSmart',
+    ]);
   });
 
   it('has unique source ids across the Boston list', () => {

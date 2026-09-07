@@ -11,7 +11,11 @@ import type { RecordSource } from './types';
 
 export type Jurisdiction = 'boston';
 
-/** Mirrors dispatcher.ts's city normalization: strip a trailing ", XX" state, lowercase. */
+/**
+ * Strip a trailing ", XX" state, lowercase. Deliberately looser than
+ * enrichment/dispatcher.ts, which requires an uppercase state and treats "Boston, ma" as
+ * unrecognized.
+ */
 function normalizeCity(city: string): string {
   return city.replace(/,\s*[A-Z]{2}$/i, '').trim().toLowerCase();
 }
@@ -23,8 +27,15 @@ export function jurisdictionForCity(city: string | null): Jurisdiction | null {
 
 export function sourcesForCity(city: string | null): RecordSource[] {
   const jurisdiction = jurisdictionForCity(city);
-  if (jurisdiction === 'boston') {
-    return [...ASSESSOR_YEARS.map(assessorSource), permitsSource, violationsSource, enforcementSource, serviceRequestsSource, rentsmartSource];
+  if (jurisdiction === null) return [];
+  switch (jurisdiction) {
+    case 'boston':
+      return [...ASSESSOR_YEARS.map(assessorSource), permitsSource, violationsSource, enforcementSource, serviceRequestsSource, rentsmartSource];
+    default: {
+      // Exhaustiveness guard: adding a Jurisdiction without a source list here is a
+      // compile error, not a silently empty result at runtime.
+      const unreachable: never = jurisdiction;
+      throw new Error(`sourcesForCity: no source list for jurisdiction "${unreachable}"`);
+    }
   }
-  return [];
 }
