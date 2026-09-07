@@ -7,7 +7,7 @@ const source = readFileSync(join(process.cwd(), 'src/components/BuildingRecords.
 
 describe('BuildingRecords.astro display rules', () => {
   it('contains none of the banned characterizations', () => {
-    const pattern = new RegExp(String.raw`b(${BANNED_WORDS.join("|")})b`, "i");
+    const pattern = new RegExp(String.raw`(${BANNED_WORDS.join("|")})`, "i");
     expect(source).not.toMatch(pattern);
   });
   it('never imports score colors or links to reviews and scores', () => {
