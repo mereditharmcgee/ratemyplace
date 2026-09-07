@@ -1,0 +1,5 @@
+[
+  { "PID": "2102110000", "ST_NUM": "55", "ST_NUM2": "65", "ST_NAME": "Lanark RD", "LU": "CM", "OWNER": "GRAND LANARK CONDO TR" },
+  { "PID": "2102110002", "ST_NUM": "55", "ST_NUM2": null, "ST_NAME": "Lanark RD", "LU": "CD", "OWNER": "SRIVATSA SRINI" },
+  { "PID": "2102110004", "ST_NUM": "55", "ST_NUM2": null, "ST_NAME": "Lanark RD", "LU": "CD", "OWNER": "MATTCAM LLC" }
+]

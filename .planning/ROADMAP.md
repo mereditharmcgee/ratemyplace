@@ -10,6 +10,7 @@
 - ✅ **v1.4.0 Open Doors** — Phases 10-15 (shipped 2026-03-22)
 - ✅ **v1.5.0 Closed Loops** — Phases 16-21 (shipped 2026-04-29)
 - 📝 **v1.6.0 Trust + Density** — Phases 22-30 (design approved; implementation planning)
+- 📝 **v1.7.0 Public Record** (Phases 31-34): A records foundation, C Boston coverage, B entity record, D neighborhood indicator; spec approved 2026-09-06; A implemented 2026-09-07 pending merge
 
 ## Phases
 

@@ -27,7 +27,14 @@ data, use Astro instead.
 | `reviews/` | `ReviewForm`, `ReviewEditForm`, `ReviewCard`, `form-steps/` |
 | `admin/` | 9 tables and queues + `AdminLayout.astro` |
 | `profile/` | Tenant dashboard, settings, notifications, verification |
+| `records/` | Public-records panel pieces: `RecordSectionHeader.astro`, `CorrectionNotes.astro`, `RecordCorrectionForm.tsx` |
 | `search/`, `ratings/`, `ui/`, `contact/`, `disputes/` | As named |
+
+`BuildingRecords.astro` and every `.astro` file in `records/` are read as source text by
+`src/lib/__tests__/recordsPanelCopy.test.ts`, which fails on any word in `BANNED_WORDS`
+(`src/lib/records/display.ts`) — the panel reports what the city recorded and never
+characterizes it. Copy added there is scanned automatically; a new section file is picked
+up with no test change.
 
 The multi-step review form is split across `reviews/form-steps/` — address, unit details,
 ratings, additional, confirm, plus `StepIndicator` and `RatingItem`. Add new form fields

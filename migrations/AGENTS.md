@@ -1,6 +1,6 @@
 # `migrations/` — D1 Schema Changes
 
-Cloudflare D1 (SQLite). 27 migrations, `0001` through `0027`.
+Cloudflare D1 (SQLite). 30 migrations, `0001` through `0030`.
 
 ---
 
@@ -14,6 +14,23 @@ ran.
 
 `0027` is a non-idempotent `DROP COLUMN` batch — 15 columns. Re-running it fails, and
 running `migrations apply --remote` blindly may attempt exactly that.
+
+**`0029` and `0030` (public building records) are the same kind of hazard.** `0029` adds
+`parcel_id` and `sam_id` to `buildings` with `ALTER TABLE ... ADD COLUMN`, which SQLite has
+no `IF NOT EXISTS` form for, so re-running it fails with `duplicate column name` and takes
+the rest of the file down with it. `0030` rebuilds `audit_logs` to widen its `action_type`
+CHECK for `records_pulled` and `record_correction_resolved`, following the 0028 pattern:
+create `audit_logs_v4`, copy every row, drop, rename.
+
+Apply both with `wrangler d1 execute --remote --file`, one file at a time, never
+`migrations apply --remote`. Back up `audit_logs` before running `0030`, and verify the row
+count matches afterwards; the copy is the whole risk in a table rebuild.
+
+**APPLIED TO PRODUCTION 2026-09-07** via `wrangler d1 execute --remote --file`, `0029` then
+`0030`, in that order. `audit_logs` held 55 rows (ids 1 to 55) before and after; `parcel_id`
+and `sam_id` present; the three records tables and all four `idx_audit_*` indexes exist; no
+`audit_logs_v4` left behind. Like `0025` through `0028`, wrangler's migration tracking does
+not know these ran. Do not re-run either file.
 
 Before touching production schema: check the live schema directly, confirm what has
 actually been applied, and apply deliberately. Do not assume wrangler's state is accurate.
@@ -75,6 +92,8 @@ Dropping a column that deployed code still reads takes the site down.
 | `audit_logs` | Destructive admin actions, old value → new value |
 | `notifications` | In-app tenant notifications |
 | `saved_buildings` | Bookmarks |
+| `record_pulls`, `building_records` | Public building records from city open data. `record_pulls` is insert-only provenance, one row per source run; `building_records` holds the typed JSON payloads, unique on `(building_id, kind, source_key)` |
+| `record_corrections` | Public "report a record error" claims and their resolutions. Stores the claim and an optional email, nothing else about the filer |
 | `rate_limits` | Fail-closed rate limiting, keyed and windowed |
 | `contact_messages`, `bug_reports` | Inbound forms with admin queues |
 | `password_reset_tokens` | Reset flow |

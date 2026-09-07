@@ -1,0 +1,17 @@
+[
+  {
+    "case_id": "BCS-00300001",
+    "open_date": "2026-08-01 10:00:00+00",
+    "close_date": null,
+    "case_status": "Open",
+    "closure_reason": null,
+    "case_topic": "Unsatisfactory Living Conditions",
+    "service_name": "Unsatisfactory Living Conditions",
+    "assigned_department": "Inspectional Services Department (ISD)",
+    "full_address": "27 Lanark Rd, Boston, MA 02135",
+    "street_number": "27",
+    "street_name": "Lanark Rd",
+    "zip_code": "02135",
+    "report_source": "BOS311"
+  }
+]

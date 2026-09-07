@@ -593,3 +593,105 @@ ${reasonBlock}
     return { success: false, error: 'Failed to send email' };
   }
 }
+
+
+/**
+ * Outcome of an admin's resolution of a public-record correction report.
+ * Mirrors `CorrectionResolution` in `lib/records/corrections.ts` — kept as its
+ * own type here so `email.ts` stays free of records-module imports.
+ */
+export type RecordCorrectionOutcome = 'repulled_unchanged' | 'repulled_updated' | 'source_mismatch_noted';
+
+/**
+ * Trusted copy constants — interpolated raw, never through escapeHtml (see the
+ * escapeHtml doc comment). Deliberately says nothing about *what* the filer
+ * claimed and names no admin: the person who filed the report is anonymous to
+ * us beyond an optional email, and the report itself is not public.
+ */
+const RECORD_CORRECTION_OUTCOME_COPY: Record<
+  RecordCorrectionOutcome,
+  { subject: string; heading: string; lede: string }
+> = {
+  repulled_unchanged: {
+    subject: 'We re-checked the public record you reported',
+    heading: 'We re-checked the public record you reported',
+    lede: "We pulled the record again from the city's primary source. It still shows what our page shows, so nothing changed.",
+  },
+  repulled_updated: {
+    subject: 'The public record you reported has been updated',
+    heading: 'The public record you reported has been updated',
+    lede: "We pulled the record again from the city's primary source. The source had changed, and the page now reflects it.",
+  },
+  source_mismatch_noted: {
+    subject: 'We noted a mismatch in the public record you reported',
+    heading: 'We noted a mismatch in the public record you reported',
+    lede: "We pulled the record again. The city's own data still disagrees with what you told us, so we have added a dated note to that section rather than editing the record by hand.",
+  },
+};
+
+/**
+ * Tell someone who reported a wrong public record what came of it.
+ *
+ * @param apiKey - Resend API key from environment
+ * @param toEmail - Filer's contact email (optional on the report; caller skips the send when absent)
+ * @param buildingAddress - Address of the building whose record was reported (user-controlled → escaped)
+ * @param buildingUrl - System-generated link to the building page's records section (NOT escaped)
+ * @param outcome - How the admin resolved the report
+ */
+export async function sendRecordCorrectionOutcomeEmail(
+  apiKey: string,
+  toEmail: string,
+  buildingAddress: string,
+  buildingUrl: string,
+  outcome: RecordCorrectionOutcome
+): Promise<EmailResult> {
+  if (!apiKey) {
+    console.error('RESEND_API_KEY not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  const resend = new Resend(apiKey);
+  const copy = RECORD_CORRECTION_OUTCOME_COPY[outcome];
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+      to: toEmail,
+      subject: copy.subject,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">${copy.heading}</h2>
+
+  <p>You reported a public record for <strong>${escapeHtml(buildingAddress)}</strong>.</p>
+
+  <p>${copy.lede}</p>
+
+  <p><a href="${buildingUrl}" style="color: #0d9488;">View the building page</a></p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>.
+  </p>
+</body>
+</html>
+      `,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err) {
+    console.error('Email send exception:', err);
+    return { success: false, error: 'Failed to send email' };
+  }
+}

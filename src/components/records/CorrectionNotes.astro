@@ -1,0 +1,19 @@
+---
+// Notes left on a section by a resolved correction: someone reported a value, we re-pulled it
+// from the primary source, and the source still says what it said. The note states that and
+// nothing more — the panel does not adjudicate between a reader and the city's records.
+import { formatPullDate } from '../../lib/records/display';
+import type { CorrectionNote } from '../../lib/records/query';
+
+interface Props {
+  notes: CorrectionNote[];
+}
+
+const { notes } = Astro.props;
+---
+
+{notes.map((note) => (
+  <p class="text-xs text-gray-600 mt-2">
+    A correction was filed on this record on {formatPullDate(note.resolvedAt)}. The source has not updated. {note.notes}
+  </p>
+))}

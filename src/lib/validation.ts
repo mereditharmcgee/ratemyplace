@@ -348,3 +348,14 @@ export function sanitizeText(text: string): string {
     .replace(/\s+/g, ' ')
     .replace(/<[^>]*>/g, '');
 }
+
+/** Like sanitizeText, but keeps line breaks: for long free text an admin reads. */
+export function sanitizeMultilineText(text: string): string {
+  return text
+    .replace(/<[^>]*>/g, '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}

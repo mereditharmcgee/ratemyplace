@@ -35,4 +35,4 @@ routes any `.md` inside `src/pages/`.
 npm test && npm run build
 ```
 
-389 unit tests, ~13s. Both should be clean.
+Both should be clean; the unit suite runs in well under a minute.

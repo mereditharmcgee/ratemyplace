@@ -84,6 +84,7 @@ npm run build      # production build
 npm run e2e        # fresh local D1 + seed + build + Playwright
 npm run db:setup   # db:fresh then db:seed (local D1 only)
 npm run ops:metrics   # regenerate ops/METRICS.md from production (read-only)
+npm run records:check   # live Lanark fixture check (hits data.boston.gov), run by hand
 ```
 
 `npm run smoke` has no default target. Supply an explicit `--environment` and
@@ -130,6 +131,15 @@ validation, and rate limiting. A missing check is a live vulnerability, not a st
 D1-backed application limiter, so cookie-free release monitoring stays independent of D1.
 This exception applies to no other public endpoint and does not authorize a custom edge
 rate rule; any such edge configuration needs separate approval.
+
+**Documented exception to "parameterized queries always":** Boston's CKAN SQL endpoint
+(`datastore_search_sql`) has no parameter binding, so `src/lib/records/` is the one place
+in this repo that builds SQL by interpolation. It is scoped to that directory and to
+queries sent to `data.boston.gov`, never to D1. The invariant that keeps it safe: every
+interpolated value passes through `sqlLiteral` or `addressLikeClauses` or a digits-only
+guard, and every identifier (resource id, column name) is a code constant, never user
+input. After touching an adapter, run `npm run records:check` against the Lanark fixture.
+This exception does not extend to any other module or any other data source.
 
 ### Getting the database
 
@@ -246,6 +256,29 @@ Things that have already cost time. Read before debugging.
   `.tmp.driveupload/` so dev doesn't reload-loop. Don't remove that config.
 - **Google OAuth on production is historically flaky** (Workers bot detection) while fine
   locally. Status unverified since May 2026 — see `GOOGLE_OAUTH_TROUBLESHOOTING.md`.
+- **Parcel ids drop their leading zero in some Boston datasets.** `buildings.parcel_id`
+  holds the canonical 10-digit form with the zero; the permits resource stores `parcel_id`
+  as a number, so the zero is gone. The assessor and RentSmart adapters query both forms;
+  the permits adapter uses the numeric form only because its column is numeric; the
+  violation feeds have no parcel column and key on street, number, and SAM id.
+- **The FY2026 assessor stores ranged addresses as `ST_NUM` plus `ST_NUM2`**, and street
+  names arrive mixed-case. An exact `datastore_search` filter therefore misses `23-27
+  Lanark Rd` entirely, which is why `src/lib/records/` uses the CKAN SQL endpoint with
+  `upper()` and checks both number columns.
+- **The violation and code-enforcement feeds drop street directionals** and store ranges
+  split across a low and a high column (`violation_stno` / `violation_sthigh`), where the
+  high column doubles as the letter of a lettered number. Matching strips the directional,
+  so `84 E Newton St` and `84 W Newton St` collide; the zip predicate narrows that and the
+  correction workflow is the escape hatch.
+- **311 is sixteen yearly resources plus a new-system resource with a different schema.**
+  The legacy files keep the address as free text in `location`; the new one splits it into
+  `street_number` / `street_name` / `zip_code`. A retired legacy resource id fails every
+  pull until someone updates `LEGACY_311_RESOURCES`; it does not clear on its own.
+- **CKAN rejects `ESCAPE '\'`** with `HTTP 409 Query is not a single statement`. LIKE
+  clauses against `data.boston.gov` use `ESCAPE '!'` instead. See `src/lib/records/ckan.ts`.
+- **Public records are never fetched on a public page view.** Pulls are admin-triggered and
+  stored in D1; the panel reads only what was stored. Lazy pull-on-view is permanently
+  rejected: it is an amplification vector and ties page latency to a third-party API.
 
 ## Pre-deploy QA
 

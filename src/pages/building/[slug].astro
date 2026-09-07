@@ -7,6 +7,7 @@ import UGCDisclaimer from '../../components/reviews/UGCDisclaimer.astro';
 import BookmarkButton from '../../components/ui/BookmarkButton';
 import PostSubmitVerification from '../../components/profile/PostSubmitVerification';
 import EmptyState from '../../components/ui/EmptyState.astro';
+import BuildingRecords from '../../components/BuildingRecords.astro';
 import { calculateBuildingAverages, getRecencyWeight, getReviewYear } from '../../lib/scoring';
 import { currentReviewYear } from '../../lib/scoring-sql';
 import { getScoreTextColor } from '../../lib/scoring-colors';
@@ -301,6 +302,8 @@ const sortedUnits = Array.from(reviewsByUnit.values())
             )}
           </dl>
         </div>
+
+        <BuildingRecords buildingId={building.id} />
 
         <!-- Units Section -->
         {sortedUnits.length > 0 && (

@@ -280,7 +280,9 @@ export type AuditActionType =
   | 'dispute_dismissed'
   | 'dispute_partially_valid'
   | 'landlord_deleted'
-  | 'user_updated';
+  | 'user_updated'
+  | 'records_pulled'
+  | 'record_correction_resolved';
 
 export interface AuditLogEntry {
   id: number;
@@ -349,4 +351,33 @@ export interface CleanupPreviewResponse {
 export interface CleanupResponse {
   success: boolean;
   deleted: number;
+}
+
+// =============================================================================
+// Public Records Types
+// =============================================================================
+
+/**
+ * One row of GET /api/admin/records/corrections — a `record_corrections` row
+ * joined to its building. `record_kind` is null when the report was filed
+ * against the whole records panel rather than one record (see
+ * `fromStoredKind` in lib/records/corrections.ts).
+ */
+export interface RecordCorrection {
+  id: string;
+  building_id: string;
+  record_kind: string | null;
+  claim: string;
+  /** 1 when the filer left an address, so the queue can say whether resolving emails them. The address itself is never sent to the client. */
+  has_contact_email: number;
+  /** 1 when a re-pull already succeeded (`ok`/`empty`) for this correction, so a reload can re-enable Resolve without a fresh client-side re-pull. */
+  has_pull: number;
+  status: 'pending' | 'resolved';
+  resolution: 'repulled_unchanged' | 'repulled_updated' | 'source_mismatch_noted' | null;
+  resolution_notes: string | null;
+  resolved_by: string | null;
+  resolved_at: number | null;
+  created_at: number;
+  building_address: string;
+  building_slug: string;
 }
