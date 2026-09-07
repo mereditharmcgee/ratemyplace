@@ -75,6 +75,17 @@ describe('buildIdentity', () => {
     ['9 S Munroe Ter', 'S MUNROE TE', 'S MUNROE'],
     ['25 Winthrop Sq', 'WINTHROP SQ', 'WINTHROP'],
     ['10 Broadway, Boston, MA', 'BROADWAY', 'BROADWAY'],
+    // Real streets named after suffix words: the guard must only fire when a suffix word
+    // stands alone with nothing to split off, not whenever the base happens to be one.
+    ['10 Park St', 'PARK ST', 'PARK'],
+    ['26 Court St', 'COURT ST', 'COURT'],
+    ['1 Park Dr', 'PARK DR', 'PARK'],
+    ['100 Terrace St', 'TERRACE ST', 'TERRACE'],
+    ['5 Court Sq', 'COURT SQ', 'COURT'],
+    // Directionals abbreviate whenever a name follows, suffix or not.
+    ['100 West Broadway', 'W BROADWAY', 'W BROADWAY'],
+    ['20 East Broadway', 'E BROADWAY', 'E BROADWAY'],
+    ['3 E First St', 'E FIRST ST', 'E FIRST'],
   ];
 
   it.each(cases)('normalizes %s to %s', (address, streetShort, streetBase) => {
@@ -90,6 +101,14 @@ describe('buildIdentity', () => {
 
   it('throws when stripping the unit designator leaves no street name', () => {
     expect(() => buildIdentity({ ...base, address: '99 Unit Ave' })).toThrow(/degenerate/i);
+  });
+
+  it('throws when a leading unit designator strips the whole street', () => {
+    expect(() => buildIdentity({ ...base, address: '5 Apt 3' })).toThrow(/degenerate/i);
+  });
+
+  it('throws on a bare suffix word with nothing to split off', () => {
+    expect(() => buildIdentity({ ...base, address: '5 Ave' })).toThrow(/degenerate/i);
   });
 
   it('throws on a spaced range the number parser cannot take whole', () => {
