@@ -1,4 +1,3 @@
-import { escapeLikePattern } from '../validation';
 import { SourceError, type BuildingIdentity, type FetchLike } from './types';
 
 export const CKAN_SQL_ENDPOINT = 'https://data.boston.gov/api/3/action/datastore_search_sql';
@@ -11,7 +10,23 @@ export function sqlLiteral(value: string): string {
 }
 
 /**
- * `upper("<column>") LIKE '<form>%' ESCAPE '\'` for every unique short and long address
+ * Escape `!`, `%`, and `_` for a LIKE pattern using `!` as the escape character
+ * (escaping `!` itself first, so a literal `!` in the input round-trips correctly).
+ *
+ * Boston's CKAN `datastore_search_sql` rejects any query containing `ESCAPE '\'`
+ * with `HTTP 409 Query is not a single statement` — its statement splitter treats
+ * the backslash-quote as an unterminated string. Verified live 2026-09-07 against
+ * the permits resource: `ESCAPE '!'` returns 200 and works correctly
+ * (`LIKE '55!_65 LANARK%' ESCAPE '!'` matches nothing, `LIKE '55-65 LANARK%' ESCAPE '!'`
+ * matches). `!` is not a SQL metacharacter and is not used elsewhere in these
+ * address forms, so it is safe to use as the escape character here.
+ */
+function escapeLikeForCkan(value: string): string {
+  return value.replace(/!/g, '!!').replace(/%/g, '!%').replace(/_/g, '!_');
+}
+
+/**
+ * `upper("<column>") LIKE '<form>%' ESCAPE '!'` for every unique short and long address
  * form on `identity`. `column` must be a code constant, never user input — it is
  * interpolated as an identifier and only checked against a conservative shape.
  *
@@ -24,7 +39,7 @@ export function sqlLiteral(value: string): string {
 export function addressLikeClauses(column: string, identity: BuildingIdentity): string[] {
   if (!/^[a-z_]+$/.test(column)) throw new Error(`Unsafe column name for LIKE clause: ${column}`);
   const forms = Array.from(new Set([...identity.addressFormsShort, ...identity.addressFormsLong]));
-  return forms.map((f) => `upper("${column}") LIKE ${sqlLiteral(`${escapeLikePattern(f)}%`)} ESCAPE '\\'`);
+  return forms.map((f) => `upper("${column}") LIKE ${sqlLiteral(`${escapeLikeForCkan(f)}%`)} ESCAPE '!'`);
 }
 
 /**

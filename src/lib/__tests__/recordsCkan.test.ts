@@ -24,7 +24,7 @@ describe('sqlLiteral', () => {
 describe('addressLikeClauses', () => {
   it('escapes single quotes, percent, and underscore, then appends the LIKE wildcard', () => {
     const [clause] = addressLikeClauses('address', identityWithForms([`O'BRIEN_50%`]));
-    expect(clause).toBe(`upper("address") LIKE 'O''BRIEN\\_50\\%%' ESCAPE '\\'`);
+    expect(clause).toBe(`upper("address") LIKE 'O''BRIEN!_50!%%' ESCAPE '!'`);
   });
 
   it('throws on a column name that is not a safe lowercase identifier', () => {
@@ -34,8 +34,9 @@ describe('addressLikeClauses', () => {
 
   it('the emitted pattern is a true prefix match: matches an address extension, not a longer number sharing the prefix', () => {
     const [clause] = addressLikeClauses('address', identityWithForms(['55 LANARK RD']));
-    const inner = clause.match(/LIKE '(.*)%' ESCAPE/)![1];
-    const regex = new RegExp('^' + inner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '.*$');
+    const inner = clause.match(/LIKE '(.*)%' ESCAPE '!'/)![1];
+    const literal = inner.replace(/!(.)/g, '$1'); // undo '!'-escaping to recover the literal prefix
+    const regex = new RegExp('^' + literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '.*$');
     expect(regex.test('55 LANARK RD REAR')).toBe(true);
     expect(regex.test('551 LANARK RD')).toBe(false);
   });

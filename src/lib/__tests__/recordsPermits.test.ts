@@ -14,8 +14,8 @@ describe('permitsSource', () => {
     const fetchImpl = fixtureFetch([{ resourceId: PERMITS_RESOURCE_ID, records: positive }]);
     const result = await permitsSource.run(fiftyFive, fetchImpl);
     expect(result.query).toContain('"parcel_id" = 2102110000');
-    expect(result.query).toContain(`upper("address") LIKE '55 LANARK RD%' ESCAPE '\\'`);
-    expect(result.query).toContain(`upper("address") LIKE '55-65 LANARK ROAD%' ESCAPE '\\'`);
+    expect(result.query).toContain(`upper("address") LIKE '55 LANARK RD%' ESCAPE '!'`);
+    expect(result.query).toContain(`upper("address") LIKE '55-65 LANARK ROAD%' ESCAPE '!'`);
     expect(result.query).toContain('ORDER BY "issued_date" DESC');
   });
 

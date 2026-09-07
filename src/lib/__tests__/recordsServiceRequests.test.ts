@@ -56,8 +56,8 @@ describe('serviceRequestsSource', () => {
     const queries: string[] = JSON.parse(result.query);
     const q = queries.find((sql) => sql.includes(year2024.resourceId));
     expect(q).toBeDefined();
-    expect(q).toContain(`upper("location") LIKE '23-27 LANARK RD%' ESCAPE '\\'`);
-    expect(q).toContain(`upper("location") LIKE '27 LANARK ROAD%' ESCAPE '\\'`);
+    expect(q).toContain(`upper("location") LIKE '23-27 LANARK RD%' ESCAPE '!'`);
+    expect(q).toContain(`upper("location") LIKE '27 LANARK ROAD%' ESCAPE '!'`);
     expect(q).toContain(`("location_zipcode" IS NULL OR "location_zipcode" = '02135')`);
     expect(q).toContain(`ORDER BY "open_dt" DESC, "case_enquiry_id" LIMIT 500`);
   });
