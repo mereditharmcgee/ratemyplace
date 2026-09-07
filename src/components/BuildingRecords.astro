@@ -1,0 +1,384 @@
+---
+// The public records panel. Product rule, non-negotiable: this panel has no opinion.
+// Every value below is a field off a stored record or a count of records — no scoring,
+// no score colors, no characterization of what the records mean. `display.ts` owns every
+// piece of framing copy so a single test can hold the whole surface to that rule.
+import { getBuildingRecords } from '../lib/records/query';
+import {
+  PANEL_FRAMING_COPY,
+  ZERO_PERMITS_COPY,
+  DECLARED_VALUATION_CAVEAT,
+  OTHER_REQUESTS_COPY,
+  CONDOMINIUM_COPY,
+  showMailingAddress,
+  formatDollars,
+  formatRecordDate,
+  permitSummary,
+  splitServiceRequests,
+  rentSmartDisagreement,
+} from '../lib/records/display';
+import { ROW_CAP } from '../lib/records/ckan';
+import { FY2026_RESOURCE_ID, ASSESSOR_PAGE_URL } from '../lib/records/sources/boston/assessor';
+import { PERMITS_RESOURCE_ID, PERMITS_PAGE_URL, PERMIT_COVERAGE_START } from '../lib/records/sources/boston/permits';
+import { VIOLATIONS_RESOURCE_ID, VIOLATIONS_PAGE_URL } from '../lib/records/sources/boston/violations';
+import { ENFORCEMENT_RESOURCE_ID, ENFORCEMENT_PAGE_URL } from '../lib/records/sources/boston/enforcement';
+import {
+  NEW_311_RESOURCE_ID,
+  SERVICE_REQUESTS_PAGE_URL,
+  HOUSING_REASONS,
+  HOUSING_DEPARTMENT_PREFIX,
+} from '../lib/records/sources/boston/serviceRequests';
+import RecordCorrectionForm from './records/RecordCorrectionForm';
+import type { AssessmentPayload } from '../lib/records/types';
+
+interface Props {
+  buildingId: string;
+}
+
+const { buildingId } = Astro.props;
+
+const view = await getBuildingRecords(Astro.locals.runtime.env.DB, buildingId);
+
+/** Provenance timestamps are unix seconds; record dates are strings. Both render the same way. */
+function asOf(unix: number): string {
+  return formatRecordDate(new Date(unix * 1000).toISOString());
+}
+
+const current = view?.assessments[0] ?? null;
+const permits = view ? permitSummary(view.permits) : null;
+const requests = view ? splitServiceRequests(view.serviceRequests) : null;
+const rentSmartNote = view && requests ? rentSmartDisagreement(view.rentsmart, requests.housing.length) : null;
+
+function statusFor(sourceId: string) {
+  return view?.sources[sourceId] ?? null;
+}
+
+/** A source that failed its most recent attempt and left no rows behind has nothing to show. */
+function unavailable(sourceId: string, kindHasRows: boolean): boolean {
+  return statusFor(sourceId)?.status === 'error' && !kindHasRows;
+}
+
+/** A correction with no kind was filed against the pull as a whole, so it shows everywhere. */
+function notesFor(kind: string) {
+  return (view?.corrections ?? []).filter((note) => note.recordKind === kind || note.recordKind === null);
+}
+
+/** The CKAN row cap is a hard slice, so a full page means there may be more upstream. */
+function capped(rowCount: number): boolean {
+  return rowCount >= ROW_CAP;
+}
+
+function orNotRecorded(value: string | number | null | undefined): string {
+  return value === null || value === undefined || value === '' ? 'Not recorded' : String(value);
+}
+
+function mailingAddress(assessment: AssessmentPayload): string {
+  const cityState = [assessment.mailCity, assessment.mailState].filter(Boolean).join(', ');
+  const cityLine = [cityState, assessment.mailZip].filter(Boolean).join(' ');
+  const joined = [assessment.mailAddressee, assessment.mailStreet, cityLine].filter(Boolean).join(', ');
+  return joined === '' ? 'Not recorded' : joined;
+}
+
+const assessorStatus = statusFor(FY2026_RESOURCE_ID);
+const permitStatus = statusFor(PERMITS_RESOURCE_ID);
+const violationStatus = statusFor(VIOLATIONS_RESOURCE_ID);
+const enforcementStatus = statusFor(ENFORCEMENT_RESOURCE_ID);
+const requestStatus = statusFor(NEW_311_RESOURCE_ID);
+
+// Open rows first, then everything else, each group keeping the query's date order.
+const violationsOrdered = view
+  ? [
+      ...view.violations.filter((row) => (row.status ?? '').toLowerCase() === 'open'),
+      ...view.violations.filter((row) => (row.status ?? '').toLowerCase() !== 'open'),
+    ]
+  : [];
+
+const rowClass = 'py-1.5 grid grid-cols-1 sm:grid-cols-[7rem_1fr_auto] gap-2';
+const listClass = 'divide-y divide-gray-100 text-sm mt-2';
+---
+
+{view && (
+  <section id="public-records" class="bg-white rounded-[6px] border border-gray-200 p-6 mb-8">
+    <div class="flex items-start justify-between gap-4">
+      <h2 class="text-xl font-semibold text-gray-900">Public records</h2>
+      <a href="#report-record" class="text-sm text-teal-700 hover:underline shrink-0">Report a record error</a>
+    </div>
+    <p class="text-sm text-gray-600 mt-2">{PANEL_FRAMING_COPY}</p>
+    <p class="text-xs text-gray-500 mt-1">Most recent pull: {asOf(view.pulledAt)}.</p>
+    {view.invalidKinds.length > 0 && (
+      <p class="text-xs text-amber-700 mt-2">
+        Some records could not be read and are not shown ({view.invalidKinds.join(', ')}).
+      </p>
+    )}
+
+    <div class="mt-6">
+      <div class="flex items-baseline justify-between gap-4">
+        <h3 class="text-base font-semibold text-gray-900">Property</h3>
+        {assessorStatus && (
+          <p class="text-xs text-gray-500 text-right shrink-0">
+            as of {asOf(assessorStatus.retrievedAt)} · <a
+              href={ASSESSOR_PAGE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-teal-700 hover:underline">Source</a>
+          </p>
+        )}
+      </div>
+      {unavailable(FY2026_RESOURCE_ID, view.assessments.length > 0) ? (
+        <p class="text-sm text-gray-600 mt-2">
+          Record unavailable. Last attempt {asOf(assessorStatus!.retrievedAt)}.
+        </p>
+      ) : current === null ? (
+        <p class="text-sm text-gray-600 mt-2">No assessor record on file.</p>
+      ) : current.condominium ? (
+        <p class="text-sm text-gray-600 mt-2">{CONDOMINIUM_COPY}</p>
+      ) : (
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mt-2">
+          <dt class="text-gray-500">Parcel</dt>
+          <dd class="text-gray-900">{orNotRecorded(current.parcelId)}</dd>
+          <dt class="text-gray-500">Owner of record</dt>
+          <dd class="text-gray-900">{orNotRecorded(current.owner)}</dd>
+          {showMailingAddress(current.owner) && (
+            <>
+              <dt class="text-gray-500">Tax mailing address</dt>
+              <dd class="text-gray-900">{mailingAddress(current)}</dd>
+            </>
+          )}
+          <dt class="text-gray-500">Land use</dt>
+          <dd class="text-gray-900">{orNotRecorded(current.landUseDescription ?? current.landUse)}</dd>
+          <dt class="text-gray-500">Year built</dt>
+          <dd class="text-gray-900">{orNotRecorded(current.yearBuilt)}</dd>
+          <dt class="text-gray-500">Last remodel year</dt>
+          <dd class="text-gray-900">{orNotRecorded(current.yearRemodel)}</dd>
+          <dt class="text-gray-500">Units</dt>
+          <dd class="text-gray-900">{orNotRecorded(current.residentialUnits)}</dd>
+          <dt class="text-gray-500">Assessed value ({current.fiscalYear})</dt>
+          <dd class="text-gray-900">{formatDollars(current.totalValue)}</dd>
+        </dl>
+      )}
+      {view.assessments.length > 1 && (
+        <div class="mt-4">
+          <h4 class="text-sm font-semibold text-gray-900">Assessed value by fiscal year</h4>
+          <table class="mt-1 text-sm w-full max-w-xs">
+            <tbody>
+              {view.assessments.map((assessment) => (
+                <tr class="border-t border-gray-100">
+                  <td class="py-1 text-gray-500 pr-4">{assessment.fiscalYear}</td>
+                  <td class="py-1 text-gray-900">{formatDollars(assessment.totalValue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {notesFor('assessment').map((note) => (
+        <p class="text-xs text-gray-600 mt-2">
+          A correction was filed on this record on {asOf(note.resolvedAt)}. The source has not updated. {note.notes}
+        </p>
+      ))}
+    </div>
+
+    <div class="mt-6">
+      <div class="flex items-baseline justify-between gap-4">
+        <h3 class="text-base font-semibold text-gray-900">Building permits</h3>
+        {permitStatus && (
+          <p class="text-xs text-gray-500 text-right shrink-0">
+            as of {asOf(permitStatus.retrievedAt)} · <a
+              href={PERMITS_PAGE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-teal-700 hover:underline">Source</a>
+          </p>
+        )}
+      </div>
+      {unavailable(PERMITS_RESOURCE_ID, view.permits.length > 0) ? (
+        <p class="text-sm text-gray-600 mt-2">
+          Record unavailable. Last attempt {asOf(permitStatus!.retrievedAt)}.
+        </p>
+      ) : permits!.count === 0 ? (
+        <p class="text-sm text-gray-600 mt-2">{ZERO_PERMITS_COPY}</p>
+      ) : (
+        <>
+          <p class="text-sm text-gray-600 mt-2">
+            {permits!.count} permit{permits!.count === 1 ? '' : 's'} on record from {PERMIT_COVERAGE_START}
+            {permits!.earliest && permits!.latest && (
+              <span> (earliest {formatRecordDate(permits!.earliest)}, latest {formatRecordDate(permits!.latest)})</span>
+            )}. Total declared valuation {formatDollars(permits!.declaredTotal)}.
+          </p>
+          <p class="text-xs text-gray-500 mt-1">{DECLARED_VALUATION_CAVEAT}</p>
+          <ul class={listClass}>
+            {view.permits.map((permit) => (
+              <li class={rowClass}>
+                <span class="text-gray-500">{formatRecordDate(permit.issuedDate)}</span>
+                <span class="text-gray-900">
+                  {permit.permitType ?? permit.workType ?? 'Permit'}{permit.description ? ` · ${permit.description}` : ''}
+                </span>
+                <span class="text-gray-500 sm:text-right">{orNotRecorded(permit.status)}</span>
+              </li>
+            ))}
+          </ul>
+          {capped(view.permits.length) && (
+            <p class="text-xs text-gray-500 mt-1">First {ROW_CAP} shown.</p>
+          )}
+        </>
+      )}
+      {notesFor('permit').map((note) => (
+        <p class="text-xs text-gray-600 mt-2">
+          A correction was filed on this record on {asOf(note.resolvedAt)}. The source has not updated. {note.notes}
+        </p>
+      ))}
+    </div>
+
+    <div class="mt-6">
+      <div class="flex items-baseline justify-between gap-4">
+        <h3 class="text-base font-semibold text-gray-900">Violations</h3>
+        {violationStatus && (
+          <p class="text-xs text-gray-500 text-right shrink-0">
+            as of {asOf(violationStatus.retrievedAt)} · <a
+              href={VIOLATIONS_PAGE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-teal-700 hover:underline">Source</a>
+          </p>
+        )}
+      </div>
+      {unavailable(VIOLATIONS_RESOURCE_ID, view.violations.length > 0) ? (
+        <p class="text-sm text-gray-600 mt-2">
+          Record unavailable. Last attempt {asOf(violationStatus!.retrievedAt)}.
+        </p>
+      ) : view.violations.length === 0 ? (
+        <p class="text-sm text-gray-600 mt-2">No violations on record.</p>
+      ) : (
+        <>
+          <ul class={listClass}>
+            {violationsOrdered.map((violation) => (
+              <li class={rowClass}>
+                <span class="text-gray-500">{formatRecordDate(violation.statusDate)}</span>
+                <span class="text-gray-900">
+                  {[violation.code, violation.description].filter(Boolean).join(' · ') || 'Violation'}
+                </span>
+                <span class="text-gray-500 sm:text-right">{orNotRecorded(violation.status)}</span>
+              </li>
+            ))}
+          </ul>
+          {capped(view.violations.length) && (
+            <p class="text-xs text-gray-500 mt-1">First {ROW_CAP} shown.</p>
+          )}
+        </>
+      )}
+      {notesFor('violation').map((note) => (
+        <p class="text-xs text-gray-600 mt-2">
+          A correction was filed on this record on {asOf(note.resolvedAt)}. The source has not updated. {note.notes}
+        </p>
+      ))}
+    </div>
+
+    <div class="mt-6">
+      <div class="flex items-baseline justify-between gap-4">
+        <h3 class="text-base font-semibold text-gray-900">Code enforcement</h3>
+        {enforcementStatus && (
+          <p class="text-xs text-gray-500 text-right shrink-0">
+            as of {asOf(enforcementStatus.retrievedAt)} · <a
+              href={ENFORCEMENT_PAGE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-teal-700 hover:underline">Source</a>
+          </p>
+        )}
+      </div>
+      {unavailable(ENFORCEMENT_RESOURCE_ID, view.enforcement.length > 0) ? (
+        <p class="text-sm text-gray-600 mt-2">
+          Record unavailable. Last attempt {asOf(enforcementStatus!.retrievedAt)}.
+        </p>
+      ) : view.enforcement.length === 0 ? (
+        <p class="text-sm text-gray-600 mt-2">No code enforcement tickets on record.</p>
+      ) : (
+        <>
+          <ul class={listClass}>
+            {view.enforcement.map((ticket) => (
+              <li class={rowClass}>
+                <span class="text-gray-500">{formatRecordDate(ticket.statusDate)}</span>
+                <span class="text-gray-900">{orNotRecorded(ticket.description)}</span>
+                <span class="text-gray-500 sm:text-right">{orNotRecorded(ticket.status)}</span>
+              </li>
+            ))}
+          </ul>
+          {capped(view.enforcement.length) && (
+            <p class="text-xs text-gray-500 mt-1">First {ROW_CAP} shown.</p>
+          )}
+        </>
+      )}
+      {notesFor('enforcement_ticket').map((note) => (
+        <p class="text-xs text-gray-600 mt-2">
+          A correction was filed on this record on {asOf(note.resolvedAt)}. The source has not updated. {note.notes}
+        </p>
+      ))}
+    </div>
+
+    <div class="mt-6">
+      <div class="flex items-baseline justify-between gap-4">
+        <h3 class="text-base font-semibold text-gray-900">311 requests</h3>
+        {requestStatus && (
+          <p class="text-xs text-gray-500 text-right shrink-0">
+            as of {asOf(requestStatus.retrievedAt)} · <a
+              href={SERVICE_REQUESTS_PAGE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-teal-700 hover:underline">Source</a>
+          </p>
+        )}
+      </div>
+      {unavailable(NEW_311_RESOURCE_ID, view.serviceRequests.length > 0) ? (
+        <p class="text-sm text-gray-600 mt-2">
+          Record unavailable. Last attempt {asOf(requestStatus!.retrievedAt)}.
+        </p>
+      ) : (
+        <>
+          <p class="text-sm text-gray-600 mt-2">
+            {requests!.housing.length} housing-related request{requests!.housing.length === 1 ? '' : 's'}, {requests!.otherCount} other.
+          </p>
+          <details class="mt-1">
+            <summary class="text-xs text-gray-500 cursor-pointer">How requests are classified</summary>
+            <p class="text-xs text-gray-500 mt-1">
+              A request is housing-related when the city files it under {HOUSING_REASONS.join(', ')}, or routes it
+              to {HOUSING_DEPARTMENT_PREFIX}. {OTHER_REQUESTS_COPY}
+            </p>
+          </details>
+          {requests!.housing.length > 0 && (
+            <ul class={listClass}>
+              {requests!.housing.map((request) => (
+                <li class={rowClass}>
+                  <span class="text-gray-500">{formatRecordDate(request.openedAt)}</span>
+                  <span class="text-gray-900">{request.type ?? request.title ?? 'Request'}</span>
+                  <span class="text-gray-500 sm:text-right">
+                    {orNotRecorded(request.status)}{request.closedAt ? ` · closed ${formatRecordDate(request.closedAt)}` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {capped(view.serviceRequests.length) && (
+            <p class="text-xs text-gray-500 mt-1">First {ROW_CAP} requests considered.</p>
+          )}
+        </>
+      )}
+      {rentSmartNote && <p class="text-xs text-gray-500 mt-2">{rentSmartNote}</p>}
+      {notesFor('service_request').map((note) => (
+        <p class="text-xs text-gray-600 mt-2">
+          A correction was filed on this record on {asOf(note.resolvedAt)}. The source has not updated. {note.notes}
+        </p>
+      ))}
+    </div>
+
+    <div id="report-record" class="border-t border-gray-200 pt-4 mt-6">
+      <h3 class="text-base font-semibold text-gray-900">Report a record error</h3>
+      <p class="text-sm text-gray-600 mt-1">
+        If a record above does not match the city's own data, tell us which one. We re-pull it from the primary
+        source. We never edit a value by hand.
+      </p>
+      <div class="mt-2">
+        <RecordCorrectionForm client:load buildingId={buildingId} />
+      </div>
+    </div>
+  </section>
+)}
