@@ -126,6 +126,34 @@ describe('diffRecordSnapshots', () => {
     expect(diff.removed).toEqual([{ kind: 'rentsmart', source_key: 'old-1' }]);
     expect(diff.changed).toEqual([]);
   });
+
+  it('treats rentsmart rows differing only inside a nested object as not equal', () => {
+    // Regression: JSON.stringify(rest, Object.keys(rest).sort()) uses the
+    // top-level key allowlist as a *recursive* replacer, so a nested object's
+    // own keys (e.g. 'severity' below) get silently dropped when they aren't
+    // also top-level keys — making genuinely different content compare equal.
+    const before: RecordSnapshot[] = [
+      {
+        kind: 'rentsmart',
+        source_key: 'old-1',
+        payload: JSON.stringify({ rowId: 'old-1', violationType: 'heat', details: { severity: 'high' } }),
+      },
+    ];
+    const after: RecordSnapshot[] = [
+      {
+        kind: 'rentsmart',
+        source_key: 'new-99',
+        payload: JSON.stringify({ rowId: 'new-99', violationType: 'heat', details: { severity: 'low' } }),
+      },
+    ];
+
+    const diff = diffRecordSnapshots(before, after);
+
+    // Content genuinely differs (nested severity), so the rows must show up
+    // as an add/remove pair rather than being silently treated as identical.
+    expect(diff.added).toEqual([{ kind: 'rentsmart', source_key: 'new-99' }]);
+    expect(diff.removed).toEqual([{ kind: 'rentsmart', source_key: 'old-1' }]);
+  });
 });
 
 describe('sanitizeMultilineText', () => {

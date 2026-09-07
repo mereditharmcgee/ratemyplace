@@ -9,7 +9,6 @@ import {
   validateCorrectionBody,
   toStoredKind,
   CLAIM_MIN,
-  CLAIM_MAX,
   type CorrectionKind,
 } from '../../../lib/records/corrections';
 
@@ -102,21 +101,14 @@ export const POST: APIRoute = async (context: APIContext) => {
     // '<b></b><i></i><em></em>' passes validateCorrectionBody's raw-string
     // length check (it's >= CLAIM_MIN characters) but sanitizes down to an
     // empty claim. Re-validate the cleaned text so that can't be stored.
+    // Only the minimum is re-checked: sanitizing strips markup, it never adds
+    // characters, so a claim already under CLAIM_MAX can't cross it here.
     const cleanedClaim = sanitizeMultilineText(claim);
     if (cleanedClaim.length < CLAIM_MIN) {
       return new Response(
         JSON.stringify({
           error: 'Validation failed',
           details: [{ field: 'claim', message: `Tell us what is wrong in at least ${CLAIM_MIN} characters.` }],
-        }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-    if (cleanedClaim.length > CLAIM_MAX) {
-      return new Response(
-        JSON.stringify({
-          error: 'Validation failed',
-          details: [{ field: 'claim', message: `Keep it under ${CLAIM_MAX} characters.` }],
         }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );

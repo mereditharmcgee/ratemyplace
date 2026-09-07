@@ -65,8 +65,12 @@ suite('POST /api/records/corrections', () => {
   });
 
   it('415s when the Content-Type header is missing entirely', async () => {
+    // No body at all: a string body (even via createContext's own
+    // JSON.stringify) makes the Fetch API auto-add a `text/plain` Content-Type
+    // header, which would defeat the "header truly absent" case this test
+    // means to cover.
     const db = createRecordsTestDb();
-    const context = createContext(db, { contentType: null, body: validBody });
+    const context = createContext(db, { contentType: null, body: undefined });
 
     const response = await POST(context);
 
@@ -77,6 +81,19 @@ suite('POST /api/records/corrections', () => {
   it('400s on a null JSON body', async () => {
     const db = createRecordsTestDb();
     const context = createContext(db, { ip: '198.51.100.20', body: 'null' });
+
+    const response = await POST(context);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Validation failed',
+      details: [{ field: 'buildingId', message: 'Building is required.' }],
+    });
+  });
+
+  it('400s on an array JSON body', async () => {
+    const db = createRecordsTestDb();
+    const context = createContext(db, { ip: '198.51.100.21', body: '[]' });
 
     const response = await POST(context);
 

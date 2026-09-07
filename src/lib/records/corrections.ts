@@ -91,6 +91,14 @@ export interface RecordDiff {
  * `_id` on dataset reloads), re-stringified with sorted keys so two payloads
  * with the same content but different key order still compare equal. Falls
  * back to the raw payload string if it isn't valid JSON.
+ *
+ * The sort is shallow by design: rentsmart payloads are flat (string/number/
+ * boolean leaf values only), so sorting the top-level keys is enough to make
+ * key order irrelevant. Any nested object or array value is compared by its
+ * own (unsorted) `JSON.stringify` output, which is fine as long as it isn't
+ * itself reordered between pulls — `JSON.stringify(rest, Object.keys(rest).sort())`
+ * would apply that same top-level allowlist recursively to every nested
+ * object, silently dropping any nested key not present at the top level.
  */
 function rentsmartContentKey(payload: string): string {
   try {
@@ -99,7 +107,8 @@ function rentsmartContentKey(payload: string): string {
       return payload;
     }
     const { rowId: _rowId, ...rest } = parsed as Record<string, unknown>;
-    return JSON.stringify(rest, Object.keys(rest).sort());
+    const sortedEntries = Object.entries(rest).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return JSON.stringify(Object.fromEntries(sortedEntries));
   } catch {
     return payload;
   }
@@ -153,16 +162,21 @@ export function diffRecordSnapshots(before: RecordSnapshot[], after: RecordSnaps
 
   // Rentsmart: compare by payload content key, ignoring source_key and the
   // embedded `rowId` (both are the CKAN `_id`, which is reassigned on reload).
-  const beforeContentKeys = new Set(beforeRentsmart.map((r) => rentsmartContentKey(r.payload)));
-  const afterContentKeys = new Set(afterRentsmart.map((r) => rentsmartContentKey(r.payload)));
+  // Compute each row's content key once and reuse it for both the Set build
+  // and the membership check below, rather than re-deriving it per lookup.
+  const beforeKeyed = beforeRentsmart.map((row) => ({ row, contentKey: rentsmartContentKey(row.payload) }));
+  const afterKeyed = afterRentsmart.map((row) => ({ row, contentKey: rentsmartContentKey(row.payload) }));
 
-  for (const row of afterRentsmart) {
-    if (!beforeContentKeys.has(rentsmartContentKey(row.payload))) {
+  const beforeContentKeys = new Set(beforeKeyed.map((r) => r.contentKey));
+  const afterContentKeys = new Set(afterKeyed.map((r) => r.contentKey));
+
+  for (const { row, contentKey } of afterKeyed) {
+    if (!beforeContentKeys.has(contentKey)) {
       added.push({ kind: row.kind, source_key: row.source_key });
     }
   }
-  for (const row of beforeRentsmart) {
-    if (!afterContentKeys.has(rentsmartContentKey(row.payload))) {
+  for (const { row, contentKey } of beforeKeyed) {
+    if (!afterContentKeys.has(contentKey)) {
       removed.push({ kind: row.kind, source_key: row.source_key });
     }
   }
