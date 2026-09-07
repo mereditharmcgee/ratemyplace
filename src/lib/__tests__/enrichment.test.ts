@@ -131,6 +131,22 @@ describe('normalizeStreetName', () => {
     const result = normalizeStreetName('elm street');
     expect(result).toBe('ELM STREET');
   });
+
+  it('does not strip a street name that starts with "unit"', () => {
+    expect(normalizeStreetName('Unity St')).toBe('UNITY ST');
+  });
+
+  it('does not strip a street name that starts with "apt"', () => {
+    expect(normalizeStreetName('Aptucxet Rd')).toBe('APTUCXET RD');
+  });
+
+  it('strips a "#" unit designator preceded by a space', () => {
+    expect(normalizeStreetName('Boylston St #2')).toBe('BOYLSTON ST');
+  });
+
+  it('strips a "Unit N" designator', () => {
+    expect(normalizeStreetName('Boylston St Unit 2')).toBe('BOYLSTON ST');
+  });
 });
 
 // ── BostonAdapter tests ──
