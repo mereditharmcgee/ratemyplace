@@ -142,9 +142,10 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
 - **The CKAN SQL exception.** Boston's `datastore_search_sql` endpoint has no parameter
   binding, so this directory is the repo's one documented exception to "parameterized
   queries always". Every source file opens with the invariant that keeps it safe: every
-  interpolated value goes through `sqlLiteral` / `addressLikeClauses` / `textOrNull` or a
-  digits-only guard, and every identifier is a code constant. Do not add a query that
-  interpolates anything else.
+  interpolated value goes through `sqlLiteral` / `addressLikeClauses` or a digits-only
+  guard, and every identifier is a code constant. Do not add a query that interpolates
+  anything else. (`textOrNull` normalizes response cells; it plays no part in query
+  construction and is not an escaping step.)
 - **`npm run records:check`** hits the live datasets and reports which resource ids and
   columns still exist. Boston retires 311 resource ids without notice, and a retired id
   fails that whole source on every pull until someone updates `LEGACY_311_RESOURCES` —
