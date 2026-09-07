@@ -1,0 +1,23 @@
+[
+  {
+    "case_no": "CE7067", "code": "1", "value": "50", "description": "Improper storage trash: res",
+    "status": "Closed", "status_dttm": "2008-08-30 09:42:00",
+    "violation_stno": "23", "violation_sthigh": null, "violation_street": "Lanark", "violation_suffix": "RD",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "1505 COMMONWEALTH  AV",
+    "sam_id": "83763", "ticket_no": "T1"
+  },
+  {
+    "case_no": "CE7067", "code": "9a", "value": "50", "description": "Illegal dumping < 1 cubic yd",
+    "status": "Closed", "status_dttm": "2008-08-30 09:42:00",
+    "violation_stno": "23", "violation_sthigh": null, "violation_street": "Lanark", "violation_suffix": "RD",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "1505 COMMONWEALTH  AV",
+    "sam_id": "83763", "ticket_no": "T1"
+  },
+  {
+    "case_no": "CE5252", "code": "9b", "value": "100", "description": "Illegal dumping 1-5 cubic yd.:",
+    "status": "Closed", "status_dttm": "2008-08-05 09:15:00",
+    "violation_stno": "23", "violation_sthigh": null, "violation_street": "Lanark", "violation_suffix": "RD",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "1505 COMMONWEALTH  AV",
+    "sam_id": "83763", "ticket_no": "T2"
+  }
+]
