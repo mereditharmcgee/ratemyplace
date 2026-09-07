@@ -29,7 +29,7 @@
 // tolerating it only risks attaching a record with a genuinely different suffix or zip (a
 // false positive) — a risk already accepted elsewhere in this module and covered by the
 // same correction workflow.
-import { ckanSql, ROW_CAP, sqlLiteral } from '../../ckan';
+import { ckanSql, ROW_CAP, sqlLiteral, textOrNull } from '../../ckan';
 import type { BuildingIdentity, EnforcementTicketPayload, RecordSource, SourceResult, ViolationPayload } from '../../types';
 
 type Row = Record<string, string | number | null>;
@@ -41,10 +41,6 @@ const BASE_COLUMNS = [
   'violation_stno', 'violation_sthigh', 'violation_street', 'violation_suffix',
   'contact_addr1', 'sam_id',
 ];
-
-function str(v: string | number | null | undefined): string | null {
-  return v == null || String(v).trim() === '' ? null : String(v).trim();
-}
 
 /**
  * The bare street name these feeds key on: `identity.streetBase` with a leading
@@ -78,10 +74,10 @@ export function suffixSpellings(identity: Pick<BuildingIdentity, 'streetBase' | 
  * ("120A"); anything else is the former and keeps the hyphen ("21-23").
  */
 function buildAddress(row: Row): string | null {
-  const stno = str(row.violation_stno);
-  const sthigh = str(row.violation_sthigh);
-  const street = str(row.violation_street);
-  const suffix = str(row.violation_suffix);
+  const stno = textOrNull(row.violation_stno);
+  const sthigh = textOrNull(row.violation_sthigh);
+  const street = textOrNull(row.violation_street);
+  const suffix = textOrNull(row.violation_suffix);
   const isLetter = sthigh != null && /^[A-Za-z]+$/.test(sthigh);
   const numberPart = stno ? `${stno}${sthigh ? (isLetter ? sthigh : `-${sthigh}`) : ''}` : null;
   const address = [numberPart, street, suffix].filter((p): p is string => Boolean(p)).join(' ');
@@ -96,14 +92,14 @@ function buildAddress(row: Row): string | null {
 function baseViolationPayload(row: Row, caseNumber: string): ViolationPayload {
   return {
     caseNumber,
-    code: str(row.code),
-    value: str(row.value),
-    description: str(row.description),
-    status: str(row.status),
-    statusDate: str(row.status_dttm),
+    code: textOrNull(row.code),
+    value: textOrNull(row.value),
+    description: textOrNull(row.description),
+    status: textOrNull(row.status),
+    statusDate: textOrNull(row.status_dttm),
     address: buildAddress(row),
-    contactAddress: str(row.contact_addr1),
-    samId: str(row.sam_id),
+    contactAddress: textOrNull(row.contact_addr1),
+    samId: textOrNull(row.sam_id),
   };
 }
 
@@ -151,15 +147,15 @@ export function violationFeedSource(config: ViolationFeedConfig): RecordSource {
       const seen = new Set<string>();
       const out: SourceResult['rows'] = [];
       for (const row of rows) {
-        const caseNumber = str(row.case_no);
+        const caseNumber = textOrNull(row.case_no);
         if (!caseNumber) continue;
-        const code = str(row.code);
+        const code = textOrNull(row.code);
         const sourceKey = `${caseNumber}:${code ?? ''}`;
         if (seen.has(sourceKey)) continue;
         seen.add(sourceKey);
         const base = baseViolationPayload(row, caseNumber);
         if (config.kind === 'enforcement_ticket') {
-          const payload: EnforcementTicketPayload = { ...base, ticketNumber: str(row.ticket_no) };
+          const payload: EnforcementTicketPayload = { ...base, ticketNumber: textOrNull(row.ticket_no) };
           out.push({ kind: 'enforcement_ticket', sourceKey, payload, sourceUrl: config.pageUrl });
         } else {
           out.push({ kind: 'violation', sourceKey, payload: base, sourceUrl: config.pageUrl });

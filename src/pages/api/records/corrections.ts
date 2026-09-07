@@ -21,6 +21,9 @@ import {
  * rate limit → request.json() → Turnstile → validation → logic) because this
  * is an unauthenticated JSON POST and Astro's checkOrigin does not cover
  * application/json bodies.
+ *
+ * Reports are only accepted for buildings that have a records panel — a building
+ * with no `record_pulls` row 404s like an unknown one.
  */
 export const POST: APIRoute = async (context: APIContext) => {
   // Content-type guard — MUST come before request.json() (which throws SyntaxError on non-JSON)
@@ -116,6 +119,22 @@ export const POST: APIRoute = async (context: APIContext) => {
 
     const building = await db.prepare('SELECT id FROM buildings WHERE id = ?').bind(buildingId).first();
     if (!building) {
+      return new Response(JSON.stringify({ error: 'Building not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // A building with no `record_pulls` row renders no records panel, and the form lives
+    // inside that panel — so there is no record on the page to report and no legitimate
+    // way to reach this endpoint for it. Same 404 as an unknown building: the queue is for
+    // corrections to records we actually publish, and this keeps it from being a general
+    // write channel keyed on any building id.
+    const pulled = await db
+      .prepare('SELECT 1 AS present FROM record_pulls WHERE building_id = ? LIMIT 1')
+      .bind(buildingId)
+      .first();
+    if (!pulled) {
       return new Response(JSON.stringify({ error: 'Building not found' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' },

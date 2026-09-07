@@ -24,6 +24,14 @@ export interface SourceStatus {
   pageUrl: string | null;
   status: 'ok' | 'empty' | 'error';
   retrievedAt: number;
+  /**
+   * NEVER RENDER THIS. It is upstream text — a CKAN error envelope, an HTTP body fragment —
+   * carried here only so `recordsQuery.test.ts` can assert that the newest pull row wins per
+   * source (a later `ok` must clear an earlier `error`'s message). The panel says
+   * "Record unavailable" and the date of the last attempt; the raw message is for the admin
+   * queue and the logs, which read `record_pulls.error_message` directly.
+   * `buildingRecordsRender.test.ts` holds the panel to that.
+   */
   errorMessage: string | null;
 }
 

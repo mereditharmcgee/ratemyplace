@@ -354,3 +354,10 @@ const NEVER_PULLED_COPY = 'Not retrieved yet.';
     </div>
   </section>
 )}
+
+{/* The correction form is the only Turnstile widget on a building page, and it only exists
+    inside the panel above — so the script loads with the panel rather than on every building
+    page. A building with no pulls renders neither, and pays for neither. */}
+{view && (
+  <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+)}

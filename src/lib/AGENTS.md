@@ -134,6 +134,32 @@ Best-effort by design — a logging failure must never break the action it is lo
 Admin grant/revoke went untracked until August 2026; do not let a new destructive action
 ship without a log entry.
 
+### `records/` — public building records
+
+The read-only public-records panel: what the city says about a building, never what we
+think of it. Sources live in `records/sources/boston/`, one module per dataset.
+
+- **The CKAN SQL exception.** Boston's `datastore_search_sql` endpoint has no parameter
+  binding, so this directory is the repo's one documented exception to "parameterized
+  queries always". Every source file opens with the invariant that keeps it safe: every
+  interpolated value goes through `sqlLiteral` / `addressLikeClauses` / `textOrNull` or a
+  digits-only guard, and every identifier is a code constant. Do not add a query that
+  interpolates anything else.
+- **`npm run records:check`** hits the live datasets and reports which resource ids and
+  columns still exist. Boston retires 311 resource ids without notice, and a retired id
+  fails that whole source on every pull until someone updates `LEGACY_311_RESOURCES` —
+  it does not heal on its own. Run it before trusting a source failure.
+- **`identity.ts`** turns a `buildings` row into every address form worth querying
+  (short and long, range and split, directional stripped) plus both parcel forms. The
+  feeds disagree about how an address is stored; normalization lives here, not in the
+  sources.
+- **`display.ts` holds a privacy gate.** `showMailingAddress` publishes a tax mailing
+  address only for an owner that reads as an entity, and `mailingAddressLine` holds the
+  addressee to the same test — an entity can list a person as its `C/O ATT`. It errs
+  toward hiding: a hidden business address costs a reader one lookup, a published home
+  address cannot be taken back. `BANNED_WORDS` in the same file is scanned against the
+  panel's templates by `__tests__/recordsPanelCopy.test.ts`.
+
 ### `enrichment/` — municipal property data
 
 Adapter pattern: `dispatcher.ts` routes to `adapters/boston.ts` (Boston Assessing, CKAN),

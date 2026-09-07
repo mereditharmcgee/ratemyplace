@@ -54,6 +54,17 @@ export function parseMoney(value: string | number | null | undefined): number | 
   return Number.isFinite(n) ? Math.round(n) : null;
 }
 
+/**
+ * A CKAN cell as trimmed text, or null when it is absent or blank. Every source adapter
+ * reads its columns through this: the datastore returns numbers for some columns and
+ * whitespace-padded strings for others, and a blank cell means "not recorded", not `''`.
+ */
+export function textOrNull(value: unknown): string | null {
+  if (value == null) return null;
+  const text = String(value).trim();
+  return text === '' ? null : text;
+}
+
 export function parseIntOrNull(value: string | number | null | undefined): number | null {
   if (value == null || value === '') return null;
   if (typeof value === 'number') return Number.isFinite(value) ? Math.trunc(value) : null;

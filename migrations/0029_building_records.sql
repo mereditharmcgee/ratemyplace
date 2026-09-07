@@ -5,6 +5,10 @@
 -- form with the leading zero; adapters that need the numeric form strip it.
 -- sam_id is Boston's address id, used by the violations and enforcement feeds.
 --
+-- EDITED 2026-09-07 (before first production apply): added the two correction-lookup
+-- indexes at the foot of this file. Editing an applied migration would be wrong; this
+-- one has only ever run against local dev, so it is still the right place for them.
+--
 -- PRODUCTION NOTE: the two ALTER TABLE ... ADD COLUMN statements are not idempotent
 -- (SQLite has no IF NOT EXISTS for columns). Re-running this file fails with
 -- "duplicate column name". Apply once with `wrangler d1 execute --remote --file`,
@@ -29,6 +33,10 @@ CREATE TABLE IF NOT EXISTS record_pulls (
   retrieved_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 CREATE INDEX IF NOT EXISTS idx_record_pulls_building ON record_pulls(building_id, source_id, retrieved_at);
+-- The resolve gate aggregates every pull row stamped with one correction, twice per PATCH
+-- (once for the group, once for the MAX(retrieved_at) subquery that scopes it to the latest
+-- re-pull). correction_id is NULL for a routine pull, so this index stays small.
+CREATE INDEX IF NOT EXISTS idx_record_pulls_correction ON record_pulls(correction_id);
 
 -- One row per record. payload is JSON validated on read against the kind's type.
 CREATE TABLE IF NOT EXISTS building_records (
@@ -62,3 +70,5 @@ CREATE TABLE IF NOT EXISTS record_corrections (
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 CREATE INDEX IF NOT EXISTS idx_record_corrections_status ON record_corrections(status, created_at);
+-- The panel reads resolved source-mismatch notes for one building on every building page.
+CREATE INDEX IF NOT EXISTS idx_record_corrections_building ON record_corrections(building_id, status);

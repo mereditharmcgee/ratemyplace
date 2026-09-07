@@ -170,7 +170,7 @@ Discriminated union on `kind`. A payload that fails validation on read renders t
 |---|---|
 | `types.ts` | Record kinds, payload types, `RecordSource` interface, `PullSummary` |
 | `identity.ts` | Builds a `BuildingIdentity` from a `buildings` row: parsed number(s) and street, every address form to try, parcel id in both forms, SAM id, zip |
-| `jurisdictions.ts` | Maps city to `RecordSource[]`. Boston has six datasets, expanded to eleven sources because each assessor fiscal year is its own source. Everything else (including New Haven) returns `[]`, and the panel renders "records are not available for this city yet" |
+| `jurisdictions.ts` | Maps city to `RecordSource[]`. Boston has six datasets, expanded to eleven sources because each assessor fiscal year is its own source. Everything else (including New Haven) returns `[]`, so nothing is ever pulled there and **no panel renders** (amended 2026-09-07: as built, a building with no `record_pulls` rows renders no section at all — there is no "not available for this city yet" copy) |
 | `sources/boston/assessor.ts` | One `RecordSource` per fiscal year (FY2026 plus five prior, six years total), sharing a per-year column map; the current-year source resolves parcel and SAM id |
 | `sources/boston/permits.ts` | Approved Building Permits `6ddcd912-32a0-43df-9908-63574f8c7e77` |
 | `sources/boston/violations.ts` | ISD violations `800a2663-1d6a-46e7-9356-bedb70f5332c` |
@@ -213,7 +213,7 @@ Input: `BuildingIdentity`. Output: `{ sourceId, sourceLabel, query, rows: { kind
 
 ### Limits
 
-Pages Functions allow 50 subrequests per invocation. A full Boston pull is about 26 fetches (6 assessor years, 1 permits, 1 violations, 1 enforcement, 16 for 311, 1 RentSmart). The 311 resource list is the number most likely to grow; if it pushes the total past 40, split 311 into its own admin action.
+Pages Functions allow 50 subrequests per invocation. A full Boston pull is 28 to 29 fetches (amended 2026-09-07, as built: 16 legacy 311 resources plus 1 new-system query, 6 assessor years, 1 to 2 parcel-resolution queries, 1 permits, 1 violations, 1 enforcement, 1 RentSmart — the parcel resolution is skipped when the building already has a stored `parcel_id`). The 311 resource list is the number most likely to grow, and it gains a resource every January; if it pushes the total past 40, split 311 into its own admin action.
 
 ### Admin surface
 

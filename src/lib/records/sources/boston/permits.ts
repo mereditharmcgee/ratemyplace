@@ -3,7 +3,7 @@
 // it safe: every interpolated value passes through `sqlLiteral`/`addressLikeClauses` or a
 // digits-only guard, and every identifier (table/column name) is a code constant, never
 // user input.
-import { addressLikeClauses, ckanSql, parseMoney, ROW_CAP, sqlLiteral } from '../../ckan';
+import { addressLikeClauses, ckanSql, parseMoney, ROW_CAP, sqlLiteral, textOrNull } from '../../ckan';
 import type { PermitPayload, RecordSource, SourceResult } from '../../types';
 
 export const PERMITS_RESOURCE_ID = '6ddcd912-32a0-43df-9908-63574f8c7e77';
@@ -16,10 +16,6 @@ type Row = Record<string, string | number | null>;
 // parcel_id is not selected: it is used only in the WHERE clause filter, and PermitPayload
 // has no field for it, so selecting it would make the "no parcel" query always mention it.
 const COLUMNS = ['permitnumber', 'worktype', 'permittypedescr', 'description', 'comments', 'applicant', 'declared_valuation', 'total_fees', 'issued_date', 'expiration_date', 'status', 'occupancytype', 'address'];
-
-function str(v: string | number | null | undefined): string | null {
-  return v == null || String(v).trim() === '' ? null : String(v).trim();
-}
 
 export const permitsSource: RecordSource = {
   id: PERMITS_RESOURCE_ID,
@@ -49,23 +45,23 @@ export const permitsSource: RecordSource = {
     const seen = new Set<string>();
     const out: SourceResult['rows'] = [];
     for (const row of rows) {
-      const permitNumber = str(row.permitnumber);
+      const permitNumber = textOrNull(row.permitnumber);
       if (!permitNumber || seen.has(permitNumber)) continue;
       seen.add(permitNumber);
       const payload: PermitPayload = {
         permitNumber,
-        workType: str(row.worktype),
-        permitType: str(row.permittypedescr),
-        description: str(row.description),
-        comments: str(row.comments),
-        applicant: str(row.applicant),
+        workType: textOrNull(row.worktype),
+        permitType: textOrNull(row.permittypedescr),
+        description: textOrNull(row.description),
+        comments: textOrNull(row.comments),
+        applicant: textOrNull(row.applicant),
         declaredValuation: parseMoney(row.declared_valuation),
         totalFees: parseMoney(row.total_fees),
-        issuedDate: str(row.issued_date),
-        expirationDate: str(row.expiration_date),
-        status: str(row.status),
-        occupancyType: str(row.occupancytype),
-        address: str(row.address),
+        issuedDate: textOrNull(row.issued_date),
+        expirationDate: textOrNull(row.expiration_date),
+        status: textOrNull(row.status),
+        occupancyType: textOrNull(row.occupancytype),
+        address: textOrNull(row.address),
       };
       out.push({ kind: 'permit', sourceKey: permitNumber, payload, sourceUrl: PERMITS_PAGE_URL });
     }

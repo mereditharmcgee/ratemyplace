@@ -525,6 +525,64 @@ suite('admin record correction routes', () => {
       expect(sendOutcomeEmail).not.toHaveBeenCalled();
     });
 
+    it('409s when the latest re-pull failed for every source, even after an earlier one succeeded', async () => {
+      const db = await createDbWithAdmin();
+      await insertBuilding(db);
+      await insertCorrection(db);
+
+      // First re-pull: FY2026 answers (which also resolves and stores the parcel),
+      // every other source returns empty. A partially successful group — evidence.
+      vi.stubGlobal('fetch', fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]));
+      expect((await REPULL(createContext(db))).status).toBe(200);
+
+      const firstGroup = await db
+        .prepare("SELECT count(*) AS n FROM record_pulls WHERE correction_id = ? AND status IN ('ok','empty')")
+        .bind(CORRECTION_ID)
+        .all<{ n: number }>();
+      expect(firstGroup.results[0].n).toBe(BOSTON_SOURCE_COUNT);
+
+      // retrieved_at defaults to unixepoch(), so two re-pulls inside one test second
+      // would share a timestamp and read as a single group. Production cannot hit that
+      // (the 120s debounce below), so backdate the first group to the separation a real
+      // pair of re-pulls would have.
+      await db
+        .prepare('UPDATE record_pulls SET retrieved_at = retrieved_at - 3600 WHERE correction_id = ?')
+        .bind(CORRECTION_ID)
+        .run();
+      // The debounce is per building and shared with the manual pull route.
+      await db.prepare('DELETE FROM rate_limits').run();
+
+      // Second re-pull: every CKAN query 503s. The parcel is stored now, so an
+      // unresolvable parcel is no longer available as the way to fail the whole group.
+      // An empty resourceId matches every query the pull issues.
+      vi.stubGlobal('fetch', fixtureFetch([{ resourceId: '', errorStatus: 503, errorMessage: 'source unavailable' }]));
+      expect((await REPULL(createContext(db))).status).toBe(200);
+
+      const latest = await db
+        .prepare(
+          'SELECT status FROM record_pulls WHERE correction_id = ? ' +
+            'AND retrieved_at = (SELECT MAX(retrieved_at) FROM record_pulls WHERE correction_id = ?)',
+        )
+        .bind(CORRECTION_ID, CORRECTION_ID)
+        .all<{ status: string }>();
+      expect(latest.results).toHaveLength(BOSTON_SOURCE_COUNT);
+      expect(latest.results.every((row) => row.status === 'error')).toBe(true);
+
+      const response = await PATCH(createContext(db, { method: 'PATCH', body: { resolution: 'repulled_unchanged' } }));
+
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({
+        error: 'The last re-pull failed for every source; run it again before resolving',
+      });
+      expect(sendOutcomeEmail).not.toHaveBeenCalled();
+
+      const row = await db
+        .prepare('SELECT status FROM record_corrections WHERE id = ?')
+        .bind(CORRECTION_ID)
+        .first<{ status: string }>();
+      expect(row?.status).toBe('pending');
+    });
+
     it('resolves once when two admins resolve the same correction at the same time', async () => {
       const db = await createDbWithAdmin();
       await insertBuilding(db, { parcel_id: '2102098000' });

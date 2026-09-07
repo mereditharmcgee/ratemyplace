@@ -41,11 +41,11 @@ interface PullGroupRow {
  * PATCH /api/admin/records/corrections/:id
  *
  * Close a public-record correction report. Every resolution asserts something
- * about a re-pull, so the route refuses to run until this correction has a
- * `record_pulls` row that actually *succeeded* (`ok` or `empty`): an admin
- * cannot close a report by declaring an outcome they never checked, and a
- * re-pull where every source errored checked nothing — the panel still shows
- * whatever it showed before.
+ * about a re-pull, so the route refuses to run until this correction's *most
+ * recent* re-pull has a `record_pulls` row that actually *succeeded* (`ok` or
+ * `empty`): an admin cannot close a report by declaring an outcome they never
+ * checked, and a re-pull where every source errored checked nothing — the panel
+ * still shows whatever it showed before.
  *
  * `source_mismatch_noted` is the one outcome that leaves the page disagreeing
  * with the filer, so it requires a public note explaining the disagreement.
@@ -111,18 +111,25 @@ export const PATCH: APIRoute = async (context: APIContext) => {
       return json({ error: 'Correction has already been resolved' }, 409);
     }
 
-    // The gate: no resolution without evidence. One aggregate over every pull row
+    // The gate: no resolution without evidence. One aggregate over the pull rows
     // stamped with this correction, because the unit of evidence is the re-pull
     // *group* — a building has ~11 sources and they are pulled together.
+    //
+    // Scoped to the *latest* group. An admin can re-pull the same correction more than
+    // once, and only the most recent attempt describes what the panel shows now: an
+    // earlier partial success must not vouch for a later run where every source failed.
+    // The whole group shares one `retrieved_at` (pull.ts stamps them together), so
+    // MAX(retrieved_at) picks it out.
     const pulls = await db
       .prepare(
         "SELECT SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END) AS ok_count, " +
           "SUM(CASE WHEN status = 'empty' THEN 1 ELSE 0 END) AS empty_count, " +
           "SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS error_count, " +
           'MAX(retrieved_at) AS latest_retrieved_at ' +
-          'FROM record_pulls WHERE correction_id = ?',
+          'FROM record_pulls WHERE correction_id = ? ' +
+          'AND retrieved_at = (SELECT MAX(retrieved_at) FROM record_pulls WHERE correction_id = ?)',
       )
-      .bind(correctionId)
+      .bind(correctionId, correctionId)
       .first<PullGroupRow>();
 
     const sourceStatuses = {

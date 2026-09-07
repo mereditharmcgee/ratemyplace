@@ -3,9 +3,16 @@
 // payloads (see query.ts) into strings and view models.
 //
 // Product rule, non-negotiable: the panel has no opinion. Every rendered value is a
-// field from a record or a count of records. BANNED_WORDS is the guardrail a test
-// enforces against every exported copy constant so a future edit cannot smuggle in an
-// editorial reading of the data.
+// field from a record or a count of records.
+//
+// This file holds the panel's *framing* copy — the sentences that explain what the reader
+// is looking at, and the caveats attached to a figure. It is not the whole surface: each
+// section's empty state ("No violations on record.", "Not retrieved yet.") is written
+// inline in the template that owns it. BANNED_WORDS is the guardrail over both halves:
+// `__tests__/recordsDisplay.test.ts` scans the constants below, and
+// `__tests__/recordsPanelCopy.test.ts` scans the raw source of `BuildingRecords.astro` and
+// `components/records/*.astro`. A future edit cannot smuggle an editorial reading of the
+// data in through either door.
 import { PERMIT_COVERAGE_START } from './sources/boston/permits';
 import type {
   AssessmentPayload,

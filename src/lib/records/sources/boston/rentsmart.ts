@@ -13,7 +13,7 @@
 // depends on `_id` surviving between pulls — but a re-pull diff must compare RentSmart
 // rows on payload content, not on `sourceKey` (which is `_id`), or every dataset reload
 // will look like an entirely new set of records.
-import { ckanSql, ROW_CAP, sqlLiteral } from '../../ckan';
+import { ckanSql, ROW_CAP, sqlLiteral, textOrNull } from '../../ckan';
 import type { RecordSource, RentSmartPayload, SourceResult } from '../../types';
 
 export const RENTSMART_RESOURCE_ID = 'dc615ff7-2ff3-416a-922b-f0f334f085d0';
@@ -22,10 +22,6 @@ export const RENTSMART_PAGE_URL = 'https://data.boston.gov/dataset/rentsmart';
 type Row = Record<string, string | number | null>;
 
 const COLUMNS = ['_id', 'date', 'violation_type', 'description', 'address', 'parcel'];
-
-function str(v: string | number | null | undefined): string | null {
-  return v == null || String(v).trim() === '' ? null : String(v).trim();
-}
 
 export const rentsmartSource: RecordSource = {
   id: RENTSMART_RESOURCE_ID,
@@ -53,16 +49,16 @@ export const rentsmartSource: RecordSource = {
     const seen = new Set<string>();
     const out: SourceResult['rows'] = [];
     for (const row of rows) {
-      const rowId = str(row._id);
+      const rowId = textOrNull(row._id);
       if (!rowId || seen.has(rowId)) continue;
       seen.add(rowId);
       const payload: RentSmartPayload = {
         rowId,
-        date: str(row.date),
-        violationType: str(row.violation_type),
-        description: str(row.description),
-        address: str(row.address),
-        parcel: str(row.parcel),
+        date: textOrNull(row.date),
+        violationType: textOrNull(row.violation_type),
+        description: textOrNull(row.description),
+        address: textOrNull(row.address),
+        parcel: textOrNull(row.parcel),
       };
       out.push({ kind: 'rentsmart', sourceKey: rowId, payload, sourceUrl: RENTSMART_PAGE_URL });
     }

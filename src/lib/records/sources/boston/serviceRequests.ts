@@ -14,7 +14,7 @@
 // replacing them with a partial 311 history. A retired resource id surfaces as an error on
 // every pull until someone fixes it by updating LEGACY_311_RESOURCES; it will not clear on
 // its own.
-import { addressLikeClauses, ckanSql, ROW_CAP, sqlLiteral } from '../../ckan';
+import { addressLikeClauses, ckanSql, ROW_CAP, sqlLiteral, textOrNull } from '../../ckan';
 import type { RecordRow, RecordSource, ServiceRequestClassification, ServiceRequestPayload, SourceResult } from '../../types';
 
 export const NEW_311_RESOURCE_ID = '254adca6-64ab-4c5c-9fc0-a6da622be185';
@@ -89,48 +89,44 @@ const NEW_COLUMNS = [
   'case_topic', 'assigned_department', 'service_name', 'full_address', 'report_source',
 ];
 
-function str(v: string | number | null | undefined): string | null {
-  return v == null || String(v).trim() === '' ? null : String(v).trim();
-}
-
 function mapLegacyRow(row: Row): ServiceRequestPayload | null {
-  const caseId = str(row.case_enquiry_id);
+  const caseId = textOrNull(row.case_enquiry_id);
   if (!caseId) return null;
-  const reason = str(row.reason);
+  const reason = textOrNull(row.reason);
   return {
     caseId,
     system: 'legacy',
-    openedAt: str(row.open_dt),
-    closedAt: str(row.closed_dt),
-    status: str(row.case_status),
-    closureReason: str(row.closure_reason),
-    title: str(row.case_title),
-    subject: str(row.subject),
+    openedAt: textOrNull(row.open_dt),
+    closedAt: textOrNull(row.closed_dt),
+    status: textOrNull(row.case_status),
+    closureReason: textOrNull(row.closure_reason),
+    title: textOrNull(row.case_title),
+    subject: textOrNull(row.subject),
     reason,
-    type: str(row.type),
-    location: str(row.location),
-    source: str(row.source),
+    type: textOrNull(row.type),
+    location: textOrNull(row.location),
+    source: textOrNull(row.source),
     classification: classifyLegacy(reason),
   };
 }
 
 function mapNewRow(row: Row): ServiceRequestPayload | null {
-  const caseId = str(row.case_id);
+  const caseId = textOrNull(row.case_id);
   if (!caseId) return null;
-  const department = str(row.assigned_department);
+  const department = textOrNull(row.assigned_department);
   return {
     caseId,
     system: 'new',
-    openedAt: str(row.open_date),
-    closedAt: str(row.close_date),
-    status: str(row.case_status),
-    closureReason: str(row.closure_reason),
-    title: str(row.case_topic),
+    openedAt: textOrNull(row.open_date),
+    closedAt: textOrNull(row.close_date),
+    status: textOrNull(row.case_status),
+    closureReason: textOrNull(row.closure_reason),
+    title: textOrNull(row.case_topic),
     subject: department,
     reason: department,
-    type: str(row.service_name),
-    location: str(row.full_address),
-    source: str(row.report_source),
+    type: textOrNull(row.service_name),
+    location: textOrNull(row.full_address),
+    source: textOrNull(row.report_source),
     classification: classifyNew(department),
   };
 }

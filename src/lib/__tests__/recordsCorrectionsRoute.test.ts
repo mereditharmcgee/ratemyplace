@@ -46,6 +46,22 @@ function createContext(db: TestD1Database, options: ContextOptions = {}): APICon
   } as unknown as APIContext;
 }
 
+/**
+ * A building whose records panel actually exists: the route refuses a report for a
+ * building with no `record_pulls` row, because no panel — and so no form — renders there.
+ */
+async function insertPulledBuilding(db: TestD1Database, id = 'bldg-lanark'): Promise<string> {
+  await insertBuilding(db, { id });
+  await db
+    .prepare(
+      'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, row_count) ' +
+        "VALUES (?, ?, 'boston', 'boston.permits', 'Approved Building Permits', 'q', 'ok', 2)",
+    )
+    .bind(`pull-${id}`, id)
+    .run();
+  return id;
+}
+
 const validBody = {
   buildingId: 'bldg-lanark',
   recordKind: 'permit',
@@ -106,7 +122,7 @@ suite('POST /api/records/corrections', () => {
 
   it('rate limits after 3 submissions per hour per IP', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'bldg-lanark' });
+    await insertPulledBuilding(db);
     const ip = '198.51.100.1';
 
     for (let i = 0; i < 3; i++) {
@@ -123,7 +139,7 @@ suite('POST /api/records/corrections', () => {
 
   it('400s on a bad Turnstile token', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'bldg-lanark' });
+    await insertPulledBuilding(db);
     const context = createContext(db, { ip: '198.51.100.2', body: { ...validBody, turnstileToken: 'bad' } });
 
     const response = await POST(context);
@@ -134,7 +150,7 @@ suite('POST /api/records/corrections', () => {
 
   it('400s on a claim that is too short, with a field-tagged detail', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'bldg-lanark' });
+    await insertPulledBuilding(db);
     const context = createContext(db, { ip: '198.51.100.3', body: { ...validBody, claim: 'too short' } });
 
     const response = await POST(context);
@@ -155,9 +171,25 @@ suite('POST /api/records/corrections', () => {
     expect(await response.json()).toEqual({ error: 'Building not found' });
   });
 
-  it('stores a pending correction with a lowercased email and null record_kind for panel', async () => {
+  it('404s for a real building that has never been pulled, so no panel or form renders there', async () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'bldg-lanark' });
+    const context = createContext(db, { ip: '198.51.100.9', body: validBody });
+
+    const response = await POST(context);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'Building not found' });
+
+    const stored = await db
+      .prepare('SELECT count(*) AS n FROM record_corrections')
+      .first<{ n: number }>();
+    expect(stored?.n).toBe(0);
+  });
+
+  it('stores a pending correction with a lowercased email and null record_kind for panel', async () => {
+    const db = createRecordsTestDb();
+    await insertPulledBuilding(db);
     const context = createContext(db, {
       ip: '198.51.100.5',
       body: {
@@ -191,7 +223,7 @@ suite('POST /api/records/corrections', () => {
 
   it('stores a non-panel kind as its own record_kind value', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'bldg-lanark' });
+    await insertPulledBuilding(db);
     const context = createContext(db, { ip: '198.51.100.6', body: validBody });
 
     const response = await POST(context);
@@ -209,7 +241,7 @@ suite('POST /api/records/corrections', () => {
 
   it('400s on an all-markup claim (sanitizes to nothing) with a claim field error', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'bldg-lanark' });
+    await insertPulledBuilding(db);
     const context = createContext(db, {
       ip: '198.51.100.7',
       body: { ...validBody, claim: '<b></b><i></i><em></em>'.repeat(2) },
@@ -225,7 +257,7 @@ suite('POST /api/records/corrections', () => {
 
   it('stores a claim with line breaks preserved', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'bldg-lanark' });
+    await insertPulledBuilding(db);
     const multilineClaim = 'This permit is wrong.\nThe applicant name does not match the 2023 renovation records.';
     const context = createContext(db, {
       ip: '198.51.100.8',
