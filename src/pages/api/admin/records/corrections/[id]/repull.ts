@@ -1,6 +1,7 @@
 import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../../../../../lib/db';
-import { checkRateLimit } from '../../../../../../lib/rateLimit';
+import { createAuditLog } from '../../../../../../lib/audit';
+import { checkRateLimit, getClientIP } from '../../../../../../lib/rateLimit';
 import { logError } from '../../../../../../lib/logger';
 import { pullBuildingRecords } from '../../../../../../lib/records/pull';
 import { diffRecordSnapshots, type RecordSnapshot } from '../../../../../../lib/records/corrections';
@@ -22,9 +23,11 @@ const SNAPSHOT_SQL = 'SELECT kind, source_key, payload FROM building_records WHE
  * changed. This is the only real answer to "your record is wrong": we do not
  * hand-edit records, we go back to the city and see what it says now.
  *
- * Not audited itself. The pull rows it writes carry `correction_id`, so the
- * provenance is already recorded, and the audited event is the *resolution*
- * (PATCH ../[id]) — which refuses to run until one of these pulls exists.
+ * Audited as `records_pulled` against the building, on top of the `record_pulls`
+ * rows the pull itself writes: those carry the provenance of the *data*, while
+ * the audit row carries who reached for the city on which correction. The
+ * resolution (PATCH ../[id]) is audited separately and refuses to run until one
+ * of these pulls has succeeded for at least one source.
  */
 export const POST: APIRoute = async (context: APIContext) => {
   if (!context.locals.user?.isAdmin) {
@@ -80,6 +83,25 @@ export const POST: APIRoute = async (context: APIContext) => {
     });
 
     const after = await db.prepare(SNAPSHOT_SQL).bind(building.id).all<RecordSnapshot>();
+
+    await createAuditLog(db, {
+      adminUserId: context.locals.user.id,
+      adminIp: getClientIP(context),
+      actionType: 'records_pulled',
+      entityType: 'building',
+      entityId: building.id,
+      newValue: {
+        correctionId,
+        parcelId: summary.parcelId,
+        condominium: summary.condominium,
+        sources: summary.sources.map((source) => ({
+          label: source.label,
+          status: source.status,
+          rowCount: source.rowCount,
+        })),
+      },
+      notes: `correction ${correctionId}`,
+    });
 
     return json({ data: { summary, diff: diffRecordSnapshots(before.results, after.results) } }, 200);
   } catch (error) {

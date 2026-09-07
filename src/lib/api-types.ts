@@ -368,7 +368,8 @@ export interface RecordCorrection {
   building_id: string;
   record_kind: string | null;
   claim: string;
-  contact_email: string | null;
+  /** 1 when the filer left an address, so the queue can say whether resolving emails them. The address itself is never sent to the client. */
+  has_contact_email: number;
   status: 'pending' | 'resolved';
   resolution: 'repulled_unchanged' | 'repulled_updated' | 'source_mismatch_noted' | null;
   resolution_notes: string | null;

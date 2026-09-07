@@ -5,7 +5,8 @@ type SqlValue = string | number | bigint | Uint8Array | null;
 interface SQLiteStatement {
   get(...values: SqlValue[]): unknown;
   all(...values: SqlValue[]): unknown[];
-  run(...values: SqlValue[]): unknown;
+  /** node:sqlite reports the affected row count here; D1 surfaces the same number as `meta.changes`. */
+  run(...values: SqlValue[]): { changes?: number | bigint };
 }
 
 export interface SQLiteDatabase {
@@ -57,9 +58,12 @@ class TestD1Statement {
     return { results: rows as T[] };
   }
 
-  async run(): Promise<{ success: boolean }> {
-    this.database.prepare(this.sql).run(...this.bindings);
-    return { success: true };
+  async run(): Promise<{ success: boolean; meta: { changes: number } }> {
+    // `meta.changes` is what D1 returns. The admin routes read it after a conditional
+    // UPDATE to tell "I resolved this" from "someone else already had", so a helper
+    // that dropped it would make those routes untestable.
+    const info = this.database.prepare(this.sql).run(...this.bindings);
+    return { success: true, meta: { changes: Number(info?.changes ?? 0) } };
   }
 }
 

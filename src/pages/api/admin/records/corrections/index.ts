@@ -16,9 +16,17 @@ type StatusFilter = (typeof STATUS_FILTERS)[number];
 /**
  * Columns listed explicitly rather than `c.*` — the join means a `SELECT *`
  * would also drag every buildings column into an admin JSON response.
+ *
+ * The filer's address is reported as a flag, never a value: the queue only ever
+ * needs to know whether resolving will email someone, and the address is the one
+ * piece of personal data a correction carries. Keeping it out of the response
+ * keeps it out of the admin bundle, the browser cache and any screenshot of the
+ * queue.
  */
 const SELECT_SQL =
-  'SELECT c.id, c.building_id, c.record_kind, c.claim, c.contact_email, c.status, c.resolution, ' +
+  'SELECT c.id, c.building_id, c.record_kind, c.claim, ' +
+  'CASE WHEN c.contact_email IS NOT NULL THEN 1 ELSE 0 END AS has_contact_email, ' +
+  'c.status, c.resolution, ' +
   'c.resolution_notes, c.resolved_by, c.resolved_at, c.created_at, ' +
   'b.address AS building_address, b.slug AS building_slug ' +
   'FROM record_corrections c JOIN buildings b ON b.id = c.building_id';

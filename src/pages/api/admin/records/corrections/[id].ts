@@ -30,13 +30,22 @@ interface CorrectionRow {
   building_slug: string;
 }
 
+interface PullGroupRow {
+  ok_count: number;
+  empty_count: number;
+  error_count: number;
+  latest_retrieved_at: number | null;
+}
+
 /**
  * PATCH /api/admin/records/corrections/:id
  *
  * Close a public-record correction report. Every resolution asserts something
- * about a re-pull, so the route refuses to run until at least one `record_pulls`
- * row carries this correction's id: an admin cannot close a report by declaring
- * an outcome they never checked.
+ * about a re-pull, so the route refuses to run until this correction has a
+ * `record_pulls` row that actually *succeeded* (`ok` or `empty`): an admin
+ * cannot close a report by declaring an outcome they never checked, and a
+ * re-pull where every source errored checked nothing — the panel still shows
+ * whatever it showed before.
  *
  * `source_mismatch_noted` is the one outcome that leaves the page disagreeing
  * with the filer, so it requires a public note explaining the disagreement.
@@ -102,24 +111,53 @@ export const PATCH: APIRoute = async (context: APIContext) => {
       return json({ error: 'Correction has already been resolved' }, 409);
     }
 
-    // The gate: no resolution without evidence. Ordered newest-first so the audit
-    // row points at the pull the admin actually looked at.
-    const pull = await db
-      .prepare('SELECT id FROM record_pulls WHERE correction_id = ? ORDER BY retrieved_at DESC, rowid DESC LIMIT 1')
+    // The gate: no resolution without evidence. One aggregate over every pull row
+    // stamped with this correction, because the unit of evidence is the re-pull
+    // *group* — a building has ~11 sources and they are pulled together.
+    const pulls = await db
+      .prepare(
+        "SELECT SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END) AS ok_count, " +
+          "SUM(CASE WHEN status = 'empty' THEN 1 ELSE 0 END) AS empty_count, " +
+          "SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS error_count, " +
+          'MAX(retrieved_at) AS latest_retrieved_at ' +
+          'FROM record_pulls WHERE correction_id = ?',
+      )
       .bind(correctionId)
-      .first<{ id: string }>();
+      .first<PullGroupRow>();
 
-    if (!pull) {
+    const sourceStatuses = {
+      ok: Number(pulls?.ok_count ?? 0),
+      empty: Number(pulls?.empty_count ?? 0),
+      error: Number(pulls?.error_count ?? 0),
+    };
+    const totalPulls = sourceStatuses.ok + sourceStatuses.empty + sourceStatuses.error;
+
+    if (totalPulls === 0) {
       return json({ error: 'Re-pull from the source before resolving' }, 409);
     }
+    // An all-error group is not evidence: nothing was read from the city, so every
+    // resolution below would be a claim about data nobody fetched.
+    if (sourceStatuses.ok + sourceStatuses.empty === 0) {
+      return json(
+        { error: 'The last re-pull failed for every source; run it again before resolving' },
+        409,
+      );
+    }
 
-    await db
+    // Conditional on the row still being pending, so two admins resolving at once
+    // cannot both write an outcome (and both email the filer). The read above is a
+    // fast path for the common case; this is the one that actually decides.
+    const update = await db
       .prepare(
         "UPDATE record_corrections SET status = 'resolved', resolution = ?, resolution_notes = ?, " +
-          'resolved_by = ?, resolved_at = unixepoch() WHERE id = ?',
+          "resolved_by = ?, resolved_at = unixepoch() WHERE id = ? AND status = 'pending'",
       )
       .bind(resolution, notes || null, user.id, correctionId)
       .run();
+
+    if (update.meta?.changes === 0) {
+      return json({ error: 'Correction has already been resolved' }, 409);
+    }
 
     await createAuditLog(db, {
       adminUserId: user.id,
@@ -128,7 +166,12 @@ export const PATCH: APIRoute = async (context: APIContext) => {
       entityType: 'building',
       entityId: correction.building_id,
       oldValue: { status: 'pending' },
-      newValue: { status: 'resolved', resolution, pullId: pull.id },
+      newValue: {
+        status: 'resolved',
+        resolution,
+        repullRetrievedAt: pulls?.latest_retrieved_at ?? null,
+        sourceStatuses,
+      },
       notes: notes ? `correction ${correctionId}: ${notes}` : `correction ${correctionId}`,
     });
 
@@ -145,7 +188,7 @@ export const PATCH: APIRoute = async (context: APIContext) => {
             apiKey,
             correction.contact_email,
             correction.building_address,
-            `${siteUrl}/building/${correction.building_slug}#public-records`,
+            `${siteUrl}/building/${encodeURIComponent(correction.building_slug)}#public-records`,
             resolution,
           ),
         );

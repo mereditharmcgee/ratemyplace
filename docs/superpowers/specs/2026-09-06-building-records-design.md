@@ -287,7 +287,7 @@ Follows the disputes reference order exactly: content-type guard, rate limit (3 
 | `repulled_updated` | The source changed; the panel now reflects it | Panel updated by the re-pull |
 | `source_mismatch_noted` | The filer is right and the city's data is wrong | `resolution_notes` renders under that section: "A correction was filed on this record on [date]. The source has not updated." |
 
-Every resolution writes an audit log entry (`records.correction.resolve`) carrying the correction id and pull id. If an email was given, the outcome goes out in general terms through `lib/email.ts` with `fireAndForget`.
+Every resolution writes an audit log entry (`record_correction_resolved`) carrying the correction id and the re-pull group it was resolved on. If an email was given, the outcome goes out in general terms through `lib/email.ts` with `fireAndForget`.
 
 ### Deliberately absent
 

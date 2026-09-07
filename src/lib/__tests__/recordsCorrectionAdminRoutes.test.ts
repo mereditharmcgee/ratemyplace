@@ -149,6 +149,7 @@ suite('admin record correction routes', () => {
           id: string;
           status: string;
           record_kind: string | null;
+          has_contact_email: number;
           building_address: string;
           building_slug: string;
         }>;
@@ -160,9 +161,26 @@ suite('admin record correction routes', () => {
         id: CORRECTION_ID,
         status: 'pending',
         record_kind: 'assessment',
+        has_contact_email: 1,
         building_address: BUILDING_ADDRESS,
         building_slug: BUILDING_ID,
       });
+      // The filer's address never leaves the server; the queue only needs to know
+      // whether resolving will email someone.
+      expect(payload.data[0]).not.toHaveProperty('contact_email');
+    });
+
+    it('reports an anonymous report as has_contact_email 0', async () => {
+      const db = await createDbWithAdmin();
+      await insertBuilding(db);
+      await insertCorrection(db, { contactEmail: null });
+
+      const response = await GET(createContext(db, { method: 'GET' }));
+      const payload = (await response.json()) as { data: Array<Record<string, unknown>> };
+
+      expect(response.status).toBe(200);
+      expect(payload.data[0].has_contact_email).toBe(0);
+      expect(payload.data[0]).not.toHaveProperty('contact_email');
     });
   });
 
@@ -221,6 +239,46 @@ suite('admin record correction routes', () => {
       expect(await second.json()).toEqual({
         error: 'A pull for this building is already running or just finished. Try again in a minute.',
       });
+    });
+
+    it('audits the re-pull against the building with the correction id in the notes', async () => {
+      const db = await createDbWithAdmin();
+      await insertBuilding(db, { parcel_id: '2102098000' });
+      await insertCorrection(db);
+      vi.stubGlobal('fetch', bostonFixtures());
+
+      expect((await REPULL(createContext(db))).status).toBe(200);
+
+      const audit = await db
+        .prepare('SELECT entity_type, entity_id, admin_user_id, new_value, notes FROM audit_logs WHERE action_type = ?')
+        .bind('records_pulled')
+        .all<{
+          entity_type: string;
+          entity_id: string;
+          admin_user_id: string;
+          new_value: string | null;
+          notes: string | null;
+        }>();
+
+      expect(audit.results).toHaveLength(1);
+      expect(audit.results[0]).toMatchObject({
+        entity_type: 'building',
+        entity_id: BUILDING_ID,
+        admin_user_id: ADMIN_ID,
+      });
+      expect(audit.results[0].notes ?? '').toContain(CORRECTION_ID);
+
+      const newValue = JSON.parse(audit.results[0].new_value ?? 'null') as {
+        correctionId: string;
+        parcelId: string | null;
+        condominium: boolean;
+        sources: Array<{ label: string; status: string; rowCount: number }>;
+      };
+      expect(newValue.correctionId).toBe(CORRECTION_ID);
+      expect(newValue.parcelId).toBe('2102098000');
+      expect(newValue.condominium).toBe(false);
+      expect(newValue.sources).toHaveLength(BOSTON_SOURCE_COUNT);
+      expect(newValue.sources.every((source) => typeof source.label === 'string')).toBe(true);
     });
   });
 
@@ -360,9 +418,16 @@ suite('admin record correction routes', () => {
         admin_user_id: ADMIN_ID,
       });
       expect(JSON.parse(audit.results[0].old_value ?? 'null')).toEqual({ status: 'pending' });
-      const newValue = JSON.parse(audit.results[0].new_value ?? 'null') as { resolution: string; pullId: string };
+      const newValue = JSON.parse(audit.results[0].new_value ?? 'null') as {
+        resolution: string;
+        repullRetrievedAt: number | null;
+        sourceStatuses: { ok: number; empty: number; error: number };
+      };
       expect(newValue).toMatchObject({ status: 'resolved', resolution: 'source_mismatch_noted' });
-      expect(newValue.pullId).toBeTruthy();
+      // The whole re-pull group is the evidence, not one row of it.
+      expect(newValue.repullRetrievedAt).toBeGreaterThan(0);
+      expect(newValue.sourceStatuses.error).toBe(0);
+      expect(newValue.sourceStatuses.ok + newValue.sourceStatuses.empty).toBe(BOSTON_SOURCE_COUNT);
       expect(audit.results[0].notes ?? '').toContain(CORRECTION_ID);
 
       expect(sendOutcomeEmail).toHaveBeenCalledTimes(1);
@@ -383,7 +448,9 @@ suite('admin record correction routes', () => {
 
     it('does not email when the filer left no contact address', async () => {
       const db = await createDbWithAdmin();
-      await insertBuilding(db);
+      // A parcel id, so the pull resolves and every source lands 'empty' rather than
+      // 'error' — an all-error group no longer satisfies the resolve gate.
+      await insertBuilding(db, { parcel_id: '2102098000' });
       await insertCorrection(db, { contactEmail: null });
       vi.stubGlobal('fetch', fixtureFetch([]));
 
@@ -399,6 +466,97 @@ suite('admin record correction routes', () => {
         .bind(CORRECTION_ID)
         .first<{ resolution_notes: string | null }>();
       expect(row?.resolution_notes).toBeNull();
+    });
+
+    it('409s when every source in the re-pull failed', async () => {
+      const db = await createDbWithAdmin();
+      // No parcel id and no assessor fixture: the parcel never resolves, so every
+      // source gets an error row. Pull rows exist, but nothing was read from the city.
+      await insertBuilding(db);
+      await insertCorrection(db);
+      vi.stubGlobal('fetch', fixtureFetch([]));
+
+      expect((await REPULL(createContext(db))).status).toBe(200);
+
+      const statuses = await db
+        .prepare('SELECT status FROM record_pulls WHERE correction_id = ?')
+        .bind(CORRECTION_ID)
+        .all<{ status: string }>();
+      expect(statuses.results).toHaveLength(BOSTON_SOURCE_COUNT);
+      expect(statuses.results.every((row) => row.status === 'error')).toBe(true);
+
+      const response = await PATCH(createContext(db, { method: 'PATCH', body: { resolution: 'repulled_unchanged' } }));
+
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({
+        error: 'The last re-pull failed for every source; run it again before resolving',
+      });
+      expect(sendOutcomeEmail).not.toHaveBeenCalled();
+
+      const row = await db
+        .prepare('SELECT status FROM record_corrections WHERE id = ?')
+        .bind(CORRECTION_ID)
+        .first<{ status: string }>();
+      expect(row?.status).toBe('pending');
+    });
+
+    it('ignores a successful pull stamped with a different correction id', async () => {
+      const db = await createDbWithAdmin();
+      await insertBuilding(db);
+      await insertCorrection(db);
+      await insertCorrection(db, { id: 'corr-other', contactEmail: null });
+      // A successful pull for the *other* report on the same building. The gate is
+      // per correction, so this one must not count as evidence for corr-1.
+      await db
+        .prepare(
+          'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, row_count, correction_id) ' +
+            "VALUES (?, ?, 'boston', 'boston.permits', 'Building permits', 'q', 'ok', 2, ?)",
+        )
+        .bind('pull-other', BUILDING_ID, 'corr-other')
+        .run();
+
+      const response = await PATCH(createContext(db, { method: 'PATCH', body: { resolution: 'repulled_unchanged' } }));
+
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ error: 'Re-pull from the source before resolving' });
+      expect(sendOutcomeEmail).not.toHaveBeenCalled();
+    });
+
+    it('resolves once when two admins resolve the same correction at the same time', async () => {
+      const db = await createDbWithAdmin();
+      await insertBuilding(db, { parcel_id: '2102098000' });
+      await insertCorrection(db);
+      vi.stubGlobal('fetch', bostonFixtures());
+
+      expect((await REPULL(createContext(db))).status).toBe(200);
+
+      // Both requests are in flight before either writes: they interleave at their
+      // awaits, so both clear the read-then-409 fast path and the conditional UPDATE
+      // is the only thing standing between them and two resolutions of one report.
+      const [first, second] = await Promise.all([
+        PATCH(createContext(db, { method: 'PATCH', body: { resolution: 'repulled_unchanged' } })),
+        PATCH(createContext(db, { method: 'PATCH', body: { resolution: 'repulled_updated' } })),
+      ]);
+
+      const statuses = [first.status, second.status].sort();
+      expect(statuses).toEqual([200, 409]);
+
+      const loser = first.status === 409 ? first : second;
+      expect(await loser.json()).toEqual({ error: 'Correction has already been resolved' });
+
+      const audit = await db
+        .prepare('SELECT id FROM audit_logs WHERE action_type = ?')
+        .bind('record_correction_resolved')
+        .all<{ id: number }>();
+      expect(audit.results).toHaveLength(1);
+
+      // One outcome stored, and the filer hears about it exactly once.
+      const row = await db
+        .prepare('SELECT status, resolution FROM record_corrections WHERE id = ?')
+        .bind(CORRECTION_ID)
+        .first<{ status: string; resolution: string }>();
+      expect(row?.status).toBe('resolved');
+      expect(sendOutcomeEmail).toHaveBeenCalledTimes(1);
     });
   });
 });
