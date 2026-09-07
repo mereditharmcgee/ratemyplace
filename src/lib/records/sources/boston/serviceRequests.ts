@@ -8,9 +8,12 @@
 // text in `location`) and one "new" resource (`case_id` like `BCS-00243666`, address split
 // into `street_number`/`street_name`/`zip_code`). This source runs one query per legacy
 // year plus one new-system query - 17 queries total - and unions the results. Any single
-// query failing throws (via ckanSql's SourceError) and fails the whole source, so a
-// transient CKAN outage on one year leaves the building's stored rows untouched rather
-// than replacing them with a partial 311 history.
+// query failing throws (via ckanSql's SourceError) and fails the whole source, so a failed
+// query -- a transient CKAN outage, but also a legacy resource id CKAN has retired, which
+// is permanent, not transient -- leaves the building's stored rows untouched rather than
+// replacing them with a partial 311 history. A retired resource id surfaces as an error on
+// every pull until someone fixes it by updating LEGACY_311_RESOURCES; it will not clear on
+// its own.
 import { addressLikeClauses, ckanSql, ROW_CAP, sqlLiteral } from '../../ckan';
 import type { RecordRow, RecordSource, ServiceRequestClassification, ServiceRequestPayload, SourceResult } from '../../types';
 
@@ -42,14 +45,30 @@ export const LEGACY_311_RESOURCES: Legacy311Resource[] = [
   { year: 2011, resourceId: '94b499d9-712a-4d2a-b790-7ceec5c9c4b1' },
 ];
 
-/** Legacy `reason` values that mean the case is about the building itself, not the street or public realm. */
-export const HOUSING_REASONS = ['Housing', 'Building', 'Code Enforcement'] as const;
+/**
+ * Legacy `reason` values that classify a case as "housing" (about the building itself)
+ * rather than "other" (the street or public realm). Verified live 2026-09-06/07 against
+ * each reason's `type` breakdown:
+ *  - "Housing" -> Unsatisfactory Living Conditions, Pest Infestation, Heat, Maintenance
+ *    Complaint, Mice, Short Term Rental, Chronic Dampness/Mold, Unsatisfactory Utilities.
+ *  - "Building" -> Work w/out Permit, Contractors Complaint, Working Beyond Hours, Building
+ *    Inspection Request, Electrical, Unsafe Dangerous Conditions, Protection of Adjoining
+ *    Property, Maintenance - Homeowner.
+ *  - "Code Enforcement" -> by 2024 volume, dominated by Improper Storage of Trash
+ *    (Barrels) (20,460), Poor Conditions of Property (8,776), Unshoveled Sidewalk (3,801)
+ *    and Illegal Dumping (3,007), plus Illegal Vending, Parking on Front/Back Yards,
+ *    Construction Debris, and Illegal Posting of Signs. So most "Code Enforcement" rows
+ *    are trash-barrel and sidewalk complaints about the property's exterior, not the
+ *    interior conditions "Housing"/"Building" describe. Including it here anyway is a
+ *    published product decision, not an oversight -- revisit in sub-project D.
+ */
+export const HOUSING_REASONS: readonly string[] = ['Housing', 'Building', 'Code Enforcement'];
 
 /** New-system `assigned_department` prefix that means the same thing for that schema. */
 export const HOUSING_DEPARTMENT_PREFIX = 'Inspectional Services';
 
 export function classifyLegacy(reason: string | null): ServiceRequestClassification {
-  return reason != null && (HOUSING_REASONS as readonly string[]).includes(reason) ? 'housing' : 'other';
+  return reason != null && HOUSING_REASONS.includes(reason) ? 'housing' : 'other';
 }
 
 export function classifyNew(department: string | null): ServiceRequestClassification {
@@ -122,19 +141,22 @@ export const serviceRequestsSource: RecordSource = {
   pageUrl: SERVICE_REQUESTS_PAGE_URL,
   kinds: ['service_request'],
   async run(identity, fetchImpl): Promise<SourceResult> {
-    const zipOk = Boolean(identity.zip && /^\d{5}$/.test(identity.zip));
+    const zip = identity.zip;
+    const zipOk = zip != null && /^\d{5}$/.test(zip);
     const addressClauses = addressLikeClauses('location', identity);
     // Qualifying by zip is why a same-named street in one neighborhood does not attach
     // 311 cases filed against a same-named street elsewhere in the city (see permits.ts).
     const legacyWhere = zipOk
-      ? `(("location_zipcode" IS NULL OR "location_zipcode" = ${sqlLiteral(identity.zip as string)}) AND (${addressClauses.join(' OR ')}))`
+      ? `(("location_zipcode" IS NULL OR "location_zipcode" = ${sqlLiteral(zip)}) AND (${addressClauses.join(' OR ')}))`
       : `(${addressClauses.join(' OR ')})`;
 
     const numberForms = identity.rangeForm ? [...identity.numbers, identity.rangeForm] : identity.numbers;
+    // upper() on street_number matches the upper() on street_name above; the new-system
+    // street_number and zip_code columns are both text (verified live 2026-09-06/07).
     const newWhere =
       `upper("street_name") IN (${identity.streetForms.map(sqlLiteral).join(',')}) ` +
-      `AND "street_number" IN (${numberForms.map(sqlLiteral).join(',')})` +
-      (zipOk ? ` AND ("zip_code" IS NULL OR "zip_code" = ${sqlLiteral(identity.zip as string)})` : '');
+      `AND upper("street_number") IN (${numberForms.map(sqlLiteral).join(',')})` +
+      (zipOk ? ` AND ("zip_code" IS NULL OR "zip_code" = ${sqlLiteral(zip)})` : '');
 
     const queries: string[] = [];
     const seen = new Set<string>();
@@ -143,8 +165,10 @@ export const serviceRequestsSource: RecordSource = {
     for (const { resourceId } of LEGACY_311_RESOURCES) {
       const sql =
         `SELECT ${LEGACY_COLUMNS.map((c) => `"${c}"`).join(',')} FROM "${resourceId}" ` +
-        // The cap is applied (by ckanSql, via ROW_CAP) before dedupe below, so the tiebreak
-        // order here determines which rows survive the cap and which duplicate survives dedupe.
+        // This LIMIT is ckanSql's per-query cap on this one year's result set, applied
+        // before dedupe below -- it is not the per-source cap applied to the unioned,
+        // deduped, sorted rows at the end of run() (see the comment there). The ORDER BY
+        // here only matters if a single year alone returns more than ROW_CAP rows.
         `WHERE ${legacyWhere} ORDER BY "open_dt" DESC, "case_enquiry_id" LIMIT ${ROW_CAP}`;
       queries.push(sql);
       const legacyRows = await ckanSql<Row>(sql, fetchImpl);
@@ -168,7 +192,21 @@ export const serviceRequestsSource: RecordSource = {
       rows.push({ kind: 'service_request', sourceKey: payload.caseId, payload, sourceUrl: SERVICE_REQUESTS_PAGE_URL });
     }
 
-    // Per-source cap applied after cross-query dedupe, on top of each query's own ROW_CAP limit.
+    // Per-source cap applied after cross-query dedupe, on top of each query's own ROW_CAP
+    // limit above. Sort newest-first by openedAt (string compare; rows with no openedAt
+    // sort last) before slicing so that, when dedupe still leaves more than ROW_CAP distinct
+    // rows, the ones truncated are the oldest rather than whichever a query happened to
+    // return first. The truncation itself is invisible downstream: a rowCount of exactly
+    // ROW_CAP looks identical to a building that happens to have exactly 500 rows. The
+    // admin panel is expected to render "500+" whenever rowCount === ROW_CAP.
+    rows.sort((a, b) => {
+      const openedA = (a.payload as ServiceRequestPayload).openedAt;
+      const openedB = (b.payload as ServiceRequestPayload).openedAt;
+      if (openedA === openedB) return 0;
+      if (openedA == null) return 1;
+      if (openedB == null) return -1;
+      return openedA < openedB ? 1 : -1;
+    });
     return { query: JSON.stringify(queries), rows: rows.slice(0, ROW_CAP) };
   },
 };

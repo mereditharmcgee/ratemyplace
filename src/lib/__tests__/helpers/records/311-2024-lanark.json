@@ -82,5 +82,19 @@
     "location": "27 Lanark Rd  Brighton  MA  02135",
     "location_zipcode": "02135",
     "source": "Constituent Call"
+  },
+  {
+    "case_enquiry_id": "101005890001",
+    "open_dt": "2024-11-25 06:30:00",
+    "closed_dt": null,
+    "case_status": "Open",
+    "closure_reason": null,
+    "case_title": "Improper Storage of Trash (Barrels)",
+    "subject": "Public Works Department",
+    "reason": "Code Enforcement",
+    "type": "Improper Storage of Trash (Barrels)",
+    "location": "23 Lanark Rd  Brighton  MA  02135",
+    "location_zipcode": "02135",
+    "source": "Constituent Call"
   }
 ]
