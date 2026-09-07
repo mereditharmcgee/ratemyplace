@@ -1,4 +1,4 @@
-import { parseStreetAddress, normalizeStreetName } from '../enrichment/helpers';
+import { parseStreetAddress } from '../enrichment/helpers';
 import type { BuildingIdentity } from './types';
 
 export interface BuildingRowForIdentity {
@@ -11,51 +11,75 @@ export interface BuildingRowForIdentity {
   sam_id: string | null;
 }
 
-/** Short (assessor/permits/enforcement) and long (311 free text) suffix spellings. */
-const SUFFIXES: Array<[short: string, long: string]> = [
-  ['AV', 'AVENUE'], ['ST', 'STREET'], ['RD', 'ROAD'], ['DR', 'DRIVE'], ['PL', 'PLACE'],
-  ['TER', 'TERRACE'], ['CT', 'COURT'], ['LN', 'LANE'], ['BLVD', 'BOULEVARD'], ['PKWY', 'PARKWAY'],
-  ['HWY', 'HIGHWAY'], ['SQ', 'SQUARE'], ['CIR', 'CIRCLE'], ['PK', 'PARK'], ['WAY', 'WAY'],
+/** Assessor spelling first, then every other spelling seen in Boston datasets. Verified 2026-09-07. */
+const SUFFIX_SPELLINGS: ReadonlyArray<readonly string[]> = [
+  ['AV', 'AVE', 'AVENUE'],
+  ['ST', 'STREET'],
+  ['RD', 'ROAD'],
+  ['DR', 'DRIVE'],
+  ['PL', 'PLACE'],
+  ['TE', 'TER', 'TERR', 'TERRACE'],
+  ['CT', 'COURT'],
+  ['LN', 'LANE'],
+  ['BLVD', 'BOULEVARD'],
+  ['PKWY', 'PARKWAY'],
+  ['HWY', 'HIGHWAY'],
+  ['SQ', 'SQUARE'],
+  ['CIR', 'CIRCLE'],
+  ['PK', 'PARK'],        // assessor: UNION PK; 311: Union Park
+  ['WHARF', 'WH', 'WHF'], // assessor: ROWES WHARF; enforcement suffix: WH
+  ['ROW'],
+  ['WAY'],
 ];
 
-const SUFFIX_ALIASES: Record<string, string> = {
-  AVE: 'AV', AVENUE: 'AV', AV: 'AV',
-  ST: 'ST', STREET: 'ST',
-  RD: 'RD', ROAD: 'RD',
-  DR: 'DR', DRIVE: 'DR',
-  PL: 'PL', PLACE: 'PL',
-  TER: 'TER', TERR: 'TER', TERRACE: 'TER',
-  CT: 'CT', COURT: 'CT',
-  LN: 'LN', LANE: 'LN',
-  BLVD: 'BLVD', BOULEVARD: 'BLVD',
-  PKWY: 'PKWY', PARKWAY: 'PKWY',
-  HWY: 'HWY', HIGHWAY: 'HWY',
-  SQ: 'SQ', SQUARE: 'SQ',
-  CIR: 'CIR', CIRCLE: 'CIR',
-  PK: 'PK', PARK: 'PK',
-  WAY: 'WAY',
-};
+/** Any spelling -> its row. Derived so there is only one table to maintain. */
+const SUFFIX_ROW_BY_SPELLING: ReadonlyMap<string, readonly string[]> = new Map(
+  SUFFIX_SPELLINGS.flatMap((row) => row.map((spelling) => [spelling, row] as const)),
+);
 
-export function toCanonicalParcel(value: string | null | undefined): string | null {
+const DIRECTIONALS: Record<string, string> = { NORTH: 'N', SOUTH: 'S', EAST: 'E', WEST: 'W', N: 'N', S: 'S', E: 'E', W: 'W' };
+
+/**
+ * Unit designators, stripped from the end of a street. `\b` keeps UNITY/APTUCXET intact,
+ * and `\s*#` catches "#2" (the old enrichment helper's `\b#` never could).
+ */
+const UNIT_PATTERN = /\s+(?:APT|APARTMENT|UNIT|STE|SUITE|FL|FLOOR|RM|ROOM)\b.*$|\s*#.*$/i;
+/** Same words: a street whose whole base is one of them ("99 Unit Ave") is not a street. */
+const UNIT_WORDS = new Set(['APT', 'APARTMENT', 'UNIT', 'STE', 'SUITE', 'FL', 'FLOOR', 'RM', 'ROOM']);
+
+export function toCanonicalParcel(value: string | number | null | undefined): string | null {
   if (!value) return null;
-  const digits = String(value).trim();
-  if (!/^\d{9,10}$/.test(digits)) return null;
-  return digits.padStart(10, '0');
+  const trimmed = String(value).trim();
+  if (!/^\d{9,10}$/.test(trimmed)) return null;
+  return trimmed.padStart(10, '0');
 }
 
-export function toNumericParcel(value: string | null | undefined): string | null {
+export function toNumericParcel(value: string | number | null | undefined): string | null {
   const canonical = toCanonicalParcel(value);
   return canonical ? String(Number.parseInt(canonical, 10)) : null;
 }
 
-function splitStreet(streetUpper: string): { base: string; short: string | null; long: string | null } {
-  const words = streetUpper.replace(/\./g, '').split(/\s+/).filter(Boolean);
-  if (words.length < 2) return { base: streetUpper, short: null, long: null };
-  const last = words[words.length - 1];
-  const short = SUFFIX_ALIASES[last];
-  if (!short) return { base: streetUpper, short: null, long: null };
-  const long = SUFFIXES.find(([s]) => s === short)?.[1] ?? short;
-  return { base: words.slice(0, -1).join(' '), short, long };
+/** Uppercase, comma/period/unit-free, with a leading directional abbreviated the way every Boston dataset writes it. */
+function normalizeStreet(street: string): string {
+  const cleaned = street
+    .replace(/,.*$/, '')
+    .replace(/\./g, '')
+    .replace(UNIT_PATTERN, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+  const words = cleaned.split(' ').filter(Boolean);
+  // "WEST NEWTON ST" -> "W NEWTON ST", but "NORTH ST" stays: there the directional is the name.
+  if (words.length >= 3 && DIRECTIONALS[words[0]]) words[0] = DIRECTIONALS[words[0]];
+  return words.join(' ');
+}
+
+function splitStreet(streetUpper: string): { base: string; spellings: readonly string[] | null } {
+  const words = streetUpper.split(' ').filter(Boolean);
+  if (words.length < 2) return { base: streetUpper, spellings: null };
+  const spellings = SUFFIX_ROW_BY_SPELLING.get(words[words.length - 1]);
+  if (!spellings) return { base: streetUpper, spellings: null };
+  return { base: words.slice(0, -1).join(' '), spellings };
 }
 
 export function buildIdentity(building: BuildingRowForIdentity): BuildingIdentity {
@@ -63,13 +87,20 @@ export function buildIdentity(building: BuildingRowForIdentity): BuildingIdentit
   if (!parsed) throw new Error(`Could not parse street address: ${building.address}`);
 
   const numberToken = parsed.number.toUpperCase();
-  const numbers = Array.from(new Set(numberToken.split('-').filter(Boolean)));
-  const rangeForm = numbers.length > 1 ? numberToken : null;
+  const parts = Array.from(new Set(numberToken.split('-').filter(Boolean)));
+  const rangeForm = parts.length > 1 ? numberToken : null;
+  // A lettered number also matches as its bare number: '12A' -> ['12A','12'].
+  const numbers = Array.from(new Set(parts.flatMap((p) => (/[A-Z]$/.test(p) ? [p, p.replace(/[A-Z]+$/, '')] : [p])))).filter(Boolean);
 
-  const streetUpper = normalizeStreetName(parsed.street);
-  const { base, short, long } = splitStreet(streetUpper);
-  const streetShort = short ? `${base} ${short}` : base;
-  const streetLong = long ? `${base} ${long}` : base;
+  const { base, spellings } = splitStreet(normalizeStreet(parsed.street));
+  if (!base || SUFFIX_ROW_BY_SPELLING.has(base) || UNIT_WORDS.has(base) || /^[^A-Z0-9]/.test(base)) {
+    throw new Error(`Degenerate street name from address: ${building.address}`);
+  }
+
+  const streetForms = spellings ? Array.from(new Set(spellings.map((s) => `${base} ${s}`))) : [base];
+  const streetShort = spellings ? `${base} ${spellings[0]}` : base;
+  const longest = spellings ? spellings.reduce((a, b) => (b.length > a.length ? b : a)) : null;
+  const streetLong = longest ? `${base} ${longest}` : base;
 
   const numberForms = rangeForm ? [...numbers, rangeForm] : numbers;
   const parcelId = toCanonicalParcel(building.parcel_id);
@@ -81,11 +112,14 @@ export function buildIdentity(building: BuildingRowForIdentity): BuildingIdentit
     streetShort,
     streetLong,
     streetBase: base,
+    streetForms,
     addressFormsShort: numberForms.map((n) => `${n} ${streetShort}`),
     addressFormsLong: numberForms.map((n) => `${n} ${streetLong}`),
     parcelId,
     parcelNumeric: toNumericParcel(parcelId),
+    // Placeholder: parcel resolution (assessor) overwrites this before any source runs.
     condominium: false,
     zip: building.zip_code,
+    samId: building.sam_id,
   };
 }

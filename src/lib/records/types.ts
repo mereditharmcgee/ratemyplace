@@ -127,6 +127,8 @@ export interface BuildingIdentity {
   streetLong: string;
   /** Uppercase street name without suffix, e.g. 'LANARK'. */
   streetBase: string;
+  /** Every known uppercase spelling of the street across Boston datasets, unique, assessor form first (e.g. ['COMMONWEALTH AV','COMMONWEALTH AVE','COMMONWEALTH AVENUE']). Use for exact matches outside the assessor. */
+  streetForms: string[];
   /** Every '<number> <streetShort>' form, uppercase. */
   addressFormsShort: string[];
   /** Every '<number> <streetLong>' form, uppercase. */
@@ -137,6 +139,8 @@ export interface BuildingIdentity {
   parcelNumeric: string | null;
   condominium: boolean;
   zip: string | null;
+  /** Boston SAM id when the building already has one. */
+  samId: string | null;
 }
 
 export interface RecordSource {
