@@ -116,6 +116,9 @@ export interface SourceResult {
   rows: RecordRow[];
 }
 
+/** A pull row's `query` when no query ran: a resolution failure, or a source that opted out. */
+export const NO_QUERY = 'no query';
+
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 export interface BuildingIdentity {

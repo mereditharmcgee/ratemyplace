@@ -1,6 +1,6 @@
 import { ckanSql, parseIntOrNull, parseMoney, sqlLiteral } from '../../ckan';
 import { toCanonicalParcel } from '../../identity';
-import { SourceError, type AssessmentPayload, type BuildingIdentity, type FetchLike, type RecordSource, type SourceResult } from '../../types';
+import { NO_QUERY, SourceError, type AssessmentPayload, type BuildingIdentity, type FetchLike, type RecordSource, type SourceResult } from '../../types';
 
 export const FY2026_RESOURCE_ID = 'ee73430d-96c0-423e-ad21-c4cfb54c8961';
 export const ASSESSOR_PAGE_URL = 'https://data.boston.gov/dataset/property-assessment';
@@ -234,7 +234,7 @@ export function assessorSource(year: AssessorYear): RecordSource {
             ? { query: 'condominium: no parcel query', rows: [{ kind: 'assessment', sourceKey: year.fiscalYear, payload: condominiumPayload(year.fiscalYear), sourceUrl: ASSESSOR_PAGE_URL }] }
             : { query: 'condominium: history skipped', rows: [] };
         }
-        throw new SourceError('Parcel not resolved for this building', 'no query');
+        throw new SourceError('Parcel not resolved for this building', NO_QUERY);
       }
       // A parcel with several buildings returns a row per BLDG_SEQ; ordering makes the
       // one row we keep the same one on every pull instead of whatever CKAN returns first.
