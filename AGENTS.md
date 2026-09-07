@@ -258,7 +258,9 @@ Things that have already cost time. Read before debugging.
   locally. Status unverified since May 2026 — see `GOOGLE_OAUTH_TROUBLESHOOTING.md`.
 - **Parcel ids drop their leading zero in some Boston datasets.** `buildings.parcel_id`
   holds the canonical 10-digit form with the zero; the permits resource stores `parcel_id`
-  as a number, so the zero is gone. Query both forms, never just the stored one.
+  as a number, so the zero is gone. The assessor and RentSmart adapters query both forms;
+  the permits adapter uses the numeric form only because its column is numeric; the
+  violation feeds have no parcel column and key on street, number, and SAM id.
 - **The FY2026 assessor stores ranged addresses as `ST_NUM` plus `ST_NUM2`**, and street
   names arrive mixed-case. An exact `datastore_search` filter therefore misses `23-27
   Lanark Rd` entirely, which is why `src/lib/records/` uses the CKAN SQL endpoint with

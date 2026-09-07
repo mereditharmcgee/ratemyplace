@@ -28,7 +28,7 @@ These override the brief where they differ. The adapters are written to them.
 | 311 legacy yearly resources 2011 to 2026 share one schema. The new-system resource has a different schema (`case_id`, `street_number`, `street_name`, `case_topic`, `assigned_department`). No Inspectional Services cases exist in the new system yet. | One 311 source runs 17 queries; classification rules differ per system. |
 | Assessment history columns drift: FY2024 has no `ST_NUM2`; FY2023 has `OWNER MAIL ADDRESS` combined; FY2022 and FY2021 use `MAIL_ADDRESS`, `MAIL_ZIPCODE`, `ZIPCODE`. Values are formatted `6,720,200`, `6780500`, or `$6,649,200.00 `. `PID` is stable across years for Lanark. | Per-year column map and a money parser that strips everything but digits and dot. |
 | Dataset page slugs: `property-assessment`, `approved-building-permits`, `building-and-property-violations1`, `public-works-violations`, `311-service-requests`, `rentsmart`. | `pageUrl` on each source. |
-| Lanark FY2026: `TOTAL_VALUE` 6,720,200; `LAND_VALUE` 1,620,500; `BLDG_VALUE` 5,099,700; mail `PO BOX 35006`, addressee `C/O ATT DENNIS CLAIR`; `LU` `A`; `YR_BUILT` 1920; `YR_REMODEL` 1980; `GROSS_AREA` 34650; `LIVING_AREA` 27720. | Fixture values. |
+| Lanark FY2026: `TOTAL_VALUE` 6,720,200; `LAND_VALUE` 1,620,500; `BLDG_VALUE` 5,099,700; mail `PO BOX 35006`, addressee `C/O ATT <person>`; `LU` `A`; `YR_BUILT` 1920; `YR_REMODEL` 1980; `GROSS_AREA` 34650; `LIVING_AREA` 27720. | Fixture values. |
 | `audit_logs` has a `CHECK` on `action_type`. New action types require a table rebuild (the 0028 pattern). | Migration 0030 rebuilds `audit_logs` adding `records_pulled` and `record_correction_resolved`. |
 
 ## File structure
@@ -1049,7 +1049,7 @@ export function fixtureFetch(routes: FixtureRoute[]): FetchLike & { calls: strin
   {
     "PID": "2102098000", "ST_NUM": "23", "ST_NUM2": "27", "ST_NAME": "Lanark RD", "CITY": "BRIGHTON", "ZIP_CODE": "02135",
     "LU": "A", "LU_DESC": "APT 7-30 UNITS", "OWNER": "LANARK ROAD LLC MASS LLC",
-    "MAIL_ADDRESSEE": "C/O ATT DENNIS CLAIR", "MAIL_STREET_ADDRESS": "PO BOX 35006", "MAIL_CITY": "BOSTON", "MAIL_STATE": "MA", "MAIL_ZIP_CODE": "02135",
+    "MAIL_ADDRESSEE": "C/O ATT <person>", "MAIL_STREET_ADDRESS": "PO BOX 35006", "MAIL_CITY": "BOSTON", "MAIL_STATE": "MA", "MAIL_ZIP_CODE": "02135",
     "RES_UNITS": null, "COM_UNITS": null, "GROSS_AREA": "34650", "LIVING_AREA": "27720",
     "LAND_VALUE": "1,620,500", "BLDG_VALUE": "5,099,700", "TOTAL_VALUE": "6,720,200",
     "YR_BUILT": "1920", "YR_REMODEL": "1980", "NUM_BLDGS": "1"
@@ -1074,7 +1074,7 @@ export function fixtureFetch(routes: FixtureRoute[]): FetchLike & { calls: strin
   {
     "PID": "2102098000", "ST_NUM": "23  27", "ST_NAME": "LANARK RD", "ZIPCODE": "02135",
     "LU": "A", "LU_DESC": "APT 7-30 UNITS", "OWNER": "LANARK ROAD LLC MASS LLC",
-    "MAIL_ADDRESSEE": "C/O ATT DENNIS CLAIR", "MAIL_ADDRESS": "PO BOX 35006", "MAIL_CITY": "BOSTON", "MAIL_STATE": "MA", "MAIL_ZIPCODE": "02135",
+    "MAIL_ADDRESSEE": "C/O ATT <person>", "MAIL_ADDRESS": "PO BOX 35006", "MAIL_CITY": "BOSTON", "MAIL_STATE": "MA", "MAIL_ZIPCODE": "02135",
     "RES_UNITS": null, "COM_UNITS": null, "GROSS_AREA": "34650", "LIVING_AREA": "27720",
     "LAND_VALUE": "$1,488,900.00 ", "BLDG_VALUE": "$5,160,300.00 ", "TOTAL_VALUE": "$6,649,200.00 ",
     "YR_BUILT": "1920", "YR_REMODEL": "1980"
@@ -1147,7 +1147,7 @@ describe('assessorSource', () => {
     expect(result.rows[0].sourceKey).toBe('FY2026');
     expect(payload).toMatchObject({
       fiscalYear: 'FY2026', parcelId: '2102098000', owner: 'LANARK ROAD LLC MASS LLC',
-      mailAddressee: 'C/O ATT DENNIS CLAIR', mailStreet: 'PO BOX 35006', mailCity: 'BOSTON', mailState: 'MA', mailZip: '02135',
+      mailAddressee: 'C/O ATT <person>', mailStreet: 'PO BOX 35006', mailCity: 'BOSTON', mailState: 'MA', mailZip: '02135',
       landUse: 'A', landUseDescription: 'APT 7-30 UNITS', yearBuilt: 1920, yearRemodel: 1980,
       grossArea: 34650, livingArea: 27720, residentialUnits: null, commercialUnits: null,
       totalValue: 6720200, landValue: 1620500, buildingValue: 5099700, condominium: false,
@@ -1314,7 +1314,7 @@ function mapRow(row: Row, year: AssessorYear): AssessmentPayload {
   let mailState = pick(c.mailState);
   let mailZip = pick(c.mailZip);
   if (c.mailCombined) {
-    // "PO BOX 35006 C/O ATT DENNIS CLAIR, BOSTON, MA 02135"
+    // "PO BOX 35006 C/O ATT <person>, BOSTON, MA 02135"
     const combined = pick(c.mailCombined) ?? '';
     const parts = combined.split(',').map((p) => p.trim());
     mailStreet = parts[0] || null;

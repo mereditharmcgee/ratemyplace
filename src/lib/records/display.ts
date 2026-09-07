@@ -87,7 +87,7 @@ export function showMailingAddress(owner: string | null): boolean {
 
 /**
  * The tax mailing address as one line, with the addressee held to the same entity gate as the
- * owner. An entity can list a person as its addressee (`C/O ATT DENNIS CLAIR`), and printing
+ * owner. An entity can list a person as its addressee (`C/O ATT <person>`), and printing
  * that name beside the address publishes exactly what the owner gate exists to withhold. The
  * street and city lines are kept either way — those belong to the entity.
  */

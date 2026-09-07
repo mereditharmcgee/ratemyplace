@@ -44,8 +44,8 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
         <p>Some building pages show public government records, such as property assessment, building permit, violation, code enforcement, and 311 data published by the City of Boston. We show these records as they were recorded, with the date we retrieved them and a link to the source dataset.</p>
         <ul class="list-disc pl-6 space-y-2">
           <li><strong>Owner of record:</strong> shown as the city publishes it.</li>
-          <li><strong>Mailing addresses:</strong> when the owner of record is an individual, or when a person is named as a trustee or in a care-of line, we do not show the mailing address. It is usually a home address.</li>
-          <li><strong>Reporting a record error:</strong> the form stores your description of what you believe is wrong and, only if you give one, an email address so we can tell you the outcome. Nothing else about you is kept.</li>
+          <li><strong>Mailing addresses:</strong> When the owner of record is an individual we do not show the mailing address. When an entity's mailing address names a person, including a care-of line, we omit that name and show only the street and city.</li>
+          <li><strong>Reporting a record error:</strong> Reporting a record error stores your description and, only if you give one, an email address. The rate limiter that protects the form keeps your IP address for one hour, as it does for every public form on the site, and nothing else about you is kept.</li>
         </ul>
       </section>
 
