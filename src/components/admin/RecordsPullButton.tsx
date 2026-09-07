@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ROW_CAP } from '../../lib/records/ckan';
 
 interface RecordsPullButtonProps {
   buildingId: string;
@@ -40,9 +41,17 @@ function sourceLineClass(status: PullSourceSummary['status']): string {
 }
 
 function sourceLineText(source: PullSourceSummary): string {
-  const capped = source.status === 'ok' && source.rowCount === 500 ? ' (500+, capped)' : '';
-  const base = `${source.label}: ${source.status} (${source.rowCount} rows)${capped}`;
-  return source.status === 'error' && source.error ? `${base} — ${source.error}` : base;
+  if (source.status === 'error') {
+    return source.error ? `${source.label}: error — ${source.error}` : `${source.label}: error`;
+  }
+  const capped = source.status === 'ok' && source.rowCount === ROW_CAP ? ` (${ROW_CAP}+, capped)` : '';
+  return `${source.label}: ${source.status} (${source.rowCount} rows)${capped}`;
+}
+
+interface PullResponsePayload {
+  data?: PullSummary;
+  error?: string;
+  details?: { field: string; message: string }[];
 }
 
 export default function RecordsPullButton({ buildingId, city }: RecordsPullButtonProps) {
@@ -58,6 +67,7 @@ export default function RecordsPullButton({ buildingId, city }: RecordsPullButto
   async function pullRecords() {
     setRunning(true);
     setError(null);
+    setSummary(null);
     try {
       const trimmed = parcelOverride.trim();
       const response = await fetch(`/api/admin/buildings/${buildingId}/records/pull`, {
@@ -65,12 +75,12 @@ export default function RecordsPullButton({ buildingId, city }: RecordsPullButto
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(trimmed ? { parcelId: trimmed } : {}),
       });
-      const payload = await response.json();
+      const payload = (await response.json()) as PullResponsePayload;
       if (!response.ok) {
         setError(payload.details?.[0]?.message || payload.error || 'Failed to pull records');
         return;
       }
-      setSummary(payload.data as PullSummary);
+      if (payload.data) setSummary(payload.data);
     } catch {
       setError('Failed to pull records');
     } finally {
@@ -83,12 +93,14 @@ export default function RecordsPullButton({ buildingId, city }: RecordsPullButto
       <h4 className="text-sm font-medium text-gray-700 mb-2">Public records</h4>
       <div className="flex flex-wrap items-center gap-2">
         <button
+          type="button"
           onClick={pullRecords}
           disabled={running}
           className="px-3 py-1.5 bg-teal-700 text-white rounded-[4px] text-xs font-semibold hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {running ? 'Pulling records…' : 'Pull records'}
         </button>
+        {running && <span className="text-xs text-gray-500">This can take a minute.</span>}
         <label className="flex items-center gap-1 text-xs text-gray-500">
           Parcel id override
           <input
@@ -100,9 +112,13 @@ export default function RecordsPullButton({ buildingId, city }: RecordsPullButto
           />
         </label>
       </div>
-      {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
+      {error && (
+        <p className="mt-2 text-xs text-red-700" aria-live="polite">
+          {error}
+        </p>
+      )}
       {summary && (
-        <div className="mt-2 text-xs space-y-1">
+        <div className="mt-2 text-xs space-y-1" aria-live="polite">
           <p className="text-gray-700">Parcel: {parcelLabel(summary)}</p>
           <ul className="space-y-0.5">
             {summary.sources.map((source) => (

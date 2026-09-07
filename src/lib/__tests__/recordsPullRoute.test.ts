@@ -112,7 +112,7 @@ suite('POST /api/admin/buildings/[id]/records/pull', () => {
     });
   });
 
-  it('pulls records, applies a parcel override, and writes an audit log', async () => {
+  it('pulls records, applies a parcel override, and writes two audit logs', async () => {
     const db = await createDbWithAdmin();
     const buildingId = await insertBuilding(db);
     vi.stubGlobal('fetch', fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]));
@@ -128,18 +128,40 @@ suite('POST /api/admin/buildings/[id]/records/pull', () => {
       expect(payload.data.sources).toHaveLength(BOSTON_SOURCE_COUNT);
 
       const auditRows = await db
-        .prepare('SELECT action_type, entity_type, entity_id, admin_user_id, notes FROM audit_logs WHERE entity_id = ?')
+        .prepare(
+          'SELECT action_type, entity_type, entity_id, admin_user_id, old_value, new_value, notes FROM audit_logs WHERE entity_id = ? ORDER BY id',
+        )
         .bind(buildingId)
-        .all<{ action_type: string; entity_type: string; entity_id: string; admin_user_id: string; notes: string | null }>();
+        .all<{
+          action_type: string;
+          entity_type: string;
+          entity_id: string;
+          admin_user_id: string;
+          old_value: string | null;
+          new_value: string | null;
+          notes: string | null;
+        }>();
 
-      expect(auditRows.results).toHaveLength(1);
-      expect(auditRows.results[0]).toMatchObject({
+      expect(auditRows.results).toHaveLength(2);
+
+      const overrideRow = auditRows.results[0];
+      expect(overrideRow).toMatchObject({
+        action_type: 'building_updated',
+        entity_type: 'building',
+        entity_id: buildingId,
+        admin_user_id: ADMIN_ID,
+      });
+      expect(JSON.parse(overrideRow.old_value ?? 'null')).toMatchObject({ parcelId: null });
+      expect(JSON.parse(overrideRow.new_value ?? 'null')).toMatchObject({ parcelId: '2102098000' });
+
+      const pulledRow = auditRows.results[1];
+      expect(pulledRow).toMatchObject({
         action_type: 'records_pulled',
         entity_type: 'building',
         entity_id: buildingId,
         admin_user_id: ADMIN_ID,
       });
-      expect(auditRows.results[0].notes ?? '').toContain('parcel override 2102098000');
+      expect(pulledRow.notes ?? '').toContain('parcel override 2102098000');
     } finally {
       vi.unstubAllGlobals();
     }
@@ -156,6 +178,51 @@ suite('POST /api/admin/buildings/[id]/records/pull', () => {
       const response = await POST(context);
 
       expect(response.status).toBe(200);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('ignores a parcelId sent with a non-JSON content type', async () => {
+    const db = await createDbWithAdmin();
+    const buildingId = await insertBuilding(db);
+    vi.stubGlobal('fetch', fixtureFetch([]));
+
+    try {
+      const context = createContext(db, {
+        buildingId,
+        body: { parcelId: '2102098000' },
+        withContentType: false,
+      });
+
+      const response = await POST(context);
+
+      expect(response.status).toBe(200);
+
+      const auditRows = await db
+        .prepare("SELECT action_type FROM audit_logs WHERE entity_id = ? AND action_type = 'building_updated'")
+        .bind(buildingId)
+        .all<{ action_type: string }>();
+      expect(auditRows.results).toHaveLength(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('debounces a second immediate pull for the same building with 429', async () => {
+    const db = await createDbWithAdmin();
+    const buildingId = await insertBuilding(db);
+    vi.stubGlobal('fetch', fixtureFetch([]));
+
+    try {
+      const first = await POST(createContext(db, { buildingId }));
+      expect(first.status).toBe(200);
+
+      const second = await POST(createContext(db, { buildingId }));
+      expect(second.status).toBe(429);
+      expect(await second.json()).toEqual({
+        error: 'A pull for this building is already running or just finished. Try again in a minute.',
+      });
     } finally {
       vi.unstubAllGlobals();
     }

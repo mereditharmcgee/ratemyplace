@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../../../lib/db';
-import { getClientIP } from '../../../../../../lib/rateLimit';
+import { checkRateLimit, getClientIP } from '../../../../../../lib/rateLimit';
 import { createAuditLog } from '../../../../../../lib/audit';
 import { logError } from '../../../../../../lib/logger';
 import { pullBuildingRecords } from '../../../../../../lib/records/pull';
@@ -25,6 +25,22 @@ export async function POST(context: APIContext): Promise<Response> {
   const buildingId = context.params.id;
   if (!buildingId) {
     return json({ error: 'Building ID required' }, 400);
+  }
+
+  const db = getDB(context);
+
+  // Debounce, not a lock: this only stops a second pull from starting for the same
+  // building within the window. It cannot interrupt a pull already running, and it
+  // does nothing to protect two different buildings' concurrent pulls from each other.
+  const guard = await checkRateLimit(db, `building:${buildingId}`, 'records_pull', 1, 120);
+  if (!guard.allowed) {
+    if (guard.error) {
+      return json({ error: 'Rate limiter unavailable' }, 503);
+    }
+    return json(
+      { error: 'A pull for this building is already running or just finished. Try again in a minute.' },
+      429,
+    );
   }
 
   // Only ever parse a JSON body when the client says it sent one. request.json()
@@ -57,8 +73,6 @@ export async function POST(context: APIContext): Promise<Response> {
     parcelOverride = canonical;
   }
 
-  const db = getDB(context);
-
   try {
     const building = await db
       .prepare('SELECT id, address, city, state, zip_code, parcel_id, sam_id FROM buildings WHERE id = ?')
@@ -70,11 +84,25 @@ export async function POST(context: APIContext): Promise<Response> {
     }
 
     if (parcelOverride) {
+      const previousParcel = building.parcel_id;
       await db
         .prepare('UPDATE buildings SET parcel_id = ?, updated_at = unixepoch() WHERE id = ?')
         .bind(parcelOverride, buildingId)
         .run();
       building.parcel_id = parcelOverride;
+
+      // Audited here, at the point of the override, with the old value — separate from
+      // the records_pulled entry below, which only ever carries the pull's own outcome.
+      await createAuditLog(db, {
+        adminUserId: context.locals.user.id,
+        adminIp: getClientIP(context),
+        actionType: 'building_updated',
+        entityType: 'building',
+        entityId: buildingId,
+        oldValue: { parcelId: previousParcel },
+        newValue: { parcelId: parcelOverride },
+        notes: 'parcel id override before records pull',
+      });
     }
 
     const summary = await pullBuildingRecords(db, building, { triggeredBy: context.locals.user.id });
