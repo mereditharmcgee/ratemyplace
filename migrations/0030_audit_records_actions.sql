@@ -13,18 +13,29 @@ CREATE TABLE IF NOT EXISTS audit_logs_v4 (
     admin_user_id TEXT NOT NULL,
     admin_ip TEXT NOT NULL,
     action_type TEXT NOT NULL CHECK (action_type IN (
+        -- reviews
         'review_approved', 'review_rejected', 'review_flagged', 'review_pending',
         'review_deleted',
+        -- disputes
         'dispute_resolved', 'dispute_dismissed', 'dispute_upheld', 'dispute_partially_valid',
+        -- landlords
         'landlord_created', 'landlord_updated', 'landlord_deleted',
+        -- buildings
         'building_updated', 'building_deleted', 'buildings_bulk_deleted',
+        -- property managers
         'manager_created', 'manager_updated',
+        -- verification
         'verification_approved', 'verification_rejected',
+        -- users / admin privilege
         'admin_granted', 'admin_revoked',
+        -- bug reports
         'bug_report_updated',
         -- public records (migration 0030)
         'records_pulled', 'record_correction_resolved'
     )),
+    -- MAINTENANCE: this list must be extended in the same change that introduces a
+    -- new action type. A missing value fails the INSERT, and createAuditLog is
+    -- best-effort, so the failure is invisible unless you are reading logs.
     entity_type TEXT NOT NULL CHECK (entity_type IN (
         'review', 'dispute', 'landlord', 'building',
         'manager', 'verification', 'user', 'bug_report'

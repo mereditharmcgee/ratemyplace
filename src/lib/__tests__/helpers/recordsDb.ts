@@ -4,10 +4,10 @@ import { createMemoryDatabase, TestD1Database } from './sqliteD1';
 
 /**
  * Minimal schema for records tests: the parent tables the 0029/0030 migrations
- * reference, then the real migration files. Keeps tests honest about the SQL
- * that ships without applying all 30 migrations.
+ * reference. Keeps tests honest about the SQL that ships without applying all
+ * 30 migrations.
  */
-export function createRecordsTestDb(): TestD1Database {
+export function createRecordsStubDb(): TestD1Database {
   const db = new TestD1Database(createMemoryDatabase());
   db.exec(`
     CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, is_admin INTEGER DEFAULT 0);
@@ -48,10 +48,27 @@ export function createRecordsTestDb(): TestD1Database {
       notes TEXT
     );
   `);
+  return db;
+}
+
+export function applyRecordsMigrations(db: TestD1Database): void {
   for (const file of ['0029_building_records.sql', '0030_audit_records_actions.sql']) {
     db.exec(readFileSync(join(process.cwd(), 'migrations', file), 'utf8'));
   }
+}
+
+export function createRecordsTestDb(): TestD1Database {
+  const db = createRecordsStubDb();
+  applyRecordsMigrations(db);
   return db;
+}
+
+/** Every action_type 0028 allows, parsed from the migration file so the list cannot drift from the source of truth. */
+export function auditActionTypesFrom0028(): string[] {
+  const sql = readFileSync(join(process.cwd(), 'migrations', '0028_audit_expand_action_types.sql'), 'utf8');
+  const block = sql.match(/action_type TEXT NOT NULL CHECK \(action_type IN \(([\s\S]*?)\)\)/);
+  if (!block) throw new Error('could not find action_type CHECK in 0028');
+  return Array.from(block[1].matchAll(/'([a-z_]+)'/g), (m) => m[1]);
 }
 
 export async function insertBuilding(
