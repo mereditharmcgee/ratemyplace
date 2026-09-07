@@ -5,10 +5,16 @@ import { BANNED_WORDS } from '../records/display';
 
 const source = readFileSync(join(process.cwd(), 'src/components/BuildingRecords.astro'), 'utf8');
 
+/** Word-boundary alternation over the banned list. Built from a plain string so the escapes survive. */
+const bannedPattern = new RegExp('\\b(' + BANNED_WORDS.join('|') + ')\\b', 'i');
+
 describe('BuildingRecords.astro display rules', () => {
+  it('builds a pattern that genuinely matches a banned word', () => {
+    expect(bannedPattern.test('there is a pattern of delay here')).toBe(true);
+    expect(bannedPattern.test('nothing to see')).toBe(false);
+  });
   it('contains none of the banned characterizations', () => {
-    const pattern = new RegExp(String.raw`(${BANNED_WORDS.join("|")})`, "i");
-    expect(source).not.toMatch(pattern);
+    expect(source).not.toMatch(bannedPattern);
   });
   it('never imports score colors or links to reviews and scores', () => {
     expect(source).not.toMatch(/scoring-colors/);
