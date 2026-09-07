@@ -6,14 +6,44 @@ import {
   DECLARED_VALUATION_CAVEAT,
   OTHER_REQUESTS_COPY,
   CONDOMINIUM_COPY,
+  KIND_LABELS,
   showMailingAddress,
+  mailingAddressLine,
   formatDollars,
+  formatPullDate,
   formatRecordDate,
   permitSummary,
   splitServiceRequests,
   rentSmartDisagreement,
 } from '../records/display';
-import type { PermitPayload, RentSmartPayload, ServiceRequestPayload } from '../records/types';
+import { RECORD_KINDS } from '../records/types';
+import type { AssessmentPayload, PermitPayload, RentSmartPayload, ServiceRequestPayload } from '../records/types';
+
+function assessment(overrides: Partial<AssessmentPayload> = {}): AssessmentPayload {
+  return {
+    fiscalYear: 'FY2026',
+    parcelId: null,
+    owner: null,
+    mailAddressee: null,
+    mailStreet: null,
+    mailCity: null,
+    mailState: null,
+    mailZip: null,
+    landUse: null,
+    landUseDescription: null,
+    yearBuilt: null,
+    yearRemodel: null,
+    grossArea: null,
+    livingArea: null,
+    residentialUnits: null,
+    commercialUnits: null,
+    totalValue: null,
+    landValue: null,
+    buildingValue: null,
+    condominium: false,
+    ...overrides,
+  };
+}
 
 function permit(overrides: Partial<PermitPayload> = {}): PermitPayload {
   return {
@@ -90,6 +120,47 @@ describe('showMailingAddress', () => {
     expect(showMailingAddress('PASCUCCI CARLO')).toBe(false);
   });
 
+  // Periods are replaced with spaces before matching, so the punctuated corporate forms have
+  // to be listed in their spaced shape. The escaped `L\.L\.C` they replaced never matched.
+  it('returns true for a punctuated LLC', () => {
+    expect(showMailingAddress('LANARK L.L.C.')).toBe(true);
+  });
+
+  it('returns true for a punctuated limited partnership', () => {
+    expect(showMailingAddress('SMITH FAMILY L.P.')).toBe(true);
+  });
+
+  // A trustee suffix on its own names a person, not an entity: these are individuals holding
+  // a family trust, and the address on file is the house they live in.
+  it.each(['SMITH JOHN TR', 'DOE JANE TRUSTEE', 'SMITH JOHN CO-TRUSTEE', 'JONES ANN TRS'])(
+    'returns false for %s, an individual trustee with no entity in the name',
+    (owner) => {
+      expect(showMailingAddress(owner)).toBe(false);
+    },
+  );
+
+  // The same suffix alongside something that names a trust does clear the gate.
+  it.each(['SMITH FAMILY TR', 'GRAND LANARK CONDO TR', 'LANARK NOMINEE TRSTEE', '17 LANARK REALTY TR'])(
+    'returns true for %s, where the trustee suffix accompanies a named trust',
+    (owner) => {
+      expect(showMailingAddress(owner)).toBe(true);
+    },
+  );
+
+  // `CO` and `CHURCH` are surnames as often as they are entity words; `COMPANY` and `CORP`
+  // carry the corporate cases without dragging these two along.
+  it.each(['TRAVIS COREY', 'CONDON PATRICK', 'BANKS JAMES', 'CO JOHN', 'CHURCH MARY E'])(
+    'returns false for %s',
+    (owner) => {
+      expect(showMailingAddress(owner)).toBe(false);
+    },
+  );
+
+  it('still returns true for the company and corporation spellings', () => {
+    expect(showMailingAddress('CLAIR MANAGEMENT COMPANY INC')).toBe(true);
+    expect(showMailingAddress('LANARK CORP')).toBe(true);
+  });
+
   // The privacy failure this gate exists to prevent: a substring test for entity tokens
   // matches INC inside PRINCE, LP inside no surname here but CORP inside CORPUS, and
   // would publish a private individual's home address as a "business" mailing address.
@@ -135,6 +206,83 @@ describe('formatRecordDate', () => {
 
   it('returns "Date not recorded" for a garbage string', () => {
     expect(formatRecordDate('garbage')).toBe('Date not recorded');
+  });
+});
+
+describe('formatPullDate', () => {
+  it('formats a unix timestamp the same way record dates read', () => {
+    // 2026-07-17T12:00:00Z, mid-morning in Boston: same calendar day either way.
+    expect(formatPullDate(1784289600)).toBe('Jul 17, 2026');
+  });
+
+  // The reason this does not reuse formatRecordDate's UTC-free path: a pull is a real instant,
+  // and an evening pull in Boston is already the next day in UTC.
+  it('reports a late-evening Boston pull as that Boston day, not the UTC day', () => {
+    // 2026-07-18T01:30:00Z is 2026-07-17 21:30 in America/New_York.
+    expect(formatPullDate(1784338200)).toBe('Jul 17, 2026');
+  });
+
+  it('returns "Date not recorded" for a non-finite timestamp', () => {
+    expect(formatPullDate(Number.NaN)).toBe('Date not recorded');
+  });
+});
+
+describe('mailingAddressLine', () => {
+  it('drops an individual addressee under an entity owner, keeping the address itself', () => {
+    const line = mailingAddressLine(
+      assessment({
+        owner: '17 LANARK RD REALTY TRUST',
+        mailAddressee: 'SMITH JOHN',
+        mailStreet: 'PO BOX 1',
+        mailCity: 'BRIGHTON',
+        mailState: 'MA',
+        mailZip: '02135',
+      }),
+    );
+
+    expect(line).toBe('PO BOX 1, BRIGHTON, MA 02135');
+    expect(line).not.toContain('SMITH JOHN');
+  });
+
+  it('drops a C/O line that names a person', () => {
+    const line = mailingAddressLine(
+      assessment({
+        owner: '17 LANARK RD REALTY TRUST',
+        mailAddressee: 'C/O ATT DENNIS CLAIR',
+        mailStreet: 'PO BOX 1',
+      }),
+    );
+
+    expect(line).toBe('PO BOX 1');
+  });
+
+  it('keeps an addressee that is itself an entity', () => {
+    const line = mailingAddressLine(
+      assessment({
+        owner: '17 LANARK RD REALTY TRUST',
+        mailAddressee: 'CLAIR MANAGEMENT COMPANY INC',
+        mailStreet: 'PO BOX 1',
+      }),
+    );
+
+    expect(line).toBe('CLAIR MANAGEMENT COMPANY INC, PO BOX 1');
+  });
+
+  it('returns "Not recorded" when the assessor recorded no mailing address at all', () => {
+    expect(mailingAddressLine(assessment())).toBe('Not recorded');
+  });
+});
+
+describe('KIND_LABELS', () => {
+  it('names every record kind', () => {
+    for (const kind of RECORD_KINDS) {
+      expect(KIND_LABELS[kind]).toBeTruthy();
+    }
+  });
+
+  it('reads as prose rather than as a column name', () => {
+    expect(KIND_LABELS.enforcement_ticket).toBe('code enforcement');
+    expect(KIND_LABELS.service_request).toBe('311 requests');
   });
 });
 

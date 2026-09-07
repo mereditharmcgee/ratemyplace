@@ -7,7 +7,13 @@
 // enforces against every exported copy constant so a future edit cannot smuggle in an
 // editorial reading of the data.
 import { PERMIT_COVERAGE_START } from './sources/boston/permits';
-import type { PermitPayload, RentSmartPayload, ServiceRequestPayload } from './types';
+import type {
+  AssessmentPayload,
+  PermitPayload,
+  RecordKind,
+  RentSmartPayload,
+  ServiceRequestPayload,
+} from './types';
 
 export const BANNED_WORDS: readonly string[] = [
   'cash-out',
@@ -35,14 +41,73 @@ export const OTHER_REQUESTS_COPY =
 export const CONDOMINIUM_COPY =
   'This building is divided into individually owned condominium units. No single owner of record is shown.';
 
-/** Word-boundary entity tokens. A bare substring test (INC in PRINCE) would publish an individual's home address. */
-const ENTITY_TOKEN = /\b(LLC|L\.L\.C|INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|TRUST|TRUSTEE|TRUSTEES|TRSTEE|TRSTEES|TR|TRS|LP|L\.P|LLP|LLLP|PARTNERSHIP|PARTNERS|REIT|REALTY|ASSOC|ASSOCIATES|ASSOCIATION|CONDOMINIUM|CONDO|AUTHORITY|COMMONWEALTH|CITY OF|HOUSING|DEVELOPMENT|HOLDINGS|PROPERTIES|GROUP|FUND|BANK|CHURCH|UNIVERSITY|COLLEGE|HOSPITAL)\b/;
+/**
+ * Word-boundary entity tokens. A bare substring test (INC in PRINCE) would publish an
+ * individual's home address. Periods become spaces before matching, so `L.L.C.` arrives as
+ * the spaced form `L L C` and is listed here that way — the escaped `L\.L\.C` this replaced
+ * could never match anything.
+ *
+ * Deliberately absent: `CO` and `CHURCH`, both common surnames (CO JOHN, CHURCH MARY E).
+ * `COMPANY` and `CORP` cover the actual corporate uses.
+ */
+const ENTITY_TOKEN =
+  /\b(LLC|L L C|INC|INCORPORATED|CORP|CORPORATION|COMPANY|TRUST|REALTY|CONDO|CONDOMINIUM|LP|L P|LLP|LLLP|PARTNERSHIP|PARTNERS|REIT|ASSOC|ASSOCIATES|ASSOCIATION|AUTHORITY|COMMONWEALTH|CITY OF|HOUSING|DEVELOPMENT|HOLDINGS|PROPERTIES|GROUP|FUND|BANK|UNIVERSITY|COLLEGE|HOSPITAL)\b/;
 
-/** No mailing address for an individual owner: it would be a home address, not a business one. */
+/**
+ * A trustee suffix is not an entity on its own. `SMITH JOHN TR` and `DOE JANE TRUSTEE` are
+ * individuals holding a family trust, and the address on file is their home.
+ */
+const TRUSTEE_TOKEN = /\b(TR|TRS|TRUSTEE|TRUSTEES|TRSTEE|TRSTEES)\b/;
+
+/**
+ * What has to accompany a trustee suffix before the name reads as a trust rather than a
+ * person. `NOMINEE` and `FAMILY` name a trust without naming an entity, so `SMITH FAMILY TR`
+ * clears the gate while `SMITH JOHN TR` does not; the rest are entity tokens too, listed
+ * again here so the rule reads on its own.
+ */
+const TRUSTEE_COMPANION = /\b(TRUST|REALTY|CONDO|CONDOMINIUM|NOMINEE|FAMILY)\b/;
+
+/**
+ * No mailing address for an individual owner: it would be a home address, not a business one.
+ *
+ * This errs toward hiding. A trust held by named individuals — `SMITH JOHN TR` — is a real
+ * trust whose address stays hidden, because from the owner string alone it is
+ * indistinguishable from a person's name plus a suffix. That is the intended fail direction:
+ * a hidden business address costs a reader one lookup; a published home address cannot be
+ * taken back.
+ */
 export function showMailingAddress(owner: string | null): boolean {
   if (!owner) return false;
-  return ENTITY_TOKEN.test(owner.toUpperCase().replace(/[.,]/g, ' '));
+  // Periods and commas become spaces so `L.L.C.` and `SMITH, JOHN` tokenize; runs of
+  // whitespace collapse so the spaced `L L C` and `L P` forms match as written above.
+  const normalized = owner.toUpperCase().replace(/[.,]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (ENTITY_TOKEN.test(normalized)) return true;
+  return TRUSTEE_TOKEN.test(normalized) && TRUSTEE_COMPANION.test(normalized);
 }
+
+/**
+ * The tax mailing address as one line, with the addressee held to the same entity gate as the
+ * owner. An entity can list a person as its addressee (`C/O ATT DENNIS CLAIR`), and printing
+ * that name beside the address publishes exactly what the owner gate exists to withhold. The
+ * street and city lines are kept either way — those belong to the entity.
+ */
+export function mailingAddressLine(assessment: AssessmentPayload): string {
+  const addressee = showMailingAddress(assessment.mailAddressee) ? assessment.mailAddressee : null;
+  const cityState = [assessment.mailCity, assessment.mailState].filter(Boolean).join(', ');
+  const cityLine = [cityState, assessment.mailZip].filter(Boolean).join(' ');
+  const joined = [addressee, assessment.mailStreet, cityLine].filter(Boolean).join(', ');
+  return joined === '' ? 'Not recorded' : joined;
+}
+
+/** Reader-facing names for the record kinds, for copy that has to list a kind by name. */
+export const KIND_LABELS: Record<RecordKind, string> = {
+  assessment: 'property assessment',
+  permit: 'building permits',
+  violation: 'violations',
+  enforcement_ticket: 'code enforcement',
+  service_request: '311 requests',
+  rentsmart: 'RentSmart',
+};
 
 export function formatDollars(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return 'Not recorded';
@@ -70,6 +135,24 @@ export function formatRecordDate(value: string | null): string {
   const dayNumber = Number(day);
   if (!Number.isInteger(dayNumber) || dayNumber < 1 || dayNumber > 31) return 'Date not recorded';
   return `${MONTH_ABBREVIATIONS[monthIndex]} ${dayNumber}, ${year}`;
+}
+
+/**
+ * For our own timestamps — when a pull ran, when a correction was resolved — which are unix
+ * seconds rather than record strings. Unlike `formatRecordDate` these are real instants, so
+ * they are pinned to `America/New_York`: a pull at 8pm Boston time must not render as the
+ * next day because the worker rendering it runs in UTC.
+ */
+const PULL_DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+export function formatPullDate(unix: number): string {
+  if (!Number.isFinite(unix)) return 'Date not recorded';
+  return PULL_DATE_FORMAT.format(new Date(unix * 1000));
 }
 
 export interface PermitSummary {

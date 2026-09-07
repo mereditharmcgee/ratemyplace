@@ -268,7 +268,9 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
     logError('building_record_invalid_payload', { buildingId, kind });
   }
 
-  assessments.sort(byDateDesc((r) => r.fiscalYear, (r) => r.fiscalYear));
+  // Two assessor rows can share a fiscal year (a condo parcel and its master parcel);
+  // the parcel id breaks that tie so the panel's 'current' row is not engine-order luck.
+  assessments.sort(byDateDesc((r) => r.fiscalYear, (r) => r.parcelId ?? ''));
   permits.sort(byDateDesc((r) => r.issuedDate, (r) => r.permitNumber));
   violations.sort(byDateDesc((r) => r.statusDate, (r) => r.caseNumber));
   enforcement.sort(byDateDesc((r) => r.statusDate, (r) => r.caseNumber));
@@ -279,7 +281,7 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
     .prepare(
       "SELECT record_kind, resolved_at, resolution_notes FROM record_corrections " +
         "WHERE building_id = ? AND status = 'resolved' AND resolution = 'source_mismatch_noted' AND resolution_notes IS NOT NULL " +
-        'ORDER BY resolved_at DESC',
+        'ORDER BY resolved_at DESC, rowid DESC',
     )
     .bind(buildingId)
     .all<CorrectionRow>();

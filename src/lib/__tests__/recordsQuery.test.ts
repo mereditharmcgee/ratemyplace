@@ -202,6 +202,56 @@ suite('getBuildingRecords', () => {
     expect(view!.permits.map((p) => p.permitNumber)).toEqual(['A-1', 'B-2']);
   });
 
+  it('breaks a tie on fiscal year with the parcel id', async () => {
+    const db = await createDbWithAdmin();
+    const buildingId = await insertBuilding(db);
+    const pullId = await insertPullRow(db, { buildingId, sourceId: FY2026_RESOURCE_ID, sourceLabel: 'Property Assessment FY2026' });
+    // Two assessor rows can share a fiscal year — a condo unit parcel alongside its master
+    // parcel. Without a tiebreak, which one the panel calls "current" is engine-order luck.
+    await insertBuildingRecord(db, {
+      buildingId,
+      pullId,
+      kind: 'assessment',
+      sourceKey: 'z-first',
+      payload: { fiscalYear: 'FY2026', condominium: false, parcelId: '0200000200' },
+    });
+    await insertBuildingRecord(db, {
+      buildingId,
+      pullId,
+      kind: 'assessment',
+      sourceKey: 'a-second',
+      payload: { fiscalYear: 'FY2026', condominium: false, parcelId: '0200000100' },
+    });
+
+    const view = await getBuildingRecords(db, buildingId);
+
+    expect(view!.assessments.map((a) => a.parcelId)).toEqual(['0200000100', '0200000200']);
+  });
+
+  it('orders two corrections resolved at the same second by storage order, newest first', async () => {
+    const db = await createDbWithAdmin();
+    const buildingId = await insertBuilding(db);
+    await insertPullRow(db, { buildingId });
+    await insertCorrection(db, {
+      buildingId,
+      recordKind: 'permit',
+      resolution: 'source_mismatch_noted',
+      resolutionNotes: 'Filed first',
+      resolvedAt: 1000,
+    });
+    await insertCorrection(db, {
+      buildingId,
+      recordKind: 'permit',
+      resolution: 'source_mismatch_noted',
+      resolutionNotes: 'Filed second',
+      resolvedAt: 1000,
+    });
+
+    const view = await getBuildingRecords(db, buildingId);
+
+    expect(view!.corrections.map((c) => c.notes)).toEqual(['Filed second', 'Filed first']);
+  });
+
   it('surfaces only resolved source_mismatch_noted corrections that carry notes', async () => {
     const db = await createDbWithAdmin();
     const buildingId = await insertBuilding(db);

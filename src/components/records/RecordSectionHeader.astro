@@ -1,0 +1,47 @@
+---
+// The heading row of one section of the public records panel: the section title on the left,
+// and on the right when the source has been pulled at all, when it was last read plus a link
+// to the dataset it came from.
+//
+// The `Source` link comes off the status row rather than a constant, so the panel cites the
+// dataset the stored rows actually came from and nothing else. A source id this build no
+// longer knows carries a null pageUrl, and then no link is rendered — a wrong citation is
+// worse than no citation.
+import { formatPullDate } from '../../lib/records/display';
+import type { SourceStatus } from '../../lib/records/query';
+
+interface Props {
+  title: string;
+  /** null when this source has never been pulled for the building. */
+  status: SourceStatus | null;
+  /** Whether the section has rows to show, which decides how a failed pull is described. */
+  hasRows: boolean;
+}
+
+const { title, status, hasRows } = Astro.props;
+
+// A source whose latest attempt failed but whose earlier rows survive is showing older data,
+// and saying "as of <today>" over those rows would date them to a pull that never landed.
+const showingStaleRows = status?.status === 'error' && hasRows;
+---
+
+<div class="flex items-baseline justify-between gap-4">
+  <h3 class="text-base font-semibold text-gray-900">{title}</h3>
+  {status && (
+    <p class="text-xs text-gray-500 text-right shrink-0">
+      {showingStaleRows
+        ? `Last checked ${formatPullDate(status.retrievedAt)}; showing records from an earlier retrieval`
+        : `as of ${formatPullDate(status.retrievedAt)}`}
+      {status.pageUrl && (
+        <>
+          {' · '}<a
+            href={status.pageUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Source: ${status.label} dataset`}
+            class="text-teal-700 hover:underline">Source</a>
+        </>
+      )}
+    </p>
+  )}
+</div>
