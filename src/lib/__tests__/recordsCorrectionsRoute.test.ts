@@ -64,6 +64,29 @@ suite('POST /api/records/corrections', () => {
     expect(await response.json()).toEqual({ error: 'Unsupported Media Type' });
   });
 
+  it('415s when the Content-Type header is missing entirely', async () => {
+    const db = createRecordsTestDb();
+    const context = createContext(db, { contentType: null, body: validBody });
+
+    const response = await POST(context);
+
+    expect(response.status).toBe(415);
+    expect(await response.json()).toEqual({ error: 'Unsupported Media Type' });
+  });
+
+  it('400s on a null JSON body', async () => {
+    const db = createRecordsTestDb();
+    const context = createContext(db, { ip: '198.51.100.20', body: 'null' });
+
+    const response = await POST(context);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Validation failed',
+      details: [{ field: 'buildingId', message: 'Building is required.' }],
+    });
+  });
+
   it('rate limits after 3 submissions per hour per IP', async () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'bldg-lanark' });
@@ -147,5 +170,61 @@ suite('POST /api/records/corrections', () => {
       contact_email: 'tenant@example.com',
       status: 'pending',
     });
+  });
+
+  it('stores a non-panel kind as its own record_kind value', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'bldg-lanark' });
+    const context = createContext(db, { ip: '198.51.100.6', body: validBody });
+
+    const response = await POST(context);
+    const payload = (await response.json()) as { data: { id: string } };
+
+    expect(response.status).toBe(201);
+
+    const row = await db
+      .prepare('SELECT record_kind FROM record_corrections WHERE id = ?')
+      .bind(payload.data.id)
+      .first<{ record_kind: string | null }>();
+
+    expect(row).toMatchObject({ record_kind: 'permit' });
+  });
+
+  it('400s on an all-markup claim (sanitizes to nothing) with a claim field error', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'bldg-lanark' });
+    const context = createContext(db, {
+      ip: '198.51.100.7',
+      body: { ...validBody, claim: '<b></b><i></i><em></em>'.repeat(2) },
+    });
+
+    const response = await POST(context);
+    const payload = (await response.json()) as { error: string; details: Array<{ field: string }> };
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe('Validation failed');
+    expect(payload.details[0].field).toBe('claim');
+  });
+
+  it('stores a claim with line breaks preserved', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'bldg-lanark' });
+    const multilineClaim = 'This permit is wrong.\nThe applicant name does not match the 2023 renovation records.';
+    const context = createContext(db, {
+      ip: '198.51.100.8',
+      body: { ...validBody, claim: multilineClaim },
+    });
+
+    const response = await POST(context);
+    const payload = (await response.json()) as { data: { id: string } };
+
+    expect(response.status).toBe(201);
+
+    const row = await db
+      .prepare('SELECT claim FROM record_corrections WHERE id = ?')
+      .bind(payload.data.id)
+      .first<{ claim: string }>();
+
+    expect(row?.claim).toBe(multilineClaim);
   });
 });

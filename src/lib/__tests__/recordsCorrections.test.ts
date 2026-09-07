@@ -8,6 +8,7 @@ import {
   diffRecordSnapshots,
   type RecordSnapshot,
 } from '../records/corrections';
+import { sanitizeMultilineText } from '../validation';
 
 const goodBody = {
   buildingId: 'bldg-lanark',
@@ -96,12 +97,12 @@ describe('diffRecordSnapshots', () => {
     expect(diff.changed).toEqual([{ kind: 'permit', source_key: 'A' }]);
   });
 
-  it('reports nothing for rentsmart rows with reassigned ids but identical payloads', () => {
+  it('reports nothing for rentsmart rows with reassigned CKAN ids (rowId differs, content is identical)', () => {
     const before: RecordSnapshot[] = [
-      { kind: 'rentsmart', source_key: 'old-1', payload: '{"violationType":"heat"}' },
+      { kind: 'rentsmart', source_key: 'old-1', payload: '{"rowId":"old-1","violationType":"heat"}' },
     ];
     const after: RecordSnapshot[] = [
-      { kind: 'rentsmart', source_key: 'new-99', payload: '{"violationType":"heat"}' },
+      { kind: 'rentsmart', source_key: 'new-99', payload: '{"rowId":"new-99","violationType":"heat"}' },
     ];
 
     const diff = diffRecordSnapshots(before, after);
@@ -111,12 +112,12 @@ describe('diffRecordSnapshots', () => {
     expect(diff.changed).toEqual([]);
   });
 
-  it('reports real rentsmart additions and removals by payload content', () => {
+  it('reports real rentsmart additions and removals by payload content, ignoring rowId', () => {
     const before: RecordSnapshot[] = [
-      { kind: 'rentsmart', source_key: 'old-1', payload: '{"violationType":"heat"}' },
+      { kind: 'rentsmart', source_key: 'old-1', payload: '{"rowId":"old-1","violationType":"heat"}' },
     ];
     const after: RecordSnapshot[] = [
-      { kind: 'rentsmart', source_key: 'new-99', payload: '{"violationType":"pests"}' },
+      { kind: 'rentsmart', source_key: 'new-99', payload: '{"rowId":"new-99","violationType":"pests"}' },
     ];
 
     const diff = diffRecordSnapshots(before, after);
@@ -124,5 +125,23 @@ describe('diffRecordSnapshots', () => {
     expect(diff.added).toEqual([{ kind: 'rentsmart', source_key: 'new-99' }]);
     expect(diff.removed).toEqual([{ kind: 'rentsmart', source_key: 'old-1' }]);
     expect(diff.changed).toEqual([]);
+  });
+});
+
+describe('sanitizeMultilineText', () => {
+  it('strips tags but keeps line breaks', () => {
+    expect(sanitizeMultilineText('<b>Line one</b>\nLine two')).toBe('Line one\nLine two');
+  });
+
+  it('normalizes CRLF to LF', () => {
+    expect(sanitizeMultilineText('Line one\r\nLine two\rLine three')).toBe('Line one\nLine two\nLine three');
+  });
+
+  it('collapses triple-or-more newlines to a blank line', () => {
+    expect(sanitizeMultilineText('Para one\n\n\n\nPara two')).toBe('Para one\n\nPara two');
+  });
+
+  it('reduces all-markup input to an empty string', () => {
+    expect(sanitizeMultilineText('<b></b><i></i><em></em>')).toBe('');
   });
 });

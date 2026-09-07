@@ -3,9 +3,15 @@ import { getDB } from '../../../lib/db';
 import { getEnv } from '../../../lib/runtime';
 import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { verifyTurnstile } from '../../../lib/turnstile';
-import { sanitizeText } from '../../../lib/validation';
+import { sanitizeMultilineText } from '../../../lib/validation';
 import { logError } from '../../../lib/logger';
-import { validateCorrectionBody } from '../../../lib/records/corrections';
+import {
+  validateCorrectionBody,
+  toStoredKind,
+  CLAIM_MIN,
+  CLAIM_MAX,
+  type CorrectionKind,
+} from '../../../lib/records/corrections';
 
 /**
  * POST /api/records/corrections
@@ -49,6 +55,20 @@ export const POST: APIRoute = async (context: APIContext) => {
 
     const body = await request.json();
 
+    // A JSON body of `null`, an array, or a primitive parses fine but isn't a
+    // record we can validate field-by-field — reject it before it reaches
+    // property access below (e.g. `body.turnstileToken` on `null` would throw
+    // and fall through to the generic 500 handler instead of a clean 400).
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+      return new Response(
+        JSON.stringify({
+          error: 'Validation failed',
+          details: [{ field: 'buildingId', message: 'Building is required.' }],
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Turnstile bot verification — this endpoint is unauthenticated and accepts
     // JSON (so Astro checkOrigin does not cover it).
     const turnstileResult = await verifyTurnstile(
@@ -73,10 +93,34 @@ export const POST: APIRoute = async (context: APIContext) => {
 
     const { buildingId, recordKind, claim, contactEmail } = body as {
       buildingId: string;
-      recordKind: string;
+      recordKind: CorrectionKind;
       claim: string;
       contactEmail?: string;
     };
+
+    // Sanitize before the length check: markup-only input like
+    // '<b></b><i></i><em></em>' passes validateCorrectionBody's raw-string
+    // length check (it's >= CLAIM_MIN characters) but sanitizes down to an
+    // empty claim. Re-validate the cleaned text so that can't be stored.
+    const cleanedClaim = sanitizeMultilineText(claim);
+    if (cleanedClaim.length < CLAIM_MIN) {
+      return new Response(
+        JSON.stringify({
+          error: 'Validation failed',
+          details: [{ field: 'claim', message: `Tell us what is wrong in at least ${CLAIM_MIN} characters.` }],
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    if (cleanedClaim.length > CLAIM_MAX) {
+      return new Response(
+        JSON.stringify({
+          error: 'Validation failed',
+          details: [{ field: 'claim', message: `Keep it under ${CLAIM_MAX} characters.` }],
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     const building = await db.prepare('SELECT id FROM buildings WHERE id = ?').bind(buildingId).first();
     if (!building) {
@@ -94,7 +138,7 @@ export const POST: APIRoute = async (context: APIContext) => {
       .prepare(
         'INSERT INTO record_corrections (id, building_id, record_kind, claim, contact_email) VALUES (?, ?, ?, ?, ?)'
       )
-      .bind(id, buildingId, recordKind === 'panel' ? null : recordKind, sanitizeText(claim), normalizedContactEmail)
+      .bind(id, buildingId, toStoredKind(recordKind), cleanedClaim, normalizedContactEmail)
       .run();
 
     return new Response(JSON.stringify({ data: { id } }), {
