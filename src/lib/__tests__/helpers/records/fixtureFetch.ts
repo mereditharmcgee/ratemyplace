@@ -9,6 +9,8 @@ export interface FixtureRoute {
   /** When set, respond with this HTTP status and a CKAN error envelope. */
   errorStatus?: number;
   errorMessage?: string;
+  /** With errorStatus, respond with this exact recorded body instead of a synthetic envelope. */
+  rawBody?: string;
 }
 
 export function fixtureFetch(routes: FixtureRoute[]): FetchLike & { calls: string[] } {
@@ -21,10 +23,8 @@ export function fixtureFetch(routes: FixtureRoute[]): FetchLike & { calls: strin
       return new Response(JSON.stringify({ success: true, result: { records: [] } }), { status: 200 });
     }
     if (route.errorStatus) {
-      return new Response(
-        JSON.stringify({ success: false, error: { info: { orig: [route.errorMessage ?? 'error'] } } }),
-        { status: route.errorStatus },
-      );
+      const body = route.rawBody ?? JSON.stringify({ success: false, error: { info: { orig: [route.errorMessage ?? 'error'] } } });
+      return new Response(body, { status: route.errorStatus });
     }
     return new Response(JSON.stringify({ success: true, result: { records: route.records ?? [] } }), { status: 200 });
   };

@@ -108,7 +108,10 @@ export type RecordRow = {
 }[RecordKind];
 
 export interface SourceResult {
-  /** The exact SQL (or JSON array of SQL strings) sent. Stored verbatim as provenance. */
+  /**
+   * The exact SQL (or JSON array of SQL strings) sent, stored verbatim as provenance.
+   * When no query ran, a short literal note saying why instead.
+   */
   query: string;
   rows: RecordRow[];
 }
@@ -157,7 +160,8 @@ export interface RecordSource {
 }
 
 export class SourceError extends Error {
-  constructor(message: string, public readonly query: string, options?: ErrorOptions) {
+  /** `detail` carries the upstream error object verbatim; `message` is a truncated summary of it. */
+  constructor(message: string, public readonly query: string, options?: ErrorOptions, public readonly detail?: unknown) {
     super(message, options);
     this.name = 'SourceError';
   }

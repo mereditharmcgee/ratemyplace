@@ -75,7 +75,7 @@ export async function ckanSql<T>(sql: string, fetchImpl: FetchLike): Promise<T[]
       throw new SourceError(`HTTP ${response.status} with non-JSON body: ${text.slice(0, 200)}`, sql);
     }
     if (!response.ok || !body.success) {
-      throw new SourceError(`HTTP ${response.status}: ${describeError(body.error ?? 'request failed')}`, sql);
+      throw new SourceError(`HTTP ${response.status}: ${describeError(body.error ?? 'request failed')}`, sql, undefined, body.error);
     }
     return (body.result?.records ?? []).slice(0, ROW_CAP);
   } finally {
