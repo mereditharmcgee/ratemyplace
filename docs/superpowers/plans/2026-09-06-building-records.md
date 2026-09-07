@@ -3688,7 +3688,7 @@ export interface RecordDiff {
   changed: RecordKey[];
 }
 
-const keyOf = (r: RecordKey) => `${r.kind}${r.source_key}`;
+const keyOf = (r: RecordKey) => `${r.kind}:${r.source_key}`;
 
 /** Compare two snapshots of building_records rows so the admin sees what a re-pull did. */
 export function diffRecordSnapshots(before: RecordSnapshot[], after: RecordSnapshot[]): RecordDiff {
