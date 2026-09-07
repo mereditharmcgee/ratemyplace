@@ -63,8 +63,8 @@ export function buildIdentity(building: BuildingRowForIdentity): BuildingIdentit
   if (!parsed) throw new Error(`Could not parse street address: ${building.address}`);
 
   const numberToken = parsed.number.toUpperCase();
-  const numbers = numberToken.split('-').map((n) => n.replace(/[A-Z]$/, '')).filter(Boolean);
-  const rangeForm = numbers.length > 1 ? numbers.join('-') : null;
+  const numbers = Array.from(new Set(numberToken.split('-').filter(Boolean)));
+  const rangeForm = numbers.length > 1 ? numberToken : null;
 
   const streetUpper = normalizeStreetName(parsed.street);
   const { base, short, long } = splitStreet(streetUpper);

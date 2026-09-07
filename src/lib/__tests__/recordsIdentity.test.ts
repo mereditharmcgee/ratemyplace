@@ -44,6 +44,16 @@ describe('buildIdentity', () => {
   it('throws on an address it cannot parse', () => {
     expect(() => buildIdentity({ ...base, address: 'Lanark Road' })).toThrow(/parse/i);
   });
+
+  it('keeps the unit letter in lettered ranges and does not duplicate numbers', () => {
+    const id = buildIdentity({ ...base, address: '100-100A Lanark Rd, Boston, MA' });
+    expect(id.numbers).toEqual(['100', '100A']);
+    expect(id.rangeForm).toBe('100-100A');
+    expect(id.addressFormsShort).toEqual(['100 LANARK RD', '100A LANARK RD', '100-100A LANARK RD']);
+    const single = buildIdentity({ ...base, address: '12A Main St, Boston, MA' });
+    expect(single.numbers).toEqual(['12A']);
+    expect(single.rangeForm).toBeNull();
+  });
 });
 
 describe('parcel helpers', () => {
