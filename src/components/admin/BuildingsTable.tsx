@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getScoreTextColor } from '../../lib/scoring-colors';
+import RecordsPullButton from './RecordsPullButton';
 
 interface LandlordOption {
   id: string;
@@ -723,6 +724,7 @@ export default function BuildingsTable() {
                       </div>
                     )}
 
+                    <RecordsPullButton buildingId={building.id} city={building.city} />
                     {/* Enrichment Results */}
                     {enrichResult && enrichResult.results?.length > 0 && expandedBuilding === building.id && (
                       <div className="mt-4 pt-4 border-t border-gray-200">
