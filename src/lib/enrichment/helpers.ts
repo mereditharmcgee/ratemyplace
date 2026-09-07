@@ -20,7 +20,10 @@ export function normalizeStreetName(street: string): string {
   // Remove city/state/zip suffix, normalize for matching
   return street
     .replace(/,.*$/, '')          // Remove everything after comma
-    .replace(/\b(apt|unit|#)\s*\S+/i, '')  // Remove apt/unit numbers
+    // Remove unit designators: "Apt 3", "Unit 2", "#2". The word forms are
+    // anchored on both sides so "Unity St" / "Aptucxet Rd" survive; "#" gets
+    // its own branch because \b cannot match between a space and "#".
+    .replace(/(\b(apt|unit)\b\s*\S+|\s*#\S*)/i, '')
     .trim()
     .toUpperCase();
 }
