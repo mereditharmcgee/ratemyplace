@@ -11,7 +11,7 @@ test.describe('Homepage', () => {
   test('has How It Works section', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('text=How It Works')).toBeVisible();
-    await expect(page.locator('text=Evidence-Based Scoring')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Evidence-based scoring' })).toBeVisible();
   });
 });
 

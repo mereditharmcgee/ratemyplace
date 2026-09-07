@@ -43,10 +43,11 @@ test.describe('Review Moderation (E2E-07)', () => {
     // Use the second review card to avoid any collision with the approve test card.
     // All seed reviews are 'approved' — expand the second card.
     const reviewCards = adminPage.locator('.cursor-pointer');
-    await reviewCards.nth(1).click();
+    const secondReviewHeader = reviewCards.nth(1);
+    await secondReviewHeader.click();
 
-    // Scope all subsequent actions to the expanded card (second card container)
-    const secondCard = adminPage.locator('.bg-white.rounded-xl').nth(1);
+    // Scope all subsequent actions to the expanded card containing that header.
+    const secondCard = secondReviewHeader.locator('..');
 
     // Click "Reset to Pending" within the second card to expose the Reject button
     await secondCard.locator('button', { hasText: 'Reset to Pending' }).click();
@@ -55,7 +56,7 @@ test.describe('Review Moderation (E2E-07)', () => {
     await expect(secondCard.locator('span.rounded-full')).toContainText('pending');
 
     // Click Reject within the same card
-    await secondCard.locator('button', { hasText: 'Reject' }).click();
+    await secondCard.locator('button', { hasText: 'Reject' }).first().click();
 
     // Assert status badge within the card updated to 'rejected'
     await expect(secondCard.locator('span.rounded-full')).toContainText('rejected');

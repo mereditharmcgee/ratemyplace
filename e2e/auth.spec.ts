@@ -1,13 +1,5 @@
-import { execSync } from 'child_process';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { test, expect } from './fixtures';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Project root for wrangler CLI calls (e2e/ is one level below root)
-const PROJECT_ROOT = path.resolve(__dirname, '..');
+import { executeLocalD1 } from './test-harness';
 
 // Seed user credentials (created in Phase 5)
 const SEED_EMAIL = 'user@test.ratemyplace.local';
@@ -134,15 +126,11 @@ test.describe('Password Reset', () => {
     await expect(page.locator('#success-message')).toBeVisible();
 
     // Step 2: Read token from local D1 via wrangler CLI
-    const wranglerCommand = `npx wrangler d1 execute ratemyplace-db --local --command "SELECT pr.token FROM password_reset_tokens pr JOIN users u ON pr.user_id = u.id WHERE u.email = '${resetEmail}' ORDER BY pr.expires_at DESC LIMIT 1"`;
+    const tokenQuery = `SELECT pr.token FROM password_reset_tokens pr JOIN users u ON pr.user_id = u.id WHERE u.email = '${resetEmail}' ORDER BY pr.expires_at DESC LIMIT 1`;
 
     let token: string;
     try {
-      const rawOutput = execSync(wranglerCommand, {
-        cwd: PROJECT_ROOT,
-        timeout: 30000,
-        encoding: 'utf8',
-      });
+      const rawOutput = executeLocalD1(tokenQuery);
 
       // Wrangler outputs JSON. Try structured parse first, then regex fallback.
       let parsed: unknown;

@@ -31,6 +31,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Audit critical vulnerabilities
+        run: npm audit --audit-level=critical
       - name: Type-check
         run: npm run check
       - name: Unit tests

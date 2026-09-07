@@ -1,4 +1,7 @@
 import { defineConfig } from '@playwright/test';
+import { buildLocalPagesCommand, validateLocalE2EEnvironment } from './e2e/test-harness';
+
+const baseURL = validateLocalE2EEnvironment();
 
 export default defineConfig({
   testDir: './e2e',
@@ -6,15 +9,15 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:8788',
+    baseURL,
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'npx wrangler pages dev ./dist --port 8788',
-    url: 'http://localhost:8788',
+    command: buildLocalPagesCommand(),
+    url: baseURL,
     timeout: 120_000,
-    reuseExistingServer: true,
+    reuseExistingServer: false,
   },
   projects: [
     {
