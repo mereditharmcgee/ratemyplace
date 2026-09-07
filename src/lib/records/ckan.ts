@@ -9,8 +9,11 @@ export function sqlLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-/** '6,720,200' | '6780500' | '$6,649,200.00 ' -> integer dollars; null when absent. */
-export function parseMoney(value: string | null | undefined): number | null {
+/**
+ * '6,720,200' | '6780500' | '$6,649,200.00 ' -> integer dollars; null when absent.
+ * Assumes non-negative assessor values; a leading minus or accounting parentheses are not interpreted.
+ */
+export function parseMoney(value: string | number | null | undefined): number | null {
   if (value == null) return null;
   const cleaned = String(value).replace(/[^0-9.]/g, '');
   if (cleaned === '') return null;
@@ -20,8 +23,11 @@ export function parseMoney(value: string | null | undefined): number | null {
 
 export function parseIntOrNull(value: string | number | null | undefined): number | null {
   if (value == null || value === '') return null;
-  const n = Number.parseInt(String(value).replace(/[^0-9-]/g, ''), 10);
-  return Number.isFinite(n) ? n : null;
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.trunc(value) : null;
+  const cleaned = value.replace(/[^0-9.\-]/g, '');
+  if (cleaned === '' || cleaned === '-' || cleaned === '.') return null;
+  const n = Number.parseFloat(cleaned);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
 interface CkanEnvelope<T> {
@@ -46,18 +52,27 @@ export async function ckanSql<T>(sql: string, fetchImpl: FetchLike): Promise<T[]
   const url = `${CKAN_SQL_ENDPOINT}?sql=${encodeURIComponent(sql)}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timedOut = () => controller.signal.aborted;
   try {
     let response: Response;
     try {
       response = await fetchImpl(url, { signal: controller.signal, headers: { Accept: 'application/json' } });
     } catch (err) {
-      throw new SourceError(`fetch failed: ${err instanceof Error ? err.message : String(err)}`, sql);
+      if (timedOut()) throw new SourceError(`timed out after ${FETCH_TIMEOUT_MS}ms`, sql, { cause: err });
+      throw new SourceError(`fetch failed: ${err instanceof Error ? err.message : String(err)}`, sql, { cause: err });
+    }
+    let text: string;
+    try {
+      text = await response.text();
+    } catch (err) {
+      if (timedOut()) throw new SourceError(`timed out after ${FETCH_TIMEOUT_MS}ms reading body`, sql, { cause: err });
+      throw new SourceError(`HTTP ${response.status}: body read failed`, sql, { cause: err });
     }
     let body: CkanEnvelope<T>;
     try {
-      body = (await response.json()) as CkanEnvelope<T>;
+      body = JSON.parse(text) as CkanEnvelope<T>;
     } catch {
-      throw new SourceError(`HTTP ${response.status} with non-JSON body`, sql);
+      throw new SourceError(`HTTP ${response.status} with non-JSON body: ${text.slice(0, 200)}`, sql);
     }
     if (!response.ok || !body.success) {
       throw new SourceError(`HTTP ${response.status}: ${describeError(body.error ?? 'request failed')}`, sql);

@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { ckanSql, sqlLiteral, parseMoney, parseIntOrNull, ROW_CAP } from '../records/ckan';
-import { SourceError } from '../records/types';
+import { describe, it, expect, vi } from 'vitest';
+import { ckanSql, sqlLiteral, parseMoney, parseIntOrNull, ROW_CAP, FETCH_TIMEOUT_MS } from '../records/ckan';
+import { SourceError, type RecordRow } from '../records/types';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -12,26 +12,49 @@ describe('sqlLiteral', () => {
   });
 });
 
-describe('parseMoney / parseIntOrNull', () => {
-  it('handles every assessor value format seen in the wild', () => {
-    expect(parseMoney('6,720,200')).toBe(6720200);
-    expect(parseMoney('6780500')).toBe(6780500);
-    expect(parseMoney('$6,649,200.00 ')).toBe(6649200);
-    expect(parseMoney('$36,500.00')).toBe(36500);
-    expect(parseMoney(null)).toBeNull();
-    expect(parseMoney('')).toBeNull();
-    expect(parseIntOrNull('1920')).toBe(1920);
-    expect(parseIntOrNull(null)).toBeNull();
-    expect(parseIntOrNull('abc')).toBeNull();
+describe('parseMoney', () => {
+  it.each([
+    ['6,720,200', 6720200],
+    ['6780500', 6780500],
+    ['$6,649,200.00 ', 6649200],
+    ['$36,500.00', 36500],
+    [6551400, 6551400],
+    [null, null],
+    ['', null],
+  ])('parseMoney(%p) -> %p', (input, expected) => {
+    expect(parseMoney(input as string | number | null)).toBe(expected);
+  });
+});
+
+describe('parseIntOrNull', () => {
+  it.each([
+    ['1920', 1920],
+    ['34650.00000', 34650],
+    ['27720.0', 27720],
+    ['1,150', 1150],
+    [1234.5, 1234],
+    ['-5', -5],
+    [null, null],
+    ['abc', null],
+    ['', null],
+  ])('parseIntOrNull(%p) -> %p', (input, expected) => {
+    expect(parseIntOrNull(input as string | number | null)).toBe(expected);
   });
 });
 
 describe('ckanSql', () => {
-  it('returns records and caps rows', async () => {
+  it('returns records and caps rows, keeping the first rows not the last', async () => {
     const records = Array.from({ length: ROW_CAP + 5 }, (_, i) => ({ n: i }));
     const fetchImpl = async () => jsonResponse({ success: true, result: { records } });
     const rows = await ckanSql<{ n: number }>('SELECT 1', fetchImpl);
     expect(rows).toHaveLength(ROW_CAP);
+    expect(rows[0].n).toBe(0);
+  });
+
+  it('returns an empty array when result is absent', async () => {
+    const fetchImpl = async () => jsonResponse({ success: true });
+    const rows = await ckanSql('SELECT 1', fetchImpl);
+    expect(rows).toEqual([]);
   });
 
   it('throws SourceError carrying the query on HTTP failure', async () => {
@@ -42,6 +65,16 @@ describe('ckanSql', () => {
   it('throws SourceError with the CKAN error message when success is false', async () => {
     const fetchImpl = async () => jsonResponse({ success: false, error: { info: { orig: ['column "ZIPCODE" does not exist'] } } }, 409);
     await expect(ckanSql('SELECT 3', fetchImpl)).rejects.toThrow(/does not exist/);
+  });
+
+  it('throws SourceError when a 200 response reports success: false', async () => {
+    const fetchImpl = async () => jsonResponse({ success: false, error: 'bad sql' }, 200);
+    await expect(ckanSql('SELECT 3b', fetchImpl)).rejects.toBeInstanceOf(SourceError);
+  });
+
+  it('includes a snippet of the body when a 200 response is not JSON', async () => {
+    const fetchImpl = async () => new Response('<html>nope</html>', { status: 200 });
+    await expect(ckanSql('SELECT 3c', fetchImpl)).rejects.toThrow(/non-JSON body: <html/);
   });
 
   it('sends the SQL url-encoded to the datastore_search_sql endpoint', async () => {
@@ -57,5 +90,35 @@ describe('ckanSql', () => {
     const err = await ckanSql('SELECT 4', fetchImpl).catch((e) => e);
     expect(err).toBeInstanceOf(SourceError);
     expect(err.message).toContain('network down');
+  });
+
+  it('preserves the original error as cause when fetch rejects', async () => {
+    const fetchImpl = async () => { throw new TypeError('network down'); };
+    const err = await ckanSql('SELECT 4b', fetchImpl).catch((e) => e);
+    expect(err.cause).toBeInstanceOf(TypeError);
+  });
+
+  it('passes an abort signal and reports a timeout as a timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchImpl = (_u: string, init?: RequestInit) =>
+        new Promise<Response>((_, reject) => init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason)));
+      const pending = ckanSql('SELECT 1', fetchImpl).catch((e) => e);
+      await vi.advanceTimersByTimeAsync(FETCH_TIMEOUT_MS + 1);
+      const err = await pending;
+      expect(err).toBeInstanceOf(SourceError);
+      expect(err.message).toMatch(/timed out after 10000ms/);
+      expect(err.query).toBe('SELECT 1');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('RecordRow discriminates payload by kind', () => {
+    const row: RecordRow = { kind: 'permit', sourceKey: 'A1', payload: { permitNumber: 'A1', workType: null, permitType: null, description: null, comments: null, applicant: null, declaredValuation: null, totalFees: null, issuedDate: null, expirationDate: null, status: null, occupancyType: null, address: null } };
+    if (row.kind === 'permit') expect(row.payload.permitNumber).toBe('A1');
+    // @ts-expect-error an assessment payload cannot ride under kind 'permit'
+    const wrong: RecordRow = { kind: 'permit', sourceKey: 'x', payload: { fiscalYear: 'FY2026', parcelId: null, owner: null, mailAddressee: null, mailStreet: null, mailCity: null, mailState: null, mailZip: null, landUse: null, landUseDescription: null, yearBuilt: null, yearRemodel: null, grossArea: null, livingArea: null, residentialUnits: null, commercialUnits: null, totalValue: null, landValue: null, buildingValue: null, condominium: false } };
+    void wrong;
   });
 });

@@ -1,14 +1,8 @@
-export type RecordKind =
-  | 'assessment'
-  | 'permit'
-  | 'violation'
-  | 'enforcement_ticket'
-  | 'service_request'
-  | 'rentsmart';
-
-export const RECORD_KINDS: readonly RecordKind[] = [
+export const RECORD_KINDS = [
   'assessment', 'permit', 'violation', 'enforcement_ticket', 'service_request', 'rentsmart',
-];
+] as const;
+
+export type RecordKind = (typeof RECORD_KINDS)[number];
 
 export interface AssessmentPayload {
   fiscalYear: string;
@@ -92,20 +86,26 @@ export interface RentSmartPayload {
   parcel: string | null;
 }
 
-export type RecordPayload =
-  | AssessmentPayload
-  | PermitPayload
-  | ViolationPayload
-  | EnforcementTicketPayload
-  | ServiceRequestPayload
-  | RentSmartPayload;
-
-export interface RecordRow {
-  kind: RecordKind;
-  sourceKey: string;
-  payload: RecordPayload;
-  sourceUrl?: string;
+export interface PayloadByKind {
+  assessment: AssessmentPayload;
+  permit: PermitPayload;
+  violation: ViolationPayload;
+  enforcement_ticket: EnforcementTicketPayload;
+  service_request: ServiceRequestPayload;
+  rentsmart: RentSmartPayload;
 }
+
+export type RecordPayload = PayloadByKind[RecordKind];
+
+// Compile-time guard: keeps PayloadByKind's keys and RECORD_KINDS/RecordKind in lockstep.
+type _AssertAllKinds = keyof PayloadByKind extends RecordKind ? (RecordKind extends keyof PayloadByKind ? true : never) : never;
+const _assertAllKinds: _AssertAllKinds = true;
+void _assertAllKinds;
+
+/** Discriminated on kind: a permit row cannot carry an assessment payload. */
+export type RecordRow = {
+  [K in RecordKind]: { kind: K; sourceKey: string; payload: PayloadByKind[K]; sourceUrl?: string };
+}[RecordKind];
 
 export interface SourceResult {
   /** The exact SQL (or JSON array of SQL strings) sent. Stored verbatim as provenance. */
@@ -153,8 +153,8 @@ export interface RecordSource {
 }
 
 export class SourceError extends Error {
-  constructor(message: string, public readonly query: string) {
-    super(message);
+  constructor(message: string, public readonly query: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'SourceError';
   }
 }
