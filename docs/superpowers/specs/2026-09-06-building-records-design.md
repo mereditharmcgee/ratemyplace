@@ -217,7 +217,7 @@ Pages Functions allow 50 subrequests per invocation. A full Boston pull is about
 
 ### Admin surface
 
-- `POST /api/admin/buildings/[id]/records/pull`: admin check, calls `pullBuildingRecords`, writes an audit log entry (`records.pull`), returns the `PullSummary`.
+- `POST /api/admin/buildings/[id]/records/pull`: admin check, calls `pullBuildingRecords`, writes an audit log entry (`records_pulled`), returns the `PullSummary`.
 - In `BuildingsTable.tsx`: a "Pull records" button per building showing the summary, and a "Pull all Boston" control that calls the endpoint one building at a time from the client with a progress indicator. No server-side loop.
 - The existing "auto-research" enrich flow is untouched.
 

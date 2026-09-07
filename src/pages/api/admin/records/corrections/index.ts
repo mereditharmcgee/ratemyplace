@@ -26,6 +26,7 @@ type StatusFilter = (typeof STATUS_FILTERS)[number];
 const SELECT_SQL =
   'SELECT c.id, c.building_id, c.record_kind, c.claim, ' +
   'CASE WHEN c.contact_email IS NOT NULL THEN 1 ELSE 0 END AS has_contact_email, ' +
+  "EXISTS (SELECT 1 FROM record_pulls p WHERE p.correction_id = c.id AND p.status IN ('ok','empty')) AS has_pull, " +
   'c.status, c.resolution, ' +
   'c.resolution_notes, c.resolved_by, c.resolved_at, c.created_at, ' +
   'b.address AS building_address, b.slug AS building_slug ' +

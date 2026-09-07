@@ -63,12 +63,13 @@ function formatDate(timestamp: number): string {
   });
 }
 
+/** All diff lines, unsliced — callers decide how many to show and report the rest as a count. */
 function diffLines(diff: RepullDiff): string[] {
   const lines: string[] = [];
   for (const key of diff.added) lines.push(`+ ${key.kind}:${key.source_key}`);
   for (const key of diff.removed) lines.push(`- ${key.kind}:${key.source_key}`);
   for (const key of diff.changed) lines.push(`~ ${key.kind}:${key.source_key}`);
-  return lines.slice(0, MAX_DIFF_LINES);
+  return lines;
 }
 
 export default function RecordCorrectionsQueue() {
@@ -116,12 +117,24 @@ export default function RecordCorrectionsQueue() {
       setResolution('repulled_unchanged');
       setNotes('');
       setResolveError(null);
+      setRepullErrors((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     }
   };
 
   const runRepull = async (id: string) => {
     setBusyId(id);
     setRepullErrors((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    // A failed re-pull must not leave the previous diff on screen with Resolve
+    // still enabled from a stale result.
+    setRepullResults((prev) => {
       const next = { ...prev };
       delete next[id];
       return next;
@@ -158,7 +171,7 @@ export default function RecordCorrectionsQueue() {
           delete next[id];
           return next;
         });
-        fetchItems();
+        void fetchItems();
       } else {
         setResolveError(data.details?.[0]?.message || data.error || 'Failed to resolve correction');
       }
@@ -169,34 +182,13 @@ export default function RecordCorrectionsQueue() {
     }
   };
 
-  const statusCounts = {
-    pending: items.filter((i) => i.status === 'pending').length,
-    resolved: items.filter((i) => i.status === 'resolved').length,
-    all: items.length,
-  };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
-        {error}
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         {(['pending', 'resolved', 'all'] as const).map((status) => (
           <button
             key={status}
+            type="button"
             onClick={() => setStatusFilter(status)}
             className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               statusFilter === status
@@ -205,150 +197,194 @@ export default function RecordCorrectionsQueue() {
             }`}
           >
             {status.charAt(0).toUpperCase() + status.slice(1)}
-            {status === statusFilter ? ` (${statusCounts[status]})` : ''}
+            {status === statusFilter ? ` (${items.length})` : ''}
           </button>
         ))}
       </div>
 
-      <div className="space-y-4">
-        {items.map((item) => {
-          const isExpanded = expandedId === item.id;
-          const repullResult = repullResults[item.id];
-          const repullError = repullErrors[item.id];
-          const isBusy = busyId === item.id;
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700 flex items-center justify-between gap-4">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => {
+              void fetchItems();
+            }}
+            className="px-3 py-1.5 text-sm font-medium rounded-[4px] bg-red-100 text-red-800 hover:bg-red-200 shrink-0"
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
-          return (
-            <div key={item.id} className="bg-white rounded-[6px] border border-gray-200 p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <a
-                    href={`/building/${item.building_slug}#public-records`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-semibold text-teal-700 hover:text-teal-800"
-                  >
-                    {item.building_address}
-                  </a>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {kindLabel(item.record_kind)} &middot; filed {formatDate(item.created_at)} &middot; {item.status}
-                    {item.resolution ? ` (${RESOLUTION_LABELS[item.resolution]})` : ''}
-                  </p>
-                  <p className="whitespace-pre-wrap text-sm text-gray-700 mt-2">{item.claim}</p>
-                  {item.resolution_notes && (
-                    <p className="text-sm text-gray-600 mt-2">Note: {item.resolution_notes}</p>
-                  )}
-                </div>
-                {item.status === 'pending' && (
-                  <button
-                    onClick={() => toggleExpand(item.id)}
-                    className="px-3 py-1.5 text-sm font-medium rounded-[4px] bg-gray-100 text-gray-700 hover:bg-gray-200 shrink-0"
-                  >
-                    {isExpanded ? 'Close' : 'Open'}
-                  </button>
-                )}
-              </div>
+      {!error &&
+        (loading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-4">
+              {items.map((item) => {
+                const isExpanded = expandedId === item.id;
+                const repullResult = repullResults[item.id];
+                const repullError = repullErrors[item.id];
+                const isBusy = busyId === item.id;
+                const canResolve = Boolean(repullResult) || item.has_pull === 1;
 
-              {isExpanded && (
-                <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
-                  <button
-                    onClick={() => runRepull(item.id)}
-                    disabled={isBusy}
-                    className="px-4 py-2 bg-teal-700 rounded-[4px] text-white text-sm font-semibold hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isBusy ? 'Re-pulling…' : 'Re-pull from source'}
-                  </button>
-
-                  <div aria-live="polite" className="space-y-2">
-                    {repullError && (
-                      <p className="text-sm text-red-700">{repullError}</p>
-                    )}
-                    {repullResult && (
-                      <div className="space-y-2">
-                        <p className="text-sm text-gray-700">
-                          Parcel: {repullResult.summary.parcelId ?? 'unknown'}
-                          {repullResult.summary.condominium ? ' (condominium)' : ''}
+                return (
+                  <div key={item.id} className="bg-white rounded-[6px] border border-gray-200 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <a
+                          href={`/building/${item.building_slug}#public-records`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-teal-700 hover:text-teal-800"
+                        >
+                          {item.building_address}
+                        </a>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {kindLabel(item.record_kind)} &middot; filed {formatDate(item.created_at)} &middot;{' '}
+                          {item.status}
+                          {item.resolution ? ` (${RESOLUTION_LABELS[item.resolution]})` : ''}
                         </p>
-                        <p className="text-sm text-gray-700">
-                          Added {repullResult.diff.added.length}, removed {repullResult.diff.removed.length}, changed{' '}
-                          {repullResult.diff.changed.length}.
-                        </p>
-                        {diffLines(repullResult.diff).length > 0 && (
-                          <pre className="font-mono text-xs bg-gray-50 border border-gray-200 rounded-[4px] p-2 overflow-x-auto">
-                            {diffLines(repullResult.diff).join('\n')}
-                          </pre>
+                        <p className="whitespace-pre-wrap text-sm text-gray-700 mt-2">{item.claim}</p>
+                        {item.resolution_notes && (
+                          <p className="text-sm text-gray-600 mt-2">Note: {item.resolution_notes}</p>
                         )}
-                        {repullResult.summary.sources
-                          .filter((s) => s.error)
-                          .map((s) => (
-                            <p key={s.label} className="text-sm text-red-700">
-                              {s.label}: {s.error}
-                            </p>
-                          ))}
+                      </div>
+                      {item.status === 'pending' && (
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(item.id)}
+                          aria-expanded={isExpanded}
+                          aria-label={`${isExpanded ? 'Close' : 'Open'} ${item.building_address}`}
+                          className="px-3 py-1.5 text-sm font-medium rounded-[4px] bg-gray-100 text-gray-700 hover:bg-gray-200 shrink-0"
+                        >
+                          {isExpanded ? 'Close' : 'Open'}
+                        </button>
+                      )}
+                    </div>
+
+                    {isExpanded && (
+                      <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+                        <button
+                          type="button"
+                          onClick={() => runRepull(item.id)}
+                          disabled={isBusy}
+                          className="px-4 py-2 bg-teal-700 rounded-[4px] text-white text-sm font-semibold hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isBusy ? 'Re-pulling…' : 'Re-pull from source'}
+                        </button>
+
+                        <div aria-live="polite" className="space-y-2">
+                          {repullError && <p className="text-sm text-red-700">{repullError}</p>}
+                          {repullResult &&
+                            (() => {
+                              const lines = diffLines(repullResult.diff);
+                              const shown = lines.slice(0, MAX_DIFF_LINES);
+                              return (
+                                <div className="space-y-2">
+                                  <p className="text-sm text-gray-700">
+                                    Parcel: {repullResult.summary.parcelId ?? 'unknown'}
+                                    {repullResult.summary.condominium ? ' (condominium)' : ''}
+                                  </p>
+                                  <p className="text-sm text-gray-700">
+                                    Added {repullResult.diff.added.length}, removed{' '}
+                                    {repullResult.diff.removed.length}, changed {repullResult.diff.changed.length}.
+                                  </p>
+                                  {shown.length > 0 && (
+                                    <pre className="font-mono text-xs bg-gray-50 border border-gray-200 rounded-[4px] p-2 overflow-x-auto">
+                                      {shown.join('\n')}
+                                      {lines.length > MAX_DIFF_LINES
+                                        ? `\n… showing first ${MAX_DIFF_LINES} of ${lines.length}`
+                                        : ''}
+                                    </pre>
+                                  )}
+                                  {repullResult.summary.sources
+                                    .filter((s) => s.error)
+                                    .map((s) => (
+                                      <p key={s.label} className="text-sm text-red-700">
+                                        {s.label}: {s.error}
+                                      </p>
+                                    ))}
+                                </div>
+                              );
+                            })()}
+                        </div>
+
+                        <div>
+                          <label
+                            htmlFor={`resolution-${item.id}`}
+                            className="block text-sm font-medium text-gray-700 mb-2"
+                          >
+                            Resolution
+                          </label>
+                          <select
+                            id={`resolution-${item.id}`}
+                            value={resolution}
+                            onChange={(e) => setResolution(e.target.value as CorrectionResolution)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          >
+                            {CORRECTION_RESOLUTIONS.map((r) => (
+                              <option key={r} value={r}>
+                                {RESOLUTION_LABELS[r]}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label htmlFor={`notes-${item.id}`} className="block text-sm font-medium text-gray-700 mb-2">
+                            Notes
+                          </label>
+                          <textarea
+                            id={`notes-${item.id}`}
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            rows={3}
+                            placeholder={
+                              resolution === 'source_mismatch_noted'
+                                ? 'Public note shown under the section (required)'
+                                : 'Private note (optional)'
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          />
+                        </div>
+
+                        <div aria-live="polite">
+                          {resolveError && <p className="text-sm text-red-700">{resolveError}</p>}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => resolveCorrection(item.id)}
+                          disabled={!canResolve || resolveBusy === item.id}
+                          className="px-6 py-2 bg-teal-700 rounded-[4px] text-white text-sm font-semibold hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {resolveBusy === item.id ? 'Resolving…' : 'Resolve'}
+                        </button>
+                        {!canResolve && (
+                          <p className="text-sm text-gray-500">
+                            Re-pull before resolving. The re-pull is the resolution; this form only records which
+                            outcome it produced.
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
-
-                  <div>
-                    <label htmlFor={`resolution-${item.id}`} className="block text-sm font-medium text-gray-700 mb-2">
-                      Resolution
-                    </label>
-                    <select
-                      id={`resolution-${item.id}`}
-                      value={resolution}
-                      onChange={(e) => setResolution(e.target.value as CorrectionResolution)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    >
-                      {CORRECTION_RESOLUTIONS.map((r) => (
-                        <option key={r} value={r}>
-                          {RESOLUTION_LABELS[r]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label htmlFor={`notes-${item.id}`} className="block text-sm font-medium text-gray-700 mb-2">
-                      Notes
-                    </label>
-                    <textarea
-                      id={`notes-${item.id}`}
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      rows={3}
-                      placeholder={
-                        resolution === 'source_mismatch_noted'
-                          ? 'Public note shown under the section (required)'
-                          : 'Private note (optional)'
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  {resolveError && <p className="text-sm text-red-700">{resolveError}</p>}
-
-                  <button
-                    onClick={() => resolveCorrection(item.id)}
-                    disabled={!repullResult || resolveBusy === item.id}
-                    className="px-6 py-2 bg-teal-700 rounded-[4px] text-white text-sm font-semibold hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {resolveBusy === item.id ? 'Resolving…' : 'Resolve'}
-                  </button>
-                  <p className="text-sm text-gray-500">
-                    Re-pull before resolving. The re-pull is the resolution; this form only records which outcome it
-                    produced.
-                  </p>
-                </div>
-              )}
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
 
-      {items.length === 0 && (
-        <div className="text-center py-12 text-gray-500 bg-white rounded-[6px] border border-gray-200">
-          No corrections found.
-        </div>
-      )}
+            {items.length === 0 && (
+              <div className="text-center py-12 text-gray-500 bg-white rounded-[6px] border border-gray-200">
+                No corrections found.
+              </div>
+            )}
+          </>
+        ))}
     </div>
   );
 }

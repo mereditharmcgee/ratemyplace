@@ -370,6 +370,8 @@ export interface RecordCorrection {
   claim: string;
   /** 1 when the filer left an address, so the queue can say whether resolving emails them. The address itself is never sent to the client. */
   has_contact_email: number;
+  /** 1 when a re-pull already succeeded (`ok`/`empty`) for this correction, so a reload can re-enable Resolve without a fresh client-side re-pull. */
+  has_pull: number;
   status: 'pending' | 'resolved';
   resolution: 'repulled_unchanged' | 'repulled_updated' | 'source_mismatch_noted' | null;
   resolution_notes: string | null;

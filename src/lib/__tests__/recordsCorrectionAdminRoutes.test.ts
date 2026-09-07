@@ -150,6 +150,7 @@ suite('admin record correction routes', () => {
           status: string;
           record_kind: string | null;
           has_contact_email: number;
+          has_pull: number;
           building_address: string;
           building_slug: string;
         }>;
@@ -162,6 +163,8 @@ suite('admin record correction routes', () => {
         status: 'pending',
         record_kind: 'assessment',
         has_contact_email: 1,
+        // No re-pull has run for this correction yet.
+        has_pull: 0,
         building_address: BUILDING_ADDRESS,
         building_slug: BUILDING_ID,
       });
