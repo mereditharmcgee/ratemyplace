@@ -155,7 +155,7 @@ export const PATCH: APIRoute = async (context: APIContext) => {
       .bind(resolution, notes || null, user.id, correctionId)
       .run();
 
-    if (update.meta?.changes === 0) {
+    if (!Number(update.meta?.changes ?? 0)) { // fail closed: a missing or zero change count means nothing was resolved
       return json({ error: 'Correction has already been resolved' }, 409);
     }
 
