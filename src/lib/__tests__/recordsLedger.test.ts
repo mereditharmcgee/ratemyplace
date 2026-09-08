@@ -10,6 +10,7 @@ import type { BuildingRecordsView, SourceStatus } from '../records/query';
 import type {
   EnforcementTicketPayload,
   PermitPayload,
+  RentSmartPayload,
   ServiceRequestPayload,
   ViolationPayload,
 } from '../records/types';
@@ -117,6 +118,18 @@ function ticket(overrides: Partial<EnforcementTicketPayload> = {}): EnforcementT
   return { ...violation(), ticketNumber: 'T1', ...overrides };
 }
 
+function rentsmart(overrides: Partial<RentSmartPayload> = {}): RentSmartPayload {
+  return {
+    rowId: 'R1',
+    date: null,
+    violationType: null,
+    description: null,
+    address: null,
+    parcel: null,
+    ...overrides,
+  };
+}
+
 describe('ledgerModel counts', () => {
   it('counts each source and qualifies the count with what is still open', () => {
     const model = ledgerModel(
@@ -185,7 +198,7 @@ describe('ledgerModel counts', () => {
 });
 
 describe('ledgerModel spans', () => {
-  it('runs a 311 span from the earliest recorded year to the current year', () => {
+  it('states the span as the years the source actually has rows for', () => {
     const model = ledgerModel(
       view({
         sources: allPulled(),
@@ -193,7 +206,9 @@ describe('ledgerModel spans', () => {
       }),
       NOW,
     );
-    expect(model.requests.span).toBe('2024–2026');
+    // The one request is filed in 2024; the chart's axis runs on to the current year, but the
+    // coverage label must not claim 2025 and 2026 as years the records reach into.
+    expect(model.requests.span).toBe('2024');
   });
 
   it('ignores a garbage year and a 1900 sentinel rather than widening the permit span', () => {
@@ -209,9 +224,11 @@ describe('ledgerModel spans', () => {
       NOW,
     );
 
-    // Permits are on record from 2006, so neither bad date can drag the axis back. Unbounded,
-    // `0201` alone would have drawn one thousand eight hundred and twenty-six bars.
-    expect(model.permits.span).toBe('2006–2026');
+    // Permits are on record from 2006, so the bars still run the full window and neither bad
+    // date can drag it back. Unbounded, `0201` alone would have drawn one thousand eight
+    // hundred and twenty-six bars. The coverage label, though, is the one real permit's year —
+    // not the window the bars are drawn across.
+    expect(model.permits.span).toBe('2019');
     expect(model.permits.years[0].year).toBe(2006);
     expect(model.permits.years).toHaveLength(21);
     // The rows are still counted; only their place on the axis was unusable.
@@ -221,6 +238,42 @@ describe('ledgerModel spans', () => {
   it('states no span when no row carried a readable date', () => {
     const model = ledgerModel(view({ sources: allPulled(), violations: [violation()] }), NOW);
     expect(model.violations.span).toBeNull();
+  });
+
+  it('drops a 1900 sentinel from the violations year series rather than widening it back to 1900', () => {
+    const model = ledgerModel(
+      view({
+        sources: allPulled(),
+        violations: [
+          violation({ caseNumber: 'sentinel', statusDate: '1900-01-01' }),
+          violation({ caseNumber: 'real', statusDate: '2020-01-01' }),
+        ],
+      }),
+      NOW,
+    );
+
+    // With the sentinel dropped, the series runs 2020 through the current year (2026) — seven
+    // entries, not the hundred and twenty-seven a floor of 1800 would have produced.
+    expect(model.violations.years).toHaveLength(7);
+    expect(model.violations.years[0].year).toBe(2020);
+    expect(model.violations.years[model.violations.years.length - 1].year).toBe(2026);
+  });
+
+  it('states no span for a source whose only dates fall outside the drawn window', () => {
+    const model = ledgerModel(
+      view({
+        sources: allPulled(),
+        permits: [permit({ permitNumber: 'sentinel', issuedDate: '1900-01-01' })],
+      }),
+      NOW,
+    );
+
+    // The sentinel is dropped, so no year in the window has a row — the bars still run the
+    // full coverage window, but there is no observed extent to name a span for.
+    expect(model.permits.span).toBeNull();
+    expect(model.permits.years[0].year).toBe(2006);
+    expect(model.permits.years).toHaveLength(21);
+    expect(model.permits.years.every((entry) => entry.count === 0)).toBe(true);
   });
 });
 
@@ -258,7 +311,7 @@ describe('ledgerModel provenance', () => {
 
     expect(model.permits.countable).toBe(true);
     expect(model.permits.count).toBe('1');
-    expect(model.permits.span).toBe('2006–2026');
+    expect(model.permits.span).toBe('2019');
   });
 
   it('flags a section that hit the row cap and names the note the section uses', () => {
@@ -331,9 +384,9 @@ describe('ledgerModel rows', () => {
       view({
         sources: allPulled(),
         rentsmart: [
-          { violationType: 'Housing Complaints' },
-          { violationType: 'Housing Complaints' },
-        ] as BuildingRecordsView['rentsmart'],
+          rentsmart({ violationType: 'Housing Complaints' }),
+          rentsmart({ violationType: 'Housing Complaints' }),
+        ],
       }),
       NOW,
     );

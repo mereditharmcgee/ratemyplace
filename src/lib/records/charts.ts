@@ -16,11 +16,12 @@ export interface YearCount {
 
 /**
  * The years a calendar-year series will accept at all. The city feeds carry typos
- * (`0201-01-01`) and a `1900-01-01` sentinel for "no date", and an unbounded span turns one
- * of those into eighteen centuries of bars. A year outside this window is not a year the
- * city meant, so it is dropped the same way an unparseable date is.
+ * (`0201-01-01`), and Boston's open-data feeds do not carry records from before 1990 — they
+ * do carry `1900-01-01` as a "no date" sentinel, which this floor also catches. A year outside
+ * this window is not a year the city meant, so it is dropped the same way an unparseable date
+ * is.
  */
-const EARLIEST_SANE_YEAR = 1800;
+const MIN_RECORD_YEAR = 1990;
 const LATEST_SANE_YEAR = 2100;
 
 /**
@@ -51,7 +52,7 @@ export function countByYear<T>(
     const match = /^(\d{4})-\d{2}-\d{2}/.exec(value);
     if (!match) continue;
     const year = Number(match[1]);
-    if (year < EARLIEST_SANE_YEAR || year > LATEST_SANE_YEAR) continue;
+    if (year < MIN_RECORD_YEAR || year > LATEST_SANE_YEAR) continue;
     if (opts?.from !== undefined && year < opts.from) continue;
     if (opts?.to !== undefined && year > opts.to) continue;
     counts.set(year, (counts.get(year) ?? 0) + 1);
@@ -68,6 +69,19 @@ export function countByYear<T>(
     series.push({ year, count: counts.get(year) ?? 0 });
   }
   return series;
+}
+
+/**
+ * The years a series actually holds rows for, inside whatever window it was drawn across. The
+ * chart may span a feed's documented coverage; the coverage label must not claim years the
+ * records do not reach into.
+ */
+export function observedYears(series: readonly YearCount[]): YearCount[] {
+  const first = series.findIndex((e) => e.count > 0);
+  if (first === -1) return [];
+  let last = series.length - 1;
+  while (series[last].count === 0) last -= 1;
+  return series.slice(first, last + 1);
 }
 
 export interface KeyCount {

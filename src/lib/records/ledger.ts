@@ -10,7 +10,7 @@
 // `BuildingRecords.astro`'s frontmatter, where "does a never-pulled source show a dash"
 // could only be answered by parsing HTML.
 import { ROW_CAP } from './ckan';
-import { countByKey, countByYear, type KeyBreakdown, type YearCount } from './charts';
+import { countByKey, countByYear, observedYears, type KeyBreakdown, type YearCount } from './charts';
 import {
   CAPPED_REQUESTS_COPY,
   CAPPED_ROWS_COPY,
@@ -90,7 +90,9 @@ export interface EnforcementSection extends LedgerSection {
   types: KeyBreakdown;
 }
 
-export type ViolationsSection = LedgerSection;
+export interface ViolationsSection extends LedgerSection {
+  years: YearCount[];
+}
 
 export interface LedgerModel {
   requests: RequestsSection;
@@ -156,7 +158,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
     countable: requestsCountable,
     count: requestsCountable ? String(housing.length) : NO_COUNT,
     subCount: requestsCountable ? openSubCount(openRequests.length, housing.length) : '',
-    span: requestsCountable ? yearSpanLabel(requestYears) : null,
+    span: requestsCountable ? yearSpanLabel(observedYears(requestYears)) : null,
     note:
       requestsCountable && otherCount > 0
         ? `${otherCount} other request${otherCount === 1 ? '' : 's'} not shown`
@@ -191,7 +193,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
       ? openSubCount(openPermits.length, summary.count) +
         (summary.declaredTotal === null ? '' : ` · ${formatDollarsCompact(summary.declaredTotal)} declared`)
       : '',
-    span: permitsCountable ? yearSpanLabel(permitYears) : null,
+    span: permitsCountable ? yearSpanLabel(observedYears(permitYears)) : null,
     note: null,
     cappedNote: cappedNote(view.permits.length, CAPPED_ROWS_COPY),
     rows: view.permits.map((row) => ({
@@ -217,7 +219,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
     countable: enforcementCountable,
     count: enforcementCountable ? String(view.enforcement.length) : NO_COUNT,
     subCount: enforcementCountable ? openSubCount(openEnforcement.length, view.enforcement.length) : '',
-    span: enforcementCountable ? yearSpanLabel(enforcementYears) : null,
+    span: enforcementCountable ? yearSpanLabel(observedYears(enforcementYears)) : null,
     note: null,
     cappedNote: cappedNote(view.enforcement.length, CAPPED_ROWS_COPY),
     rows: view.enforcement.map((row) => ({
@@ -241,7 +243,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
     countable: violationsCountable,
     count: violationsCountable ? String(view.violations.length) : NO_COUNT,
     subCount: violationsCountable ? openSubCount(openViolations.length, view.violations.length) : '',
-    span: violationsCountable ? yearSpanLabel(violationYears) : null,
+    span: violationsCountable ? yearSpanLabel(observedYears(violationYears)) : null,
     note: null,
     cappedNote: cappedNote(view.violations.length, CAPPED_ROWS_COPY),
     rows: openFirst(view.violations).map((row) => ({
@@ -250,6 +252,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
       status: row.status,
       trailing: null,
     })),
+    years: violationYears,
   };
 
   return { requests, permits, enforcement, violations };

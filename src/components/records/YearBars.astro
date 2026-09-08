@@ -46,8 +46,12 @@ function axisLabel(year: number): string {
   return abbreviate ? `’${String(year).slice(2)}` : String(year);
 }
 
-// The whole component is behind `series.length > 0`, so this always describes real bars.
-const ariaLabel = `${title}: ${total} ${noun} across ${series[0]?.year} to ${series[series.length - 1]?.year}`;
+// The frontmatter runs whether or not the markup below renders, so the empty case still has
+// to be handled here even though the JSX only reaches `ariaLabel` behind `series.length > 0`.
+const ariaLabel =
+  series.length > 0
+    ? `${title}: ${total} ${noun} across ${series[0].year} to ${series[series.length - 1].year}`
+    : '';
 ---
 
 {series.length > 0 && (

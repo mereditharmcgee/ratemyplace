@@ -1,14 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { countByYear, countByKey, assessmentSeries, sparklinePoints } from '../records/charts';
-import {
-  BANNED_WORDS,
-  NO_VIOLATIONS_CAVEAT,
-  formatDollarsCompact,
-  NOT_RECORDED,
-  isOpenStatus,
-  openSubCount,
-  yearSpanLabel,
-} from '../records/display';
+import { countByYear, countByKey, observedYears, assessmentSeries, sparklinePoints } from '../records/charts';
+import { NOT_RECORDED } from '../records/display';
 import type { AssessmentPayload } from '../records/types';
 
 /**
@@ -16,6 +8,10 @@ import type { AssessmentPayload } from '../records/types';
  * They are counting functions, not judgement functions: every one of them turns a list of
  * stored rows into a count, a span, or a coordinate. Nothing here reads a value and decides
  * what it means.
+ *
+ * The panel's copy and caveats (`formatDollarsCompact`, `NO_VIOLATIONS_CAVEAT`,
+ * `isOpenStatus`, `openSubCount`, `yearSpanLabel`) live in `display.ts` and are covered by
+ * `recordsDisplay.test.ts` instead — this file is only the shape helpers in `charts.ts`.
  */
 
 interface Row {
@@ -104,6 +100,11 @@ describe('countByYear', () => {
     expect(countByYear(rows, (r) => r.date)).toEqual([{ year: 2021, count: 1 }]);
   });
 
+  it('drops the 1900-01-01 "no date" sentinel the same way it drops an unparseable date', () => {
+    const rows = [row('1900-01-01'), row('2021-06-01')];
+    expect(countByYear(rows, (r) => r.date)).toEqual([{ year: 2021, count: 1 }]);
+  });
+
   it('reads the year off each of the timestamp shapes the feeds use', () => {
     const rows = [row('2008-08-30 09:42:00'), row('2021-01-28T16:29:26'), row('2026-07-17 13:56:00+00')];
     const series = countByYear(rows, (r) => r.date);
@@ -165,54 +166,6 @@ describe('countByKey', () => {
   it('trims surrounding whitespace so one type is not counted twice', () => {
     const result = countByKey([row(null, 'Heat '), row(null, ' Heat')], (r) => r.key, 6);
     expect(result.top).toEqual([{ key: 'Heat', count: 2 }]);
-  });
-});
-
-describe('formatDollarsCompact', () => {
-  it('says not recorded for a missing value', () => {
-    expect(formatDollarsCompact(null)).toBe(NOT_RECORDED);
-    expect(formatDollarsCompact(Number.NaN)).toBe(NOT_RECORDED);
-  });
-
-  it('renders millions to three significant figures', () => {
-    expect(formatDollarsCompact(9_510_000)).toBe('$9.51M');
-  });
-
-  it('renders thousands without a decimal point when it does not need one', () => {
-    expect(formatDollarsCompact(630_000)).toBe('$630K');
-  });
-
-  it('renders a value under a thousand in full', () => {
-    expect(formatDollarsCompact(950)).toBe('$950');
-  });
-
-  it('trims a trailing zero rather than printing 9.50M', () => {
-    expect(formatDollarsCompact(9_500_000)).toBe('$9.5M');
-    expect(formatDollarsCompact(2_000_000)).toBe('$2M');
-  });
-
-  it('renders billions', () => {
-    expect(formatDollarsCompact(1_250_000_000)).toBe('$1.25B');
-  });
-
-  it('renders zero as zero, not as not recorded', () => {
-    expect(formatDollarsCompact(0)).toBe('$0');
-  });
-
-  it('promotes to the next unit when rounding lands on it', () => {
-    // 999,500 scales to 999.5K, which rounds to 1000K. That is $1M written the long way.
-    expect(formatDollarsCompact(999_500)).toBe('$1M');
-    expect(formatDollarsCompact(999_999_999)).toBe('$1B');
-  });
-
-  it('keeps the sign on a negative value', () => {
-    expect(formatDollarsCompact(-1_500)).toBe('-$1.5K');
-  });
-
-  it('says not recorded for an absent value however it arrives', () => {
-    expect(formatDollarsCompact(null)).toBe(NOT_RECORDED);
-    expect(formatDollarsCompact(undefined)).toBe(NOT_RECORDED);
-    expect(formatDollarsCompact(Number.POSITIVE_INFINITY)).toBe(NOT_RECORDED);
   });
 });
 
@@ -302,65 +255,49 @@ describe('sparklinePoints', () => {
   });
 });
 
-describe('NO_VIOLATIONS_CAVEAT', () => {
-  const bannedPattern = new RegExp(`\\b(${BANNED_WORDS.join('|')})\\b`, 'i');
-
-  it('contains no banned word', () => {
-    expect(bannedPattern.test(NO_VIOLATIONS_CAVEAT)).toBe(false);
-  });
-
-  it('says the list is a record of the feed rather than a finding about the building', () => {
-    expect(NO_VIOLATIONS_CAVEAT).toMatch(/feed/i);
-  });
-});
-
-describe('isOpenStatus', () => {
-  it('reads the city word, case and padding insensitive', () => {
-    expect(isOpenStatus('Open')).toBe(true);
-    expect(isOpenStatus(' open ')).toBe(true);
-    expect(isOpenStatus('OPEN')).toBe(true);
-  });
-
-  it('treats every other status as not open', () => {
-    expect(isOpenStatus('Closed')).toBe(false);
-    expect(isOpenStatus('Issued')).toBe(false);
-  });
-
-  it('treats a blank status as not open rather than assuming it is unresolved', () => {
-    expect(isOpenStatus(null)).toBe(false);
-    expect(isOpenStatus(undefined)).toBe(false);
-    expect(isOpenStatus('')).toBe(false);
-  });
-});
-
-describe('openSubCount', () => {
-  it('distinguishes an empty source from a fully closed one', () => {
-    expect(openSubCount(0, 0)).toBe('none on record');
-    expect(openSubCount(0, 7)).toBe('all closed');
-  });
-
-  it('counts the open rows when there are any', () => {
-    expect(openSubCount(3, 7)).toBe('3 open');
-    expect(openSubCount(1, 1)).toBe('1 open');
-  });
-});
-
-describe('yearSpanLabel', () => {
-  it('returns null for an empty series', () => {
-    expect(yearSpanLabel([])).toBeNull();
-  });
-
-  it('returns the bare year for a single-year series', () => {
-    expect(yearSpanLabel([{ year: 2021, count: 2 }])).toBe('2021');
-  });
-
-  it('returns the span for a multi-year series', () => {
+describe('observedYears', () => {
+  it('returns an empty series when nothing was ever recorded', () => {
+    expect(observedYears([])).toEqual([]);
     expect(
-      yearSpanLabel([
-        { year: 2019, count: 1 },
+      observedYears([
+        { year: 2019, count: 0 },
         { year: 2020, count: 0 },
-        { year: 2021, count: 4 },
       ]),
-    ).toBe('2019–2021');
+    ).toEqual([]);
+  });
+
+  it('trims the leading and trailing zero years off a dense window', () => {
+    const series = [
+      { year: 2006, count: 0 },
+      { year: 2007, count: 0 },
+      { year: 2019, count: 3 },
+      { year: 2020, count: 0 },
+      { year: 2021, count: 1 },
+      { year: 2022, count: 0 },
+      { year: 2026, count: 0 },
+    ];
+    expect(observedYears(series)).toEqual([
+      { year: 2019, count: 3 },
+      { year: 2020, count: 0 },
+      { year: 2021, count: 1 },
+    ]);
+  });
+
+  it('keeps a run with no trailing zeroes to trim', () => {
+    const series = [
+      { year: 2024, count: 1 },
+      { year: 2025, count: 0 },
+      { year: 2026, count: 2 },
+    ];
+    expect(observedYears(series)).toEqual(series);
+  });
+
+  it('returns the single observed year for a series with one non-zero entry', () => {
+    const series = [
+      { year: 2006, count: 0 },
+      { year: 2019, count: 1 },
+      { year: 2026, count: 0 },
+    ];
+    expect(observedYears(series)).toEqual([{ year: 2019, count: 1 }]);
   });
 });

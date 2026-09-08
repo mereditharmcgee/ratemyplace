@@ -310,9 +310,9 @@ suite('BuildingRecords.astro ledger', () => {
     // Two permits after the duplicate row is deduped, one open, $36,500 + $1,200 declared.
     const permits = summaryText(html, 'Building permits');
     expect(permits).toContain('1 open · $37.7K declared');
-    // The permit axis is the feed's coverage, not the building's own rows: a bound the city
-    // documents, so one bad date cannot drag the chart back to the third century.
-    expect(permits).toContain('2006–2026');
+    // The coverage label is the years the permits actually fall in (2019 and 2021) — not the
+    // feed's documented coverage window the bars are drawn across, which runs 2006 to 2026.
+    expect(permits).toContain('2019–2021');
   });
 
   it('says none on record rather than zero open for a source that came back empty', async () => {
