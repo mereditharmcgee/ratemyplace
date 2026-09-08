@@ -109,12 +109,12 @@ export default function ConfirmStep({
               Your landlord may be able to identify you based on details in your review. Avoid mentioning
               specific dates, unit numbers, or personal details.
             </p>
-            <label className="flex items-center gap-2 py-3 cursor-pointer">
+            <label className="flex items-start gap-3 py-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={privacyAcknowledged}
                 onChange={(e) => onPrivacyChange(e.target.checked)}
-                className="h-5 w-5 accent-amber-600"
+                className="mt-0.5 h-5 w-5 shrink-0 accent-amber-600"
               />
               <span className="text-sm text-amber-800">
                 I confirm this review reflects my honest personal experience and agree to the{' '}
