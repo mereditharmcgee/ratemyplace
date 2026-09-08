@@ -51,8 +51,10 @@ const ariaLabel =
   <div>
     <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</h4>
     <div role="img" aria-label={ariaLabel} class="mt-2 flex items-end gap-px" style={`height:${BAR_AREA_PX}px`}>
+      {/* Capped so a one- or two-year span draws bars rather than a wall of ink. A long span
+          never reaches the cap, so the chart still fills its column. */}
       {series.map((entry) => (
-        <span class="flex flex-1 items-end" title={`${entry.year}: ${entry.count}`}>
+        <span class="flex max-w-8 flex-1 items-end" title={`${entry.year}: ${entry.count}`}>
           <span
             class:list={['block w-full', entry.count > 0 ? 'bg-gray-700' : 'bg-gray-200']}
             style={`height:${barHeight(entry.count)}px`}></span>
@@ -61,7 +63,7 @@ const ariaLabel =
     </div>
     <div class="mt-1 flex gap-px" aria-hidden="true">
       {series.map((entry) => (
-        <span class="flex-1 whitespace-nowrap text-center text-[10px] leading-none text-gray-400">{axisLabel(entry.year)}</span>
+        <span class="max-w-8 flex-1 whitespace-nowrap text-center text-[10px] leading-none text-gray-400">{axisLabel(entry.year)}</span>
       ))}
     </div>
   </div>
