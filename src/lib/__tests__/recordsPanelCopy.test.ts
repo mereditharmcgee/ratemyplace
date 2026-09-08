@@ -21,8 +21,18 @@ const bannedPattern = new RegExp('\\b(' + BANNED_WORDS.join('|') + ')\\b', 'i');
 describe('BuildingRecords.astro display rules', () => {
   it('scans every file that makes up the panel', () => {
     expect(PANEL_FILES.length).toBeGreaterThan(1);
-    expect(PANEL_FILES.some((path) => path.endsWith('RecordSectionHeader.astro'))).toBe(true);
-    expect(PANEL_FILES.some((path) => path.endsWith('CorrectionNotes.astro'))).toBe(true);
+    // Every piece the panel is assembled from, named so a rename that quietly drops one out
+    // of the scan is a failure rather than a silently smaller surface.
+    for (const name of [
+      'CorrectionNotes.astro',
+      'FactsStrip.astro',
+      'LedgerRow.astro',
+      'YearBars.astro',
+      'CategoryBars.astro',
+      'StatusToken.astro',
+    ]) {
+      expect(PANEL_FILES.some((path) => path.endsWith(name))).toBe(true);
+    }
   });
   it('builds a pattern that genuinely matches a banned word', () => {
     expect(bannedPattern.test('there is a pattern of delay here')).toBe(true);

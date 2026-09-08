@@ -1,0 +1,68 @@
+---
+// How many records the city filed each year, as bars. One ink for a year with records and a
+// lighter one for a year without, and no second colour anywhere: a bar is tall because more
+// rows were recorded that year, and the chart says nothing else.
+//
+// Every year in the span gets a bar, including the empty ones. Dropping a zero year would
+// close a gap the records actually have and make an intermittent run look continuous.
+import type { YearCount } from '../../lib/records/display';
+
+interface Props {
+  title: string;
+  series: YearCount[];
+  /** Plural noun for the accessible description, e.g. `requests`. */
+  noun: string;
+}
+
+const { title, series, noun } = Astro.props;
+
+const BAR_AREA_PX = 64;
+/** A year with no records still draws, so the axis reads as a continuous span. */
+const MIN_BAR_PX = 2;
+
+const total = series.reduce((sum, entry) => sum + entry.count, 0);
+const max = series.reduce((highest, entry) => Math.max(highest, entry.count), 0);
+
+// A label under every year while they fit; past that, only the years divisible by five, so
+// the axis stays readable across a twenty-year span without dropping either end's context.
+const labelled = new Set(
+  series.length <= 16 ? series.map((entry) => entry.year) : series.filter((entry) => entry.year % 5 === 0).map((entry) => entry.year),
+);
+// Four digits per column stops fitting once there are more than eight labels.
+const abbreviate = labelled.size > 8;
+
+function barHeight(count: number): number {
+  if (max === 0) return MIN_BAR_PX;
+  return Math.max(MIN_BAR_PX, Math.round((count / max) * BAR_AREA_PX));
+}
+
+function axisLabel(year: number): string {
+  if (!labelled.has(year)) return '';
+  return abbreviate ? `’${String(year).slice(2)}` : String(year);
+}
+
+const ariaLabel =
+  series.length === 0
+    ? `${title}: no dated records`
+    : `${title}: ${total} ${noun} across ${series[0].year} to ${series[series.length - 1].year}`;
+---
+
+{series.length > 0 && (
+  <div>
+    <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</h4>
+    <div role="img" aria-label={ariaLabel} class="mt-2 flex items-end gap-px" style={`height:${BAR_AREA_PX}px`}>
+      {series.map((entry) => (
+        <span class="flex flex-1 items-end" title={`${entry.year}: ${entry.count}`}>
+          <span
+            class:list={['block w-full', entry.count > 0 ? 'bg-gray-700' : 'bg-gray-200']}
+            style={`height:${barHeight(entry.count)}px`}></span>
+        </span>
+      ))}
+    </div>
+    <div class="mt-1 flex gap-px" aria-hidden="true">
+      {series.map((entry) => (
+        <span class="flex-1 whitespace-nowrap text-center text-[10px] leading-none text-gray-400">{axisLabel(entry.year)}</span>
+      ))}
+    </div>
+  </div>
+)}

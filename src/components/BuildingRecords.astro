@@ -3,6 +3,12 @@
 // Every value below is a field off a stored record or a count of records — no scoring,
 // no score colors, no characterization of what the records mean. `display.ts` owns every
 // piece of framing copy so a single test can hold the whole surface to that rule.
+//
+// The shape is a facts strip (what the assessor says this building is) over a ledger of four
+// sources (what each city feed holds for it). A source's whole answer is a count and a span
+// until the reader opens it; the lists are still there, one disclosure down. Summarizing is
+// not the same as judging — a count is a count whether it reads 0 or 42, and nothing here
+// sizes, colours, or orders a number by whether it is good news.
 import { getBuildingRecords, type BuildingRecordsView } from '../lib/records/query';
 import { logError } from '../lib/logger';
 import {
@@ -11,15 +17,20 @@ import {
   DECLARED_VALUATION_CAVEAT,
   OTHER_REQUESTS_COPY,
   CONDOMINIUM_COPY,
+  NO_VIOLATIONS_CAVEAT,
   KIND_LABELS,
-  showMailingAddress,
-  mailingAddressLine,
   formatDollars,
+  formatDollarsCompact,
   formatPullDate,
   formatRecordDate,
   permitSummary,
   splitServiceRequests,
   rentSmartDisagreement,
+  countByYear,
+  countByKey,
+  isOpenStatus,
+  openSubCount,
+  yearSpanLabel,
 } from '../lib/records/display';
 import { ROW_CAP } from '../lib/records/ckan';
 import { FY2026_RESOURCE_ID } from '../lib/records/sources/boston/assessor';
@@ -32,8 +43,12 @@ import {
   HOUSING_DEPARTMENT_PREFIX,
 } from '../lib/records/sources/boston/serviceRequests';
 import RecordCorrectionForm from './records/RecordCorrectionForm';
-import RecordSectionHeader from './records/RecordSectionHeader.astro';
 import CorrectionNotes from './records/CorrectionNotes.astro';
+import FactsStrip from './records/FactsStrip.astro';
+import LedgerRow from './records/LedgerRow.astro';
+import YearBars from './records/YearBars.astro';
+import CategoryBars from './records/CategoryBars.astro';
+import StatusToken from './records/StatusToken.astro';
 import type { RecordKind } from '../lib/records/types';
 
 interface Props {
@@ -102,17 +117,54 @@ const violationStatus = statusFor(VIOLATIONS_RESOURCE_ID);
 const enforcementStatus = statusFor(ENFORCEMENT_RESOURCE_ID);
 const requestStatus = statusFor(NEW_311_RESOURCE_ID);
 
+/**
+ * Whether a row's figures mean anything yet. A source nobody has queried has no count — not a
+ * zero — and neither does one whose only attempt failed, so both render `—` rather than a
+ * number a reader would take as a finding.
+ */
+function countable(status: unknown, sourceId: string, hasRows: boolean): boolean {
+  return status !== null && !unavailable(sourceId, hasRows);
+}
+
+const housing = requests?.housing ?? [];
+const requestsCountable = countable(requestStatus, NEW_311_RESOURCE_ID, (view?.serviceRequests.length ?? 0) > 0);
+const requestYears = countByYear(housing, (row) => row.openedAt);
+const requestTypes = countByKey(housing, (row) => row.type ?? row.title, 6);
+const openRequests = housing.filter((row) => isOpenStatus(row.status));
+
+const permitsCountable = countable(permitStatus, PERMITS_RESOURCE_ID, (view?.permits.length ?? 0) > 0);
+const permitYears = countByYear(view?.permits ?? [], (row) => row.issuedDate);
+const permitTypes = countByKey(view?.permits ?? [], (row) => row.description ?? row.permitType ?? row.workType, 6);
+const openPermits = (view?.permits ?? []).filter((row) => isOpenStatus(row.status));
+const permitSubCount = permits
+  ? openSubCount(openPermits.length, permits.count) +
+    (permits.declaredTotal === null ? '' : ` · ${formatDollarsCompact(permits.declaredTotal)} declared`)
+  : '';
+
+const enforcementCountable = countable(enforcementStatus, ENFORCEMENT_RESOURCE_ID, (view?.enforcement.length ?? 0) > 0);
+const enforcementYears = countByYear(view?.enforcement ?? [], (row) => row.statusDate);
+const enforcementTypes = countByKey(view?.enforcement ?? [], (row) => row.description, 6);
+const openEnforcement = (view?.enforcement ?? []).filter((row) => isOpenStatus(row.status));
+
+const violationsCountable = countable(violationStatus, VIOLATIONS_RESOURCE_ID, (view?.violations.length ?? 0) > 0);
+const violationYears = countByYear(view?.violations ?? [], (row) => row.statusDate);
+const openViolations = (view?.violations ?? []).filter((row) => isOpenStatus(row.status));
+
 // Open rows first, then everything else, each group keeping the query's date order.
 const violationsOrdered = view
   ? [
-      ...view.violations.filter((row) => (row.status ?? '').toLowerCase() === 'open'),
-      ...view.violations.filter((row) => (row.status ?? '').toLowerCase() !== 'open'),
+      ...view.violations.filter((row) => isOpenStatus(row.status)),
+      ...view.violations.filter((row) => !isOpenStatus(row.status)),
     ]
   : [];
 
 const rowClass = 'grid grid-cols-1 sm:grid-cols-[7rem_1fr_auto] gap-x-2 gap-y-0.5 py-2';
 const listClass = 'divide-y divide-gray-100 text-sm mt-2';
-const bodyClass = 'text-sm text-gray-600 mt-2';
+const bodyClass = 'text-sm text-gray-600';
+const noteClass = 'text-xs text-gray-500 mt-2';
+const chartsClass = 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5';
+const disclosureClass =
+  'mt-4 text-sm text-teal-700 cursor-pointer list-none [&::-webkit-details-marker]:hidden underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700';
 
 /** A source nobody has queried has no finding to report — not an empty one, none at all. */
 const NEVER_PULLED_COPY = 'Not retrieved yet.';
@@ -120,226 +172,227 @@ const NEVER_PULLED_COPY = 'Not retrieved yet.';
 
 {view && (
   <section id="public-records" class="bg-white rounded-[6px] border border-gray-200 p-6 mb-8">
-    <div class="flex items-start justify-between gap-4">
-      <h2 class="text-xl font-semibold text-gray-900">Public records</h2>
-      <a href="#report-record" class="text-sm text-teal-700 hover:underline shrink-0">Report a record error</a>
+    <div class="flex flex-wrap items-start justify-between gap-x-4">
+      <div>
+        <h2 class="text-xl font-semibold text-gray-900">Public records</h2>
+        <p class="mt-0.5 text-xs text-gray-500">City of Boston · pulled {formatPullDate(view.pulledAt)}</p>
+      </div>
+      {/* Padded to a 44px tap target rather than sized as bare text — it is the panel's one
+          call to action and it sits on a phone next to a scrolling list. */}
+      <a
+        href="#report-record"
+        class="-mr-3 inline-flex min-h-[44px] shrink-0 items-center px-3 py-2 text-sm text-teal-700 hover:underline">Report a record error</a>
     </div>
-    <p class="text-sm text-gray-600 mt-2">{PANEL_FRAMING_COPY}</p>
-    <p class="text-xs text-gray-500 mt-1">Most recent pull: {formatPullDate(view.pulledAt)}.</p>
+    <p class="mt-2 text-sm text-gray-600">{PANEL_FRAMING_COPY}</p>
     {view.invalidKinds.length > 0 && (
       <p class="text-xs text-amber-700 mt-2">
         Some records could not be read and are not shown ({view.invalidKinds.map(kindLabel).join(', ')}).
       </p>
     )}
 
-    <div class="mt-6">
-      <RecordSectionHeader title="Property" status={assessorStatus} hasRows={view.assessments.length > 0} />
-      {assessorStatus === null ? (
-        <p class={bodyClass}>{NEVER_PULLED_COPY}</p>
-      ) : (
-        <>
-          {unavailable(FY2026_RESOURCE_ID, view.assessments.length > 0) ? (
-            <p class={bodyClass}>
-              Record unavailable. Last attempt {formatPullDate(assessorStatus.retrievedAt)}.
-            </p>
-          ) : current === null ? (
-            <p class={bodyClass}>No assessor record on file.</p>
-          ) : current.condominium ? (
-            <p class={bodyClass}>{CONDOMINIUM_COPY}</p>
-          ) : (
-            <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mt-2">
-              <dt class="text-gray-500">Parcel</dt>
-              <dd class="text-gray-900">{orNotRecorded(current.parcelId)}</dd>
-              <dt class="text-gray-500">Owner of record</dt>
-              <dd class="text-gray-900">{orNotRecorded(current.owner)}</dd>
-              {showMailingAddress(current.owner) && (
-                <>
-                  <dt class="text-gray-500">Tax mailing address</dt>
-                  <dd class="text-gray-900">{mailingAddressLine(current)}</dd>
-                </>
-              )}
-              <dt class="text-gray-500">Land use</dt>
-              <dd class="text-gray-900">{orNotRecorded(current.landUseDescription ?? current.landUse)}</dd>
-              <dt class="text-gray-500">Year built</dt>
-              <dd class="text-gray-900">{orNotRecorded(current.yearBuilt)}</dd>
-              <dt class="text-gray-500">Last remodel year</dt>
-              <dd class="text-gray-900">{orNotRecorded(current.yearRemodel)}</dd>
-              <dt class="text-gray-500">Units</dt>
-              <dd class="text-gray-900">{orNotRecorded(current.residentialUnits)}</dd>
-              <dt class="text-gray-500">Assessed value ({current.fiscalYear})</dt>
-              <dd class="text-gray-900">{formatDollars(current.totalValue)}</dd>
-            </dl>
-          )}
-          {/* A condominium parcel's assessed values are the unit's, not the building's, and the
-              panel does not name an owner for one — so it does not chart one either. */}
-          {view.assessments.length > 1 && current !== null && !current.condominium && (
-            <div class="mt-4">
-              <h4 class="text-sm font-semibold text-gray-900">Assessed value by fiscal year</h4>
-              <table class="mt-1 text-sm w-full max-w-xs">
-                <caption class="sr-only">Assessed value by fiscal year</caption>
-                <tbody>
-                  {view.assessments.map((assessment) => (
-                    <tr class="border-t border-gray-100">
-                      <th scope="row" class="py-1 text-gray-500 pr-4 font-normal text-left">{assessment.fiscalYear}</th>
-                      <td class="py-1 text-gray-900">{formatDollars(assessment.totalValue)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+    {assessorStatus === null ? (
+      <p class={`${bodyClass} mt-4`}>{NEVER_PULLED_COPY}</p>
+    ) : unavailable(FY2026_RESOURCE_ID, view.assessments.length > 0) ? (
+      <p class={`${bodyClass} mt-4`}>Record unavailable. Last attempt {formatPullDate(assessorStatus.retrievedAt)}.</p>
+    ) : current === null ? (
+      <p class={`${bodyClass} mt-4`}>No assessor record on file.</p>
+    ) : current.condominium ? (
+      /* A condominium parcel's assessed values are the unit's, not the building's, and the
+         panel does not name an owner for one — so it does not chart one either. */
+      <p class={`${bodyClass} mt-4`}>{CONDOMINIUM_COPY}</p>
+    ) : (
+      <FactsStrip current={current} all={view.assessments} />
+    )}
+    <CorrectionNotes notes={notesFor('assessment')} />
+
+    <div class="mt-6 border-b border-gray-200">
+      <LedgerRow
+        title="311 housing requests"
+        status={requestStatus}
+        hasRows={view.serviceRequests.length > 0}
+        span={yearSpanLabel(requestYears)}
+        note={requestsCountable && requests!.otherCount > 0
+          ? `${requests!.otherCount} other request${requests!.otherCount === 1 ? '' : 's'} not shown`
+          : null}
+        count={requestsCountable ? String(housing.length) : '—'}
+        subCount={requestsCountable ? openSubCount(openRequests.length, housing.length) : ''}
+        open={true}>
+        {requestStatus === null ? (
+          <p class={bodyClass}>{NEVER_PULLED_COPY}</p>
+        ) : unavailable(NEW_311_RESOURCE_ID, view.serviceRequests.length > 0) ? (
+          <p class={bodyClass}>Record unavailable. Last attempt {formatPullDate(requestStatus.retrievedAt)}.</p>
+        ) : (
+          <>
+            <div class={chartsClass}>
+              <YearBars title="Requests by year opened" series={requestYears} noun="requests" />
+              <CategoryBars title="What was reported" breakdown={requestTypes} restNoun="requests" />
             </div>
-          )}
-        </>
-      )}
-      <CorrectionNotes notes={notesFor('assessment')} />
-    </div>
-
-    <div class="mt-6">
-      <RecordSectionHeader title="Building permits" status={permitStatus} hasRows={view.permits.length > 0} />
-      {permitStatus === null ? (
-        <p class={bodyClass}>{NEVER_PULLED_COPY}</p>
-      ) : unavailable(PERMITS_RESOURCE_ID, view.permits.length > 0) ? (
-        <p class={bodyClass}>
-          Record unavailable. Last attempt {formatPullDate(permitStatus.retrievedAt)}.
-        </p>
-      ) : permits!.count === 0 ? (
-        <p class={bodyClass}>{ZERO_PERMITS_COPY}</p>
-      ) : (
-        <>
-          <p class={bodyClass}>
-            {permits!.count} permit{permits!.count === 1 ? '' : 's'} on record from {PERMIT_COVERAGE_START}
-            {permits!.earliest && permits!.latest && (
-              <span> (earliest {formatRecordDate(permits!.earliest)}, latest {formatRecordDate(permits!.latest)})</span>
-            )}.{' '}
-            {permits!.declaredTotal === null ? (
-              'No declared valuation recorded.'
-            ) : (
-              <>Total declared valuation {formatDollars(permits!.declaredTotal)}{permits!.declaredCount < permits!.count
-                ? ` (recorded for ${permits!.declaredCount} of ${permits!.count} permits)`
-                : ''}.</>
-            )}
-          </p>
-          <p class="text-xs text-gray-500 mt-1">{DECLARED_VALUATION_CAVEAT}</p>
-          <ul class={listClass}>
-            {view.permits.map((permit) => (
-              <li class={rowClass}>
-                <span class="text-gray-500">{formatRecordDate(permit.issuedDate)}</span>
-                <span class="text-gray-900">
-                  {permit.permitType ?? permit.workType ?? 'Permit'}{permit.description ? ` · ${permit.description}` : ''}
-                </span>
-                <span class="text-gray-500 sm:text-right">{orNotRecorded(permit.status)}</span>
-              </li>
-            ))}
-          </ul>
-          {capped(view.permits.length) && (
-            <p class="text-xs text-gray-500 mt-1">First {ROW_CAP} shown.</p>
-          )}
-        </>
-      )}
-      <CorrectionNotes notes={notesFor('permit')} />
-    </div>
-
-    <div class="mt-6">
-      <RecordSectionHeader title="Violations" status={violationStatus} hasRows={view.violations.length > 0} />
-      {violationStatus === null ? (
-        <p class={bodyClass}>{NEVER_PULLED_COPY}</p>
-      ) : unavailable(VIOLATIONS_RESOURCE_ID, view.violations.length > 0) ? (
-        <p class={bodyClass}>
-          Record unavailable. Last attempt {formatPullDate(violationStatus.retrievedAt)}.
-        </p>
-      ) : view.violations.length === 0 ? (
-        <p class={bodyClass}>No violations on record.</p>
-      ) : (
-        <>
-          <ul class={listClass}>
-            {violationsOrdered.map((violation) => (
-              <li class={rowClass}>
-                <span class="text-gray-500">{formatRecordDate(violation.statusDate)}</span>
-                <span class="text-gray-900">
-                  {[violation.code, violation.description].filter(Boolean).join(' · ') || 'Violation'}
-                </span>
-                <span class="text-gray-500 sm:text-right">{orNotRecorded(violation.status)}</span>
-              </li>
-            ))}
-          </ul>
-          {capped(view.violations.length) && (
-            <p class="text-xs text-gray-500 mt-1">First {ROW_CAP} shown.</p>
-          )}
-        </>
-      )}
-      <CorrectionNotes notes={notesFor('violation')} />
-    </div>
-
-    <div class="mt-6">
-      <RecordSectionHeader title="Code enforcement" status={enforcementStatus} hasRows={view.enforcement.length > 0} />
-      {enforcementStatus === null ? (
-        <p class={bodyClass}>{NEVER_PULLED_COPY}</p>
-      ) : unavailable(ENFORCEMENT_RESOURCE_ID, view.enforcement.length > 0) ? (
-        <p class={bodyClass}>
-          Record unavailable. Last attempt {formatPullDate(enforcementStatus.retrievedAt)}.
-        </p>
-      ) : view.enforcement.length === 0 ? (
-        <p class={bodyClass}>No code enforcement tickets on record.</p>
-      ) : (
-        <>
-          <ul class={listClass}>
-            {view.enforcement.map((ticket) => (
-              <li class={rowClass}>
-                <span class="text-gray-500">{formatRecordDate(ticket.statusDate)}</span>
-                <span class="text-gray-900">{orNotRecorded(ticket.description)}</span>
-                <span class="text-gray-500 sm:text-right">{orNotRecorded(ticket.status)}</span>
-              </li>
-            ))}
-          </ul>
-          {capped(view.enforcement.length) && (
-            <p class="text-xs text-gray-500 mt-1">First {ROW_CAP} shown.</p>
-          )}
-        </>
-      )}
-      <CorrectionNotes notes={notesFor('enforcement_ticket')} />
-    </div>
-
-    <div class="mt-6">
-      <RecordSectionHeader title="311 requests" status={requestStatus} hasRows={view.serviceRequests.length > 0} />
-      {requestStatus === null ? (
-        <p class={bodyClass}>{NEVER_PULLED_COPY}</p>
-      ) : unavailable(NEW_311_RESOURCE_ID, view.serviceRequests.length > 0) ? (
-        <p class={bodyClass}>
-          Record unavailable. Last attempt {formatPullDate(requestStatus.retrievedAt)}.
-        </p>
-      ) : (
-        <>
-          <p class={bodyClass}>
-            {requests!.housing.length} housing-related request{requests!.housing.length === 1 ? '' : 's'}, {requests!.otherCount} other.
-          </p>
-          <details class="mt-1">
-            <summary class="text-xs text-gray-500 cursor-pointer">How requests are classified</summary>
-            <p class="text-xs text-gray-500 mt-1">
-              A request is housing-related when the city files it under {HOUSING_REASONS.join(', ')}, or routes it
-              to {HOUSING_DEPARTMENT_PREFIX}. {OTHER_REQUESTS_COPY}
+            <p class={noteClass}>
+              How requests are classified: a request is housing-related when the city files it under{' '}
+              {HOUSING_REASONS.join(', ')}, or routes it to {HOUSING_DEPARTMENT_PREFIX}. {OTHER_REQUESTS_COPY}
             </p>
-          </details>
-          {requests!.housing.length > 0 && (
+            {openRequests.length > 0 && (
+              <>
+                <h4 class="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Open now ({openRequests.length})
+                </h4>
+                <ul class={listClass}>
+                  {openRequests.map((request) => (
+                    <li class={rowClass}>
+                      <span class="text-gray-500">{formatRecordDate(request.openedAt)}</span>
+                      <span class="text-gray-900">{request.type ?? request.title ?? 'Request'}</span>
+                      <span class="text-xs sm:text-right"><StatusToken status={request.status} /></span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {housing.length > 0 && (
+              <details>
+                <summary class={disclosureClass}>Show all {housing.length} requests</summary>
+                <ul class={listClass}>
+                  {housing.map((request) => (
+                    <li class={rowClass}>
+                      <span class="text-gray-500">{formatRecordDate(request.openedAt)}</span>
+                      <span class="text-gray-900">{request.type ?? request.title ?? 'Request'}</span>
+                      <span class="text-xs sm:text-right">
+                        <StatusToken status={request.status} />
+                        {request.closedAt && <span class="text-gray-500"> · closed {formatRecordDate(request.closedAt)}</span>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {capped(view.serviceRequests.length) && (
+              <p class={noteClass}>First {ROW_CAP} requests considered.</p>
+            )}
+            {/* Only alongside the counts it disagrees with. Under "Record unavailable" or
+                "Not retrieved yet" there is nothing above for it to disagree with. */}
+            {rentSmartNote && <p class={noteClass}>{rentSmartNote}</p>}
+          </>
+        )}
+        <CorrectionNotes notes={notesFor('service_request')} />
+      </LedgerRow>
+
+      <LedgerRow
+        title="Building permits"
+        status={permitStatus}
+        hasRows={view.permits.length > 0}
+        span={yearSpanLabel(permitYears)}
+        count={permitsCountable ? String(permits!.count) : '—'}
+        subCount={permitsCountable ? permitSubCount : ''}>
+        {permitStatus === null ? (
+          <p class={bodyClass}>{NEVER_PULLED_COPY}</p>
+        ) : unavailable(PERMITS_RESOURCE_ID, view.permits.length > 0) ? (
+          <p class={bodyClass}>Record unavailable. Last attempt {formatPullDate(permitStatus.retrievedAt)}.</p>
+        ) : permits!.count === 0 ? (
+          <p class={bodyClass}>{ZERO_PERMITS_COPY}</p>
+        ) : (
+          <>
+            <div class={chartsClass}>
+              <YearBars title="Permits by year issued" series={permitYears} noun="permits" />
+              <CategoryBars title="Type of work" breakdown={permitTypes} restNoun="permits" />
+            </div>
+            <p class={noteClass}>
+              On record from {PERMIT_COVERAGE_START}.{' '}
+              {permits!.declaredTotal === null
+                ? 'No declared valuation recorded.'
+                : `Total declared valuation ${formatDollars(permits!.declaredTotal)}${
+                    permits!.declaredCount < permits!.count
+                      ? ` (recorded for ${permits!.declaredCount} of ${permits!.count} permits)`
+                      : ''
+                  }.`}{' '}
+              {DECLARED_VALUATION_CAVEAT}
+            </p>
+            <details>
+              <summary class={disclosureClass}>Show all {permits!.count} permits</summary>
+              <ul class={listClass}>
+                {view.permits.map((permit) => (
+                  <li class={rowClass}>
+                    <span class="text-gray-500">{formatRecordDate(permit.issuedDate)}</span>
+                    <span class="text-gray-900">
+                      {permit.permitType ?? permit.workType ?? 'Permit'}{permit.description ? ` · ${permit.description}` : ''}
+                    </span>
+                    <span class="text-xs sm:text-right"><StatusToken status={permit.status} /></span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+            {capped(view.permits.length) && <p class={noteClass}>First {ROW_CAP} shown.</p>}
+          </>
+        )}
+        <CorrectionNotes notes={notesFor('permit')} />
+      </LedgerRow>
+
+      <LedgerRow
+        title="Code enforcement tickets"
+        status={enforcementStatus}
+        hasRows={view.enforcement.length > 0}
+        span={yearSpanLabel(enforcementYears)}
+        count={enforcementCountable ? String(view.enforcement.length) : '—'}
+        subCount={enforcementCountable ? openSubCount(openEnforcement.length, view.enforcement.length) : ''}>
+        {enforcementStatus === null ? (
+          <p class={bodyClass}>{NEVER_PULLED_COPY}</p>
+        ) : unavailable(ENFORCEMENT_RESOURCE_ID, view.enforcement.length > 0) ? (
+          <p class={bodyClass}>Record unavailable. Last attempt {formatPullDate(enforcementStatus.retrievedAt)}.</p>
+        ) : view.enforcement.length === 0 ? (
+          <p class={bodyClass}>No code enforcement tickets on record.</p>
+        ) : (
+          <>
+            <CategoryBars title="What was ticketed" breakdown={enforcementTypes} restNoun="tickets" />
+            <details>
+              <summary class={disclosureClass}>Show all {view.enforcement.length} tickets</summary>
+              <ul class={listClass}>
+                {view.enforcement.map((ticket) => (
+                  <li class={rowClass}>
+                    <span class="text-gray-500">{formatRecordDate(ticket.statusDate)}</span>
+                    <span class="text-gray-900">{orNotRecorded(ticket.description)}</span>
+                    <span class="text-xs sm:text-right"><StatusToken status={ticket.status} /></span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+            {capped(view.enforcement.length) && <p class={noteClass}>First {ROW_CAP} shown.</p>}
+          </>
+        )}
+        <CorrectionNotes notes={notesFor('enforcement_ticket')} />
+      </LedgerRow>
+
+      <LedgerRow
+        title="ISD violations"
+        status={violationStatus}
+        hasRows={view.violations.length > 0}
+        span={yearSpanLabel(violationYears)}
+        count={violationsCountable ? String(view.violations.length) : '—'}
+        subCount={violationsCountable ? openSubCount(openViolations.length, view.violations.length) : ''}>
+        {violationStatus === null ? (
+          <p class={bodyClass}>{NEVER_PULLED_COPY}</p>
+        ) : unavailable(VIOLATIONS_RESOURCE_ID, view.violations.length > 0) ? (
+          <p class={bodyClass}>Record unavailable. Last attempt {formatPullDate(violationStatus.retrievedAt)}.</p>
+        ) : view.violations.length === 0 ? (
+          <>
+            <p class={bodyClass}>No violations on record.</p>
+            <p class={noteClass}>{NO_VIOLATIONS_CAVEAT}</p>
+          </>
+        ) : (
+          <>
             <ul class={listClass}>
-              {requests!.housing.map((request) => (
+              {violationsOrdered.map((violation) => (
                 <li class={rowClass}>
-                  <span class="text-gray-500">{formatRecordDate(request.openedAt)}</span>
-                  <span class="text-gray-900">{request.type ?? request.title ?? 'Request'}</span>
-                  <span class="text-gray-500 sm:text-right">
-                    {orNotRecorded(request.status)}{request.closedAt ? ` · closed ${formatRecordDate(request.closedAt)}` : ''}
+                  <span class="text-gray-500">{formatRecordDate(violation.statusDate)}</span>
+                  <span class="text-gray-900">
+                    {[violation.code, violation.description].filter(Boolean).join(' · ') || 'Violation'}
                   </span>
+                  <span class="text-xs sm:text-right"><StatusToken status={violation.status} /></span>
                 </li>
               ))}
             </ul>
-          )}
-          {capped(view.serviceRequests.length) && (
-            <p class="text-xs text-gray-500 mt-1">First {ROW_CAP} requests considered.</p>
-          )}
-          {/* Only alongside the counts it disagrees with. Under "Record unavailable" or
-              "Not retrieved yet" there is nothing above for it to disagree with. */}
-          {rentSmartNote && <p class="text-xs text-gray-500 mt-2">{rentSmartNote}</p>}
-        </>
-      )}
-      <CorrectionNotes notes={notesFor('service_request')} />
+            {capped(view.violations.length) && <p class={noteClass}>First {ROW_CAP} shown.</p>}
+          </>
+        )}
+        <CorrectionNotes notes={notesFor('violation')} />
+      </LedgerRow>
     </div>
 
     <div id="report-record" class="border-t border-gray-200 pt-4 mt-6">
