@@ -72,7 +72,7 @@ export default function AdditionalStep({
         />
         <p className="text-sm text-gray-500 mt-1">This helps us link reviews to the right landlord. It won't be shown publicly on your review.</p>
 
-        <label className="flex items-center gap-2 mt-3 cursor-pointer">
+        <label className="flex items-center gap-2 py-3 cursor-pointer">
           <input
             type="checkbox"
             checked={review.hasSeparateManager}
@@ -81,7 +81,7 @@ export default function AdditionalStep({
               hasSeparateManager: e.target.checked,
               propertyManagerName: e.target.checked ? review.propertyManagerName : '',
             })}
-            className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+            className="h-5 w-5 accent-teal-700"
           />
           <span className="text-sm text-gray-700">Someone else manages the property</span>
         </label>

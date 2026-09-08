@@ -23,7 +23,7 @@ export default function StepIndicator({ currentStep }: Props) {
             className="h-1 bg-teal-700 rounded"
             style={{ width: `${progressPercent}%` }}
             role="progressbar"
-            aria-valuemin={1}
+            aria-valuemin={0}
             aria-valuemax={totalSteps}
             aria-valuenow={stepNumber}
             aria-valuetext={`Step ${stepNumber} of ${totalSteps}`}

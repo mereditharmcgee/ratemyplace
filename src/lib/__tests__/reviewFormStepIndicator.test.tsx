@@ -13,7 +13,10 @@ describe('StepIndicator', () => {
     render(<StepIndicator currentStep="unit-rating" />);
 
     const bar = screen.getByRole('progressbar', { name: /review progress/i });
-    expect(bar.getAttribute('aria-valuemin')).toBe('1');
+    // 0, not 1: the bar's width is stepNumber/totalSteps, and assistive tech computes the
+    // same percentage as (now - min) / (max - min). With a min of 1, step 1 of 7 is announced
+    // as 0% while the bar visibly shows a seventh.
+    expect(bar.getAttribute('aria-valuemin')).toBe('0');
     expect(bar.getAttribute('aria-valuemax')).toBe('7');
     expect(bar.getAttribute('aria-valuenow')).toBe('3');
     expect(bar.getAttribute('aria-valuetext')).toBe('Step 3 of 7');
