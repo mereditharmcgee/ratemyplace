@@ -1,11 +1,12 @@
 import { experimental_AstroContainer as AstroContainer } from 'astro/container';
 import { describe, expect, it } from 'vitest';
 import SigninPage from '../../pages/auth/signin.astro';
+import SignupPage from '../../pages/auth/signup.astro';
 
 /**
  * Visual-audit regression test: the sign-in page used an h2 with no h1 on the
- * page at all. Assert there is exactly one h1 and that it carries the page
- * heading text.
+ * page at all. Assert there is exactly one h1, that it carries the page
+ * heading text, and that it's the first heading in document order.
  */
 
 function mainFragment(html: string): HTMLDivElement {
@@ -16,19 +17,24 @@ function mainFragment(html: string): HTMLDivElement {
   return fragment;
 }
 
-describe('sign-in page heading', () => {
-  it('renders exactly one h1 carrying the page heading', async () => {
+describe.each([
+  { name: 'sign-in', Page: SigninPage, path: '/auth/signin', headingText: 'Sign in to your account' },
+  { name: 'sign-up', Page: SignupPage, path: '/auth/signup', headingText: 'Create your account' },
+])('$name page heading', ({ Page, path, headingText }) => {
+  it('renders exactly one h1, first in document order, carrying the page heading', async () => {
     const container = await AstroContainer.create();
-    const html = await container.renderToString(SigninPage, {
+    const html = await container.renderToString(Page, {
       locals: { user: null, session: null } as unknown as App.Locals,
-      request: new Request('https://ratemyplace.org/auth/signin'),
+      request: new Request(`https://ratemyplace.org${path}`),
     });
 
     const main = mainFragment(html);
     const h1s = main.querySelectorAll('h1');
 
     expect(h1s.length).toBe(1);
-    expect(h1s[0].textContent).toContain('Sign in to your account');
-    expect(main.querySelectorAll('h2').length).toBe(0);
+    expect(h1s[0].textContent).toContain(headingText);
+
+    const firstHeading = main.querySelector('h1, h2, h3, h4, h5, h6');
+    expect(firstHeading).toBe(h1s[0]);
   });
 });

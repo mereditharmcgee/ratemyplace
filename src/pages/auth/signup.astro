@@ -7,7 +7,7 @@ if (Astro.locals.user) {
 }
 ---
 
-<BaseLayout title="Sign Up">
+<BaseLayout title="Sign up">
   <div class="min-h-[80vh] flex items-center justify-center px-4 py-12">
     <div class="max-w-md w-full space-y-8">
       <div>
@@ -133,7 +133,7 @@ if (Astro.locals.user) {
           <a href="/privacy" class="text-teal-700 hover:text-teal-500">Privacy Policy</a>.
         </div>
 
-        <div id="turnstile-container" class="min-h-0 flex justify-center"></div>
+        <div id="turnstile-container" class="flex justify-center"></div>
 
         <button
           type="submit"
@@ -192,10 +192,16 @@ if (Astro.locals.user) {
   if ((window as any).turnstile) {
     renderTurnstile();
   } else {
-    const turnstileInterval = setInterval(() => {
+    // Bound the poll so a blocked/failed script load doesn't spin forever:
+    // 100 ticks at 100ms = 10s, then give up.
+    let turnstilePollAttempts = 0;
+    const turnstileInterval: ReturnType<typeof setInterval> = setInterval(() => {
+      turnstilePollAttempts++;
       if ((window as any).turnstile) {
         clearInterval(turnstileInterval);
         renderTurnstile();
+      } else if (turnstilePollAttempts >= 100) {
+        clearInterval(turnstileInterval);
       }
     }, 100);
   }

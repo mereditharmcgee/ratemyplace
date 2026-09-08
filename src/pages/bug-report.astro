@@ -86,7 +86,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
         type="submit"
         class="w-full h-11 flex items-center justify-center px-4 border border-transparent rounded-[4px] text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Submit Report
+        Submit report
       </button>
     </form>
   </div>
@@ -128,7 +128,9 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
       errorMessage.classList.remove('hidden');
     } finally {
       button.disabled = false;
-      button.textContent = 'Submit Report';
+      button.textContent = 'Submit report';
+      // Turnstile tokens are single-use, so a retry needs a fresh one.
+      (window as any).turnstile?.reset();
     }
   });
 </script>
