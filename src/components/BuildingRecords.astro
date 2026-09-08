@@ -21,17 +21,17 @@ import {
   KIND_LABELS,
   formatDollars,
   formatDollarsCompact,
+  orNotRecorded,
   formatPullDate,
   formatRecordDate,
   permitSummary,
   splitServiceRequests,
   rentSmartDisagreement,
-  countByYear,
-  countByKey,
   isOpenStatus,
   openSubCount,
   yearSpanLabel,
 } from '../lib/records/display';
+import { countByYear, countByKey } from '../lib/records/charts';
 import { ROW_CAP } from '../lib/records/ckan';
 import { FY2026_RESOURCE_ID } from '../lib/records/sources/boston/assessor';
 import { PERMITS_RESOURCE_ID, PERMIT_COVERAGE_START } from '../lib/records/sources/boston/permits';
@@ -100,10 +100,6 @@ function notesFor(kind: string) {
  */
 function capped(rowCount: number): boolean {
   return rowCount >= ROW_CAP;
-}
-
-function orNotRecorded(value: string | number | null | undefined): string {
-  return value === null || value === undefined || value === '' ? 'Not recorded' : String(value);
 }
 
 /** A kind written by an older build has no label; show its stored name rather than "undefined". */

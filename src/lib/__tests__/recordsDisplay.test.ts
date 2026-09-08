@@ -15,6 +15,8 @@ import {
   permitSummary,
   splitServiceRequests,
   rentSmartDisagreement,
+  NOT_RECORDED,
+  orNotRecorded,
 } from '../records/display';
 import { RECORD_KINDS } from '../records/types';
 import type { AssessmentPayload, PermitPayload, RentSmartPayload, ServiceRequestPayload } from '../records/types';
@@ -178,12 +180,12 @@ describe('formatDollars', () => {
   });
 
   it('returns "Not recorded" for null', () => {
-    expect(formatDollars(null)).toBe('Not recorded');
+    expect(formatDollars(null)).toBe(NOT_RECORDED);
   });
 
   it('returns "Not recorded" for a non-finite number', () => {
-    expect(formatDollars(Number.NaN)).toBe('Not recorded');
-    expect(formatDollars(Number.POSITIVE_INFINITY)).toBe('Not recorded');
+    expect(formatDollars(Number.NaN)).toBe(NOT_RECORDED);
+    expect(formatDollars(Number.POSITIVE_INFINITY)).toBe(NOT_RECORDED);
   });
 });
 
@@ -269,7 +271,7 @@ describe('mailingAddressLine', () => {
   });
 
   it('returns "Not recorded" when the assessor recorded no mailing address at all', () => {
-    expect(mailingAddressLine(assessment())).toBe('Not recorded');
+    expect(mailingAddressLine(assessment())).toBe(NOT_RECORDED);
   });
 });
 
@@ -287,7 +289,7 @@ describe('KIND_LABELS', () => {
 });
 
 describe('permitSummary', () => {
-  it('counts permits, sums only the declared valuations present, and finds earliest/latest issued dates', () => {
+  it('counts permits and sums only the declared valuations present', () => {
     const permits = [
       permit({ permitNumber: 'A', declaredValuation: 1000, issuedDate: '2020-01-01' }),
       permit({ permitNumber: 'B', declaredValuation: null, issuedDate: '2022-06-15' }),
@@ -298,8 +300,6 @@ describe('permitSummary', () => {
       count: 3,
       declaredTotal: 1500,
       declaredCount: 2,
-      earliest: '2020-01-01',
-      latest: '2022-06-15',
     });
   });
 
@@ -309,8 +309,8 @@ describe('permitSummary', () => {
     expect(permitSummary(permits)).toMatchObject({ count: 2, declaredTotal: null, declaredCount: 0 });
   });
 
-  it('returns a null total and null dates for an empty list', () => {
-    expect(permitSummary([])).toEqual({ count: 0, declaredTotal: null, declaredCount: 0, earliest: null, latest: null });
+  it('returns a null total for an empty list', () => {
+    expect(permitSummary([])).toEqual({ count: 0, declaredTotal: null, declaredCount: 0 });
   });
 });
 
@@ -388,5 +388,23 @@ describe('panel copy stays free of banned words', () => {
 
   it.each(copyConstants)('%s does not contain a banned word', (_name, copy) => {
     expect(bannedPattern.test(copy)).toBe(false);
+  });
+});
+
+/**
+ * One placeholder string, one function. Both templates that needed this grew their own copy,
+ * which is how two surfaces end up disagreeing about what a blank field looks like.
+ */
+describe('orNotRecorded', () => {
+  it('passes a recorded value through as a string', () => {
+    expect(orNotRecorded('APT 7-30 UNITS')).toBe('APT 7-30 UNITS');
+    expect(orNotRecorded(1920)).toBe('1920');
+    expect(orNotRecorded(0)).toBe('0');
+  });
+
+  it('reports every shape of absence as the one placeholder', () => {
+    expect(orNotRecorded(null)).toBe(NOT_RECORDED);
+    expect(orNotRecorded(undefined)).toBe(NOT_RECORDED);
+    expect(orNotRecorded('')).toBe(NOT_RECORDED);
   });
 });

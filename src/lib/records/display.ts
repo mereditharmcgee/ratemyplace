@@ -1,6 +1,7 @@
-// Pure display helpers for the building records panel. Nothing here touches the
+// Copy and string formatters for the building records panel. Nothing here touches the
 // database or the network: every function is a straight transform of already-validated
-// payloads (see query.ts) into strings and view models.
+// payloads (see query.ts) into strings. The counting helpers behind the bars and the
+// sparkline live next door in `charts.ts`; the per-source view model in `ledger.ts`.
 //
 // Product rule, non-negotiable: the panel has no opinion. Every rendered value is a
 // field from a record or a count of records.
@@ -13,7 +14,9 @@
 // `__tests__/recordsPanelCopy.test.ts` scans the raw source of `BuildingRecords.astro` and
 // `components/records/*.astro`. A future edit cannot smuggle an editorial reading of the
 // data in through either door.
+import { ROW_CAP } from './ckan';
 import { PERMIT_COVERAGE_START } from './sources/boston/permits';
+import type { YearCount } from './charts';
 import type {
   AssessmentPayload,
   PermitPayload,
@@ -31,6 +34,18 @@ export const BANNED_WORDS: readonly string[] = [
   'evasive',
   'delay',
 ];
+
+/** The panel's single string for a field the city left blank. Used as a label and as a category key. */
+export const NOT_RECORDED = 'Not recorded';
+
+/**
+ * A stored field as the panel prints it, with one name for absence. Two templates each grew
+ * a private copy of this, which is how two surfaces end up disagreeing about what a blank
+ * field looks like. Zero is a recorded value and prints as one.
+ */
+export function orNotRecorded(value: string | number | null | undefined): string {
+  return value === null || value === undefined || value === '' ? NOT_RECORDED : String(value);
+}
 
 export const PANEL_FRAMING_COPY =
   'These are facts from City of Boston and Commonwealth of Massachusetts records, shown as recorded. No rating is applied to them and they are not part of any score.';
@@ -103,7 +118,7 @@ export function mailingAddressLine(assessment: AssessmentPayload): string {
   const cityState = [assessment.mailCity, assessment.mailState].filter(Boolean).join(', ');
   const cityLine = [cityState, assessment.mailZip].filter(Boolean).join(' ');
   const joined = [addressee, assessment.mailStreet, cityLine].filter(Boolean).join(', ');
-  return joined === '' ? 'Not recorded' : joined;
+  return joined === '' ? NOT_RECORDED : joined;
 }
 
 /** Reader-facing names for the record kinds, for copy that has to list a kind by name. */
@@ -117,7 +132,7 @@ export const KIND_LABELS: Record<RecordKind, string> = {
 };
 
 export function formatDollars(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return 'Not recorded';
+  if (value === null || !Number.isFinite(value)) return NOT_RECORDED;
   return `$${Math.round(value).toLocaleString('en-US')}`;
 }
 
@@ -168,26 +183,18 @@ export interface PermitSummary {
   declaredTotal: number | null;
   /** How many of `count` permits carried a declared valuation. */
   declaredCount: number;
-  earliest: string | null;
-  latest: string | null;
 }
 
 export function permitSummary(permits: PermitPayload[]): PermitSummary {
   let declaredTotal: number | null = null;
   let declaredCount = 0;
-  let earliest: string | null = null;
-  let latest: string | null = null;
   for (const permit of permits) {
     if (typeof permit.declaredValuation === 'number' && Number.isFinite(permit.declaredValuation)) {
       declaredTotal = (declaredTotal ?? 0) + permit.declaredValuation;
       declaredCount += 1;
     }
-    if (permit.issuedDate) {
-      if (earliest === null || permit.issuedDate < earliest) earliest = permit.issuedDate;
-      if (latest === null || permit.issuedDate > latest) latest = permit.issuedDate;
-    }
   }
-  return { count: permits.length, declaredTotal, declaredCount, earliest, latest };
+  return { count: permits.length, declaredTotal, declaredCount };
 }
 
 export function splitServiceRequests(
@@ -220,17 +227,6 @@ export function rentSmartDisagreement(rows: RentSmartPayload[], housingRequestCo
   return `The city's RentSmart summary reports ${complaintCount} ${noun} for this address; the 311 records above show ${housingRequestCount}.`;
 }
 
-// ---------------------------------------------------------------------------
-// Shape helpers for the panel's bars, category lists, and assessed-value sparkline.
-//
-// Every one of these is a counting function. They turn stored rows into counts, spans, and
-// coordinates; none of them reads a value and decides what it means. A bar is tall because
-// the city recorded more rows that year, and for no other reason.
-// ---------------------------------------------------------------------------
-
-/** The panel's single string for a field the city left blank. Used as a label and as a category key. */
-export const NOT_RECORDED = 'Not recorded';
-
 /**
  * A section listing what the city's feed holds, not a statement about the building. Read
  * next to "No violations on record." so an empty list is not mistaken for a clearance.
@@ -238,97 +234,24 @@ export const NOT_RECORDED = 'Not recorded';
 export const NO_VIOLATIONS_CAVEAT =
   "This section lists what the city's violation feed holds for this address. An empty list is a fact about the feed, not confirmation that the building meets code.";
 
-export interface YearCount {
-  year: number;
-  count: number;
+/** A source nobody has queried has no finding to report — not an empty one, none at all. */
+export const NEVER_PULLED_COPY = 'Not retrieved yet.';
+
+/**
+ * A source whose latest attempt failed and left no rows behind. The upstream error text is
+ * never shown — see the note on `SourceStatus.errorMessage` — only the fact and the date.
+ */
+export function unavailableCopy(retrievedAt: number): string {
+  return `Record unavailable. Last attempt ${formatPullDate(retrievedAt)}.`;
 }
 
 /**
- * Rows bucketed by the calendar year of `getDate`, dense across the span so a year with
- * nothing in it still gets a bar. Reads only the leading `YYYY` the way `formatRecordDate`
- * reads the leading `YYYY-MM-DD` — never through `Date`, whose timezone handling could move
- * a December 31st record into the next year.
- *
- * A row whose date will not parse is skipped rather than bucketed anywhere: inventing a year
- * for it would put a count under a year the city never recorded.
+ * The CKAN row cap is a hard slice, so a full page means there may be more upstream. The 311
+ * wording differs because its cap applies before the housing filter: the rows beyond it were
+ * not weighed at all, rather than fetched and left off a list.
  */
-export function countByYear<T>(
-  rows: readonly T[],
-  getDate: (row: T) => string | null | undefined,
-  opts?: { from?: number; to?: number },
-): YearCount[] {
-  const counts = new Map<number, number>();
-  let observedMin: number | null = null;
-  let observedMax: number | null = null;
-
-  for (const row of rows) {
-    const value = getDate(row);
-    if (!value) continue;
-    const match = /^(\d{4})-\d{2}-\d{2}/.exec(value);
-    if (!match) continue;
-    const year = Number(match[1]);
-    if (opts?.from !== undefined && year < opts.from) continue;
-    if (opts?.to !== undefined && year > opts.to) continue;
-    counts.set(year, (counts.get(year) ?? 0) + 1);
-    if (observedMin === null || year < observedMin) observedMin = year;
-    if (observedMax === null || year > observedMax) observedMax = year;
-  }
-
-  const from = opts?.from ?? observedMin;
-  const to = opts?.to ?? observedMax;
-  if (from === null || to === null || from === undefined || to === undefined || to < from) return [];
-
-  const series: YearCount[] = [];
-  for (let year = from; year <= to; year += 1) {
-    series.push({ year, count: counts.get(year) ?? 0 });
-  }
-  return series;
-}
-
-export interface KeyCount {
-  key: string;
-  count: number;
-}
-
-export interface KeyBreakdown {
-  /** At most `topN` categories, most rows first. */
-  top: KeyCount[];
-  /** How many categories fell outside `top`. */
-  restTypes: number;
-  /** How many rows those categories hold between them. */
-  restCount: number;
-}
-
-/**
- * Rows grouped by `getKey`, largest group first. Ties break on the key ascending so the
- * same data always renders in the same order — an unstable list would look like the records
- * changed when only the sort did.
- */
-export function countByKey<T>(
-  rows: readonly T[],
-  getKey: (row: T) => string | null | undefined,
-  topN: number,
-): KeyBreakdown {
-  const counts = new Map<string, number>();
-  for (const row of rows) {
-    const raw = getKey(row);
-    const key = raw === null || raw === undefined || raw.trim() === '' ? NOT_RECORDED : raw.trim();
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-
-  const ordered = Array.from(counts.entries())
-    .map(([key, count]) => ({ key, count }))
-    .sort((a, b) => (b.count !== a.count ? b.count - a.count : a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
-
-  const limit = Math.max(0, topN);
-  const top = ordered.slice(0, limit);
-  const rest = ordered.slice(limit);
-  return {
-    top,
-    restTypes: rest.length,
-    restCount: rest.reduce((sum, entry) => sum + entry.count, 0),
-  };
-}
+export const CAPPED_REQUESTS_COPY = `First ${ROW_CAP} requests considered.`;
+export const CAPPED_ROWS_COPY = `First ${ROW_CAP} shown.`;
 
 const COMPACT_UNITS: Array<{ threshold: number; suffix: string }> = [
   { threshold: 1_000_000_000, suffix: 'B' },
@@ -336,85 +259,38 @@ const COMPACT_UNITS: Array<{ threshold: number; suffix: string }> = [
   { threshold: 1_000, suffix: 'K' },
 ];
 
+/** Three significant figures: two decimals under ten, one under a hundred, none above. */
+function compactDecimals(scaled: number): number {
+  return scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2;
+}
+
 /**
  * Three significant figures plus a unit — `$9.51M`, `$630K`, `$950`. The long form stays in
  * `formatDollars`; this exists so a dollar figure can sit in a fact cell without wrapping.
  * It rounds, and rounding is a loss, so never use it where the exact figure is the point.
  */
-export function formatDollarsCompact(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return NOT_RECORDED;
+export function formatDollarsCompact(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return NOT_RECORDED;
   const sign = value < 0 ? '-' : '';
   const magnitude = Math.abs(value);
-  const unit = COMPACT_UNITS.find((candidate) => magnitude >= candidate.threshold);
-  if (!unit) return `${sign}$${Math.round(magnitude).toLocaleString('en-US')}`;
+  let index = COMPACT_UNITS.findIndex((candidate) => magnitude >= candidate.threshold);
+  if (index === -1) return `${sign}$${Math.round(magnitude).toLocaleString('en-US')}`;
 
-  const scaled = magnitude / unit.threshold;
-  const decimals = scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2;
+  let scaled = magnitude / COMPACT_UNITS[index].threshold;
+  let fixed = scaled.toFixed(compactDecimals(scaled));
+  // Rounding can carry a figure onto the next unit's doorstep: 999,500 scales to 999.5K,
+  // which rounds to "1000K" — the same number as $1M, written in a way no one writes it.
+  if (Number(fixed) >= 1000 && index > 0) {
+    index -= 1;
+    scaled = magnitude / COMPACT_UNITS[index].threshold;
+    fixed = scaled.toFixed(compactDecimals(scaled));
+  }
+
   // Trailing zeroes carry no information at this precision, and "$9.50M" reads as more
   // certainty than a rounded figure has. Anchored on the decimal point: a bare `0+$` strip
   // would turn "630K" into "63K", off by a factor of ten.
-  const fixed = scaled.toFixed(decimals);
   const text = fixed.includes('.') ? fixed.replace(/\.?0+$/, '') : fixed;
-  return `${sign}$${text}${unit.suffix}`;
-}
-
-export interface AssessmentSeries {
-  /** Totals ordered by fiscal year ascending. */
-  values: number[];
-  min: number;
-  max: number;
-  /** Fiscal year labels as the assessor writes them, e.g. `FY2021`. */
-  firstYear: string;
-  lastYear: string;
-}
-
-/**
- * The assessed-value series behind the sparkline. Years with no recorded total drop out of
- * `values` — a missing figure is not a zero, and plotting it as one would draw a collapse
- * the records do not show. The first and last labels are the first and last *recorded*
- * years, so the axis label and the line describe the same span.
- */
-export function assessmentSeries(assessments: readonly AssessmentPayload[]): AssessmentSeries | null {
-  const usable = assessments
-    .filter((row) => typeof row.totalValue === 'number' && Number.isFinite(row.totalValue))
-    .slice()
-    .sort((a, b) => (a.fiscalYear < b.fiscalYear ? -1 : a.fiscalYear > b.fiscalYear ? 1 : 0));
-  if (usable.length === 0) return null;
-
-  const values = usable.map((row) => row.totalValue as number);
-  return {
-    values,
-    min: Math.min(...values),
-    max: Math.max(...values),
-    firstYear: usable[0].fiscalYear,
-    lastYear: usable[usable.length - 1].fiscalYear,
-  };
-}
-
-/**
- * An SVG `points` string for the assessed-value line: every value on one linear scale
- * between the series low and high, so the slope between two years is proportional to the
- * change the records show. A constant series (including a single year) draws flat through
- * the middle rather than pinned to the top, which would read as a maximum.
- */
-export function sparklinePoints(values: readonly number[], width: number, height: number, pad: number): string {
-  if (values.length === 0) return '';
-  const midY = height / 2;
-  if (values.length === 1) return `${pad},${midY} ${width - pad},${midY}`;
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const innerWidth = width - pad * 2;
-  const innerHeight = height - pad * 2;
-  const span = max - min;
-
-  return values
-    .map((value, index) => {
-      const x = pad + (innerWidth * index) / (values.length - 1);
-      const y = span === 0 ? midY : pad + innerHeight * (1 - (value - min) / span);
-      return `${x},${y}`;
-    })
-    .join(' ');
+  return `${sign}$${text}${COMPACT_UNITS[index].suffix}`;
 }
 
 /**

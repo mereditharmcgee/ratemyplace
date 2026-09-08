@@ -1,12 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { countByYear, countByKey, assessmentSeries, sparklinePoints } from '../records/charts';
 import {
   BANNED_WORDS,
   NO_VIOLATIONS_CAVEAT,
-  countByYear,
-  countByKey,
   formatDollarsCompact,
-  assessmentSeries,
-  sparklinePoints,
   NOT_RECORDED,
   isOpenStatus,
   openSubCount,
@@ -99,6 +96,12 @@ describe('countByYear', () => {
       { year: 2020, count: 0 },
       { year: 2021, count: 1 },
     ]);
+  });
+
+  it('ignores a year outside the sane window rather than drawing a bar for it', () => {
+    // `0201-01-01` is a real typo in the city feeds; unbounded it draws eighteen centuries of bars.
+    const rows = [row('0201-01-01'), row('2021-06-01'), row('9999-01-01')];
+    expect(countByYear(rows, (r) => r.date)).toEqual([{ year: 2021, count: 1 }]);
   });
 
   it('reads the year off each of the timestamp shapes the feeds use', () => {
@@ -195,6 +198,22 @@ describe('formatDollarsCompact', () => {
   it('renders zero as zero, not as not recorded', () => {
     expect(formatDollarsCompact(0)).toBe('$0');
   });
+
+  it('promotes to the next unit when rounding lands on it', () => {
+    // 999,500 scales to 999.5K, which rounds to 1000K. That is $1M written the long way.
+    expect(formatDollarsCompact(999_500)).toBe('$1M');
+    expect(formatDollarsCompact(999_999_999)).toBe('$1B');
+  });
+
+  it('keeps the sign on a negative value', () => {
+    expect(formatDollarsCompact(-1_500)).toBe('-$1.5K');
+  });
+
+  it('says not recorded for an absent value however it arrives', () => {
+    expect(formatDollarsCompact(null)).toBe(NOT_RECORDED);
+    expect(formatDollarsCompact(undefined)).toBe(NOT_RECORDED);
+    expect(formatDollarsCompact(Number.POSITIVE_INFINITY)).toBe(NOT_RECORDED);
+  });
 });
 
 describe('assessmentSeries', () => {
@@ -229,6 +248,14 @@ describe('assessmentSeries', () => {
     expect(series?.values).toEqual([100, 300]);
     expect(series?.firstYear).toBe('FY2024');
     expect(series?.lastYear).toBe('FY2026');
+  });
+
+  it('orders by the fiscal year number rather than by the raw label', () => {
+    // A bare `2026` sorts before `FY2025` as a string; as a year it does not.
+    const series = assessmentSeries([assessment('2026', 900), assessment('FY2025', 800)]);
+    expect(series?.values).toEqual([800, 900]);
+    expect(series?.firstYear).toBe('FY2025');
+    expect(series?.lastYear).toBe('2026');
   });
 
   it('handles a single fiscal year', () => {

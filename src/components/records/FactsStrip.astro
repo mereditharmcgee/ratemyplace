@@ -6,12 +6,12 @@
 // The mailing address is behind `showMailingAddress`, which publishes a tax address only for
 // an owner that reads as an entity. That gate is a privacy control, not a formatting choice —
 // see the note on it in `display.ts` before changing anything here.
+import { assessmentSeries, sparklinePoints } from '../../lib/records/charts';
 import {
   showMailingAddress,
   mailingAddressLine,
   formatDollarsCompact,
-  assessmentSeries,
-  sparklinePoints,
+  orNotRecorded,
   NOT_RECORDED,
 } from '../../lib/records/display';
 import type { AssessmentPayload } from '../../lib/records/types';
@@ -24,10 +24,6 @@ interface Props {
 }
 
 const { current, all } = Astro.props;
-
-function orNotRecorded(value: string | number | null | undefined): string {
-  return value === null || value === undefined || value === '' ? NOT_RECORDED : String(value);
-}
 
 /** Mid-sentence in a sub-line, where the capitalised constant would read as a new sentence. */
 function orNotRecordedInline(value: string | number | null | undefined): string {
