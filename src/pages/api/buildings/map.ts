@@ -7,6 +7,8 @@ interface BuildingMapData {
   address: string;
   slug: string;
   neighborhood: string | null;
+  /** Carried so the InfoWindow can fall back to it when `displayLocality` rejects the stored neighborhood. */
+  city: string | null;
   latitude: number;
   longitude: number;
   reviewCount: number;
@@ -42,6 +44,7 @@ export async function GET(context: APIContext): Promise<Response> {
         b.address,
         b.slug,
         b.neighborhood,
+        b.city,
         b.latitude,
         b.longitude,
         COUNT(r.id) as review_count,
@@ -60,6 +63,7 @@ export async function GET(context: APIContext): Promise<Response> {
       address: row.address,
       slug: row.slug,
       neighborhood: row.neighborhood,
+      city: row.city,
       latitude: row.latitude,
       longitude: row.longitude,
       reviewCount: row.review_count || 0,

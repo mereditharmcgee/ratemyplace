@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getScoreColor, getScoreHex } from '../lib/scoring-colors';
+import { displayLocality } from '../lib/locality';
 
 interface Building {
   id: string;
   address: string;
   slug: string;
   neighborhood: string | null;
+  city: string | null;
   latitude: number;
   longitude: number;
   reviewCount: number;
@@ -257,11 +259,16 @@ export default function BuildingMap({
         heading.textContent = building.address;
         container.appendChild(heading);
 
-        if (building.neighborhood) {
-          const neighborhood = document.createElement('p');
-          neighborhood.style.cssText = 'margin: 0 0 8px 0; font-size: 12px; color: #666;';
-          neighborhood.textContent = building.neighborhood;
-          container.appendChild(neighborhood);
+        // Not `building.neighborhood` raw: the geocoder sometimes stored a street-name word
+        // ("Commonwealth" for 1027 Commonwealth Ave), which reads as nonsense under the
+        // address. `displayLocality` falls back to the city, or to '' when there is nothing
+        // trustworthy to show — same rule as search results and the building page.
+        const locality = displayLocality(building);
+        if (locality) {
+          const localityLabel = document.createElement('p');
+          localityLabel.style.cssText = 'margin: 0 0 8px 0; font-size: 12px; color: #666;';
+          localityLabel.textContent = locality;
+          container.appendChild(localityLabel);
         }
 
         const scoreRow = document.createElement('div');

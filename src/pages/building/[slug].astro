@@ -12,13 +12,15 @@ import { calculateBuildingAverages, getRecencyWeight, getReviewYear } from '../.
 import { currentReviewYear } from '../../lib/scoring-sql';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 import { humanize } from '../../lib/format';
-import { BUILDING_DETAIL_FIELDS, hasBuildingDetails } from '../../lib/buildingDetails';
-import { localityLine } from '../../lib/locality';
+import { BUILDING_DETAIL_FIELDS, hasBuildingDetails, type BuildingDetailFields } from '../../lib/buildingDetails';
+import { displayLocality, localityLine } from '../../lib/locality';
 
 // Label and formatter for each field in BUILDING_DETAIL_FIELDS, in display order —
 // keeps the <dl> rows and the hasBuildingDetails check from drifting.
-const buildingDetailRows: Record<(typeof BUILDING_DETAIL_FIELDS)[number], { label: string; format: (building: any) => unknown }> = {
-  building_type: { label: 'Type', format: (b) => humanize(b.building_type) },
+const buildingDetailRows: Record<(typeof BUILDING_DETAIL_FIELDS)[number], { label: string; format: (building: BuildingDetailFields) => unknown }> = {
+  // `?? ''` only satisfies the type: the row is guarded by `Boolean(building[field])` below,
+  // so a blank building_type never reaches a formatter.
+  building_type: { label: 'Type', format: (b) => humanize(b.building_type ?? '') },
   year_built: { label: 'Year built', format: (b) => b.year_built },
   unit_count: { label: 'Units', format: (b) => b.unit_count },
 };
@@ -188,7 +190,7 @@ const sortedUnits = Array.from(reviewsByUnit.values())
 const showBuildingDetails = hasBuildingDetails(building);
 ---
 
-<BaseLayout title={building.address} description={`Reviews for ${building.address} in ${building.neighborhood || building.city}`}>
+<BaseLayout title={building.address} description={`Reviews for ${building.address} in ${displayLocality(building)}`}>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {submitted && (
       <div class="mb-6 bg-teal-50 border border-teal-200 rounded-[6px] p-4" id="submitted-banner">
@@ -335,7 +337,7 @@ const showBuildingDetails = hasBuildingDetails(building);
           <div class="bg-white rounded-[6px] border border-gray-200 p-6 mb-8">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Building details</h2>
             <dl class="grid grid-cols-2 gap-4">
-              {BUILDING_DETAIL_FIELDS.map((field) => building[field] && (
+              {BUILDING_DETAIL_FIELDS.map((field) => Boolean(building[field]) && (
                 <>
                   <dt class="text-gray-500">{buildingDetailRows[field].label}</dt>
                   <dd class="text-gray-900">{buildingDetailRows[field].format(building)}</dd>

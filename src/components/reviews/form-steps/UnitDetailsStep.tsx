@@ -6,6 +6,7 @@ import {
   parkingTypeOptions,
   petTypeOptions,
 } from '../../../lib/formOptions';
+import { localityLine } from '../../../lib/locality';
 import type { Building, UnitDetails } from './types';
 
 interface Props {
@@ -21,10 +22,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
       {building && (
         <div className="bg-paper p-4 rounded-[6px] mb-6">
           <div className="font-medium">{building.address}</div>
-          <div className="text-sm text-gray-500">
-            {building.neighborhood && `${building.neighborhood}, `}
-            {building.city}
-          </div>
+          <div className="text-sm text-gray-500">{localityLine(building)}</div>
         </div>
       )}
 

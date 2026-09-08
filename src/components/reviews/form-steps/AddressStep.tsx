@@ -1,4 +1,5 @@
 import AddressAutocomplete, { type PlaceDetails } from '../../AddressAutocomplete';
+import { localityLine } from '../../../lib/locality';
 import type { PlaceData } from './types';
 
 export interface ManualAddress {
@@ -162,8 +163,14 @@ export default function AddressStep({
               <div className="flex-1">
                 <div className="font-semibold text-teal-900">{selectedPlace.streetAddress}</div>
                 <div className="text-sm text-teal-700">
-                  {selectedPlace.neighborhood && `${selectedPlace.neighborhood}, `}
-                  {selectedPlace.city}, {selectedPlace.state} {selectedPlace.zipCode}
+                  {localityLine(
+                    {
+                      address: selectedPlace.streetAddress,
+                      neighborhood: selectedPlace.neighborhood,
+                      city: selectedPlace.city,
+                    },
+                    selectedPlace.state,
+                  )}{selectedPlace.zipCode ? ` ${selectedPlace.zipCode}` : ''}
                 </div>
                 {selectedPlace.existingBuilding ? (
                   <div className="mt-2 text-sm text-teal-700">
