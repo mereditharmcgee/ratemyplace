@@ -303,8 +303,6 @@ const sortedUnits = Array.from(reviewsByUnit.values())
           </dl>
         </div>
 
-        <BuildingRecords buildingId={building.id} />
-
         <!-- Units Section -->
         {sortedUnits.length > 0 && (
           <div class="mb-8">
@@ -395,6 +393,9 @@ const sortedUnits = Array.from(reviewsByUnit.values())
         )}
 
         <UGCDisclaimer />
+
+        <!-- Public records sit below the reviews: reviews are the judgment layer, records the reference. -->
+        <BuildingRecords buildingId={building.id} />
       </div>
 
       <!-- Sidebar -->
