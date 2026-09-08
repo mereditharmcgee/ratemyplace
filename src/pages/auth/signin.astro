@@ -11,7 +11,7 @@ if (Astro.locals.user) {
   <div class="min-h-[80vh] flex items-center justify-center px-4">
     <div class="max-w-md w-full space-y-8">
       <div>
-        <h2 class="text-center text-3xl font-bold text-gray-900">Sign in to your account</h2>
+        <h1 class="text-center text-3xl font-bold text-gray-900">Sign in to your account</h1>
         <p class="mt-2 text-center text-sm text-gray-600">
           Or{' '}
           <a href="/auth/signup" class="font-medium text-teal-700 hover:text-teal-500">
@@ -46,8 +46,6 @@ if (Astro.locals.user) {
 
       <form id="signin-form" class="space-y-6">
         <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"></div>
-
-        <div class="cf-turnstile" data-sitekey="0x4AAAAAACo4KpkxsacPhM2r" data-theme="light"></div>
 
         <div class="space-y-4">
           <div>
@@ -100,9 +98,11 @@ if (Astro.locals.user) {
           </div>
         </div>
 
+        <div id="turnstile-container" class="min-h-0 flex justify-center"></div>
+
         <button
           type="submit"
-          class="w-full flex justify-center py-2 px-4 border border-transparent rounded-[4px] text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="w-full h-11 flex items-center justify-center px-4 border border-transparent rounded-[4px] text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Sign in
         </button>
@@ -137,6 +137,34 @@ if (Astro.locals.user) {
   const form = document.getElementById('signin-form') as HTMLFormElement;
   const errorMessage = document.getElementById('error-message') as HTMLDivElement;
 
+  // Explicit render instead of the declarative cf-turnstile div: implicit
+  // auto-scan reserves a fixed-size placeholder as soon as the script loads,
+  // even if the widget never mounts (e.g. an unallowlisted preview domain).
+  // Rendering explicitly into an empty, unstyled container avoids that
+  // reserved height — see ContactForm/DisputeForm for the same pattern.
+  let turnstileWidgetId: string | null = null;
+
+  function renderTurnstile() {
+    const container = document.getElementById('turnstile-container');
+    const turnstile = (window as any).turnstile;
+    if (!container || !turnstile || turnstileWidgetId) return;
+    turnstileWidgetId = turnstile.render(container, {
+      sitekey: '0x4AAAAAACo4KpkxsacPhM2r',
+      theme: 'light',
+    });
+  }
+
+  if ((window as any).turnstile) {
+    renderTurnstile();
+  } else {
+    const turnstileInterval = setInterval(() => {
+      if ((window as any).turnstile) {
+        clearInterval(turnstileInterval);
+        renderTurnstile();
+      }
+    }, 100);
+  }
+
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -167,6 +195,11 @@ if (Astro.locals.user) {
     } finally {
       button.disabled = false;
       button.textContent = 'Sign in';
+      // A Turnstile token is single-use — reset the widget after every
+      // attempt so a retry gets a fresh token instead of a spent one.
+      if (turnstileWidgetId && (window as any).turnstile) {
+        (window as any).turnstile.reset(turnstileWidgetId);
+      }
     }
   });
 </script>
