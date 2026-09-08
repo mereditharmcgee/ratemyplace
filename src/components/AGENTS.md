@@ -1,6 +1,6 @@
 # `src/components/` — Components
 
-33 React islands + 13 Astro components. Components render; they do not hold business
+36 React islands + 22 Astro components. Components render; they do not hold business
 logic. Scoring, validation, formatting, and data access all live in `src/lib/`.
 
 ---
@@ -27,7 +27,7 @@ data, use Astro instead.
 | `reviews/` | `ReviewForm`, `ReviewEditForm`, `ReviewCard`, `form-steps/` |
 | `admin/` | 9 tables and queues + `AdminLayout.astro` |
 | `profile/` | Tenant dashboard, settings, notifications, verification |
-| `records/` | Public-records panel pieces: `RecordSectionHeader.astro`, `CorrectionNotes.astro`, `RecordCorrectionForm.tsx` |
+| `records/` | Public-records panel pieces: `FactsStrip`, `LedgerRow`, `SourceState`, `RecordList`, `YearBars`, `CategoryBars`, `StatusToken`, `CorrectionNotes` (all `.astro`) + `RecordCorrectionForm.tsx` |
 | `search/`, `ratings/`, `ui/`, `contact/`, `disputes/` | As named |
 
 `BuildingRecords.astro` and every `.astro` file in `records/` are read as source text by
@@ -35,6 +35,12 @@ data, use Astro instead.
 (`src/lib/records/display.ts`) — the panel reports what the city recorded and never
 characterizes it. Copy added there is scanned automatically; a new section file is picked
 up with no test change.
+
+`BuildingRecords.astro` is markup: the four ledger rows' counts, spans, breakdowns, and row
+lists are built by `ledgerModel()` in [`src/lib/records/ledger.ts`](../lib/records/ledger.ts)
+and unit-tested there. `SourceState` decides between "never pulled" and "unavailable" once
+for every section; `RecordList` renders the shared date · label · status row. Put a new
+derivation in `ledger.ts`, not in the template's frontmatter.
 
 The multi-step review form is split across `reviews/form-steps/` — address, unit details,
 ratings, additional, confirm, plus `StepIndicator` and `RatingItem`. Add new form fields

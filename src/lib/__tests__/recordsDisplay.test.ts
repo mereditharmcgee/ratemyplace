@@ -1,21 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import {
   BANNED_WORDS,
-  PANEL_FRAMING_COPY,
+  PANEL_COPY,
   ZERO_PERMITS_COPY,
-  DECLARED_VALUATION_CAVEAT,
-  OTHER_REQUESTS_COPY,
-  CONDOMINIUM_COPY,
+  NO_VIOLATIONS_CAVEAT,
   KIND_LABELS,
   showMailingAddress,
   mailingAddressLine,
   formatDollars,
+  formatDollarsCompact,
   formatPullDate,
   formatRecordDate,
   permitSummary,
   splitServiceRequests,
   rentSmartDisagreement,
+  isOpenStatus,
+  openSubCount,
+  yearSpanLabel,
+  NOT_RECORDED,
+  orNotRecorded,
 } from '../records/display';
+// Namespace import purely so the guard below can reflect over every export of the module.
+import * as displayModule from '../records/display';
 import { RECORD_KINDS } from '../records/types';
 import type { AssessmentPayload, PermitPayload, RentSmartPayload, ServiceRequestPayload } from '../records/types';
 
@@ -178,12 +184,12 @@ describe('formatDollars', () => {
   });
 
   it('returns "Not recorded" for null', () => {
-    expect(formatDollars(null)).toBe('Not recorded');
+    expect(formatDollars(null)).toBe(NOT_RECORDED);
   });
 
   it('returns "Not recorded" for a non-finite number', () => {
-    expect(formatDollars(Number.NaN)).toBe('Not recorded');
-    expect(formatDollars(Number.POSITIVE_INFINITY)).toBe('Not recorded');
+    expect(formatDollars(Number.NaN)).toBe(NOT_RECORDED);
+    expect(formatDollars(Number.POSITIVE_INFINITY)).toBe(NOT_RECORDED);
   });
 });
 
@@ -269,7 +275,7 @@ describe('mailingAddressLine', () => {
   });
 
   it('returns "Not recorded" when the assessor recorded no mailing address at all', () => {
-    expect(mailingAddressLine(assessment())).toBe('Not recorded');
+    expect(mailingAddressLine(assessment())).toBe(NOT_RECORDED);
   });
 });
 
@@ -287,7 +293,7 @@ describe('KIND_LABELS', () => {
 });
 
 describe('permitSummary', () => {
-  it('counts permits, sums only the declared valuations present, and finds earliest/latest issued dates', () => {
+  it('counts permits and sums only the declared valuations present', () => {
     const permits = [
       permit({ permitNumber: 'A', declaredValuation: 1000, issuedDate: '2020-01-01' }),
       permit({ permitNumber: 'B', declaredValuation: null, issuedDate: '2022-06-15' }),
@@ -298,8 +304,6 @@ describe('permitSummary', () => {
       count: 3,
       declaredTotal: 1500,
       declaredCount: 2,
-      earliest: '2020-01-01',
-      latest: '2022-06-15',
     });
   });
 
@@ -309,8 +313,8 @@ describe('permitSummary', () => {
     expect(permitSummary(permits)).toMatchObject({ count: 2, declaredTotal: null, declaredCount: 0 });
   });
 
-  it('returns a null total and null dates for an empty list', () => {
-    expect(permitSummary([])).toEqual({ count: 0, declaredTotal: null, declaredCount: 0, earliest: null, latest: null });
+  it('returns a null total for an empty list', () => {
+    expect(permitSummary([])).toEqual({ count: 0, declaredTotal: null, declaredCount: 0 });
   });
 });
 
@@ -378,15 +382,151 @@ describe('rentSmartDisagreement', () => {
 
 describe('panel copy stays free of banned words', () => {
   const bannedPattern = new RegExp(`\\b(${BANNED_WORDS.join('|')})\\b`, 'i');
-  const copyConstants: Array<[string, string]> = [
-    ['PANEL_FRAMING_COPY', PANEL_FRAMING_COPY],
-    ['ZERO_PERMITS_COPY', ZERO_PERMITS_COPY],
-    ['DECLARED_VALUATION_CAVEAT', DECLARED_VALUATION_CAVEAT],
-    ['OTHER_REQUESTS_COPY', OTHER_REQUESTS_COPY],
-    ['CONDOMINIUM_COPY', CONDOMINIUM_COPY],
-  ];
 
-  it.each(copyConstants)('%s does not contain a banned word', (_name, copy) => {
+  it.each(Object.entries(PANEL_COPY))('%s does not contain a banned word', (_name, copy) => {
     expect(bannedPattern.test(copy)).toBe(false);
+  });
+
+  /**
+   * The guard is only as good as the list it walks, and the hand-written list this replaced
+   * named five constants while the module exported eleven. Reflecting over the exports means a
+   * new copy constant fails here the moment it is added, rather than shipping unscanned.
+   */
+  it('lists every all-caps string export of display.ts in PANEL_COPY', () => {
+    const stringConstants = Object.entries(displayModule)
+      .filter(([name, value]) => typeof value === 'string' && /^[A-Z][A-Z0-9_]*$/.test(name))
+      .map(([name]) => name);
+
+    expect(stringConstants.length).toBeGreaterThan(0);
+    expect(Object.keys(PANEL_COPY)).toEqual(expect.arrayContaining(stringConstants));
+  });
+});
+
+/**
+ * One placeholder string, one function. Both templates that needed this grew their own copy,
+ * which is how two surfaces end up disagreeing about what a blank field looks like.
+ */
+describe('orNotRecorded', () => {
+  it('passes a recorded value through as a string', () => {
+    expect(orNotRecorded('APT 7-30 UNITS')).toBe('APT 7-30 UNITS');
+    expect(orNotRecorded(1920)).toBe('1920');
+    expect(orNotRecorded(0)).toBe('0');
+  });
+
+  it('reports every shape of absence as the one placeholder', () => {
+    expect(orNotRecorded(null)).toBe(NOT_RECORDED);
+    expect(orNotRecorded(undefined)).toBe(NOT_RECORDED);
+    expect(orNotRecorded('')).toBe(NOT_RECORDED);
+  });
+});
+
+describe('formatDollarsCompact', () => {
+  it('says not recorded for a missing value', () => {
+    expect(formatDollarsCompact(null)).toBe(NOT_RECORDED);
+    expect(formatDollarsCompact(Number.NaN)).toBe(NOT_RECORDED);
+  });
+
+  it('renders millions to three significant figures', () => {
+    expect(formatDollarsCompact(9_510_000)).toBe('$9.51M');
+  });
+
+  it('renders thousands without a decimal point when it does not need one', () => {
+    expect(formatDollarsCompact(630_000)).toBe('$630K');
+  });
+
+  it('renders a value under a thousand in full', () => {
+    expect(formatDollarsCompact(950)).toBe('$950');
+  });
+
+  it('trims a trailing zero rather than printing 9.50M', () => {
+    expect(formatDollarsCompact(9_500_000)).toBe('$9.5M');
+    expect(formatDollarsCompact(2_000_000)).toBe('$2M');
+  });
+
+  it('renders billions', () => {
+    expect(formatDollarsCompact(1_250_000_000)).toBe('$1.25B');
+  });
+
+  it('renders zero as zero, not as not recorded', () => {
+    expect(formatDollarsCompact(0)).toBe('$0');
+  });
+
+  it('promotes to the next unit when rounding lands on it', () => {
+    // 999,500 scales to 999.5K, which rounds to 1000K. That is $1M written the long way.
+    expect(formatDollarsCompact(999_500)).toBe('$1M');
+    expect(formatDollarsCompact(999_999_999)).toBe('$1B');
+  });
+
+  it('keeps the sign on a negative value', () => {
+    expect(formatDollarsCompact(-1_500)).toBe('-$1.5K');
+  });
+
+  it('says not recorded for an absent value however it arrives', () => {
+    expect(formatDollarsCompact(null)).toBe(NOT_RECORDED);
+    expect(formatDollarsCompact(undefined)).toBe(NOT_RECORDED);
+    expect(formatDollarsCompact(Number.POSITIVE_INFINITY)).toBe(NOT_RECORDED);
+  });
+});
+
+describe('NO_VIOLATIONS_CAVEAT', () => {
+  const bannedPattern = new RegExp(`\\b(${BANNED_WORDS.join('|')})\\b`, 'i');
+
+  it('contains no banned word', () => {
+    expect(bannedPattern.test(NO_VIOLATIONS_CAVEAT)).toBe(false);
+  });
+
+  it('says the list is a record of the feed rather than a finding about the building', () => {
+    expect(NO_VIOLATIONS_CAVEAT).toMatch(/feed/i);
+  });
+});
+
+describe('isOpenStatus', () => {
+  it('reads the city word, case and padding insensitive', () => {
+    expect(isOpenStatus('Open')).toBe(true);
+    expect(isOpenStatus(' open ')).toBe(true);
+    expect(isOpenStatus('OPEN')).toBe(true);
+  });
+
+  it('treats every other status as not open', () => {
+    expect(isOpenStatus('Closed')).toBe(false);
+    expect(isOpenStatus('Issued')).toBe(false);
+  });
+
+  it('treats a blank status as not open rather than assuming it is unresolved', () => {
+    expect(isOpenStatus(null)).toBe(false);
+    expect(isOpenStatus(undefined)).toBe(false);
+    expect(isOpenStatus('')).toBe(false);
+  });
+});
+
+describe('openSubCount', () => {
+  it('distinguishes an empty source from a fully closed one', () => {
+    expect(openSubCount(0, 0)).toBe('none on record');
+    expect(openSubCount(0, 7)).toBe('all closed');
+  });
+
+  it('counts the open rows when there are any', () => {
+    expect(openSubCount(3, 7)).toBe('3 open');
+    expect(openSubCount(1, 1)).toBe('1 open');
+  });
+});
+
+describe('yearSpanLabel', () => {
+  it('returns null for an empty series', () => {
+    expect(yearSpanLabel([])).toBeNull();
+  });
+
+  it('returns the bare year for a single-year series', () => {
+    expect(yearSpanLabel([{ year: 2021, count: 2 }])).toBe('2021');
+  });
+
+  it('returns the span for a multi-year series', () => {
+    expect(
+      yearSpanLabel([
+        { year: 2019, count: 1 },
+        { year: 2020, count: 0 },
+        { year: 2021, count: 4 },
+      ]),
+    ).toBe('2019–2021');
   });
 });

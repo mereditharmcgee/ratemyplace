@@ -109,12 +109,12 @@ export default function ConfirmStep({
               Your landlord may be able to identify you based on details in your review. Avoid mentioning
               specific dates, unit numbers, or personal details.
             </p>
-            <label className="flex items-start gap-3 cursor-pointer">
+            <label className="flex items-start gap-3 py-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={privacyAcknowledged}
                 onChange={(e) => onPrivacyChange(e.target.checked)}
-                className="mt-0.5 rounded border-amber-400 text-amber-700 focus:ring-amber-500"
+                className="mt-0.5 h-5 w-5 shrink-0 accent-amber-600"
               />
               <span className="text-sm text-amber-800">
                 I confirm this review reflects my honest personal experience and agree to the{' '}
@@ -183,7 +183,7 @@ export default function ConfirmStep({
         <button
           type="button"
           onClick={onBack}
-          className="px-6 py-2 border border-gray-300 rounded-[6px] hover:bg-gray-50"
+          className="h-11 inline-flex items-center justify-center px-6 border border-gray-300 rounded-[6px] hover:bg-gray-50"
         >
           Back
         </button>
@@ -191,7 +191,7 @@ export default function ConfirmStep({
           type="button"
           onClick={onSubmit}
           disabled={loading || !privacyAcknowledged || !turnstileToken}
-          className="px-6 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="h-11 inline-flex items-center justify-center px-6 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Submitting...' : 'Submit Review'}
         </button>

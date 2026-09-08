@@ -2,9 +2,9 @@
 import BaseLayout from '../components/layout/BaseLayout.astro';
 ---
 
-<BaseLayout title="Report a Bug" description="Found something broken? Let us know so we can fix it.">
+<BaseLayout title="Report a bug" description="Found something broken? Let us know so we can fix it.">
   <div class="max-w-2xl mx-auto px-4 py-12">
-    <h1 class="text-3xl font-bold text-gray-900 mb-2">Report a Bug</h1>
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">Report a bug</h1>
     <p class="text-gray-600 mb-8">
       Found something broken or not working right? Let us know and we'll look into it.
     </p>
@@ -23,8 +23,6 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
 
     <form id="bug-form" class="space-y-6">
       <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"></div>
-
-      <div class="cf-turnstile" data-sitekey="0x4AAAAAACo4KpkxsacPhM2r" data-theme="light"></div>
 
       <div>
         <label for="email" class="block text-sm font-medium text-gray-700">
@@ -82,11 +80,13 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
         <p class="mt-1 text-xs text-gray-500">At least 10 characters</p>
       </div>
 
+      <div class="cf-turnstile" data-sitekey="0x4AAAAAACo4KpkxsacPhM2r" data-theme="light" data-size="flexible"></div>
+
       <button
         type="submit"
-        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-[4px] text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        class="w-full h-11 flex items-center justify-center px-4 border border-transparent rounded-[4px] text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Submit Report
+        Submit report
       </button>
     </form>
   </div>
@@ -128,7 +128,9 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
       errorMessage.classList.remove('hidden');
     } finally {
       button.disabled = false;
-      button.textContent = 'Submit Report';
+      button.textContent = 'Submit report';
+      // Turnstile tokens are single-use, so a retry needs a fresh one.
+      (window as any).turnstile?.reset();
     }
   });
 </script>

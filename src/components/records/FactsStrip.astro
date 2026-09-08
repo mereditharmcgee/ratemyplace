@@ -1,0 +1,118 @@
+---
+// The four assessor facts that answer "what is this building" before the ledger answers
+// "what has happened to it". Hairline separators rather than four cards: these are one row of
+// facts off one record, not four findings.
+//
+// The mailing address is behind `showMailingAddress`, which publishes a tax address only for
+// an owner that reads as an entity. That gate is a privacy control, not a formatting choice —
+// see the note on it in `display.ts` before changing anything here.
+import { assessmentSeries, sparklinePoints } from '../../lib/records/charts';
+import {
+  showMailingAddress,
+  mailingAddressLine,
+  formatDollarsCompact,
+  orNotRecorded,
+} from '../../lib/records/display';
+import type { AssessmentPayload } from '../../lib/records/types';
+
+interface Props {
+  /** The most recent fiscal year's row. */
+  current: AssessmentPayload;
+  /** Every stored fiscal year, for the value series. */
+  all: AssessmentPayload[];
+}
+
+const { current, all } = Astro.props;
+
+/** Mid-sentence in a sub-line, where the capitalised constant would read as a new sentence. */
+function orNotRecordedInline(value: string | number | null | undefined): string {
+  return value === null || value === undefined || value === '' ? 'not recorded' : String(value);
+}
+
+const SPARK_WIDTH = 84;
+const SPARK_HEIGHT = 22;
+const SPARK_PAD = 3;
+
+const series = assessmentSeries(all);
+// One year is not a series: a single point drawn as a line would suggest a trend the records
+// do not contain, so the sparkline and the range line both wait for a second fiscal year.
+const multiYear = series !== null && series.values.length > 1;
+const points = multiYear ? sparklinePoints(series!.values, SPARK_WIDTH, SPARK_HEIGHT, SPARK_PAD) : '';
+const valueSubLine = multiYear
+  ? `${series!.firstYear}–${series!.lastYear}, range ${formatDollarsCompact(series!.min)}–${formatDollarsCompact(series!.max)}`
+  : current.fiscalYear;
+const sparkLabel = multiYear
+  ? `Assessed value ${series!.firstYear} to ${series!.lastYear}, ${formatDollarsCompact(series!.min)} to ${formatDollarsCompact(series!.max)}`
+  : '';
+
+const CELL = 'px-3 py-3';
+// Four across on desktop, two-by-two under sm. Written out per cell rather than with `divide-*`
+// because a grid's divide utilities put a stray border on the first cell of the second row.
+const cells = [
+  `${CELL} pl-0`,
+  `${CELL} border-l border-gray-200`,
+  `${CELL} pl-0 border-t border-gray-200 sm:border-t-0 sm:border-l sm:pl-3`,
+  `${CELL} border-l border-t border-gray-200 sm:border-t-0`,
+];
+// A term and its description, which is what a `dl` is for. The grid lives on the list and the
+// cells are plain `div`s, so the markup says "four facts off one record" without the layout
+// changing a pixel.
+const LABEL = 'text-xs uppercase tracking-wide text-gray-500';
+const VALUE = 'mt-1 block text-sm font-medium text-gray-900';
+const SUB = 'mt-1 block text-xs text-gray-500';
+---
+
+<dl class="mt-4 grid grid-cols-2 sm:grid-cols-4">
+  <div class={cells[0]}>
+    <dt class={LABEL}>Owner of record</dt>
+    <dd class={`${VALUE} break-words`}>
+      {orNotRecorded(current.owner)}
+      <span class={SUB}>Assessor {current.fiscalYear} · parcel {orNotRecordedInline(current.parcelId)}</span>
+      {showMailingAddress(current.owner) && (
+        <span class={`${SUB} break-words`}>Tax mailing address: {mailingAddressLine(current)}</span>
+      )}
+    </dd>
+  </div>
+
+  <div class={cells[1]}>
+    <dt class={LABEL}>Built</dt>
+    <dd class={VALUE}>
+      {orNotRecorded(current.yearBuilt)}
+      <span class={SUB}>
+        Last remodel {orNotRecordedInline(current.yearRemodel)} · units {orNotRecordedInline(current.residentialUnits)}
+      </span>
+    </dd>
+  </div>
+
+  <div class={cells[2]}>
+    <dt class={LABEL}>Assessed value</dt>
+    <dd class="mt-1">
+      <span class="flex flex-wrap items-center gap-2">
+        <span class="text-sm font-medium text-gray-900">{formatDollarsCompact(current.totalValue)}</span>
+        {multiYear && points !== '' && (
+          <svg
+            viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`}
+            width={SPARK_WIDTH}
+            height={SPARK_HEIGHT}
+            class="shrink-0 text-gray-400"
+            role="img"
+            aria-label={sparkLabel}>
+            <polyline
+              points={points}
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"></polyline>
+          </svg>
+        )}
+      </span>
+      <span class={SUB}>{valueSubLine}</span>
+    </dd>
+  </div>
+
+  <div class={cells[3]}>
+    <dt class={LABEL}>Land use</dt>
+    <dd class={`${VALUE} break-words`}>{orNotRecorded(current.landUseDescription ?? current.landUse)}</dd>
+  </div>
+</dl>

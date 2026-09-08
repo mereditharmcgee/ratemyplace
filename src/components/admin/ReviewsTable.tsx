@@ -354,7 +354,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                       </span>
                     ) : null}
                   </div>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 truncate">
                     {review.user_email} • {formatDate(review.created_at)}
                   </p>
                   {review.review_title && (
@@ -369,7 +369,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                   <div className="text-right">
                     <div className={`text-lg font-bold ${getScoreColor(review.overall_score)}`}>
                       {review.overall_score?.toFixed(1) || 'N/A'}

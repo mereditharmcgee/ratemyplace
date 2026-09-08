@@ -22,10 +22,11 @@ export default function AdditionalStep({
   return (
     <div className="space-y-6">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="review-tenure" className="block text-sm font-medium text-gray-700 mb-2">
           {supplementaryItems.tenure.text}
         </label>
         <select
+          id="review-tenure"
           value={tenancy.tenure}
           onChange={(e) => onTenancyChange({ ...tenancy, tenure: parseInt(e.target.value) })}
           className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
@@ -39,10 +40,11 @@ export default function AdditionalStep({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="review-move-out-year" className="block text-sm font-medium text-gray-700 mb-2">
           {supplementaryItems.moveOutTiming.text}
         </label>
         <select
+          id="review-move-out-year"
           value={tenancy.moveOutYear}
           onChange={(e) => onTenancyChange({ ...tenancy, moveOutYear: e.target.value })}
           className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
@@ -56,10 +58,11 @@ export default function AdditionalStep({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="review-landlord-name" className="block text-sm font-medium text-gray-700 mb-2">
           Who was your landlord or property manager? <span className="text-gray-400">(optional)</span>
         </label>
         <input
+          id="review-landlord-name"
           type="text"
           value={review.landlordName}
           onChange={(e) => onReviewChange({ ...review, landlordName: e.target.value })}
@@ -69,7 +72,7 @@ export default function AdditionalStep({
         />
         <p className="text-sm text-gray-500 mt-1">This helps us link reviews to the right landlord. It won't be shown publicly on your review.</p>
 
-        <label className="flex items-center gap-2 mt-3 cursor-pointer">
+        <label className="flex items-center gap-2 py-3 cursor-pointer">
           <input
             type="checkbox"
             checked={review.hasSeparateManager}
@@ -78,17 +81,18 @@ export default function AdditionalStep({
               hasSeparateManager: e.target.checked,
               propertyManagerName: e.target.checked ? review.propertyManagerName : '',
             })}
-            className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+            className="h-5 w-5 accent-teal-700"
           />
           <span className="text-sm text-gray-700">Someone else manages the property</span>
         </label>
 
         {review.hasSeparateManager && (
           <div className="mt-3">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="review-property-manager-name" className="block text-sm font-medium text-gray-700 mb-2">
               Who manages the property? <span className="text-gray-400">(optional)</span>
             </label>
             <input
+              id="review-property-manager-name"
               type="text"
               value={review.propertyManagerName}
               onChange={(e) => onReviewChange({ ...review, propertyManagerName: e.target.value })}
@@ -101,15 +105,16 @@ export default function AdditionalStep({
         )}
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div role="group" aria-labelledby="review-housing-vouchers-label">
+        <span id="review-housing-vouchers-label" className="block text-sm font-medium text-gray-700 mb-2">
           {supplementaryItems.housingVouchers.text} <span className="text-gray-400">(optional)</span>
-        </label>
+        </span>
         <div className="flex gap-4">
           {supplementaryItems.housingVouchers.options.map((opt) => (
             <label key={opt.value} className="flex items-center gap-2">
               <input
                 type="radio"
+                name="review-housing-vouchers"
                 checked={review.housingVouchers === opt.value}
                 onChange={() => onReviewChange({ ...review, housingVouchers: opt.value })}
                 className="text-teal-700 focus:ring-teal-500"
@@ -120,15 +125,16 @@ export default function AdditionalStep({
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div role="group" aria-labelledby="review-safely-lit-label">
+        <span id="review-safely-lit-label" className="block text-sm font-medium text-gray-700 mb-2">
           {supplementaryItems.safelyLit.text} <span className="text-gray-400">(optional)</span>
-        </label>
+        </span>
         <div className="flex gap-4">
           {supplementaryItems.safelyLit.options.map((opt) => (
             <label key={opt.value} className="flex items-center gap-2">
               <input
                 type="radio"
+                name="review-safely-lit"
                 checked={review.safelyLit === opt.value}
                 onChange={() => onReviewChange({ ...review, safelyLit: opt.value })}
                 className="text-teal-700 focus:ring-teal-500"
@@ -139,15 +145,16 @@ export default function AdditionalStep({
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div role="group" aria-labelledby="review-would-recommend-label">
+        <span id="review-would-recommend-label" className="block text-sm font-medium text-gray-700 mb-2">
           {supplementaryItems.wouldRecommend.text}
-        </label>
+        </span>
         <div className="flex gap-4">
           {supplementaryItems.wouldRecommend.options.map((opt) => (
             <label key={opt.value} className="flex items-center gap-2">
               <input
                 type="radio"
+                name="review-would-recommend"
                 checked={review.wouldRecommend === opt.value}
                 onChange={() => onReviewChange({ ...review, wouldRecommend: opt.value })}
                 className="text-teal-700 focus:ring-teal-500"
@@ -158,12 +165,12 @@ export default function AdditionalStep({
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
+      <div role="group" aria-labelledby="review-issues-label">
+        <span id="review-issues-label" className="block text-sm font-medium text-gray-700 mb-3">
           Did you experience any of these issues? <span className="text-gray-400">(check all that apply)</span>
-        </label>
+        </span>
         <div className="space-y-2">
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2 py-3 cursor-pointer">
             <input
               type="checkbox"
               checked={review.hadPestIssues}
@@ -172,7 +179,7 @@ export default function AdditionalStep({
                 hadPestIssues: e.target.checked,
                 pestTypesExperienced: e.target.checked ? review.pestTypesExperienced : [],
               })}
-              className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+              className="h-5 w-5 accent-teal-700"
             />
             <span className="text-sm text-gray-700">Pest issues (roaches, mice, rats, bedbugs, etc.)</span>
           </label>
@@ -215,12 +222,12 @@ export default function AdditionalStep({
             { key: 'hadSecurityDepositIssues' as const, label: 'Security deposit problems' },
             { key: 'hadEvictionThreats' as const, label: 'Eviction threats or retaliation' },
           ].map((issue) => (
-            <label key={issue.key} className="flex items-center gap-2 cursor-pointer">
+            <label key={issue.key} className="flex items-center gap-2 py-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={review[issue.key]}
                 onChange={(e) => onReviewChange({ ...review, [issue.key]: e.target.checked })}
-                className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+                className="h-5 w-5 accent-teal-700"
               />
               <span className="text-sm text-gray-700">{issue.label}</span>
             </label>
@@ -229,10 +236,11 @@ export default function AdditionalStep({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="review-title" className="block text-sm font-medium text-gray-700 mb-2">
           Review Title <span className="text-gray-400">(optional)</span>
         </label>
         <input
+          id="review-title"
           type="text"
           value={review.reviewTitle}
           onChange={(e) => onReviewChange({ ...review, reviewTitle: e.target.value })}
@@ -244,7 +252,7 @@ export default function AdditionalStep({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="review-comments" className="block text-sm font-medium text-gray-700 mb-2">
           Additional Comments <span className="text-gray-400">(optional)</span>
         </label>
         <p className="text-sm text-gray-500 mb-2">
@@ -253,6 +261,7 @@ export default function AdditionalStep({
           or anything the ratings don't capture.
         </p>
         <textarea
+          id="review-comments"
           value={review.comments}
           onChange={(e) => onReviewChange({ ...review, comments: e.target.value })}
           placeholder="Share any details that would help future tenants. Avoid including identifying information."
@@ -267,14 +276,14 @@ export default function AdditionalStep({
         <button
           type="button"
           onClick={onBack}
-          className="px-6 py-2 border border-gray-300 rounded-[6px] hover:bg-gray-50"
+          className="h-11 inline-flex items-center justify-center px-6 border border-gray-300 rounded-[6px] hover:bg-gray-50"
         >
           Back
         </button>
         <button
           type="button"
           onClick={onNext}
-          className="px-6 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800"
+          className="h-11 inline-flex items-center justify-center px-6 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800"
         >
           Review & Submit
         </button>

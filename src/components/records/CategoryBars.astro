@@ -1,0 +1,49 @@
+---
+// The categories the city filed rows under, longest first, with a track showing each one
+// against the largest. The label is the city's own word for the category, reproduced as
+// stored; the bar is a count. Neither is ranked against anything outside this building.
+import type { KeyBreakdown } from '../../lib/records/charts';
+
+interface Props {
+  title: string;
+  breakdown: KeyBreakdown;
+  /** Plural noun for the leftover line, e.g. `requests`. */
+  restNoun: string;
+}
+
+const { title, breakdown, restNoun } = Astro.props;
+
+// The largest category, which the rest are drawn against. Sorted first by `countByKey`, and
+// never zero: a category only exists because at least one row was filed under it. The list is
+// behind `top.length > 0` below, so this is only read when there is a category to read.
+const largest = breakdown.top[0]?.count ?? 1;
+
+/** Proportional to the largest category, with a floor so a single-row category still draws. */
+function trackWidth(count: number): number {
+  return Math.max(2, Math.round((count / largest) * 100));
+}
+---
+
+{breakdown.top.length > 0 && (
+  <div>
+    <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</h4>
+    <ul class="mt-2 space-y-2">
+      {breakdown.top.map((entry) => (
+        <li class="grid grid-cols-[minmax(0,1fr)_2.5rem] items-center gap-2">
+          <span class="min-w-0">
+            <span class="block truncate text-xs text-gray-700" title={entry.key}>{entry.key}</span>
+            <span class="mt-1 block h-1.5 w-full rounded-full bg-gray-200">
+              <span class="block h-1.5 rounded-full bg-gray-700" style={`width:${trackWidth(entry.count)}%`}></span>
+            </span>
+          </span>
+          <span class="text-right text-xs tabular-nums text-gray-600">{entry.count}</span>
+        </li>
+      ))}
+    </ul>
+    {breakdown.restTypes > 0 && (
+      <p class="mt-2 text-xs text-gray-500">
+        {breakdown.restTypes} more types · {breakdown.restCount} {restNoun}
+      </p>
+    )}
+  </div>
+)}

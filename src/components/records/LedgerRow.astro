@@ -1,0 +1,100 @@
+---
+// One row of the public records ledger: a disclosure whose closed state is the whole answer
+// to "how much is on file here", and whose open state is the detail behind that number.
+//
+// The row states a count and a span. It does not say whether the count is high, and there is
+// no colour on it — the count is the same shape of black whether it reads 0 or 42. Sizing a
+// number is not the same as judging it, and the difference is the panel's whole rule.
+//
+// The dataset link lives in the body rather than the summary: a link inside a summary is a
+// control inside a control, and clicking it would toggle the row. It comes off the status row
+// rather than a constant, so the panel cites the dataset the stored rows actually came from —
+// a source id this build no longer knows carries a null pageUrl and gets no link, because a
+// wrong citation is worse than none.
+import { formatPullDate } from '../../lib/records/display';
+import type { SourceStatus } from '../../lib/records/query';
+
+interface Props {
+  title: string;
+  /** null when this source has never been pulled for the building. */
+  status: SourceStatus | null;
+  /** Whether the section has rows to show, which decides how a failed pull is described. */
+  hasRows: boolean;
+  /** The years the rows cover, e.g. `2008–2026`. Null when no row carried a readable date. */
+  span?: string | null;
+  /** A second muted line under the coverage line. */
+  note?: string | null;
+  /** The large figure. `—` for a source with nothing to count yet. */
+  count: string;
+  /** The small line under the figure. Empty when there is no count to qualify. */
+  subCount: string;
+  open?: boolean;
+}
+
+const { title, status, hasRows, span = null, note = null, count, subCount, open = false } = Astro.props;
+
+// A source whose latest attempt failed but whose earlier rows survive is showing older data,
+// and saying "as of <today>" over those rows would date them to a pull that never landed.
+const showingStaleRows = status?.status === 'error' && hasRows;
+const asOf =
+  status === null
+    ? 'not retrieved'
+    : showingStaleRows
+      ? `last checked ${formatPullDate(status.retrievedAt)}`
+      : `as of ${formatPullDate(status.retrievedAt)}`;
+const coverage = [span, asOf].filter(Boolean).join(' · ');
+---
+
+<details open={open} class="border-t border-gray-200">
+  <summary
+    class="grid grid-cols-[minmax(0,1fr)_auto_1.25rem] items-center gap-3 min-h-[44px] py-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
+    <span class="min-w-0">
+      <h3 class="text-base font-semibold text-gray-900">{title}</h3>
+      <span class="block text-xs text-gray-500">{coverage}</span>
+      {note && <span class="block text-xs text-gray-500">{note}</span>}
+    </span>
+    <span class="text-right">
+      <span class="block text-2xl font-semibold leading-none text-gray-900 tabular-nums">{count}</span>
+      <span class="mt-1 block text-xs text-gray-500">{subCount}</span>
+    </span>
+    <svg
+      class="records-chevron h-4 w-4 justify-self-end text-gray-400"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.5"
+      aria-hidden="true">
+      <path d="M5 7.5 10 12.5 15 7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </summary>
+  <div class="pb-5">
+    {showingStaleRows && (
+      <p class="text-xs text-gray-500">Showing records from an earlier retrieval.</p>
+    )}
+    <slot />
+    {status?.pageUrl && (
+      <p class="mt-3 text-xs text-gray-500">
+        <a
+          href={status.pageUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Source: ${status.label} dataset`}
+          class="text-teal-700 hover:underline">Source</a>
+      </p>
+    )}
+  </div>
+</details>
+
+<style>
+  .records-chevron {
+    transition: transform 150ms ease;
+  }
+  details[open] > summary .records-chevron {
+    transform: rotate(180deg);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .records-chevron {
+      transition: none;
+    }
+  }
+</style>

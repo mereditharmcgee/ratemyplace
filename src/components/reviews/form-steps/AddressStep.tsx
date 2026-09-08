@@ -1,4 +1,5 @@
 import AddressAutocomplete, { type PlaceDetails } from '../../AddressAutocomplete';
+import { localityLine } from '../../../lib/locality';
 import type { PlaceData } from './types';
 
 export interface ManualAddress {
@@ -54,8 +55,9 @@ export default function AddressStep({
 
           <div className="space-y-3">
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Street address</label>
+              <label htmlFor="review-street-address" className="block text-xs text-gray-600 mb-1">Street address</label>
               <input
+                id="review-street-address"
                 type="text"
                 value={manualAddress.streetAddress}
                 onChange={(e) => onManualAddressChange({ ...manualAddress, streetAddress: e.target.value })}
@@ -65,8 +67,9 @@ export default function AddressStep({
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-gray-600 mb-1">City</label>
+                <label htmlFor="review-city" className="block text-xs text-gray-600 mb-1">City</label>
                 <input
+                  id="review-city"
                   type="text"
                   value={manualAddress.city}
                   onChange={(e) => onManualAddressChange({ ...manualAddress, city: e.target.value })}
@@ -75,8 +78,9 @@ export default function AddressStep({
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">State</label>
+                <label htmlFor="review-state" className="block text-xs text-gray-600 mb-1">State</label>
                 <input
+                  id="review-state"
                   type="text"
                   value={manualAddress.state}
                   onChange={(e) => onManualAddressChange({ ...manualAddress, state: e.target.value.toUpperCase().slice(0, 2) })}
@@ -87,8 +91,9 @@ export default function AddressStep({
               </div>
             </div>
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Zip code (optional)</label>
+              <label htmlFor="review-zip-code" className="block text-xs text-gray-600 mb-1">Zip code (optional)</label>
               <input
+                id="review-zip-code"
                 type="text"
                 value={manualAddress.zipCode}
                 onChange={(e) => onManualAddressChange({ ...manualAddress, zipCode: e.target.value })}
@@ -114,7 +119,7 @@ export default function AddressStep({
             type="button"
             onClick={onManualConfirm}
             disabled={loading || !manualAddress.streetAddress.trim() || !manualAddress.city.trim()}
-            className="px-6 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
+            className="h-11 inline-flex items-center justify-center px-6 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
           >
             {loading ? 'Adding...' : 'Continue'}
           </button>
@@ -158,8 +163,14 @@ export default function AddressStep({
               <div className="flex-1">
                 <div className="font-semibold text-teal-900">{selectedPlace.streetAddress}</div>
                 <div className="text-sm text-teal-700">
-                  {selectedPlace.neighborhood && `${selectedPlace.neighborhood}, `}
-                  {selectedPlace.city}, {selectedPlace.state} {selectedPlace.zipCode}
+                  {localityLine(
+                    {
+                      address: selectedPlace.streetAddress,
+                      neighborhood: selectedPlace.neighborhood,
+                      city: selectedPlace.city,
+                    },
+                    selectedPlace.state,
+                  )}{selectedPlace.zipCode ? ` ${selectedPlace.zipCode}` : ''}
                 </div>
                 {selectedPlace.existingBuilding ? (
                   <div className="mt-2 text-sm text-teal-700">
@@ -179,7 +190,7 @@ export default function AddressStep({
               type="button"
               onClick={onConfirm}
               disabled={loading}
-              className="px-6 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
+              className="h-11 inline-flex items-center justify-center px-6 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
             >
               {loading ? 'Verifying...' : 'Continue'}
             </button>

@@ -1,0 +1,38 @@
+---
+// A list of records as the city filed them: date, the city's own words, the city's own status
+// word. Four sections print this same shape, so they print it from here.
+//
+// The rows arrive already built by `ledger.ts` — this component picks no field and composes
+// no label, which is what keeps the decisions about what a row says testable without a render.
+import { formatRecordDate } from '../../lib/records/display';
+import type { RecordRow } from '../../lib/records/ledger';
+import StatusToken from './StatusToken.astro';
+
+interface Props {
+  rows: RecordRow[];
+  /**
+   * The row-cap note, when the stored rows filled a CKAN page. Null when they did not — a
+   * note about a cap that did not bite would suggest records are missing when none are.
+   */
+  cappedNote?: string | null;
+}
+
+const { rows, cappedNote = null } = Astro.props;
+
+const LIST = 'divide-y divide-gray-100 text-sm mt-2';
+const ROW = 'grid grid-cols-1 sm:grid-cols-[7rem_1fr_auto] gap-x-2 gap-y-0.5 py-2';
+---
+
+<ul class={LIST}>
+  {rows.map((row) => (
+    <li class={ROW}>
+      <span class="text-gray-500">{formatRecordDate(row.date)}</span>
+      <span class="text-gray-900">{row.label}</span>
+      <span class="text-xs sm:text-right">
+        <StatusToken status={row.status} />
+        {row.trailing && <span class="text-gray-500">{row.trailing}</span>}
+      </span>
+    </li>
+  ))}
+</ul>
+{cappedNote && <p class="text-xs text-gray-500 mt-2">{cappedNote}</p>}

@@ -251,6 +251,15 @@ A section whose latest pull is `error` and which has no prior rows renders "reco
 
 > **Amended 2026-09-07, as built:** a section that has **never been queried** is a third state, distinct from both "empty" and "unavailable", and renders **"Not retrieved yet."** Rendering a never-queried section as an empty result would state a fact the site does not have: "no violations on record" and "we have not asked" are different claims, and only one of them is true. RentSmart's cross-check line is suppressed in that state too, since there is nothing above it to disagree with.
 
+> **Amended 2026-09-07, as built:** the panel is not six stacked sections inside the two-column grid. It renders **below the grid entirely** — after the reviews column and the rating sidebar, in its own single column capped at `max-w-3xl` for measure — in two pieces:
+>
+> - **A facts strip:** owner of record, year built and last remodel, current assessed value with a **fiscal-year sparkline**, and land use. The six-year value-history table described above is **replaced by that sparkline**.
+> - **A four-row `<details>` ledger:** 311 housing requests (**open by default**), building permits, code enforcement, and ISD violations. Each row carries per-year bars and a **top-six category breakdown** inside it, lists its **open rows first**, and keeps the full cited list behind a **"Show all"** disclosure.
+>
+> Two details that follow from the layout: the coverage label reports the years **actually observed** in the stored rows, while the charts span the **feed's full coverage**, so a year with nothing in it reads as a gap rather than vanishing from the axis; and **correction notes render outside the collapsible rows**, beside the count, so a disputed figure is visible without opening anything.
+>
+> Nothing about the no-opinion rule, the mailing-address privacy gate, or the correction flow changed.
+
 ### Display rules (each enforced by a unit test where a test can enforce it)
 
 - **Owner mailing address is shown only when the owner of record is an entity**, decided by `inferOwnerEntity`. An individual's mailing address is never rendered, even though the assessor publishes it, because it is usually their home.

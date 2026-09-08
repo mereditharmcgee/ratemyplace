@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 import { getNamedPartyScoreState, NAMED_PARTY_MIN_REVIEWS } from '../../lib/scoring';
+import { localityLine } from '../../lib/locality';
 
 interface Building {
   slug: string;
@@ -42,7 +43,7 @@ function BuildingCard({ building }: { building: Building }) {
         <div className="min-w-0 flex-1">
           <h3 className="text-lg font-semibold text-gray-900 break-words">{building.address}</h3>
           <p className="text-gray-600">
-            {building.neighborhood && `${building.neighborhood}, `}{building.city}, {building.state}
+            {localityLine(building, building.state)}
           </p>
           {building.landlord_name && (
             <p className="text-sm text-gray-500 mt-1">Landlord: {building.landlord_name}</p>
@@ -197,7 +198,7 @@ export default function SearchResults({
   );
 
   return (
-    <div>
+    <div className="lg:max-w-3xl">
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-[6px] text-sm text-red-700">
           {error}

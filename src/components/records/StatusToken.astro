@@ -1,0 +1,21 @@
+---
+// A record's own status word. Open is outlined so it can be found by scanning a list; every
+// other status is muted text. The outline is grey on purpose — a red or amber "Open" would
+// tell the reader that an open record is bad news, which is exactly the reading this panel
+// refuses to supply.
+import { isOpenStatus, NOT_RECORDED } from '../../lib/records/display';
+
+interface Props {
+  status: string | null | undefined;
+}
+
+const { status } = Astro.props;
+
+const text = status === null || status === undefined || status.trim() === '' ? NOT_RECORDED : status;
+---
+
+{isOpenStatus(status) ? (
+  <span class="inline-flex items-center rounded-full border border-gray-400 px-2 py-0.5 text-[11px] font-medium text-gray-700">{text}</span>
+) : (
+  <span class="text-gray-500">{text}</span>
+)}

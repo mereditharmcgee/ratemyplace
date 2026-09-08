@@ -27,9 +27,9 @@ export interface Building {
   zip_code?: string;
   latitude?: number;
   longitude?: number;
-  year_built?: number;
-  unit_count?: number;
-  building_type?: string;
+  year_built?: number | null;
+  unit_count?: number | null;
+  building_type?: string | null;
   created_at: number;
   updated_at: number;
 }

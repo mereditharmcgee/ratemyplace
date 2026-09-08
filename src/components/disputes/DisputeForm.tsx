@@ -330,24 +330,22 @@ export default function DisputeForm({ siteUrl }: Props) {
         </h3>
         <p className="text-sm text-gray-500 mb-4">Select all that apply</p>
 
-        <div className="space-y-3">
+        <div className="space-y-1">
           {DISPUTE_REASONS.map((reason) => (
-            <div key={reason} className="flex items-start">
-              <div className="flex items-center h-5">
-                <input
-                  type="checkbox"
-                  id={`reason-${reason}`}
-                  checked={disputeReasons.includes(reason)}
-                  onChange={() => handleReasonToggle(reason)}
-                  className="h-4 w-4 text-teal-700 border-gray-300 rounded focus:ring-teal-500"
-                />
-              </div>
-              <div className="ml-3">
-                <label htmlFor={`reason-${reason}`} className="text-sm text-gray-700">
-                  {reason}
-                </label>
-              </div>
-            </div>
+            <label
+              key={reason}
+              htmlFor={`reason-${reason}`}
+              className="flex items-center gap-2 py-3 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                id={`reason-${reason}`}
+                checked={disputeReasons.includes(reason)}
+                onChange={() => handleReasonToggle(reason)}
+                className="h-5 w-5 accent-teal-700"
+              />
+              <span className="text-sm text-gray-700">{reason}</span>
+            </label>
           ))}
         </div>
         {fieldErrors.disputeReasons && (
@@ -389,7 +387,7 @@ export default function DisputeForm({ siteUrl }: Props) {
         <button
           type="submit"
           disabled={loading || !turnstileToken}
-          className="w-full bg-teal-700 text-white px-6 py-3 rounded-[4px] font-semibold hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          className="w-full h-11 flex items-center justify-center bg-teal-700 text-white px-6 rounded-[4px] font-semibold hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? 'Submitting...' : 'Submit Dispute'}
         </button>
