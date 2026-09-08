@@ -118,7 +118,7 @@ export default function AddressStep({
             type="button"
             onClick={onManualConfirm}
             disabled={loading || !manualAddress.streetAddress.trim() || !manualAddress.city.trim()}
-            className="px-6 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
+            className="h-11 inline-flex items-center justify-center px-6 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
           >
             {loading ? 'Adding...' : 'Continue'}
           </button>
@@ -183,7 +183,7 @@ export default function AddressStep({
               type="button"
               onClick={onConfirm}
               disabled={loading}
-              className="px-6 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
+              className="h-11 inline-flex items-center justify-center px-6 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
             >
               {loading ? 'Verifying...' : 'Continue'}
             </button>
