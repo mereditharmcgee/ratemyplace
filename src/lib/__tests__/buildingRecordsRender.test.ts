@@ -15,6 +15,7 @@ import {
   NO_VIOLATIONS_CAVEAT,
   OTHER_REQUESTS_COPY,
 } from '../records/display';
+import { ROW_CAP } from '../records/ckan';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 import { fixtureFetch, type FixtureRoute } from './helpers/records/fixtureFetch';
@@ -256,13 +257,23 @@ suite('BuildingRecords.astro ledger', () => {
     expect(html).toMatch(/href="#report-record"[^>]*min-h-\[44px\]/);
   });
 
-  it('renders the assessor facts strip rather than a definition list', async () => {
+  it('renders the assessor facts as a definition list of labelled cells', async () => {
     const db = await createDbWithAdmin();
     await seedFullBuilding(db);
 
     const html = await renderPanel(db);
+    const strip = parse(html).querySelector('dl');
 
-    expect(html).toContain('Owner of record');
+    // Four facts off one record: terms and descriptions, not four findings in four boxes.
+    expect(strip).toBeTruthy();
+    expect(Array.from(strip!.querySelectorAll('dt')).map((node) => node.textContent?.trim())).toEqual([
+      'Owner of record',
+      'Built',
+      'Assessed value',
+      'Land use',
+    ]);
+    expect(strip!.querySelectorAll('dd')).toHaveLength(4);
+
     expect(html).toContain('LANARK ROAD LLC MASS LLC');
     expect(html).toContain('Assessor FY2026 · parcel 2102098000');
     expect(html).toContain('Built');
@@ -299,7 +310,9 @@ suite('BuildingRecords.astro ledger', () => {
     // Two permits after the duplicate row is deduped, one open, $36,500 + $1,200 declared.
     const permits = summaryText(html, 'Building permits');
     expect(permits).toContain('1 open · $37.7K declared');
-    expect(permits).toContain('2019–2021');
+    // The permit axis is the feed's coverage, not the building's own rows: a bound the city
+    // documents, so one bad date cannot drag the chart back to the third century.
+    expect(permits).toContain('2006–2026');
   });
 
   it('says none on record rather than zero open for a source that came back empty', async () => {
@@ -324,17 +337,18 @@ suite('BuildingRecords.astro ledger', () => {
     }
   });
 
-  it('makes each summary a focusable row with the default marker hidden', async () => {
+  it('makes each summary a tappable row that carries its own count', async () => {
     const db = await createDbWithAdmin();
     await seedFullBuilding(db);
 
-    const html = await renderPanel(db);
-    const summary = ledgerRow(html, 'Building permits').querySelector('summary');
+    const summary = ledgerRow(await renderPanel(db), 'Building permits').querySelector('summary');
 
+    // The one class worth pinning: the row is the tap target on a phone, and 44px is the floor.
     expect(summary?.className).toContain('min-h-[44px]');
-    expect(summary?.className).toContain('list-none');
-    expect(summary?.className).toContain('[&::-webkit-details-marker]:hidden');
-    expect(summary?.className).toContain('focus-visible:outline-teal-700');
+    // Everything a closed row has to answer lives in the summary, not behind the disclosure.
+    expect(summary?.querySelector('h3')?.textContent).toContain('Building permits');
+    expect(summary?.textContent).toContain('as of');
+    expect(summary?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
   });
 
   it('charts the requests by year and by what was reported', async () => {
@@ -428,6 +442,70 @@ suite('BuildingRecords.astro ledger', () => {
     expect(violations.textContent).not.toContain('none on record');
   });
 
+  it('keeps a correction note beside the count rather than behind the disclosure', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+    await db
+      .prepare(
+        "INSERT INTO record_corrections (id, building_id, record_kind, claim, status, resolution, resolution_notes, resolved_at) " +
+          "VALUES (?, ?, 'permit', 'The valuation is wrong', 'resolved', 'source_mismatch_noted', ?, 1770000000)",
+      )
+      .bind('corr-permit', BUILDING_ID, 'The city re-sent the same figure.')
+      .run();
+
+    const html = await renderPanel(db);
+    const permits = ledgerRow(html, 'Building permits');
+
+    // The permits row is closed, and a filed correction is context for the count on it.
+    expect(permits.hasAttribute('open')).toBe(false);
+    expect(html).toContain('The city re-sent the same figure.');
+    expect(permits.textContent).not.toContain('The city re-sent the same figure.');
+  });
+
+  it('dates surviving rows to the pull that fetched them when a re-pull fails', async () => {
+    const db = await createDbWithAdmin();
+    // A full page of permits, so the row cap bites and the section says so.
+    const capacityPermits = Array.from({ length: ROW_CAP }, (_unused, index) => ({
+      ...(permitsPositive[0] as AssessorRow),
+      permitnumber: 'CAP' + index,
+    }));
+    await seedPulledBuilding(db, lanark2026 as AssessorRow[], [
+      { resourceId: PERMITS_RESOURCE_ID, records: capacityPermits },
+    ]);
+
+    // Re-pull: the permits feed is down, but the rows the earlier pull stored are still there.
+    const building = await loadBuilding(db, BUILDING_ID);
+    await pullBuildingRecords(db, building, {
+      triggeredBy: ADMIN_ID,
+      fetchImpl: fixtureFetch([
+        { resourceId: FY2026_RESOURCE_ID, records: lanark2026 as AssessorRow[] },
+        { resourceId: PERMITS_RESOURCE_ID, errorStatus: 503, errorMessage: UPSTREAM_ERROR_TEXT },
+      ]),
+    });
+
+    const html = await renderPanel(db);
+    const permits = ledgerRow(html, 'Building permits');
+
+    expect(html).not.toContain(UPSTREAM_ERROR_TEXT);
+    // Not "Record unavailable": there are rows. Not "as of today" either — that pull failed.
+    expect(permits.querySelector('summary')?.textContent).toContain('last checked');
+    expect(permits.textContent).not.toContain('Record unavailable');
+    expect(permits.textContent).toContain('Showing records from an earlier retrieval.');
+    expect(permits.querySelector('summary')?.textContent).toContain(String(ROW_CAP));
+
+    // The dataset the stored rows came from is still cited.
+    const source = Array.from(permits.querySelectorAll('a')).find(
+      (node) => (node.textContent ?? '').trim() === 'Source',
+    );
+    expect(source?.getAttribute('href')).toContain('https://');
+
+    // One cap note, on the list it describes.
+    const capNotes = Array.from(permits.querySelectorAll('p')).filter((node) =>
+      (node.textContent ?? '').includes('First ' + ROW_CAP + ' shown.'),
+    );
+    expect(capNotes).toHaveLength(1);
+  });
+
   it('replaces the facts strip with the condominium note for a condo parcel', async () => {
     const db = await createDbWithAdmin();
     await insertBuilding(db, { id: 'bldg-condo', address: '55 Lanark Rd, Boston, MA 02135' });
@@ -448,6 +526,6 @@ suite('BuildingRecords.astro ledger', () => {
     expect(html).not.toContain('Owner of record');
     expect(html).not.toContain('<polyline');
     // The ledger still renders: the condo rule is about the assessor row, not the whole panel.
-    expect(ledgerRow(html, 'Building permits')).toBeTruthy();
+    expect(sectionText(html, 'Building permits')).toContain('No permitted work on record since 2006');
   });
 });

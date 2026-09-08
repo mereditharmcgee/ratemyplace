@@ -1,0 +1,32 @@
+---
+// What a section says when it has nothing to show, and the one place that decides which of
+// the two "nothing"s it is. A source nobody has queried has no finding; a source whose only
+// attempt failed has no answer. Neither is an empty result, and the panel must not let a
+// reader mistake either for one.
+//
+// The body goes in the slot, so a caller writes its own content once and gets both states
+// for free. The failure copy never carries the upstream error text — see the note on
+// `SourceStatus.errorMessage`.
+import { NEVER_PULLED_COPY, unavailableCopy } from '../../lib/records/display';
+import type { SourceStatus } from '../../lib/records/query';
+
+interface Props {
+  /** null when this source has never been pulled for the building. */
+  status: SourceStatus | null;
+  /** Whether the section has stored rows. Rows that survive a failed re-pull are still shown. */
+  hasRows: boolean;
+}
+
+const { status, hasRows } = Astro.props;
+
+const unavailable = status !== null && status.status === 'error' && !hasRows;
+const BODY = 'text-sm text-gray-600';
+---
+
+{status === null ? (
+  <p class={BODY}>{NEVER_PULLED_COPY}</p>
+) : unavailable ? (
+  <p class={BODY}>{unavailableCopy(status.retrievedAt)}</p>
+) : (
+  <slot />
+)}

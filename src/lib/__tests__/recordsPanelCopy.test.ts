@@ -30,6 +30,8 @@ describe('BuildingRecords.astro display rules', () => {
       'YearBars.astro',
       'CategoryBars.astro',
       'StatusToken.astro',
+      'SourceState.astro',
+      'RecordList.astro',
     ]) {
       expect(PANEL_FILES.some((path) => path.endsWith(name))).toBe(true);
     }

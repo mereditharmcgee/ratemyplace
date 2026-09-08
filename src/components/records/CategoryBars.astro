@@ -13,11 +13,13 @@ interface Props {
 
 const { title, breakdown, restNoun } = Astro.props;
 
-const largest = breakdown.top.length > 0 ? breakdown.top[0].count : 0;
+// The largest category, which the rest are drawn against. Sorted first by `countByKey`, and
+// never zero: a category only exists because at least one row was filed under it. The list is
+// behind `top.length > 0` below, so this is only read when there is a category to read.
+const largest = breakdown.top[0]?.count ?? 1;
 
 /** Proportional to the largest category, with a floor so a single-row category still draws. */
 function trackWidth(count: number): number {
-  if (largest === 0) return 0;
   return Math.max(2, Math.round((count / largest) * 100));
 }
 ---

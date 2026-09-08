@@ -52,6 +52,14 @@ export const PANEL_FRAMING_COPY =
 
 const PERMIT_COVERAGE_YEAR = /\d{4}/.exec(PERMIT_COVERAGE_START)?.[0] ?? PERMIT_COVERAGE_START;
 
+/**
+ * The same coverage year as a number, for bounding a year series. Null when the phrase carries
+ * no four-digit year, so a caller falls back to the observed rows rather than to `NaN`.
+ */
+export const PERMIT_COVERAGE_YEAR_NUMBER: number | null = /^\d{4}$/.test(PERMIT_COVERAGE_YEAR)
+  ? Number(PERMIT_COVERAGE_YEAR)
+  : null;
+
 export const ZERO_PERMITS_COPY = `No permitted work on record since ${PERMIT_COVERAGE_YEAR}. This means no permits were filed, not that no maintenance was done.`;
 
 export const DECLARED_VALUATION_CAVEAT =

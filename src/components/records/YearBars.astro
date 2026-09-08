@@ -23,13 +23,18 @@ const MIN_BAR_PX = 2;
 const total = series.reduce((sum, entry) => sum + entry.count, 0);
 const max = series.reduce((highest, entry) => Math.max(highest, entry.count), 0);
 
-// A label under every year while they fit; past that, only the years divisible by five, so
-// the axis stays readable across a twenty-year span without dropping either end's context.
+/** Past sixteen columns a label under every year runs the digits together, so only the years
+ *  divisible by five keep one — the axis stays readable without losing either end's context. */
+const DENSE_LABEL_LIMIT = 16;
+/** Four digits per column stop fitting past eight labels, so the century is dropped instead. */
+const ABBREVIATE_ABOVE = 8;
+
 const labelled = new Set(
-  series.length <= 16 ? series.map((entry) => entry.year) : series.filter((entry) => entry.year % 5 === 0).map((entry) => entry.year),
+  series.length <= DENSE_LABEL_LIMIT
+    ? series.map((entry) => entry.year)
+    : series.filter((entry) => entry.year % 5 === 0).map((entry) => entry.year),
 );
-// Four digits per column stops fitting once there are more than eight labels.
-const abbreviate = labelled.size > 8;
+const abbreviate = labelled.size > ABBREVIATE_ABOVE;
 
 function barHeight(count: number): number {
   if (max === 0) return MIN_BAR_PX;
@@ -41,10 +46,8 @@ function axisLabel(year: number): string {
   return abbreviate ? `’${String(year).slice(2)}` : String(year);
 }
 
-const ariaLabel =
-  series.length === 0
-    ? `${title}: no dated records`
-    : `${title}: ${total} ${noun} across ${series[0].year} to ${series[series.length - 1].year}`;
+// The whole component is behind `series.length > 0`, so this always describes real bars.
+const ariaLabel = `${title}: ${total} ${noun} across ${series[0]?.year} to ${series[series.length - 1]?.year}`;
 ---
 
 {series.length > 0 && (

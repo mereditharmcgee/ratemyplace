@@ -55,56 +55,65 @@ const cells = [
   `${CELL} pl-0 border-t border-gray-200 sm:border-t-0 sm:border-l sm:pl-3`,
   `${CELL} border-l border-t border-gray-200 sm:border-t-0`,
 ];
+// A term and its description, which is what a `dl` is for. The grid lives on the list and the
+// cells are plain `div`s, so the markup says "four facts off one record" without the layout
+// changing a pixel.
 const LABEL = 'text-xs uppercase tracking-wide text-gray-500';
 const VALUE = 'mt-1 block text-sm font-medium text-gray-900';
 const SUB = 'mt-1 block text-xs text-gray-500';
 ---
 
-<div class="mt-4 grid grid-cols-2 sm:grid-cols-4">
+<dl class="mt-4 grid grid-cols-2 sm:grid-cols-4">
   <div class={cells[0]}>
-    <span class={LABEL}>Owner of record</span>
-    <span class={`${VALUE} break-words`}>{orNotRecorded(current.owner)}</span>
-    <span class={SUB}>Assessor {current.fiscalYear} · parcel {orNotRecordedInline(current.parcelId)}</span>
-    {showMailingAddress(current.owner) && (
-      <span class={`${SUB} break-words`}>Tax mailing address: {mailingAddressLine(current)}</span>
-    )}
+    <dt class={LABEL}>Owner of record</dt>
+    <dd class={`${VALUE} break-words`}>
+      {orNotRecorded(current.owner)}
+      <span class={SUB}>Assessor {current.fiscalYear} · parcel {orNotRecordedInline(current.parcelId)}</span>
+      {showMailingAddress(current.owner) && (
+        <span class={`${SUB} break-words`}>Tax mailing address: {mailingAddressLine(current)}</span>
+      )}
+    </dd>
   </div>
 
   <div class={cells[1]}>
-    <span class={LABEL}>Built</span>
-    <span class={VALUE}>{orNotRecorded(current.yearBuilt)}</span>
-    <span class={SUB}>
-      Last remodel {orNotRecordedInline(current.yearRemodel)} · units {orNotRecordedInline(current.residentialUnits)}
-    </span>
+    <dt class={LABEL}>Built</dt>
+    <dd class={VALUE}>
+      {orNotRecorded(current.yearBuilt)}
+      <span class={SUB}>
+        Last remodel {orNotRecordedInline(current.yearRemodel)} · units {orNotRecordedInline(current.residentialUnits)}
+      </span>
+    </dd>
   </div>
 
   <div class={cells[2]}>
-    <span class={LABEL}>Assessed value</span>
-    <span class="mt-1 flex flex-wrap items-center gap-2">
-      <span class="text-sm font-medium text-gray-900">{formatDollarsCompact(current.totalValue)}</span>
-      {multiYear && points !== '' && (
-        <svg
-          viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`}
-          width={SPARK_WIDTH}
-          height={SPARK_HEIGHT}
-          class="shrink-0 text-gray-400"
-          role="img"
-          aria-label={sparkLabel}>
-          <polyline
-            points={points}
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"></polyline>
-        </svg>
-      )}
-    </span>
-    <span class={SUB}>{valueSubLine}</span>
+    <dt class={LABEL}>Assessed value</dt>
+    <dd class="mt-1">
+      <span class="flex flex-wrap items-center gap-2">
+        <span class="text-sm font-medium text-gray-900">{formatDollarsCompact(current.totalValue)}</span>
+        {multiYear && points !== '' && (
+          <svg
+            viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`}
+            width={SPARK_WIDTH}
+            height={SPARK_HEIGHT}
+            class="shrink-0 text-gray-400"
+            role="img"
+            aria-label={sparkLabel}>
+            <polyline
+              points={points}
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"></polyline>
+          </svg>
+        )}
+      </span>
+      <span class={SUB}>{valueSubLine}</span>
+    </dd>
   </div>
 
   <div class={cells[3]}>
-    <span class={LABEL}>Land use</span>
-    <span class={`${VALUE} break-words`}>{orNotRecorded(current.landUseDescription ?? current.landUse)}</span>
+    <dt class={LABEL}>Land use</dt>
+    <dd class={`${VALUE} break-words`}>{orNotRecorded(current.landUseDescription ?? current.landUse)}</dd>
   </div>
-</div>
+</dl>

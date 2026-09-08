@@ -8,7 +8,11 @@
 // sources (what each city feed holds for it). A source's whole answer is a count and a span
 // until the reader opens it; the lists are still there, one disclosure down. Summarizing is
 // not the same as judging — a count is a count whether it reads 0 or 42, and nothing here
-// sizes, colours, or orders a number by whether it is good news.
+// sizes or colours a number by whether it is good news. Open rows are listed before closed
+// ones, which orders the list by the city's own status word: a fact about the record, on the
+// same footing as its date, and not a claim that an open record is the worse one.
+//
+// The derivation behind the four rows lives in `lib/records/ledger.ts`. This file is markup.
 import { getBuildingRecords, type BuildingRecordsView } from '../lib/records/query';
 import { logError } from '../lib/logger';
 import {
@@ -20,35 +24,20 @@ import {
   NO_VIOLATIONS_CAVEAT,
   KIND_LABELS,
   formatDollars,
-  formatDollarsCompact,
-  orNotRecorded,
   formatPullDate,
-  formatRecordDate,
-  permitSummary,
-  splitServiceRequests,
-  rentSmartDisagreement,
-  isOpenStatus,
-  openSubCount,
-  yearSpanLabel,
 } from '../lib/records/display';
-import { countByYear, countByKey } from '../lib/records/charts';
-import { ROW_CAP } from '../lib/records/ckan';
+import { ledgerModel } from '../lib/records/ledger';
 import { FY2026_RESOURCE_ID } from '../lib/records/sources/boston/assessor';
-import { PERMITS_RESOURCE_ID, PERMIT_COVERAGE_START } from '../lib/records/sources/boston/permits';
-import { VIOLATIONS_RESOURCE_ID } from '../lib/records/sources/boston/violations';
-import { ENFORCEMENT_RESOURCE_ID } from '../lib/records/sources/boston/enforcement';
-import {
-  NEW_311_RESOURCE_ID,
-  HOUSING_REASONS,
-  HOUSING_DEPARTMENT_PREFIX,
-} from '../lib/records/sources/boston/serviceRequests';
+import { PERMIT_COVERAGE_START } from '../lib/records/sources/boston/permits';
+import { HOUSING_REASONS, HOUSING_DEPARTMENT_PREFIX } from '../lib/records/sources/boston/serviceRequests';
 import RecordCorrectionForm from './records/RecordCorrectionForm';
 import CorrectionNotes from './records/CorrectionNotes.astro';
 import FactsStrip from './records/FactsStrip.astro';
 import LedgerRow from './records/LedgerRow.astro';
+import RecordList from './records/RecordList.astro';
+import SourceState from './records/SourceState.astro';
 import YearBars from './records/YearBars.astro';
 import CategoryBars from './records/CategoryBars.astro';
-import StatusToken from './records/StatusToken.astro';
 import type { RecordKind } from '../lib/records/types';
 
 interface Props {
@@ -73,33 +62,12 @@ try {
 }
 
 const current = view?.assessments[0] ?? null;
-const permits = view ? permitSummary(view.permits) : null;
-const requests = view ? splitServiceRequests(view.serviceRequests) : null;
-const rentSmartNote = view && requests ? rentSmartDisagreement(view.rentsmart, requests.housing.length) : null;
-
-/** null when this source has never been pulled for this building, which is not the same as empty. */
-function statusFor(sourceId: string) {
-  return view?.sources[sourceId] ?? null;
-}
-
-/** A source that failed its most recent attempt and left no rows behind has nothing to show. */
-function unavailable(sourceId: string, kindHasRows: boolean): boolean {
-  return statusFor(sourceId)?.status === 'error' && !kindHasRows;
-}
+const assessorStatus = view?.sources[FY2026_RESOURCE_ID] ?? null;
+const ledger = view ? ledgerModel(view, new Date()) : null;
 
 /** A correction with no kind was filed against the pull as a whole, so it shows everywhere. */
 function notesFor(kind: string) {
   return (view?.corrections ?? []).filter((note) => note.recordKind === kind || note.recordKind === null);
-}
-
-/**
- * The CKAN row cap is a hard slice, so a full page means there may be more upstream.
- * Counts validated rows only: a row rejected by `validatePayload` never reaches this count, so
- * a capped pull whose rows partly failed validation undercounts and the note stays off. That
- * undercount is the safe direction — the kind is already flagged as unreadable above.
- */
-function capped(rowCount: number): boolean {
-  return rowCount >= ROW_CAP;
 }
 
 /** A kind written by an older build has no label; show its stored name rather than "undefined". */
@@ -107,66 +75,14 @@ function kindLabel(kind: string): string {
   return KIND_LABELS[kind as RecordKind] ?? kind;
 }
 
-const assessorStatus = statusFor(FY2026_RESOURCE_ID);
-const permitStatus = statusFor(PERMITS_RESOURCE_ID);
-const violationStatus = statusFor(VIOLATIONS_RESOURCE_ID);
-const enforcementStatus = statusFor(ENFORCEMENT_RESOURCE_ID);
-const requestStatus = statusFor(NEW_311_RESOURCE_ID);
-
-/**
- * Whether a row's figures mean anything yet. A source nobody has queried has no count — not a
- * zero — and neither does one whose only attempt failed, so both render `—` rather than a
- * number a reader would take as a finding.
- */
-function countable(status: unknown, sourceId: string, hasRows: boolean): boolean {
-  return status !== null && !unavailable(sourceId, hasRows);
-}
-
-const housing = requests?.housing ?? [];
-const requestsCountable = countable(requestStatus, NEW_311_RESOURCE_ID, (view?.serviceRequests.length ?? 0) > 0);
-const requestYears = countByYear(housing, (row) => row.openedAt);
-const requestTypes = countByKey(housing, (row) => row.type ?? row.title, 6);
-const openRequests = housing.filter((row) => isOpenStatus(row.status));
-
-const permitsCountable = countable(permitStatus, PERMITS_RESOURCE_ID, (view?.permits.length ?? 0) > 0);
-const permitYears = countByYear(view?.permits ?? [], (row) => row.issuedDate);
-const permitTypes = countByKey(view?.permits ?? [], (row) => row.description ?? row.permitType ?? row.workType, 6);
-const openPermits = (view?.permits ?? []).filter((row) => isOpenStatus(row.status));
-const permitSubCount = permits
-  ? openSubCount(openPermits.length, permits.count) +
-    (permits.declaredTotal === null ? '' : ` · ${formatDollarsCompact(permits.declaredTotal)} declared`)
-  : '';
-
-const enforcementCountable = countable(enforcementStatus, ENFORCEMENT_RESOURCE_ID, (view?.enforcement.length ?? 0) > 0);
-const enforcementYears = countByYear(view?.enforcement ?? [], (row) => row.statusDate);
-const enforcementTypes = countByKey(view?.enforcement ?? [], (row) => row.description, 6);
-const openEnforcement = (view?.enforcement ?? []).filter((row) => isOpenStatus(row.status));
-
-const violationsCountable = countable(violationStatus, VIOLATIONS_RESOURCE_ID, (view?.violations.length ?? 0) > 0);
-const violationYears = countByYear(view?.violations ?? [], (row) => row.statusDate);
-const openViolations = (view?.violations ?? []).filter((row) => isOpenStatus(row.status));
-
-// Open rows first, then everything else, each group keeping the query's date order.
-const violationsOrdered = view
-  ? [
-      ...view.violations.filter((row) => isOpenStatus(row.status)),
-      ...view.violations.filter((row) => !isOpenStatus(row.status)),
-    ]
-  : [];
-
-const rowClass = 'grid grid-cols-1 sm:grid-cols-[7rem_1fr_auto] gap-x-2 gap-y-0.5 py-2';
-const listClass = 'divide-y divide-gray-100 text-sm mt-2';
 const bodyClass = 'text-sm text-gray-600';
 const noteClass = 'text-xs text-gray-500 mt-2';
 const chartsClass = 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5';
 const disclosureClass =
   'mt-4 text-sm text-teal-700 cursor-pointer list-none [&::-webkit-details-marker]:hidden underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700';
-
-/** A source nobody has queried has no finding to report — not an empty one, none at all. */
-const NEVER_PULLED_COPY = 'Not retrieved yet.';
 ---
 
-{view && (
+{view && ledger && (
   <section id="public-records" class="bg-white rounded-[6px] border border-gray-200 p-6 mb-8">
     <div class="flex flex-wrap items-start justify-between gap-x-4">
       <div>
@@ -186,209 +102,142 @@ const NEVER_PULLED_COPY = 'Not retrieved yet.';
       </p>
     )}
 
-    {assessorStatus === null ? (
-      <p class={`${bodyClass} mt-4`}>{NEVER_PULLED_COPY}</p>
-    ) : unavailable(FY2026_RESOURCE_ID, view.assessments.length > 0) ? (
-      <p class={`${bodyClass} mt-4`}>Record unavailable. Last attempt {formatPullDate(assessorStatus.retrievedAt)}.</p>
-    ) : current === null ? (
-      <p class={`${bodyClass} mt-4`}>No assessor record on file.</p>
-    ) : current.condominium ? (
-      /* A condominium parcel's assessed values are the unit's, not the building's, and the
-         panel does not name an owner for one — so it does not chart one either. */
-      <p class={`${bodyClass} mt-4`}>{CONDOMINIUM_COPY}</p>
-    ) : (
-      <FactsStrip current={current} all={view.assessments} />
-    )}
+    <div class="mt-4">
+      <SourceState status={assessorStatus} hasRows={view.assessments.length > 0}>
+        {current === null ? (
+          <p class={bodyClass}>No assessor record on file.</p>
+        ) : current.condominium ? (
+          /* A condominium parcel's assessed values are the unit's, not the building's, and the
+             panel does not name an owner for one — so it does not chart one either. */
+          <p class={bodyClass}>{CONDOMINIUM_COPY}</p>
+        ) : (
+          <FactsStrip current={current} all={view.assessments} />
+        )}
+      </SourceState>
+    </div>
     <CorrectionNotes notes={notesFor('assessment')} />
 
     <div class="mt-6 border-b border-gray-200">
       <LedgerRow
         title="311 housing requests"
-        status={requestStatus}
-        hasRows={view.serviceRequests.length > 0}
-        span={yearSpanLabel(requestYears)}
-        note={requestsCountable && requests!.otherCount > 0
-          ? `${requests!.otherCount} other request${requests!.otherCount === 1 ? '' : 's'} not shown`
-          : null}
-        count={requestsCountable ? String(housing.length) : '—'}
-        subCount={requestsCountable ? openSubCount(openRequests.length, housing.length) : ''}
+        status={ledger.requests.status}
+        hasRows={ledger.requests.hasRows}
+        span={ledger.requests.span}
+        note={ledger.requests.note}
+        count={ledger.requests.count}
+        subCount={ledger.requests.subCount}
         open={true}>
-        {requestStatus === null ? (
-          <p class={bodyClass}>{NEVER_PULLED_COPY}</p>
-        ) : unavailable(NEW_311_RESOURCE_ID, view.serviceRequests.length > 0) ? (
-          <p class={bodyClass}>Record unavailable. Last attempt {formatPullDate(requestStatus.retrievedAt)}.</p>
-        ) : (
-          <>
-            <div class={chartsClass}>
-              <YearBars title="Requests by year opened" series={requestYears} noun="requests" />
-              <CategoryBars title="What was reported" breakdown={requestTypes} restNoun="requests" />
-            </div>
-            <p class={noteClass}>
-              How requests are classified: a request is housing-related when the city files it under{' '}
-              {HOUSING_REASONS.join(', ')}, or routes it to {HOUSING_DEPARTMENT_PREFIX}. {OTHER_REQUESTS_COPY}
-            </p>
-            {openRequests.length > 0 && (
-              <>
-                <h4 class="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Open now ({openRequests.length})
-                </h4>
-                <ul class={listClass}>
-                  {openRequests.map((request) => (
-                    <li class={rowClass}>
-                      <span class="text-gray-500">{formatRecordDate(request.openedAt)}</span>
-                      <span class="text-gray-900">{request.type ?? request.title ?? 'Request'}</span>
-                      <span class="text-xs sm:text-right"><StatusToken status={request.status} /></span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            {housing.length > 0 && (
-              <details>
-                <summary class={disclosureClass}>Show all {housing.length} requests</summary>
-                <ul class={listClass}>
-                  {housing.map((request) => (
-                    <li class={rowClass}>
-                      <span class="text-gray-500">{formatRecordDate(request.openedAt)}</span>
-                      <span class="text-gray-900">{request.type ?? request.title ?? 'Request'}</span>
-                      <span class="text-xs sm:text-right">
-                        <StatusToken status={request.status} />
-                        {request.closedAt && <span class="text-gray-500"> · closed {formatRecordDate(request.closedAt)}</span>}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-            {capped(view.serviceRequests.length) && (
-              <p class={noteClass}>First {ROW_CAP} requests considered.</p>
-            )}
-            {/* Only alongside the counts it disagrees with. Under "Record unavailable" or
-                "Not retrieved yet" there is nothing above for it to disagree with. */}
-            {rentSmartNote && <p class={noteClass}>{rentSmartNote}</p>}
-          </>
-        )}
-        <CorrectionNotes notes={notesFor('service_request')} />
+        <SourceState status={ledger.requests.status} hasRows={ledger.requests.hasRows}>
+          <div class={chartsClass}>
+            <YearBars title="Requests by year opened" series={ledger.requests.years} noun="requests" />
+            <CategoryBars title="What was reported" breakdown={ledger.requests.types} restNoun="requests" />
+          </div>
+          <p class={noteClass}>
+            How requests are classified: a request is housing-related when the city files it under{' '}
+            {HOUSING_REASONS.join(', ')}, or routes it to {HOUSING_DEPARTMENT_PREFIX}. {OTHER_REQUESTS_COPY}
+          </p>
+          {ledger.requests.openRows.length > 0 && (
+            <>
+              <h4 class="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Open now ({ledger.requests.openRows.length})
+              </h4>
+              <RecordList rows={ledger.requests.openRows} />
+            </>
+          )}
+          {ledger.requests.rows.length > 0 && (
+            <details>
+              <summary class={disclosureClass}>Show all {ledger.requests.rows.length} requests</summary>
+              <RecordList rows={ledger.requests.rows} cappedNote={ledger.requests.cappedNote} />
+            </details>
+          )}
+          {/* Only alongside the counts it disagrees with. Under "Record unavailable" or
+              "Not retrieved yet" there is nothing above for it to disagree with. */}
+          {ledger.requests.rentSmartNote && <p class={noteClass}>{ledger.requests.rentSmartNote}</p>}
+        </SourceState>
       </LedgerRow>
+      {/* Outside the disclosure on purpose: a correction someone already filed against this
+          source is context for the count, and a reader who never opens the row must still see it. */}
+      <CorrectionNotes notes={notesFor('service_request')} />
 
       <LedgerRow
         title="Building permits"
-        status={permitStatus}
-        hasRows={view.permits.length > 0}
-        span={yearSpanLabel(permitYears)}
-        count={permitsCountable ? String(permits!.count) : '—'}
-        subCount={permitsCountable ? permitSubCount : ''}>
-        {permitStatus === null ? (
-          <p class={bodyClass}>{NEVER_PULLED_COPY}</p>
-        ) : unavailable(PERMITS_RESOURCE_ID, view.permits.length > 0) ? (
-          <p class={bodyClass}>Record unavailable. Last attempt {formatPullDate(permitStatus.retrievedAt)}.</p>
-        ) : permits!.count === 0 ? (
-          <p class={bodyClass}>{ZERO_PERMITS_COPY}</p>
-        ) : (
-          <>
-            <div class={chartsClass}>
-              <YearBars title="Permits by year issued" series={permitYears} noun="permits" />
-              <CategoryBars title="Type of work" breakdown={permitTypes} restNoun="permits" />
-            </div>
-            <p class={noteClass}>
-              On record from {PERMIT_COVERAGE_START}.{' '}
-              {permits!.declaredTotal === null
-                ? 'No declared valuation recorded.'
-                : `Total declared valuation ${formatDollars(permits!.declaredTotal)}${
-                    permits!.declaredCount < permits!.count
-                      ? ` (recorded for ${permits!.declaredCount} of ${permits!.count} permits)`
-                      : ''
-                  }.`}{' '}
-              {DECLARED_VALUATION_CAVEAT}
-            </p>
-            <details>
-              <summary class={disclosureClass}>Show all {permits!.count} permits</summary>
-              <ul class={listClass}>
-                {view.permits.map((permit) => (
-                  <li class={rowClass}>
-                    <span class="text-gray-500">{formatRecordDate(permit.issuedDate)}</span>
-                    <span class="text-gray-900">
-                      {permit.permitType ?? permit.workType ?? 'Permit'}{permit.description ? ` · ${permit.description}` : ''}
-                    </span>
-                    <span class="text-xs sm:text-right"><StatusToken status={permit.status} /></span>
-                  </li>
-                ))}
-              </ul>
-            </details>
-            {capped(view.permits.length) && <p class={noteClass}>First {ROW_CAP} shown.</p>}
-          </>
-        )}
-        <CorrectionNotes notes={notesFor('permit')} />
+        status={ledger.permits.status}
+        hasRows={ledger.permits.hasRows}
+        span={ledger.permits.span}
+        count={ledger.permits.count}
+        subCount={ledger.permits.subCount}>
+        <SourceState status={ledger.permits.status} hasRows={ledger.permits.hasRows}>
+          {ledger.permits.summary.count === 0 ? (
+            <p class={bodyClass}>{ZERO_PERMITS_COPY}</p>
+          ) : (
+            <>
+              <div class={chartsClass}>
+                <YearBars title="Permits by year issued" series={ledger.permits.years} noun="permits" />
+                <CategoryBars title="Type of work" breakdown={ledger.permits.types} restNoun="permits" />
+              </div>
+              <p class={noteClass}>
+                On record from {PERMIT_COVERAGE_START}.{' '}
+                {ledger.permits.summary.declaredTotal === null
+                  ? 'No declared valuation recorded.'
+                  : `Total declared valuation ${formatDollars(ledger.permits.summary.declaredTotal)}${
+                      ledger.permits.summary.declaredCount < ledger.permits.summary.count
+                        ? ` (recorded for ${ledger.permits.summary.declaredCount} of ${ledger.permits.summary.count} permits)`
+                        : ''
+                    }.`}{' '}
+                {DECLARED_VALUATION_CAVEAT}
+              </p>
+              <details>
+                <summary class={disclosureClass}>Show all {ledger.permits.summary.count} permits</summary>
+                <RecordList rows={ledger.permits.rows} cappedNote={ledger.permits.cappedNote} />
+              </details>
+            </>
+          )}
+        </SourceState>
       </LedgerRow>
+      <CorrectionNotes notes={notesFor('permit')} />
 
       <LedgerRow
         title="Code enforcement tickets"
-        status={enforcementStatus}
-        hasRows={view.enforcement.length > 0}
-        span={yearSpanLabel(enforcementYears)}
-        count={enforcementCountable ? String(view.enforcement.length) : '—'}
-        subCount={enforcementCountable ? openSubCount(openEnforcement.length, view.enforcement.length) : ''}>
-        {enforcementStatus === null ? (
-          <p class={bodyClass}>{NEVER_PULLED_COPY}</p>
-        ) : unavailable(ENFORCEMENT_RESOURCE_ID, view.enforcement.length > 0) ? (
-          <p class={bodyClass}>Record unavailable. Last attempt {formatPullDate(enforcementStatus.retrievedAt)}.</p>
-        ) : view.enforcement.length === 0 ? (
-          <p class={bodyClass}>No code enforcement tickets on record.</p>
-        ) : (
-          <>
-            <CategoryBars title="What was ticketed" breakdown={enforcementTypes} restNoun="tickets" />
-            <details>
-              <summary class={disclosureClass}>Show all {view.enforcement.length} tickets</summary>
-              <ul class={listClass}>
-                {view.enforcement.map((ticket) => (
-                  <li class={rowClass}>
-                    <span class="text-gray-500">{formatRecordDate(ticket.statusDate)}</span>
-                    <span class="text-gray-900">{orNotRecorded(ticket.description)}</span>
-                    <span class="text-xs sm:text-right"><StatusToken status={ticket.status} /></span>
-                  </li>
-                ))}
-              </ul>
-            </details>
-            {capped(view.enforcement.length) && <p class={noteClass}>First {ROW_CAP} shown.</p>}
-          </>
-        )}
-        <CorrectionNotes notes={notesFor('enforcement_ticket')} />
+        status={ledger.enforcement.status}
+        hasRows={ledger.enforcement.hasRows}
+        span={ledger.enforcement.span}
+        count={ledger.enforcement.count}
+        subCount={ledger.enforcement.subCount}>
+        <SourceState status={ledger.enforcement.status} hasRows={ledger.enforcement.hasRows}>
+          {ledger.enforcement.rows.length === 0 ? (
+            <p class={bodyClass}>No code enforcement tickets on record.</p>
+          ) : (
+            <>
+              <CategoryBars title="What was ticketed" breakdown={ledger.enforcement.types} restNoun="tickets" />
+              <details>
+                <summary class={disclosureClass}>Show all {ledger.enforcement.rows.length} tickets</summary>
+                <RecordList rows={ledger.enforcement.rows} cappedNote={ledger.enforcement.cappedNote} />
+              </details>
+            </>
+          )}
+        </SourceState>
       </LedgerRow>
+      <CorrectionNotes notes={notesFor('enforcement_ticket')} />
 
       <LedgerRow
         title="ISD violations"
-        status={violationStatus}
-        hasRows={view.violations.length > 0}
-        span={yearSpanLabel(violationYears)}
-        count={violationsCountable ? String(view.violations.length) : '—'}
-        subCount={violationsCountable ? openSubCount(openViolations.length, view.violations.length) : ''}>
-        {violationStatus === null ? (
-          <p class={bodyClass}>{NEVER_PULLED_COPY}</p>
-        ) : unavailable(VIOLATIONS_RESOURCE_ID, view.violations.length > 0) ? (
-          <p class={bodyClass}>Record unavailable. Last attempt {formatPullDate(violationStatus.retrievedAt)}.</p>
-        ) : view.violations.length === 0 ? (
-          <>
-            <p class={bodyClass}>No violations on record.</p>
-            <p class={noteClass}>{NO_VIOLATIONS_CAVEAT}</p>
-          </>
-        ) : (
-          <>
-            <ul class={listClass}>
-              {violationsOrdered.map((violation) => (
-                <li class={rowClass}>
-                  <span class="text-gray-500">{formatRecordDate(violation.statusDate)}</span>
-                  <span class="text-gray-900">
-                    {[violation.code, violation.description].filter(Boolean).join(' · ') || 'Violation'}
-                  </span>
-                  <span class="text-xs sm:text-right"><StatusToken status={violation.status} /></span>
-                </li>
-              ))}
-            </ul>
-            {capped(view.violations.length) && <p class={noteClass}>First {ROW_CAP} shown.</p>}
-          </>
-        )}
-        <CorrectionNotes notes={notesFor('violation')} />
+        status={ledger.violations.status}
+        hasRows={ledger.violations.hasRows}
+        span={ledger.violations.span}
+        count={ledger.violations.count}
+        subCount={ledger.violations.subCount}>
+        <SourceState status={ledger.violations.status} hasRows={ledger.violations.hasRows}>
+          {ledger.violations.rows.length === 0 ? (
+            <>
+              <p class={bodyClass}>No violations on record.</p>
+              <p class={noteClass}>{NO_VIOLATIONS_CAVEAT}</p>
+            </>
+          ) : (
+            <RecordList rows={ledger.violations.rows} cappedNote={ledger.violations.cappedNote} />
+          )}
+        </SourceState>
       </LedgerRow>
+      <CorrectionNotes notes={notesFor('violation')} />
     </div>
 
     <div id="report-record" class="border-t border-gray-200 pt-4 mt-6">
