@@ -12,7 +12,15 @@ import { calculateBuildingAverages, getRecencyWeight, getReviewYear } from '../.
 import { currentReviewYear } from '../../lib/scoring-sql';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 import { humanize } from '../../lib/format';
-import { hasBuildingDetails } from '../../lib/buildingDetails';
+import { BUILDING_DETAIL_FIELDS, hasBuildingDetails } from '../../lib/buildingDetails';
+
+// Label and formatter for each field in BUILDING_DETAIL_FIELDS, in display order —
+// keeps the <dl> rows and the hasBuildingDetails check from drifting.
+const buildingDetailRows: Record<(typeof BUILDING_DETAIL_FIELDS)[number], { label: string; format: (building: any) => unknown }> = {
+  building_type: { label: 'Type', format: (b) => humanize(b.building_type) },
+  year_built: { label: 'Year built', format: (b) => b.year_built },
+  unit_count: { label: 'Units', format: (b) => b.unit_count },
+};
 
 const { slug } = Astro.params;
 const submitted = Astro.url.searchParams.get('submitted') === 'true';
@@ -279,31 +287,59 @@ const showBuildingDetails = hasBuildingDetails(building);
     </div>
 
     <div class="grid lg:grid-cols-3 gap-8">
+      <!-- Sidebar -->
+      <div class="lg:col-start-3 lg:row-start-1 lg:col-span-1 lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
+        {scores && <ScoreCard scores={scores} type="building" />}
+
+        {scores && scores.review_count > 0 && (
+          <div class="bg-white rounded-[6px] border border-gray-200 p-6 mt-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Common issues reported</h3>
+            <ul class="space-y-2 text-sm">
+              {scores.pct_pest_issues > 0 && (
+                <li class="flex justify-between">
+                  <span class="text-gray-600">Pest issues</span>
+                  <span class="text-red-600 font-medium">{Math.round(scores.pct_pest_issues)}%</span>
+                </li>
+              )}
+              {scores.pct_heat_issues > 0 && (
+                <li class="flex justify-between">
+                  <span class="text-gray-600">Heat/hot water issues</span>
+                  <span class="text-orange-600 font-medium">{Math.round(scores.pct_heat_issues)}%</span>
+                </li>
+              )}
+              {scores.pct_water_issues > 0 && (
+                <li class="flex justify-between">
+                  <span class="text-gray-600">Water/plumbing issues</span>
+                  <span class="text-blue-600 font-medium">{Math.round(scores.pct_water_issues)}%</span>
+                </li>
+              )}
+              {scores.pct_deposit_issues > 0 && (
+                <li class="flex justify-between">
+                  <span class="text-gray-600">Deposit issues</span>
+                  <span class="text-yellow-600 font-medium">{Math.round(scores.pct_deposit_issues)}%</span>
+                </li>
+              )}
+            </ul>
+            {scores.pct_pest_issues === 0 && scores.pct_heat_issues === 0 && scores.pct_water_issues === 0 && scores.pct_deposit_issues === 0 && (
+              <p class="text-gray-500 text-sm">No issues reported</p>
+            )}
+          </div>
+        )}
+      </div>
+
       <!-- Main Content -->
-      <div class="lg:col-span-2 order-2 lg:order-none">
+      <div class="lg:col-start-1 lg:row-start-1 lg:col-span-2">
         <!-- Building Details -->
         {showBuildingDetails && (
           <div class="bg-white rounded-[6px] border border-gray-200 p-6 mb-8">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Building details</h2>
             <dl class="grid grid-cols-2 gap-4">
-              {building.building_type && (
+              {BUILDING_DETAIL_FIELDS.map((field) => building[field] && (
                 <>
-                  <dt class="text-gray-500">Type</dt>
-                  <dd class="text-gray-900">{humanize(building.building_type)}</dd>
+                  <dt class="text-gray-500">{buildingDetailRows[field].label}</dt>
+                  <dd class="text-gray-900">{buildingDetailRows[field].format(building)}</dd>
                 </>
-              )}
-              {building.year_built && (
-                <>
-                  <dt class="text-gray-500">Year built</dt>
-                  <dd class="text-gray-900">{building.year_built}</dd>
-                </>
-              )}
-              {building.unit_count && (
-                <>
-                  <dt class="text-gray-500">Units</dt>
-                  <dd class="text-gray-900">{building.unit_count}</dd>
-                </>
-              )}
+              ))}
             </dl>
           </div>
         )}
@@ -399,49 +435,10 @@ const showBuildingDetails = hasBuildingDetails(building);
 
         <UGCDisclaimer />
       </div>
-
-      <!-- Sidebar -->
-      <div class="lg:col-span-1 order-1 lg:order-none lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
-        {scores && <ScoreCard scores={scores} type="building" />}
-
-        {scores && scores.review_count > 0 && (
-          <div class="bg-white rounded-[6px] border border-gray-200 p-6 mt-6">
-            <h3 class="font-semibold text-gray-900 mb-4">Common issues reported</h3>
-            <ul class="space-y-2 text-sm">
-              {scores.pct_pest_issues > 0 && (
-                <li class="flex justify-between">
-                  <span class="text-gray-600">Pest issues</span>
-                  <span class="text-red-600 font-medium">{Math.round(scores.pct_pest_issues)}%</span>
-                </li>
-              )}
-              {scores.pct_heat_issues > 0 && (
-                <li class="flex justify-between">
-                  <span class="text-gray-600">Heat/hot water issues</span>
-                  <span class="text-orange-600 font-medium">{Math.round(scores.pct_heat_issues)}%</span>
-                </li>
-              )}
-              {scores.pct_water_issues > 0 && (
-                <li class="flex justify-between">
-                  <span class="text-gray-600">Water/plumbing issues</span>
-                  <span class="text-blue-600 font-medium">{Math.round(scores.pct_water_issues)}%</span>
-                </li>
-              )}
-              {scores.pct_deposit_issues > 0 && (
-                <li class="flex justify-between">
-                  <span class="text-gray-600">Deposit issues</span>
-                  <span class="text-yellow-600 font-medium">{Math.round(scores.pct_deposit_issues)}%</span>
-                </li>
-              )}
-            </ul>
-            {scores.pct_pest_issues === 0 && scores.pct_heat_issues === 0 && scores.pct_water_issues === 0 && scores.pct_deposit_issues === 0 && (
-              <p class="text-gray-500 text-sm">No issues reported</p>
-            )}
-          </div>
-        )}
-      </div>
     </div>
 
-    <!-- Public records sit below the reviews: reviews are the judgment layer, records the reference. -->
+    <!-- Public records sit below the reviews and the rating sidebar: reviews and
+         the sidebar are the judgment layer, records are the reference. -->
     <div class="max-w-3xl mt-8">
       <BuildingRecords buildingId={building.id} />
     </div>
