@@ -43,6 +43,27 @@ describe('displayLocality', () => {
   it('handles a missing address gracefully (no street words to match)', () => {
     expect(displayLocality({ address: null, neighborhood: 'Allston', city: 'Boston' })).toBe('Allston');
   });
+
+  it('trusts a known neighborhood even when it is also a street word', () => {
+    expect(
+      displayLocality({ address: '100 Roxbury St', neighborhood: 'Roxbury', city: 'Boston' })
+    ).toBe('Roxbury');
+    expect(
+      displayLocality({ address: '1234 Dorchester Ave', neighborhood: 'Dorchester', city: 'Boston' })
+    ).toBe('Dorchester');
+  });
+
+  it('still falls back to city for an unlisted street-name neighborhood', () => {
+    expect(
+      displayLocality({ address: '84 East Newton Street', neighborhood: 'Newton', city: 'Boston' })
+    ).toBe('Boston');
+  });
+
+  it('strips punctuation attached to an address word before matching', () => {
+    expect(
+      displayLocality({ address: '1027 Commonwealth, Boston', neighborhood: 'Commonwealth', city: 'Boston' })
+    ).toBe('Boston');
+  });
 });
 
 describe('localityLine', () => {
@@ -70,5 +91,10 @@ describe('localityLine', () => {
 
   it('handles a city-only building with a state', () => {
     expect(localityLine({ address: '1 Main St', neighborhood: null, city: 'Boston' }, 'MA')).toBe('Boston, MA');
+  });
+
+  it('does not render a bare state when both neighborhood and city are missing', () => {
+    expect(localityLine({ address: '1 Main St', neighborhood: null, city: null }, 'MA')).toBe('');
+    expect(localityLine({ address: '1 Main St', neighborhood: undefined, city: undefined }, 'MA')).toBe('');
   });
 });

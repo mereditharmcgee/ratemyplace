@@ -33,7 +33,28 @@ describe('ProfileDashboard tabs', () => {
     expect(tabs.className).toContain('whitespace-nowrap');
   });
 
-  it('shows "My Reviews" once as a tab and never repeats it as a heading in the panel', async () => {
+  it('marks the active tab with aria-current="true" and the others without it', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ reviews: [] }),
+    }));
+
+    render(<ProfileDashboard {...baseProps} />);
+
+    const tabs = await screen.findByRole('navigation', { name: 'Tabs' });
+    const reviewsTab = within(tabs).getByText(/My Reviews/).closest('button')!;
+    const savedTab = within(tabs).getByText(/Saved Buildings/).closest('button')!;
+
+    expect(reviewsTab.getAttribute('aria-current')).toBe('true');
+    expect(savedTab.getAttribute('aria-current')).toBeNull();
+
+    fireEvent.click(savedTab);
+
+    expect(savedTab.getAttribute('aria-current')).toBe('true');
+    expect(reviewsTab.getAttribute('aria-current')).toBeNull();
+  });
+
+  it('shows "My Reviews" once as a tab and never repeats it as a VISIBLE heading in the panel', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ reviews: [] }),
@@ -49,16 +70,18 @@ describe('ProfileDashboard tabs', () => {
     const reviewsTab = within(tabs).getByText(/My Reviews/);
     expect(reviewsTab.tagName).toBe('BUTTON');
 
-    // No h1/h2/h3 anywhere in the panel should repeat "My Reviews" — the tab
-    // button is the only place that label appears.
+    // No *visible* h1/h2/h3 in the panel should repeat "My Reviews" — a
+    // sr-only heading carrying that label for screen readers is fine, since
+    // it's never visually rendered alongside the tab button.
     const headings = Array.from(container.querySelectorAll('h1, h2, h3'));
-    expect(headings.some((h) => h.textContent?.includes('My Reviews'))).toBe(false);
+    const visibleHeadings = headings.filter((h) => !h.classList.contains('sr-only'));
+    expect(visibleHeadings.some((h) => h.textContent?.includes('My Reviews'))).toBe(false);
 
     // The "Write a review" action should still be present.
     expect(container.textContent).toContain('Write a Review');
   });
 
-  it('does not repeat "Notifications" as a heading under the Notifications tab', async () => {
+  it('does not repeat "Notifications" as a VISIBLE heading under the Notifications tab', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/notifications')) {
         return Promise.resolve({ ok: true, json: async () => ({ notifications: [] }) });
@@ -77,7 +100,8 @@ describe('ProfileDashboard tabs', () => {
 
     await waitFor(() => {
       const headings = Array.from(container.querySelectorAll('h1, h2, h3'));
-      expect(headings.some((h) => h.textContent?.trim() === 'Notifications')).toBe(false);
+      const visibleHeadings = headings.filter((h) => !h.classList.contains('sr-only'));
+      expect(visibleHeadings.some((h) => h.textContent?.trim() === 'Notifications')).toBe(false);
     });
   });
 });

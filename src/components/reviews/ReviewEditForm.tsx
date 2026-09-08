@@ -19,6 +19,7 @@ import {
 } from '../../lib/formOptions';
 import { HelpTooltip } from './HelpTooltip';
 import type { ReviewDetail } from '../../pages/api/reviews/[id]';
+import { localityLine } from '../../lib/locality';
 
 interface Props {
   review: ReviewDetail;
@@ -275,7 +276,7 @@ export default function ReviewEditForm({ review }: Props) {
       <div className="bg-paper p-4 rounded-[6px]">
         <div className="font-medium text-gray-900">{review.building_address}</div>
         <div className="text-sm text-gray-500">
-          {review.neighborhood && `${review.neighborhood}, `}{review.city}
+          {localityLine({ address: review.building_address, neighborhood: review.neighborhood, city: review.city })}
         </div>
         <div className="text-xs text-gray-400 mt-1">
           Move-in: {review.move_in_season} {review.move_in_year}

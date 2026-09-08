@@ -36,11 +36,14 @@ describe('methodology.astro contents nav', () => {
     const nav = navMatch![0];
 
     // The nav renders one <li>/<a> per entry in sectionHeadings, linking to
-    // `#${heading.id}` and printing `{heading.title}` — the same array that
-    // stamps ids onto every h2 further down the page.
+    // each heading's id and printing its title — the same array that stamps
+    // ids onto every h2 further down the page. This only asserts that
+    // `heading.id` and `heading.title` are referenced somewhere in the nav;
+    // it doesn't pin the exact interpolation syntax (template literal vs.
+    // string concatenation vs. anything else).
     expect(nav).toMatch(/sectionHeadings\.map/);
-    expect(nav).toMatch(/href=\{`#\$\{heading\.id\}`\}/);
-    expect(nav).toMatch(/\{heading\.title\}/);
+    expect(nav).toContain('heading.id');
+    expect(nav).toContain('heading.title');
 
     const sectionHeadingsMatch = source.match(/const sectionHeadings = \[([\s\S]*?)\]\.map/);
     expect(sectionHeadingsMatch).not.toBeNull();
@@ -91,8 +94,18 @@ describe('methodology.astro health/safety weighting disclosures', () => {
   });
 
   it('opens exactly the first weighting disclosure by default', () => {
-    const detailsBlocks = [...source.matchAll(/<details([^>]*)>/g)];
-    // Scope to the six weighting <details> — they're the only <details> on the page.
+    // Scope to the "Health and safety weighting" section specifically —
+    // the substring between its h2 (not the contents-nav link of the same
+    // text, which appears earlier in the page) and the next h2 — rather
+    // than assuming its six <details> are the only ones on the page.
+    const h2Match = source.match(/<h2[^>]*>Health and safety weighting<\/h2>/);
+    expect(h2Match).not.toBeNull();
+    const sectionStart = h2Match!.index! + h2Match![0].length;
+    const nextH2 = source.indexOf('<h2', sectionStart);
+    expect(nextH2).toBeGreaterThan(-1);
+    const section = source.slice(sectionStart, nextH2);
+
+    const detailsBlocks = [...section.matchAll(/<details([^>]*)>/g)];
     expect(detailsBlocks.length).toBe(6);
     expect(detailsBlocks[0][1]).toMatch(/\bopen\b/);
     for (const block of detailsBlocks.slice(1)) {

@@ -62,6 +62,18 @@ const sectionHeadings = [
   'Tenants are the experts',
 ].map((title) => ({ title, id: slugify(title) }));
 
+// Guard against two headings slugifying to the same id — that would make the
+// contents nav silently link two entries to one anchor.
+{
+  const seenIds = new Set<string>();
+  for (const heading of sectionHeadings) {
+    if (seenIds.has(heading.id)) {
+      throw new Error(`methodology.astro: duplicate section heading id "${heading.id}"`);
+    }
+    seenIds.add(heading.id);
+  }
+}
+
 const realExamples = [
   {
     address: '38 Edgemere Road',
@@ -253,10 +265,13 @@ const realExamples = [
 
       <div class="space-y-4">
         <!-- Pests -->
-        <details open class="bg-white border border-gray-200 rounded-[6px] p-6">
-          <summary class="flex items-center gap-2 mb-2 cursor-pointer">
+        <details open class="group bg-white border border-gray-200 rounded-[6px] p-6">
+          <summary class="flex items-center gap-2 mb-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600">
             <span class="px-2 py-1 bg-red-100 text-red-700 text-sm font-bold rounded">1.5x Weight</span>
-            <h3 class="font-semibold text-gray-900 inline">Pest control</h3>
+            <h3 class="font-semibold text-gray-900">Pest control</h3>
+            <svg aria-hidden="true" class="w-4 h-4 ml-auto text-gray-400 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
           </summary>
           <p class="text-gray-600 text-sm">
             Pest infestations (cockroaches, rodents, bed bugs) are strongly associated with asthma,
@@ -269,10 +284,13 @@ const realExamples = [
         </details>
 
         <!-- Mold -->
-        <details class="bg-white border border-gray-200 rounded-[6px] p-6">
-          <summary class="flex items-center gap-2 mb-2 cursor-pointer">
+        <details class="group bg-white border border-gray-200 rounded-[6px] p-6">
+          <summary class="flex items-center gap-2 mb-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600">
             <span class="px-2 py-1 bg-red-100 text-red-700 text-sm font-bold rounded">1.5x Weight</span>
-            <h3 class="font-semibold text-gray-900 inline">Mold and moisture</h3>
+            <h3 class="font-semibold text-gray-900">Mold and moisture</h3>
+            <svg aria-hidden="true" class="w-4 h-4 ml-auto text-gray-400 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
           </summary>
           <p class="text-gray-600 text-sm">
             Visible mold and dampness are associated with a 1.5-3.5x increased odds ratio for
@@ -285,10 +303,13 @@ const realExamples = [
         </details>
 
         <!-- Structural -->
-        <details class="bg-white border border-gray-200 rounded-[6px] p-6">
-          <summary class="flex items-center gap-2 mb-2 cursor-pointer">
+        <details class="group bg-white border border-gray-200 rounded-[6px] p-6">
+          <summary class="flex items-center gap-2 mb-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600">
             <span class="px-2 py-1 bg-orange-100 text-orange-700 text-sm font-bold rounded">1.3x Weight</span>
-            <h3 class="font-semibold text-gray-900 inline">Structural integrity</h3>
+            <h3 class="font-semibold text-gray-900">Structural integrity</h3>
+            <svg aria-hidden="true" class="w-4 h-4 ml-auto text-gray-400 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
           </summary>
           <p class="text-gray-600 text-sm">
             Structural deficiencies including damaged floors, walls, and ceilings pose direct
@@ -301,10 +322,13 @@ const realExamples = [
         </details>
 
         <!-- Climate -->
-        <details class="bg-white border border-gray-200 rounded-[6px] p-6">
-          <summary class="flex items-center gap-2 mb-2 cursor-pointer">
+        <details class="group bg-white border border-gray-200 rounded-[6px] p-6">
+          <summary class="flex items-center gap-2 mb-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600">
             <span class="px-2 py-1 bg-orange-100 text-orange-700 text-sm font-bold rounded">1.3x Weight</span>
-            <h3 class="font-semibold text-gray-900 inline">Climate control (heating and cooling)</h3>
+            <h3 class="font-semibold text-gray-900">Climate control (heating and cooling)</h3>
+            <svg aria-hidden="true" class="w-4 h-4 ml-auto text-gray-400 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
           </summary>
           <p class="text-gray-600 text-sm">
             Inadequate heating is associated with cardiovascular stress, hypothermia risk, and
@@ -317,10 +341,13 @@ const realExamples = [
         </details>
 
         <!-- Plumbing -->
-        <details class="bg-white border border-gray-200 rounded-[6px] p-6">
-          <summary class="flex items-center gap-2 mb-2 cursor-pointer">
+        <details class="group bg-white border border-gray-200 rounded-[6px] p-6">
+          <summary class="flex items-center gap-2 mb-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600">
             <span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-sm font-bold rounded">1.2x Weight</span>
-            <h3 class="font-semibold text-gray-900 inline">Plumbing</h3>
+            <h3 class="font-semibold text-gray-900">Plumbing</h3>
+            <svg aria-hidden="true" class="w-4 h-4 ml-auto text-gray-400 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
           </summary>
           <p class="text-gray-600 text-sm">
             Plumbing issues create pathways to mold growth through water damage and leaks.
@@ -333,10 +360,13 @@ const realExamples = [
         </details>
 
         <!-- Security -->
-        <details class="bg-white border border-gray-200 rounded-[6px] p-6">
-          <summary class="flex items-center gap-2 mb-2 cursor-pointer">
+        <details class="group bg-white border border-gray-200 rounded-[6px] p-6">
+          <summary class="flex items-center gap-2 mb-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600">
             <span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-sm font-bold rounded">1.2x Weight</span>
-            <h3 class="font-semibold text-gray-900 inline">Security</h3>
+            <h3 class="font-semibold text-gray-900">Security</h3>
+            <svg aria-hidden="true" class="w-4 h-4 ml-auto text-gray-400 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
           </summary>
           <p class="text-gray-600 text-sm">
             Building security features (working locks, secure entry, lighting) directly impact

@@ -13,6 +13,7 @@ import { currentReviewYear } from '../../lib/scoring-sql';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 import { humanize } from '../../lib/format';
 import { BUILDING_DETAIL_FIELDS, hasBuildingDetails } from '../../lib/buildingDetails';
+import { localityLine } from '../../lib/locality';
 
 // Label and formatter for each field in BUILDING_DETAIL_FIELDS, in display order —
 // keeps the <dl> rows and the hasBuildingDetails check from drifting.
@@ -234,7 +235,7 @@ const showBuildingDetails = hasBuildingDetails(building);
         <div class="min-w-0 flex-1">
           <h1 class="text-2xl md:text-3xl font-bold text-gray-900 break-words">{building.address}</h1>
           <p class="text-lg text-gray-600">
-            {building.neighborhood && `${building.neighborhood}, `}{building.city}, {building.state} {building.zip_code}
+            {localityLine({ address: building.address, neighborhood: building.neighborhood, city: building.city }, building.state)} {building.zip_code}
           </p>
           {(building.landlord_name || building.property_manager_name) && (
             <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">

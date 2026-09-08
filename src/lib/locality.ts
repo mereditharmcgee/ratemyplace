@@ -12,8 +12,33 @@ interface LocalityBuilding {
   city?: string | null;
 }
 
+// Single-word neighborhoods that are also common street names, so the
+// street-word heuristic below would otherwise wrongly discard them (e.g.
+// "45 Roxbury Street" really is in Roxbury). These are checked first and
+// always trusted. Multi-word names (Hyde Park, Jamaica Plain) need no entry
+// here — a multi-word neighborhood can never equal a single address word, so
+// the street-word test already leaves them alone.
+const KNOWN_NEIGHBORHOODS = new Set([
+  'allston',
+  'brighton',
+  'charlestown',
+  'chinatown',
+  'dorchester',
+  'downtown',
+  'fenway',
+  'mattapan',
+  'roslindale',
+  'roxbury',
+  'seaport',
+  // New Haven — production has New Haven addresses too.
+  'westville',
+  'newhallville',
+  'dwight',
+  'dixwell',
+]);
+
 function normalize(value: string): string {
-  return value.trim().toLowerCase();
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
 function addressWords(address?: string | null): Set<string> {
@@ -30,7 +55,9 @@ function addressWords(address?: string | null): Set<string> {
  * Returns the neighborhood to display, unless it is empty/whitespace or
  * matches (case-insensitively, trimmed) a whitespace-separated word from the
  * street address — in which case it falls back to the city (or '' if the
- * city is also missing).
+ * city is also missing). Known neighborhoods that happen to also be street
+ * names (see KNOWN_NEIGHBORHOODS) are trusted before that street-word check
+ * ever runs, so they're never discarded.
  */
 export function displayLocality(building: LocalityBuilding): string {
   const neighborhood = building.neighborhood?.trim();
@@ -40,8 +67,13 @@ export function displayLocality(building: LocalityBuilding): string {
     return city;
   }
 
+  const normalizedNeighborhood = normalize(neighborhood);
+  if (KNOWN_NEIGHBORHOODS.has(normalizedNeighborhood)) {
+    return neighborhood;
+  }
+
   const words = addressWords(building.address);
-  if (words.has(normalize(neighborhood))) {
+  if (words.has(normalizedNeighborhood)) {
     return city;
   }
 
@@ -56,6 +88,12 @@ export function displayLocality(building: LocalityBuilding): string {
 export function localityLine(building: LocalityBuilding, state?: string | null): string {
   const locality = displayLocality(building);
   const city = building.city?.trim() || '';
+
+  // With no locality and no city there's nothing to anchor a state to —
+  // don't render a bare state on its own.
+  if (!locality && !city) {
+    return '';
+  }
 
   const parts: string[] = [];
   if (locality) parts.push(locality);

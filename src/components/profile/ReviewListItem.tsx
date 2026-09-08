@@ -1,4 +1,5 @@
 import type { UserReview } from '../../lib/api-types';
+import { localityLine } from '../../lib/locality';
 
 interface Props {
   review: UserReview;
@@ -66,7 +67,7 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
             {review.building_address}
           </h3>
           <p className="text-sm text-gray-500">
-            {review.neighborhood && `${review.neighborhood}, `}{review.city}
+            {localityLine({ address: review.building_address, neighborhood: review.neighborhood, city: review.city })}
           </p>
           {review.review_title && (
             <p className="text-sm text-gray-600 mt-1 italic">"{review.review_title}"</p>
