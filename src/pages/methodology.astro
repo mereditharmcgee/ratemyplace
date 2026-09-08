@@ -38,6 +38,30 @@ const muWeighted = Math.round((muWeightedSum / muWeightSum) * 10) / 10;
 // in src/lib/scoring.ts. Both reviews have their addresses changed for privacy
 // (the ratings are real); the second is the site owner's own review, used with
 // consent.
+// Every h2 on the page, in document order, feeding the in-page contents nav.
+// Ids are slugified from the heading text so the nav and the headings can
+// never drift out of sync.
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+const sectionHeadings = [
+  'Where the items come from',
+  'How scores are calculated',
+  'The 27 rating items',
+  'Health and safety weighting',
+  'How weighting changes a score',
+  'Interpreting scores',
+  'Recency weighting',
+  'Public records are not scored',
+  'References',
+  'Tenants are the experts',
+].map((title) => ({ title, id: slugify(title) }));
+
 const realExamples = [
   {
     address: '38 Edgemere Road',
@@ -74,10 +98,22 @@ const realExamples = [
       </p>
     </div>
 
+    <!-- In-page contents -->
+    <nav aria-label="Contents" class="mb-12 bg-white border border-gray-200 rounded-[6px] p-6">
+      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">Contents</p>
+      <ol class="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+        {sectionHeadings.map((heading) => (
+          <li>
+            <a href={`#${heading.id}`} class="text-teal-700 hover:underline">{heading.title}</a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+
     <!-- Survey Instrument Foundation -->
     <section class="mb-12">
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">Foundation</p>
-      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Where the items come from</h2>
+      <h2 id={sectionHeadings[0].id} class="text-2xl font-semibold text-gray-900 mb-4">Where the items come from</h2>
       <div class="bg-white border border-gray-200 rounded-[6px] p-6">
         <p class="text-gray-600 mb-4">
           Our 27-item assessment is adapted from three validated public health instruments:
@@ -114,7 +150,7 @@ const realExamples = [
     <!-- Overview Section -->
     <section class="mb-12">
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">The math</p>
-      <h2 class="text-2xl font-semibold text-gray-900 mb-4">How scores are calculated</h2>
+      <h2 id={sectionHeadings[1].id} class="text-2xl font-semibold text-gray-900 mb-4">How scores are calculated</h2>
       <div class="bg-white border border-gray-200 rounded-[6px] p-6">
         <p class="text-gray-600 mb-4">
           Each review collects ratings across <strong>27 individual items</strong> organized into three domains:
@@ -145,7 +181,7 @@ const realExamples = [
     <!-- Survey Items Detail -->
     <section class="mb-12">
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">What we ask</p>
-      <h2 class="text-2xl font-semibold text-gray-900 mb-4">The 27 rating items</h2>
+      <h2 id={sectionHeadings[2].id} class="text-2xl font-semibold text-gray-900 mb-4">The 27 rating items</h2>
       <p class="text-gray-600 mb-6">
         Each item traces to one of the three instruments above. Items marked with
         <span class="text-red-500 font-bold">*</span> carry health and safety weighting.
@@ -210,138 +246,114 @@ const realExamples = [
     <!-- Health/Safety Weighting -->
     <section class="mb-12">
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">Why some items count more</p>
-      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Health and safety weighting</h2>
+      <h2 id={sectionHeadings[3].id} class="text-2xl font-semibold text-gray-900 mb-4">Health and safety weighting</h2>
       <p class="text-gray-600 mb-6">
         Some housing conditions have stronger associations with health outcomes than others. The weights below come from epidemiological research:
       </p>
 
       <div class="space-y-4">
         <!-- Pests -->
-        <div class="bg-white border border-gray-200 rounded-[6px] p-6">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="flex items-center gap-2 mb-2">
-                <span class="px-2 py-1 bg-red-100 text-red-700 text-sm font-bold rounded">1.5x Weight</span>
-                <h3 class="font-semibold text-gray-900">Pest control</h3>
-              </div>
-              <p class="text-gray-600 text-sm">
-                Pest infestations (cockroaches, rodents, bed bugs) are strongly associated with asthma,
-                allergic reactions, and disease transmission. Cockroach allergen is a major trigger for
-                childhood asthma in urban environments.
-              </p>
-            </div>
-          </div>
+        <details open class="bg-white border border-gray-200 rounded-[6px] p-6">
+          <summary class="flex items-center gap-2 mb-2 cursor-pointer">
+            <span class="px-2 py-1 bg-red-100 text-red-700 text-sm font-bold rounded">1.5x Weight</span>
+            <h3 class="font-semibold text-gray-900 inline">Pest control</h3>
+          </summary>
+          <p class="text-gray-600 text-sm">
+            Pest infestations (cockroaches, rodents, bed bugs) are strongly associated with asthma,
+            allergic reactions, and disease transmission. Cockroach allergen is a major trigger for
+            childhood asthma in urban environments.
+          </p>
           <div class="mt-3 text-xs text-gray-500">
             Reference: Krieger & Higgins (2002), American Journal of Public Health
           </div>
-        </div>
+        </details>
 
         <!-- Mold -->
-        <div class="bg-white border border-gray-200 rounded-[6px] p-6">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="flex items-center gap-2 mb-2">
-                <span class="px-2 py-1 bg-red-100 text-red-700 text-sm font-bold rounded">1.5x Weight</span>
-                <h3 class="font-semibold text-gray-900">Mold and moisture</h3>
-              </div>
-              <p class="text-gray-600 text-sm">
-                Visible mold and dampness are associated with a 1.5-3.5x increased odds ratio for
-                respiratory symptoms, including asthma, wheeze, and upper respiratory infections.
-                This is one of the most well-documented housing-health relationships.
-              </p>
-            </div>
-          </div>
+        <details class="bg-white border border-gray-200 rounded-[6px] p-6">
+          <summary class="flex items-center gap-2 mb-2 cursor-pointer">
+            <span class="px-2 py-1 bg-red-100 text-red-700 text-sm font-bold rounded">1.5x Weight</span>
+            <h3 class="font-semibold text-gray-900 inline">Mold and moisture</h3>
+          </summary>
+          <p class="text-gray-600 text-sm">
+            Visible mold and dampness are associated with a 1.5-3.5x increased odds ratio for
+            respiratory symptoms, including asthma, wheeze, and upper respiratory infections.
+            This is one of the most well-documented housing-health relationships.
+          </p>
           <div class="mt-3 text-xs text-gray-500">
             Reference: Jacobs et al. (2009), Environmental Health Perspectives
           </div>
-        </div>
+        </details>
 
         <!-- Structural -->
-        <div class="bg-white border border-gray-200 rounded-[6px] p-6">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="flex items-center gap-2 mb-2">
-                <span class="px-2 py-1 bg-orange-100 text-orange-700 text-sm font-bold rounded">1.3x Weight</span>
-                <h3 class="font-semibold text-gray-900">Structural integrity</h3>
-              </div>
-              <p class="text-gray-600 text-sm">
-                Structural deficiencies including damaged floors, walls, and ceilings pose direct
-                injury risks from falls, collapses, and accidents. Poor structural condition also
-                often indicates deferred maintenance affecting other systems.
-              </p>
-            </div>
-          </div>
+        <details class="bg-white border border-gray-200 rounded-[6px] p-6">
+          <summary class="flex items-center gap-2 mb-2 cursor-pointer">
+            <span class="px-2 py-1 bg-orange-100 text-orange-700 text-sm font-bold rounded">1.3x Weight</span>
+            <h3 class="font-semibold text-gray-900 inline">Structural integrity</h3>
+          </summary>
+          <p class="text-gray-600 text-sm">
+            Structural deficiencies including damaged floors, walls, and ceilings pose direct
+            injury risks from falls, collapses, and accidents. Poor structural condition also
+            often indicates deferred maintenance affecting other systems.
+          </p>
           <div class="mt-3 text-xs text-gray-500">
             Reference: Bonnefoy et al. (2003), WHO LARES Study
           </div>
-        </div>
+        </details>
 
         <!-- Climate -->
-        <div class="bg-white border border-gray-200 rounded-[6px] p-6">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="flex items-center gap-2 mb-2">
-                <span class="px-2 py-1 bg-orange-100 text-orange-700 text-sm font-bold rounded">1.3x Weight</span>
-                <h3 class="font-semibold text-gray-900">Climate control (heating and cooling)</h3>
-              </div>
-              <p class="text-gray-600 text-sm">
-                Inadequate heating is associated with cardiovascular stress, hypothermia risk, and
-                respiratory illness. This is particularly important in Boston's climate where winter
-                temperatures regularly drop below freezing.
-              </p>
-            </div>
-          </div>
+        <details class="bg-white border border-gray-200 rounded-[6px] p-6">
+          <summary class="flex items-center gap-2 mb-2 cursor-pointer">
+            <span class="px-2 py-1 bg-orange-100 text-orange-700 text-sm font-bold rounded">1.3x Weight</span>
+            <h3 class="font-semibold text-gray-900 inline">Climate control (heating and cooling)</h3>
+          </summary>
+          <p class="text-gray-600 text-sm">
+            Inadequate heating is associated with cardiovascular stress, hypothermia risk, and
+            respiratory illness. This is particularly important in Boston's climate where winter
+            temperatures regularly drop below freezing.
+          </p>
           <div class="mt-3 text-xs text-gray-500">
             Reference: Bonnefoy et al. (2003), WHO LARES Study
           </div>
-        </div>
+        </details>
 
         <!-- Plumbing -->
-        <div class="bg-white border border-gray-200 rounded-[6px] p-6">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="flex items-center gap-2 mb-2">
-                <span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-sm font-bold rounded">1.2x Weight</span>
-                <h3 class="font-semibold text-gray-900">Plumbing</h3>
-              </div>
-              <p class="text-gray-600 text-sm">
-                Plumbing issues create pathways to mold growth through water damage and leaks.
-                Persistent moisture from plumbing problems is a primary cause of indoor mold,
-                creating indirect health effects.
-              </p>
-            </div>
-          </div>
+        <details class="bg-white border border-gray-200 rounded-[6px] p-6">
+          <summary class="flex items-center gap-2 mb-2 cursor-pointer">
+            <span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-sm font-bold rounded">1.2x Weight</span>
+            <h3 class="font-semibold text-gray-900 inline">Plumbing</h3>
+          </summary>
+          <p class="text-gray-600 text-sm">
+            Plumbing issues create pathways to mold growth through water damage and leaks.
+            Persistent moisture from plumbing problems is a primary cause of indoor mold,
+            creating indirect health effects.
+          </p>
           <div class="mt-3 text-xs text-gray-500">
             Reference: Jacobs et al. (2009), Environmental Health Perspectives
           </div>
-        </div>
+        </details>
 
         <!-- Security -->
-        <div class="bg-white border border-gray-200 rounded-[6px] p-6">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="flex items-center gap-2 mb-2">
-                <span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-sm font-bold rounded">1.2x Weight</span>
-                <h3 class="font-semibold text-gray-900">Security</h3>
-              </div>
-              <p class="text-gray-600 text-sm">
-                Building security features (working locks, secure entry, lighting) directly impact
-                personal safety and are associated with reduced risk of break-ins, assault, and
-                psychological stress from fear of crime.
-              </p>
-            </div>
-          </div>
+        <details class="bg-white border border-gray-200 rounded-[6px] p-6">
+          <summary class="flex items-center gap-2 mb-2 cursor-pointer">
+            <span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-sm font-bold rounded">1.2x Weight</span>
+            <h3 class="font-semibold text-gray-900 inline">Security</h3>
+          </summary>
+          <p class="text-gray-600 text-sm">
+            Building security features (working locks, secure entry, lighting) directly impact
+            personal safety and are associated with reduced risk of break-ins, assault, and
+            psychological stress from fear of crime.
+          </p>
           <div class="mt-3 text-xs text-gray-500">
             Reference: Bonnefoy et al. (2003), WHO LARES Study
           </div>
-        </div>
+        </details>
       </div>
     </section>
 
     <!-- Worked Example -->
     <section class="mb-12">
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">A worked example</p>
-      <h2 class="text-2xl font-semibold text-gray-900 mb-4">How weighting changes a score</h2>
+      <h2 id={sectionHeadings[4].id} class="text-2xl font-semibold text-gray-900 mb-4">How weighting changes a score</h2>
       <p class="text-gray-600 mb-6">
         The weights only matter if you can see what they do. We'll start with a made-up unit to show the formula, then run the exact same math on two real reviews.
       </p>
@@ -472,7 +484,7 @@ const realExamples = [
     <!-- Score Interpretation -->
     <section class="mb-12">
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">Reading the numbers</p>
-      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Interpreting scores</h2>
+      <h2 id={sectionHeadings[5].id} class="text-2xl font-semibold text-gray-900 mb-4">Interpreting scores</h2>
       <p class="text-gray-600 mb-6">
         The color-coded scores in the examples above all come from the same four-band scale. Here's what each band means at a glance:
       </p>
@@ -503,7 +515,7 @@ const realExamples = [
     <!-- Recency Weighting -->
     <section class="mb-12">
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">Recent reviews count more</p>
-      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Recency weighting</h2>
+      <h2 id={sectionHeadings[6].id} class="text-2xl font-semibold text-gray-900 mb-4">Recency weighting</h2>
       <div class="bg-white border border-gray-200 rounded-[6px] p-6">
         <p class="text-gray-600 mb-4">
           Aggregate scores apply recency weighting because buildings and management change over time. Newer reviews count more than older ones, but historical reviews still count.
@@ -533,7 +545,7 @@ const realExamples = [
     <!-- Public records are outside the score -->
     <section class="mb-12">
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">Outside the score</p>
-      <h2 class="text-2xl font-semibold text-gray-900 mb-4">Public records are not scored</h2>
+      <h2 id={sectionHeadings[7].id} class="text-2xl font-semibold text-gray-900 mb-4">Public records are not scored</h2>
       <div class="bg-white border border-gray-200 rounded-[6px] p-6">
         <p class="text-gray-600 mb-4">
           Some building pages show public records from the City of Boston beneath the building details. Every value there is a field from a primary record or a count of records, carrying the date it was retrieved and a link to the dataset it came from. Those records never enter a building, landlord, or property manager score, and no number on this page changes because of them. Reviews are the judgment layer. The records panel has no opinion.
@@ -547,7 +559,7 @@ const realExamples = [
     <!-- Academic References -->
     <section class="mb-12">
       <p class="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700 mb-3">Sources</p>
-      <h2 class="text-2xl font-semibold text-gray-900 mb-4">References</h2>
+      <h2 id={sectionHeadings[8].id} class="text-2xl font-semibold text-gray-900 mb-4">References</h2>
       <div class="bg-gray-50 border border-gray-200 rounded-[6px] p-6">
         <h3 class="font-semibold text-gray-800 mb-3">Survey instrument sources</h3>
         <ol class="space-y-4 text-sm text-gray-700 mb-6">
@@ -626,7 +638,7 @@ const realExamples = [
     <!-- Transparency Note -->
     <section class="mb-12">
       <div class="bg-teal-50 border border-teal-200 rounded-[6px] p-6">
-        <h2 class="text-lg font-semibold text-teal-900 mb-2">Tenants are the experts</h2>
+        <h2 id={sectionHeadings[9].id} class="text-lg font-semibold text-teal-900 mb-2">Tenants are the experts</h2>
         <p class="text-teal-800 text-sm">
           You know your home better than anyone who tours it for ten minutes. The full methodology is public, the weights come from cited research, and every review shows both its raw item ratings and its weighted scores. You can always check our work.
         </p>
