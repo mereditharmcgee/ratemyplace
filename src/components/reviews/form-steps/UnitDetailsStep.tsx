@@ -333,7 +333,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
         <button
           type="button"
           onClick={onNext}
-          className="px-6 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800"
+          className="h-11 inline-flex items-center justify-center px-6 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800"
         >
           Continue
         </button>
