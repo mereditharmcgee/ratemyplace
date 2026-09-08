@@ -274,10 +274,13 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
 
       {/* Tab Bar */}
       <div className="border-b border-gray-200 mb-6">
-        <nav className="-mb-px flex gap-6" aria-label="Tabs">
+        <nav
+          className="-mb-px flex overflow-x-auto whitespace-nowrap -mx-4 px-4 gap-6 border-b border-gray-200"
+          aria-label="Tabs"
+        >
           <button
             onClick={() => handleTabSwitch('reviews')}
-            className={`py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`shrink-0 h-11 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'reviews'
                 ? 'border-teal-600 text-teal-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -287,7 +290,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
           </button>
           <button
             onClick={() => handleTabSwitch('saved')}
-            className={`py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`shrink-0 h-11 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'saved'
                 ? 'border-teal-600 text-teal-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -297,7 +300,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
           </button>
           <button
             onClick={() => handleTabSwitch('notifications')}
-            className={`py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`shrink-0 h-11 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'notifications'
                 ? 'border-teal-600 text-teal-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -307,7 +310,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
           </button>
           <button
             onClick={() => handleTabSwitch('settings')}
-            className={`py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`shrink-0 h-11 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'settings'
                 ? 'border-teal-600 text-teal-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -321,10 +324,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
       {/* Reviews Tab */}
       {activeTab === 'reviews' && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">
-              My Reviews ({reviews.length})
-            </h2>
+          <div className="flex items-center justify-end mb-4">
             <a
               href="/review/new"
               className="inline-flex items-center gap-2 px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 transition-colors"
@@ -424,9 +424,6 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
       {/* Notifications Tab */}
       {activeTab === 'notifications' && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Notifications</h2>
-          </div>
           <NotificationsTab
             notifications={notifications}
             loading={notificationsLoading}
