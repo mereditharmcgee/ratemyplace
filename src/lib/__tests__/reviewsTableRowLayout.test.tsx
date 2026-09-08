@@ -3,11 +3,13 @@ import { cleanup, render, waitFor } from '@testing-library/react';
 import ReviewsTable from '../../components/admin/ReviewsTable';
 
 /**
- * Visual-audit regression test: at 375px the admin reviews row's left block
- * (address + "email • date") had no min-w-0, so a long email ran underneath
- * the right-aligned score/status cluster instead of truncating. This asserts
- * the left block can shrink, the email line truncates, and the right cluster
- * never shrinks in response.
+ * Visual-audit regression test: at 375px the admin reviews row's long email
+ * line ran underneath the right-aligned score/status cluster. The left block
+ * already had min-w-0/flex-1 (that predates this fix), so shrinking wasn't
+ * the missing piece; the row still overflowed because the email line had no
+ * truncate and the right cluster had no shrink-0 to hold its width. This
+ * asserts the left block keeps min-w-0/flex-1, the email line truncates, and
+ * the right cluster carries shrink-0 so it never shrinks in response.
  */
 
 afterEach(() => {

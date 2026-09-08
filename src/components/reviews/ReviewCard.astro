@@ -182,7 +182,7 @@ const pestLabels: Record<string, string> = {
         )}
         {review.is_verified === 1 && <VerifiedBadge size="sm" />}
       </div>
-      <div class="flex items-center gap-2 mb-2">
+      <div class="flex items-center gap-2 mb-2 min-w-0">
         <StarRating rating={domainScores.overall || review.overall_score || 0} size="sm" />
         <span class="text-sm font-medium text-gray-900">
           {(domainScores.overall || review.overall_score || 0).toFixed(1)}
@@ -211,7 +211,7 @@ const pestLabels: Record<string, string> = {
       )}
     </div>
     <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 sm:block sm:text-right sm:min-w-0 sm:max-w-[45%]">
-      <span class="font-medium text-gray-700">{unitDisplay}</span>
+      <p class="font-medium text-gray-700">{unitDisplay}</p>
       <SeasonChip
         moveInSeason={review.move_in_season}
         moveInYear={review.move_in_year}
@@ -219,9 +219,9 @@ const pestLabels: Record<string, string> = {
         isCurrentTenant={review.is_current_tenant === 1 || review.move_out_year_new === 'current'}
         class="sm:my-1"
       />
-      <span>{recencyLabel}</span>
+      <p>{recencyLabel}</p>
       {review.rent_amount && (
-        <span class="text-teal-700 font-medium">${review.rent_amount.toLocaleString()}/mo</span>
+        <p class="text-teal-700 font-medium">${review.rent_amount.toLocaleString()}/mo</p>
       )}
     </div>
   </div>
