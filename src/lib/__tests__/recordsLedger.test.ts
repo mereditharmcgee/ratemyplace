@@ -284,7 +284,6 @@ describe('ledgerModel provenance', () => {
     const model = ledgerModel(view({ sources }), NOW);
 
     expect(model.violations.status).toBeNull();
-    expect(model.violations.countable).toBe(false);
     expect(model.violations.count).toBe('—');
     expect(model.violations.subCount).toBe('');
     // "2024–2026 · not retrieved" over a dash would state coverage for a count that is not there.
@@ -296,7 +295,6 @@ describe('ledgerModel provenance', () => {
     sources[PERMITS_RESOURCE_ID] = status({ sourceId: PERMITS_RESOURCE_ID, status: 'error' });
     const model = ledgerModel(view({ sources }), NOW);
 
-    expect(model.permits.countable).toBe(false);
     expect(model.permits.count).toBe('—');
     expect(model.permits.span).toBeNull();
   });
@@ -309,7 +307,6 @@ describe('ledgerModel provenance', () => {
       NOW,
     );
 
-    expect(model.permits.countable).toBe(true);
     expect(model.permits.count).toBe('1');
     expect(model.permits.span).toBe('2019');
   });

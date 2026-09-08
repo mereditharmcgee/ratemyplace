@@ -1,11 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   BANNED_WORDS,
-  PANEL_FRAMING_COPY,
+  PANEL_COPY,
   ZERO_PERMITS_COPY,
-  DECLARED_VALUATION_CAVEAT,
-  OTHER_REQUESTS_COPY,
-  CONDOMINIUM_COPY,
   NO_VIOLATIONS_CAVEAT,
   KIND_LABELS,
   showMailingAddress,
@@ -23,6 +20,8 @@ import {
   NOT_RECORDED,
   orNotRecorded,
 } from '../records/display';
+// Namespace import purely so the guard below can reflect over every export of the module.
+import * as displayModule from '../records/display';
 import { RECORD_KINDS } from '../records/types';
 import type { AssessmentPayload, PermitPayload, RentSmartPayload, ServiceRequestPayload } from '../records/types';
 
@@ -383,16 +382,23 @@ describe('rentSmartDisagreement', () => {
 
 describe('panel copy stays free of banned words', () => {
   const bannedPattern = new RegExp(`\\b(${BANNED_WORDS.join('|')})\\b`, 'i');
-  const copyConstants: Array<[string, string]> = [
-    ['PANEL_FRAMING_COPY', PANEL_FRAMING_COPY],
-    ['ZERO_PERMITS_COPY', ZERO_PERMITS_COPY],
-    ['DECLARED_VALUATION_CAVEAT', DECLARED_VALUATION_CAVEAT],
-    ['OTHER_REQUESTS_COPY', OTHER_REQUESTS_COPY],
-    ['CONDOMINIUM_COPY', CONDOMINIUM_COPY],
-  ];
 
-  it.each(copyConstants)('%s does not contain a banned word', (_name, copy) => {
+  it.each(Object.entries(PANEL_COPY))('%s does not contain a banned word', (_name, copy) => {
     expect(bannedPattern.test(copy)).toBe(false);
+  });
+
+  /**
+   * The guard is only as good as the list it walks, and the hand-written list this replaced
+   * named five constants while the module exported eleven. Reflecting over the exports means a
+   * new copy constant fails here the moment it is added, rather than shipping unscanned.
+   */
+  it('lists every all-caps string export of display.ts in PANEL_COPY', () => {
+    const stringConstants = Object.entries(displayModule)
+      .filter(([name, value]) => typeof value === 'string' && /^[A-Z][A-Z0-9_]*$/.test(name))
+      .map(([name]) => name);
+
+    expect(stringConstants.length).toBeGreaterThan(0);
+    expect(Object.keys(PANEL_COPY)).toEqual(expect.arrayContaining(stringConstants));
   });
 });
 

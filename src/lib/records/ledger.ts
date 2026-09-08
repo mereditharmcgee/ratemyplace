@@ -51,11 +51,6 @@ export interface LedgerSection {
   status: SourceStatus | null;
   /** Whether the source has stored rows, which decides how a failed pull is described. */
   hasRows: boolean;
-  /**
-   * Whether this row's figures mean anything yet. A source nobody has queried has no count —
-   * not a zero — and neither does one whose only attempt failed.
-   */
-  countable: boolean;
   /** The large figure, or `—` when there is nothing to count. */
   count: string;
   /** The small line under the figure. Empty when there is no count to qualify. */
@@ -155,7 +150,6 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
   const requests: RequestsSection = {
     status: requestStatus,
     hasRows: view.serviceRequests.length > 0,
-    countable: requestsCountable,
     count: requestsCountable ? String(housing.length) : NO_COUNT,
     subCount: requestsCountable ? openSubCount(openRequests.length, housing.length) : '',
     span: requestsCountable ? yearSpanLabel(observedYears(requestYears)) : null,
@@ -187,7 +181,6 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
   const permits: PermitsSection = {
     status: permitStatus,
     hasRows: view.permits.length > 0,
-    countable: permitsCountable,
     count: permitsCountable ? String(summary.count) : NO_COUNT,
     subCount: permitsCountable
       ? openSubCount(openPermits.length, summary.count) +
@@ -216,7 +209,6 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
   const enforcement: EnforcementSection = {
     status: enforcementStatus,
     hasRows: view.enforcement.length > 0,
-    countable: enforcementCountable,
     count: enforcementCountable ? String(view.enforcement.length) : NO_COUNT,
     subCount: enforcementCountable ? openSubCount(openEnforcement.length, view.enforcement.length) : '',
     span: enforcementCountable ? yearSpanLabel(observedYears(enforcementYears)) : null,
@@ -240,7 +232,6 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
   const violations: ViolationsSection = {
     status: violationStatus,
     hasRows: view.violations.length > 0,
-    countable: violationsCountable,
     count: violationsCountable ? String(view.violations.length) : NO_COUNT,
     subCount: violationsCountable ? openSubCount(openViolations.length, view.violations.length) : '',
     span: violationsCountable ? yearSpanLabel(observedYears(violationYears)) : null,

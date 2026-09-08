@@ -10,7 +10,8 @@
 // is looking at, and the caveats attached to a figure. It is not the whole surface: each
 // section's empty state ("No violations on record.", "Not retrieved yet.") is written
 // inline in the template that owns it. BANNED_WORDS is the guardrail over both halves:
-// `__tests__/recordsDisplay.test.ts` scans the constants below, and
+// `__tests__/recordsDisplay.test.ts` scans every string in `PANEL_COPY` at the foot of this
+// file, which a reflection test in the same file keeps exhaustive, and
 // `__tests__/recordsPanelCopy.test.ts` scans the raw source of `BuildingRecords.astro` and
 // `components/records/*.astro`. A future edit cannot smuggle an editorial reading of the
 // data in through either door.
@@ -331,3 +332,52 @@ export function yearSpanLabel(series: readonly YearCount[]): string | null {
   const last = series[series.length - 1].year;
   return first === last ? String(first) : `${first}–${last}`;
 }
+
+/**
+ * A fixed instant for the sampled copy below. Any unix second would do — the guard cares
+ * about the sentence around the date, not the date.
+ */
+const SAMPLE_PULL_DATE = 1_757_000_000;
+
+/** A minimal roll-up row, only so the disagreement sentence can be sampled below. */
+const SAMPLE_RENTSMART_ROW: RentSmartPayload = {
+  rowId: 'sample',
+  date: null,
+  violationType: 'Housing Complaints',
+  description: null,
+  address: null,
+  parcel: null,
+};
+
+/**
+ * Every user-visible string this module publishes, in one object, keyed by where it comes
+ * from. `__tests__/recordsDisplay.test.ts` iterates this against BANNED_WORDS instead of
+ * naming constants by hand — the hand-written list had five entries while the file exported
+ * eleven, so six sentences were shipping unguarded. Copy produced by a function is sampled
+ * here with representative arguments, since the guard can only read a string.
+ *
+ * The same test reflects over this module's exports and fails if an all-caps string export is
+ * missing a key below, so a new constant cannot quietly escape the scan.
+ */
+export const PANEL_COPY: Readonly<Record<string, string>> = {
+  NOT_RECORDED,
+  PANEL_FRAMING_COPY,
+  ZERO_PERMITS_COPY,
+  DECLARED_VALUATION_CAVEAT,
+  OTHER_REQUESTS_COPY,
+  CONDOMINIUM_COPY,
+  NO_VIOLATIONS_CAVEAT,
+  NEVER_PULLED_COPY,
+  CAPPED_REQUESTS_COPY,
+  CAPPED_ROWS_COPY,
+  ...Object.fromEntries(
+    Object.entries(KIND_LABELS).map(([kind, label]) => [`KIND_LABELS.${kind}`, label]),
+  ),
+  'unavailableCopy()': unavailableCopy(SAMPLE_PULL_DATE),
+  'openSubCount() — empty': openSubCount(0, 0),
+  'openSubCount() — all closed': openSubCount(0, 3),
+  'openSubCount() — some open': openSubCount(2, 3),
+  'formatRecordDate() — no date': formatRecordDate(null),
+  'formatPullDate() — no date': formatPullDate(Number.NaN),
+  'rentSmartDisagreement()': rentSmartDisagreement([SAMPLE_RENTSMART_ROW], 0) ?? '',
+};
