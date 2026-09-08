@@ -54,8 +54,9 @@ export default function AddressStep({
 
           <div className="space-y-3">
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Street address</label>
+              <label htmlFor="review-street-address" className="block text-xs text-gray-600 mb-1">Street address</label>
               <input
+                id="review-street-address"
                 type="text"
                 value={manualAddress.streetAddress}
                 onChange={(e) => onManualAddressChange({ ...manualAddress, streetAddress: e.target.value })}
@@ -65,8 +66,9 @@ export default function AddressStep({
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-gray-600 mb-1">City</label>
+                <label htmlFor="review-city" className="block text-xs text-gray-600 mb-1">City</label>
                 <input
+                  id="review-city"
                   type="text"
                   value={manualAddress.city}
                   onChange={(e) => onManualAddressChange({ ...manualAddress, city: e.target.value })}
@@ -75,8 +77,9 @@ export default function AddressStep({
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">State</label>
+                <label htmlFor="review-state" className="block text-xs text-gray-600 mb-1">State</label>
                 <input
+                  id="review-state"
                   type="text"
                   value={manualAddress.state}
                   onChange={(e) => onManualAddressChange({ ...manualAddress, state: e.target.value.toUpperCase().slice(0, 2) })}
@@ -87,8 +90,9 @@ export default function AddressStep({
               </div>
             </div>
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Zip code (optional)</label>
+              <label htmlFor="review-zip-code" className="block text-xs text-gray-600 mb-1">Zip code (optional)</label>
               <input
+                id="review-zip-code"
                 type="text"
                 value={manualAddress.zipCode}
                 onChange={(e) => onManualAddressChange({ ...manualAddress, zipCode: e.target.value })}
