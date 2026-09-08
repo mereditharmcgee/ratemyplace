@@ -30,11 +30,13 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
 
       {/* Move-in date */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <span className="block text-sm font-medium text-gray-700 mb-2">
           When did you move in?
-        </label>
+        </span>
         <div className="grid grid-cols-2 gap-3">
           <select
+            id="review-move-in-month"
+            aria-label="Move-in month"
             value={unitDetails.moveInMonth}
             onChange={(e) => onChange({ ...unitDetails, moveInMonth: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
@@ -54,6 +56,8 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
             <option value="12">December</option>
           </select>
           <select
+            id="review-move-in-year"
+            aria-label="Move-in year"
             value={unitDetails.moveInYear}
             onChange={(e) => onChange({ ...unitDetails, moveInYear: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
@@ -68,10 +72,11 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
 
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2 sm:col-span-1">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="review-unit-number" className="block text-sm font-medium text-gray-700 mb-2">
             Unit Number <span className="text-gray-400">(optional)</span>
           </label>
           <input
+            id="review-unit-number"
             type="text"
             value={unitDetails.unitNumber}
             onChange={(e) => onChange({ ...unitDetails, unitNumber: e.target.value })}
@@ -84,10 +89,11 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
         </div>
 
         <div className="col-span-2 sm:col-span-1">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="review-square-footage" className="block text-sm font-medium text-gray-700 mb-2">
             Square Footage <span className="text-gray-400">(optional)</span>
           </label>
           <input
+            id="review-square-footage"
             type="number"
             value={unitDetails.squareFootage}
             onChange={(e) => onChange({ ...unitDetails, squareFootage: e.target.value })}
@@ -97,8 +103,9 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Bedrooms</label>
+          <label htmlFor="review-bedrooms" className="block text-sm font-medium text-gray-700 mb-2">Bedrooms</label>
           <select
+            id="review-bedrooms"
             value={unitDetails.bedrooms}
             onChange={(e) => onChange({ ...unitDetails, bedrooms: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
@@ -112,8 +119,9 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Bathrooms</label>
+          <label htmlFor="review-bathrooms" className="block text-sm font-medium text-gray-700 mb-2">Bathrooms</label>
           <select
+            id="review-bathrooms"
             value={unitDetails.bathrooms}
             onChange={(e) => onChange({ ...unitDetails, bathrooms: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
@@ -127,12 +135,13 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
         </div>
 
         <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="review-rent" className="block text-sm font-medium text-gray-700 mb-2">
             Monthly Rent <span className="text-gray-400">(optional)</span>
           </label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
             <input
+              id="review-rent"
               type="number"
               value={unitDetails.rentAmount}
               onChange={(e) => onChange({ ...unitDetails, rentAmount: e.target.value })}
@@ -151,11 +160,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
           {amenityOptions.map((amenity) => (
             <label
               key={amenity.id}
-              className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
-                unitDetails.amenities.includes(amenity.id)
-                  ? 'border-teal-500 bg-teal-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
+              className="flex items-center gap-2 py-2 cursor-pointer"
             >
               <input
                 type="checkbox"
@@ -170,7 +175,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
                     });
                   }
                 }}
-                className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+                className="h-5 w-5 accent-teal-700"
               />
               <span className="text-sm text-gray-700">{amenity.label}</span>
             </label>
@@ -218,12 +223,13 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
 
       {unitDetails.utilitiesIncluded.length < utilityOptions.length && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="review-estimated-utilities" className="block text-sm font-medium text-gray-700 mb-2">
             Estimated Monthly Utility Cost <span className="text-gray-400">(for utilities not included)</span>
           </label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
             <input
+              id="review-estimated-utilities"
               type="number"
               value={unitDetails.estimatedMonthlyUtilities}
               onChange={(e) => onChange({ ...unitDetails, estimatedMonthlyUtilities: e.target.value })}
@@ -239,8 +245,9 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Laundry Situation</label>
+          <label htmlFor="review-laundry" className="block text-sm font-medium text-gray-700 mb-2">Laundry Situation</label>
           <select
+            id="review-laundry"
             value={unitDetails.laundryType}
             onChange={(e) => onChange({ ...unitDetails, laundryType: e.target.value as any })}
             className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
@@ -254,12 +261,13 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
 
         {unitDetails.laundryType === 'coin_op' && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="review-laundry-cost-per-load" className="block text-sm font-medium text-gray-700 mb-2">
               Cost per Load (wash + dry) <span className="text-gray-400">(optional)</span>
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
               <input
+                id="review-laundry-cost-per-load"
                 type="number"
                 step="0.25"
                 value={unitDetails.laundryCostPerLoad}
@@ -276,10 +284,11 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="review-parking" className="block text-sm font-medium text-gray-700 mb-2">
           Parking Situation <span className="text-gray-400">(optional)</span>
         </label>
         <select
+          id="review-parking"
           value={unitDetails.parkingType}
           onChange={(e) => onChange({ ...unitDetails, parkingType: e.target.value })}
           className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"

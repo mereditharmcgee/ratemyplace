@@ -22,10 +22,11 @@ export default function AdditionalStep({
   return (
     <div className="space-y-6">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="review-tenure" className="block text-sm font-medium text-gray-700 mb-2">
           {supplementaryItems.tenure.text}
         </label>
         <select
+          id="review-tenure"
           value={tenancy.tenure}
           onChange={(e) => onTenancyChange({ ...tenancy, tenure: parseInt(e.target.value) })}
           className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
@@ -39,10 +40,11 @@ export default function AdditionalStep({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="review-move-out-year" className="block text-sm font-medium text-gray-700 mb-2">
           {supplementaryItems.moveOutTiming.text}
         </label>
         <select
+          id="review-move-out-year"
           value={tenancy.moveOutYear}
           onChange={(e) => onTenancyChange({ ...tenancy, moveOutYear: e.target.value })}
           className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
@@ -56,10 +58,11 @@ export default function AdditionalStep({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="review-landlord-name" className="block text-sm font-medium text-gray-700 mb-2">
           Who was your landlord or property manager? <span className="text-gray-400">(optional)</span>
         </label>
         <input
+          id="review-landlord-name"
           type="text"
           value={review.landlordName}
           onChange={(e) => onReviewChange({ ...review, landlordName: e.target.value })}
@@ -85,10 +88,11 @@ export default function AdditionalStep({
 
         {review.hasSeparateManager && (
           <div className="mt-3">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="review-property-manager-name" className="block text-sm font-medium text-gray-700 mb-2">
               Who manages the property? <span className="text-gray-400">(optional)</span>
             </label>
             <input
+              id="review-property-manager-name"
               type="text"
               value={review.propertyManagerName}
               onChange={(e) => onReviewChange({ ...review, propertyManagerName: e.target.value })}
@@ -229,10 +233,11 @@ export default function AdditionalStep({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="review-title" className="block text-sm font-medium text-gray-700 mb-2">
           Review Title <span className="text-gray-400">(optional)</span>
         </label>
         <input
+          id="review-title"
           type="text"
           value={review.reviewTitle}
           onChange={(e) => onReviewChange({ ...review, reviewTitle: e.target.value })}
@@ -244,7 +249,7 @@ export default function AdditionalStep({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="review-comments" className="block text-sm font-medium text-gray-700 mb-2">
           Additional Comments <span className="text-gray-400">(optional)</span>
         </label>
         <p className="text-sm text-gray-500 mb-2">
@@ -253,6 +258,7 @@ export default function AdditionalStep({
           or anything the ratings don't capture.
         </p>
         <textarea
+          id="review-comments"
           value={review.comments}
           onChange={(e) => onReviewChange({ ...review, comments: e.target.value })}
           placeholder="Share any details that would help future tenants. Avoid including identifying information."
