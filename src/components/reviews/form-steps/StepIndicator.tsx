@@ -26,6 +26,7 @@ export default function StepIndicator({ currentStep }: Props) {
             aria-valuemin={1}
             aria-valuemax={totalSteps}
             aria-valuenow={stepNumber}
+            aria-valuetext={`Step ${stepNumber} of ${totalSteps}`}
             aria-label="Review progress"
           />
         </div>

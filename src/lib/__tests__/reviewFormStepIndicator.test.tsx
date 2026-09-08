@@ -16,6 +16,7 @@ describe('StepIndicator', () => {
     expect(bar.getAttribute('aria-valuemin')).toBe('1');
     expect(bar.getAttribute('aria-valuemax')).toBe('7');
     expect(bar.getAttribute('aria-valuenow')).toBe('3');
+    expect(bar.getAttribute('aria-valuetext')).toBe('Step 3 of 7');
 
     expect(screen.getByText(/Step 3 of 7/)).toBeTruthy();
   });

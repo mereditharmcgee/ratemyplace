@@ -105,15 +105,16 @@ export default function AdditionalStep({
         )}
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div role="group" aria-labelledby="review-housing-vouchers-label">
+        <span id="review-housing-vouchers-label" className="block text-sm font-medium text-gray-700 mb-2">
           {supplementaryItems.housingVouchers.text} <span className="text-gray-400">(optional)</span>
-        </label>
+        </span>
         <div className="flex gap-4">
           {supplementaryItems.housingVouchers.options.map((opt) => (
             <label key={opt.value} className="flex items-center gap-2">
               <input
                 type="radio"
+                name="review-housing-vouchers"
                 checked={review.housingVouchers === opt.value}
                 onChange={() => onReviewChange({ ...review, housingVouchers: opt.value })}
                 className="text-teal-700 focus:ring-teal-500"
@@ -124,15 +125,16 @@ export default function AdditionalStep({
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div role="group" aria-labelledby="review-safely-lit-label">
+        <span id="review-safely-lit-label" className="block text-sm font-medium text-gray-700 mb-2">
           {supplementaryItems.safelyLit.text} <span className="text-gray-400">(optional)</span>
-        </label>
+        </span>
         <div className="flex gap-4">
           {supplementaryItems.safelyLit.options.map((opt) => (
             <label key={opt.value} className="flex items-center gap-2">
               <input
                 type="radio"
+                name="review-safely-lit"
                 checked={review.safelyLit === opt.value}
                 onChange={() => onReviewChange({ ...review, safelyLit: opt.value })}
                 className="text-teal-700 focus:ring-teal-500"
@@ -143,15 +145,16 @@ export default function AdditionalStep({
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div role="group" aria-labelledby="review-would-recommend-label">
+        <span id="review-would-recommend-label" className="block text-sm font-medium text-gray-700 mb-2">
           {supplementaryItems.wouldRecommend.text}
-        </label>
+        </span>
         <div className="flex gap-4">
           {supplementaryItems.wouldRecommend.options.map((opt) => (
             <label key={opt.value} className="flex items-center gap-2">
               <input
                 type="radio"
+                name="review-would-recommend"
                 checked={review.wouldRecommend === opt.value}
                 onChange={() => onReviewChange({ ...review, wouldRecommend: opt.value })}
                 className="text-teal-700 focus:ring-teal-500"
@@ -162,12 +165,12 @@ export default function AdditionalStep({
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
+      <div role="group" aria-labelledby="review-issues-label">
+        <span id="review-issues-label" className="block text-sm font-medium text-gray-700 mb-3">
           Did you experience any of these issues? <span className="text-gray-400">(check all that apply)</span>
-        </label>
+        </span>
         <div className="space-y-2">
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2 py-3 cursor-pointer">
             <input
               type="checkbox"
               checked={review.hadPestIssues}
@@ -176,7 +179,7 @@ export default function AdditionalStep({
                 hadPestIssues: e.target.checked,
                 pestTypesExperienced: e.target.checked ? review.pestTypesExperienced : [],
               })}
-              className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+              className="h-5 w-5 accent-teal-700"
             />
             <span className="text-sm text-gray-700">Pest issues (roaches, mice, rats, bedbugs, etc.)</span>
           </label>
@@ -219,12 +222,12 @@ export default function AdditionalStep({
             { key: 'hadSecurityDepositIssues' as const, label: 'Security deposit problems' },
             { key: 'hadEvictionThreats' as const, label: 'Eviction threats or retaliation' },
           ].map((issue) => (
-            <label key={issue.key} className="flex items-center gap-2 cursor-pointer">
+            <label key={issue.key} className="flex items-center gap-2 py-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={review[issue.key]}
                 onChange={(e) => onReviewChange({ ...review, [issue.key]: e.target.checked })}
-                className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+                className="h-5 w-5 accent-teal-700"
               />
               <span className="text-sm text-gray-700">{issue.label}</span>
             </label>

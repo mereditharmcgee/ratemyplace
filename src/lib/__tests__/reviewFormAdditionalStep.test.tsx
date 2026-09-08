@@ -46,4 +46,25 @@ describe('AdditionalStep labeling', () => {
     expect(screen.getByLabelText(/review title/i)).toBeTruthy();
     expect(screen.getByLabelText(/additional comments/i)).toBeTruthy();
   });
+
+  it('gives the "would recommend" radio group a shared name for arrow-key navigation', () => {
+    render(
+      <AdditionalStep
+        tenancy={baseTenancy}
+        review={baseReview}
+        onTenancyChange={vi.fn()}
+        onReviewChange={vi.fn()}
+        onBack={vi.fn()}
+        onNext={vi.fn()}
+      />
+    );
+
+    const group = screen.getByRole('group', { name: /would you recommend this unit/i });
+    const radios = group.querySelectorAll('input[type="radio"]') as NodeListOf<HTMLInputElement>;
+
+    expect(radios.length).toBe(3);
+    const names = new Set(Array.from(radios).map((r) => r.name));
+    expect(names.size).toBe(1);
+    expect(names.has('')).toBe(false);
+  });
 });

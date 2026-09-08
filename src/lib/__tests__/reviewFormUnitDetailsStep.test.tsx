@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, cleanup, screen } from '@testing-library/react';
+import { render, cleanup, screen, fireEvent } from '@testing-library/react';
 import UnitDetailsStep from '../../components/reviews/form-steps/UnitDetailsStep';
 import { amenityOptions } from '../formOptions';
 import type { UnitDetails } from '../../components/reviews/form-steps/types';
@@ -50,7 +50,7 @@ describe('UnitDetailsStep labeling', () => {
     expect(screen.getByLabelText(/Unit number/i)).toBeTruthy();
   });
 
-  it('gives amenity checkboxes a 40px-plus tap target and accent styling', () => {
+  it('gives amenity checkboxes a 44px tap target and accent styling', () => {
     renderStep();
 
     for (const amenity of amenityOptions) {
@@ -60,7 +60,24 @@ describe('UnitDetailsStep labeling', () => {
 
       const label = checkbox.closest('label');
       expect(label).toBeTruthy();
-      expect(label!.className).toContain('py-2');
+      expect(label!.className).toContain('py-3');
     }
+  });
+
+  it('exposes the move-in date fields as a labeled group', () => {
+    renderStep();
+
+    expect(screen.getByRole('group', { name: 'When did you move in?' })).toBeTruthy();
+  });
+
+  it('reports the updated amenities array when a checkbox is toggled', () => {
+    const { onChange } = renderStep();
+
+    const checkbox = screen.getByLabelText(amenityOptions[0].label) as HTMLInputElement;
+    fireEvent.click(checkbox);
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ amenities: [amenityOptions[0].id] })
+    );
   });
 });

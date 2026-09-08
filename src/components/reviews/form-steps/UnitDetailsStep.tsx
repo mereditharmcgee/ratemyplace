@@ -29,8 +29,8 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
       )}
 
       {/* Move-in date */}
-      <div>
-        <span className="block text-sm font-medium text-gray-700 mb-2">
+      <div role="group" aria-labelledby="review-move-in-label">
+        <span id="review-move-in-label" className="block text-sm font-medium text-gray-700 mb-2">
           When did you move in?
         </span>
         <div className="grid grid-cols-2 gap-3">
@@ -152,15 +152,15 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
+      <div role="group" aria-labelledby="review-amenities-label">
+        <span id="review-amenities-label" className="block text-sm font-medium text-gray-700 mb-3">
           Amenities <span className="text-gray-400">(select all that apply)</span>
-        </label>
+        </span>
         <div className="grid grid-cols-2 gap-2">
           {amenityOptions.map((amenity) => (
             <label
               key={amenity.id}
-              className="flex items-center gap-2 py-2 cursor-pointer"
+              className="flex items-center gap-2 py-3 cursor-pointer"
             >
               <input
                 type="checkbox"
@@ -183,19 +183,15 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
+      <div role="group" aria-labelledby="review-utilities-label">
+        <span id="review-utilities-label" className="block text-sm font-medium text-gray-700 mb-3">
           Utilities Included in Rent <span className="text-gray-400">(select all that apply)</span>
-        </label>
+        </span>
         <div className="grid grid-cols-2 gap-2">
           {utilityOptions.map((utility) => (
             <label
               key={utility.id}
-              className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
-                unitDetails.utilitiesIncluded.includes(utility.id)
-                  ? 'border-teal-500 bg-teal-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
+              className="flex items-center gap-2 py-3 cursor-pointer"
             >
               <input
                 type="checkbox"
@@ -213,7 +209,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
                     });
                   }
                 }}
-                className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+                className="h-5 w-5 accent-teal-700"
               />
               <span className="text-sm text-gray-700">{utility.label}</span>
             </label>
@@ -249,7 +245,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
           <select
             id="review-laundry"
             value={unitDetails.laundryType}
-            onChange={(e) => onChange({ ...unitDetails, laundryType: e.target.value as any })}
+            onChange={(e) => onChange({ ...unitDetails, laundryType: e.target.value as UnitDetails['laundryType'] })}
             className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
             <option value="in_unit">In-unit washer/dryer</option>
@@ -302,19 +298,15 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
         </select>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
+      <div role="group" aria-labelledby="review-pets-label">
+        <span id="review-pets-label" className="block text-sm font-medium text-gray-700 mb-3">
           Pets Allowed <span className="text-gray-400">(select all that apply)</span>
-        </label>
+        </span>
         <div className="grid grid-cols-2 gap-2">
           {petTypeOptions.map((pet) => (
             <label
               key={pet.id}
-              className={`flex items-center gap-2 p-3 border rounded-[6px] cursor-pointer transition-colors ${
-                unitDetails.petTypes.includes(pet.id)
-                  ? 'border-teal-500 bg-teal-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
+              className="flex items-center gap-2 py-3 cursor-pointer"
             >
               <input
                 type="checkbox"
@@ -329,7 +321,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
                     });
                   }
                 }}
-                className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+                className="h-5 w-5 accent-teal-700"
               />
               <span className="text-sm text-gray-700">{pet.label}</span>
             </label>
