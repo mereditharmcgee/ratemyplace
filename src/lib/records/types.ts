@@ -190,7 +190,13 @@ export interface PullSummary {
 export interface RecordsStatement {
   first<T = unknown>(): Promise<T | null>;
   all<T = unknown>(): Promise<{ results: T[] }>;
-  run(): Promise<unknown>;
+  /**
+   * D1's `D1Response` shape, narrowed to the two fields this codebase reads. Both are
+   * optional so a conditional UPDATE that reports no count reads as zero — fail closed,
+   * the way the correction-resolve endpoint treats it. Real `D1Database` and the
+   * `TestD1Database` double both satisfy this.
+   */
+  run(): Promise<{ success?: boolean; meta?: { changes?: number } }>;
 }
 export interface RecordsPreparedStatement extends RecordsStatement {
   bind(...values: unknown[]): RecordsPreparedStatement;

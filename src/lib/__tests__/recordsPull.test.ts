@@ -50,7 +50,7 @@ class TrackingStatement implements RecordsPreparedStatement {
     return this.inner.all<T>();
   }
 
-  run(): Promise<unknown> {
+  run(): Promise<{ success?: boolean; meta?: { changes?: number } }> {
     return this.inner.run();
   }
 }
