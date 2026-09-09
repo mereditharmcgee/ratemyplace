@@ -8,10 +8,10 @@
 // claims means such a row parks itself after MAX_ATTEMPTS and waits for a human, while a row
 // that merely fails cleanly still gets its MAX_ATTEMPTS tries and a `last_error` each time.
 import { truncateError } from './pull';
-import type { RecordsDb } from './types';
+import type { QueueReason, RecordsDb } from './types';
 import type { BuildingRowForIdentity } from './identity';
 
-export type QueueReason = 'button' | 'follower' | 'refresh' | 'fill';
+export type { QueueReason };
 
 /** Lower runs first. Button and follower are a person waiting; refresh keeps interest fresh; fill is the city-wide pass. */
 export const PRIORITY: Record<QueueReason, number> = { button: 0, follower: 0, refresh: 1, fill: 2 };

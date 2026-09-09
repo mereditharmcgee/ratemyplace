@@ -24,16 +24,18 @@ import {
   type RecordsDb,
   type RecordsPreparedStatement,
   type SourceResult,
+  type TriggerReason,
 } from './types';
 
 export interface PullOptions {
   /** Admin user id, or null when no admin is behind the pull (seed, queue). */
   triggeredBy: string | null;
   /**
-   * Why the pull ran, stored in record_pulls.trigger_reason: 'admin', 'correction',
-   * 'seed', or 'queue:<reason>'. Defaults to 'admin' when triggeredBy is set.
+   * Why the pull ran, stored in record_pulls.trigger_reason. Defaults to 'admin' when
+   * triggeredBy is set, and stays null when nothing else says why. A union, not a string,
+   * so a caller cannot invent a reason the queue and the admin panel do not recognize.
    */
-  triggerReason?: string | null;
+  triggerReason?: TriggerReason | null;
   correctionId?: string | null;
   /** Injectable for tests. Defaults to global fetch. */
   fetchImpl?: FetchLike;
@@ -60,7 +62,7 @@ interface PullRowValues {
   errorMessage: string | null;
   triggeredBy: string | null;
   correctionId: string | null;
-  triggerReason: string | null;
+  triggerReason: TriggerReason | null;
 }
 
 /** Shared with the queue, so `record_pulls.error_message` and `records_queue.last_error` read the same. */

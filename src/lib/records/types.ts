@@ -170,6 +170,16 @@ export class SourceError extends Error {
   }
 }
 
+/** Why a queue row exists. Mirrors 0031's CHECK on records_queue.reason. */
+export type QueueReason = 'button' | 'follower' | 'refresh' | 'fill';
+
+/**
+ * Why a pull ran, written verbatim to `record_pulls.trigger_reason`. It lives here, not in
+ * queue.ts, so `pull.ts` can name the union without importing the queue — and so a new queue
+ * reason cannot reach the column without first appearing in `QueueReason` above.
+ */
+export type TriggerReason = 'admin' | 'correction' | 'seed' | `queue:${QueueReason}`;
+
 export interface PullSourceSummary {
   sourceId: string;
   label: string;
