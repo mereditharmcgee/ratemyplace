@@ -75,6 +75,22 @@ describe('matchExistingBuildings', () => {
     expect(swallows.unmatched.map((u) => u.reason)).toEqual(['existing_spans_multiple_parcels']);
     expect(swallows.unmatched[0].candidates.map((p) => p.parcelId)).toEqual(['2102098000']);
   });
+  it('respects street-side parity: an even number is not inside an odd-only parcel range', () => {
+    // The production dry run of 2026-09-09: 66 Chiswick Road saw two candidates, the odd
+    // side "61-69" and the even side "66-70". Only the even side really contains 66.
+    const oddSide = seed({ parcelId: '2102229000', address: '61-69 Chiswick Road', streetKey: 'CHISWICK RD', numLo: 61, numHi: 69, zip: '02135' });
+    const evenSide = seed({ parcelId: '2102304000', address: '66-70 Chiswick Road', streetKey: 'CHISWICK RD', numLo: 66, numHi: 70, zip: '02135' });
+    const result = matchExistingBuildings([existing({ id: 'c1', address: '66 Chiswick Rd' })], [oddSide, evenSide]);
+    expect(result.matched.map((m) => m.parcel.parcelId)).toEqual(['2102304000']);
+    expect(result.unmatched).toEqual([]);
+  });
+
+  it('treats a mixed-parity parcel range as spanning both sides', () => {
+    const bothSides = seed({ parcelId: '2102229000', address: '6-9 A Street', streetKey: 'A ST', numLo: 6, numHi: 9 });
+    const result = matchExistingBuildings([existing({ id: 'a1', address: '7 A St' }), existing({ id: 'a2', address: '8 A St' })], [bothSides]);
+    expect(result.matched).toHaveLength(2);
+  });
+
   it('reports two parcels claiming one address as ambiguous', () => {
     const result = matchExistingBuildings([existing({ address: '25 Lanark Rd' })], [seed({}), seed({ parcelId: '2102099000', numLo: 25, numHi: 25 })]);
     expect(result.matched).toEqual([]);
