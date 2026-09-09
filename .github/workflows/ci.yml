@@ -32,7 +32,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Audit critical vulnerabilities
-        run: npm audit --audit-level=critical
+        run: node scripts/audit-critical.mjs
       - name: Type-check
         run: npm run check
       - name: Unit tests
