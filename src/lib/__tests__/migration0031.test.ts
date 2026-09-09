@@ -22,13 +22,14 @@ describe('migration 0031 (Boston coverage)', () => {
   it('creates records_queue with one pending row per building and a reason check', async () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'b1' });
+    await insertBuilding(db, { id: 'b2', slug: 'b2' });
     await db.prepare("INSERT INTO records_queue (building_id, reason, priority) VALUES ('b1', 'button', 0)").run();
     await expect(async () =>
       db.prepare("INSERT INTO records_queue (building_id, reason, priority) VALUES ('b1', 'fill', 2)").run(),
     ).rejects.toThrow(/UNIQUE/);
     await expect(async () =>
-      db.prepare("INSERT INTO records_queue (building_id, reason, priority) VALUES ('b1', 'view', 0)").run(),
-    ).rejects.toThrow(/CHECK|UNIQUE/);
+      db.prepare("INSERT INTO records_queue (building_id, reason, priority) VALUES ('b2', 'view', 0)").run(),
+    ).rejects.toThrow(/CHECK/);
   });
 
   it('allows a second pending row once the first is done', async () => {
@@ -38,6 +39,14 @@ describe('migration 0031 (Boston coverage)', () => {
     await db.prepare("INSERT INTO records_queue (building_id, reason, priority) VALUES ('b1', 'button', 0)").run();
     const n = await db.prepare("SELECT COUNT(*) AS n FROM records_queue WHERE building_id = 'b1'").first<{ n: number }>();
     expect(n?.n).toBe(2);
+  });
+
+  it('creates the two non-unique indexes the queue and dedupe rely on', async () => {
+    const db = createRecordsTestDb();
+    const rows = await db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('idx_buildings_street', 'idx_records_queue_pending') ORDER BY name")
+      .all<{ name: string }>();
+    expect(rows.results.map((r) => r.name)).toEqual(['idx_buildings_street', 'idx_records_queue_pending']);
   });
 
   it('creates app_settings and record_pulls.trigger_reason', async () => {
