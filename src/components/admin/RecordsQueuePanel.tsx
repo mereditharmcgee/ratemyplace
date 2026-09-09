@@ -1,8 +1,29 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { RecordsQueueParkedRow, RecordsQueueStats } from '../../lib/api-types';
+import type { RecordsQueueFixtureResult, RecordsQueueParkedRow, RecordsQueueStats } from '../../lib/api-types';
 
 /** The queue moves on a one-minute Worker tick, so a one-minute poll is as fresh as the data gets. */
 const POLL_INTERVAL_MS = 60_000;
+
+/**
+ * A copy of `LOCK_TTL_SECONDS` from lib/records/queue.ts rather than an import: that module
+ * is the queue's SQL, and this panel is a client island — the same reason `RecordsQueueStats`
+ * is mirrored in api-types instead of imported from there. recordsQueuePanel.test.tsx asserts
+ * this equals the exported constant, so the copy cannot drift silently.
+ */
+export const RETRY_LOCK_TTL_SECONDS = 1800;
+
+/** Shown on the disabled Retry button, and inline when the endpoint answers 409. */
+const STILL_RUNNING = 'Pull still running; retry after its lease expires';
+
+/**
+ * True while the claim that parked this row may still be pulling. `attempts` counts CLAIMS,
+ * so a row crosses its attempt limit at the moment of its last claim and lands in this list
+ * with the pull still in flight; retrying then would queue a second pull of the same
+ * building alongside the first. The endpoint refuses that, and the button says so first.
+ */
+function isRunning(row: RecordsQueueParkedRow, nowSeconds: number): boolean {
+  return row.locked_at !== null && nowSeconds - row.locked_at < RETRY_LOCK_TTL_SECONDS;
+}
 
 /** Enough of a stack-trace-free error to recognize it; the full text stays in the `title`. */
 const MAX_ERROR_CHARS = 120;
@@ -17,16 +38,12 @@ const REASON_LABELS: Array<[keyof RecordsQueueStats['pendingByReason'], string]>
 ];
 
 /**
- * What the scheduler stamps into `app_settings.records_fixture_last` after each daily
- * plan run. Parsed defensively: a settings row written by a newer scheduler must degrade
- * to "not run yet" rather than throw the panel away.
+ * The part of the scheduler's `app_settings.records_fixture_last` this panel renders.
+ * Derived from the shared type so the two cannot drift, and parsed defensively anyway:
+ * a settings row written by a newer scheduler must degrade to "not run yet" rather than
+ * throw the panel away.
  */
-interface LastFixture {
-  at: number;
-  failures: number;
-  failed: string[];
-  sourceErrors: Array<{ label: string; message: string }>;
-}
+type LastFixture = Pick<RecordsQueueFixtureResult, 'at' | 'failures' | 'failed' | 'sourceErrors'>;
 
 function parseFixture(value: unknown): LastFixture | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -103,14 +120,20 @@ export default function RecordsQueuePanel() {
   const load = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/records/queue');
-      const data = await response.json();
+      const payload = await response.json();
       if (!response.ok) {
         // The endpoint's own message describes a server-side failure; the panel says
         // the one thing the admin can act on instead.
         setError(LOAD_ERROR);
         return;
       }
-      setStats(data.stats as RecordsQueueStats);
+      // Success is a `{ data }` envelope (AGENTS.md); failures are a bare `{ error }`.
+      const data = (payload?.data ?? {}) as {
+        stats?: RecordsQueueStats;
+        parked?: unknown;
+        lastFixture?: unknown;
+      };
+      setStats(data.stats ?? null);
       setParked(Array.isArray(data.parked) ? (data.parked as RecordsQueueParkedRow[]) : []);
       setLastFixture(parseFixture(data.lastFixture));
       setError(null);
@@ -140,12 +163,13 @@ export default function RecordsQueuePanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paused }),
       });
-      const data = await response.json();
+      const payload = await response.json();
       if (!response.ok) {
         setActionError(paused ? 'Could not pause the fill' : 'Could not resume the fill');
         return;
       }
-      setStats(data.stats as RecordsQueueStats);
+      const next = (payload?.data as { stats?: RecordsQueueStats } | undefined)?.stats;
+      if (next) setStats(next);
     } catch {
       setActionError(paused ? 'Could not pause the fill' : 'Could not resume the fill');
     } finally {
@@ -162,9 +186,13 @@ export default function RecordsQueuePanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
-      const data = await response.json();
+      const payload = await response.json();
       if (!response.ok) {
-        setActionError(data?.error === 'Queue row not found' ? 'That row is no longer in the queue' : 'Could not retry that row');
+        // 409 is the one failure the admin can do something about — wait for the lease to
+        // expire — so it says so. Everything else (403, 415, 500) is a generic failure.
+        if (response.status === 409) setActionError(STILL_RUNNING);
+        else if (payload?.error === 'Queue row not found') setActionError('That row is no longer in the queue');
+        else setActionError('Could not retry that row');
         return;
       }
       // Re-fetch rather than trusting the returned stats alone: the row has to leave
@@ -203,6 +231,11 @@ export default function RecordsQueuePanel() {
       </div>
     );
   }
+
+  // Read once per render, and a render happens on every poll — a lease that expires between
+  // two polls unlocks its Retry button up to a minute later, which is the same minute the
+  // queue itself moves in.
+  const nowSeconds = Math.floor(Date.now() / 1000);
 
   return (
     <div className="space-y-4">
@@ -289,7 +322,9 @@ export default function RecordsQueuePanel() {
                 </tr>
               </thead>
               <tbody>
-                {parked.map((row) => (
+                {parked.map((row) => {
+                  const running = isRunning(row, nowSeconds);
+                  return (
                   <tr key={row.id} className="border-b border-gray-100 align-top">
                     <td className="py-2 pr-4">
                       <a
@@ -301,7 +336,14 @@ export default function RecordsQueuePanel() {
                         {row.address}
                       </a>
                     </td>
-                    <td className="py-2 pr-4 text-gray-700">{row.reason}</td>
+                    <td className="py-2 pr-4 text-gray-700">
+                      {row.reason}
+                      {running && (
+                        <span className="ml-2 inline-block rounded-[4px] bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
+                          running
+                        </span>
+                      )}
+                    </td>
                     <td className="py-2 pr-4 text-gray-700">{row.attempts}</td>
                     <td className="py-2 pr-4 text-gray-700 max-w-md">
                       {row.last_error ? (
@@ -317,7 +359,8 @@ export default function RecordsQueuePanel() {
                         onClick={() => {
                           void retryRow(row.id);
                         }}
-                        disabled={retryingId === row.id}
+                        disabled={retryingId === row.id || running}
+                        title={running ? STILL_RUNNING : undefined}
                         aria-label={`Retry ${row.address}`}
                         className="h-11 px-4 rounded-[4px] bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -325,7 +368,8 @@ export default function RecordsQueuePanel() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
