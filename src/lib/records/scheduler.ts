@@ -23,9 +23,13 @@ import type { BuildingRowForIdentity } from './identity';
 import type { PullSummary, RecordsDb } from './types';
 
 /**
- * Per one-minute tick. A pull is about twenty requests to data.boston.gov, so three
- * people-facing rows plus one city-wide row is roughly eighty requests a minute — polite
- * against a public CKAN endpoint, and slow enough that the fill takes months on purpose.
+ * Per one-minute tick. A seeded building's pull is about 27 requests to data.boston.gov —
+ * 17 of them 311 (sixteen yearly files plus the new-system resource), one per assessor year,
+ * one each for the other four sources, and no parcel-resolution query, because a seeded row
+ * already carries its parcel. Three people-facing rows plus one city-wide row is therefore
+ * about 110 requests a minute — polite against a public CKAN endpoint, well under the Workers
+ * limit of 1,000 subrequests per invocation, and slow enough that the fill takes months on
+ * purpose. Each pull also writes 11 `record_pulls` rows, one per source.
  */
 export const PRIORITY_PER_RUN = 3;
 export const FILL_PER_RUN = 1;

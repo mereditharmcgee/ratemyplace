@@ -74,8 +74,21 @@ npx wrangler tail --config workers/records-scheduler/wrangler.jsonc --format pre
 ```
 
 On a quiet queue with the fill paused, expect one line a minute reading `records_drain` with
-`fillPaused: true`, `pulled: 0`, `failed: 0`. Anything else — a `records_scheduler_error`,
-or a `pulled` count while the fill is paused — means stop and look before walking away.
+`fillPaused: true`, `pulled: 0`, `failed: 0`, `budgetHit: false`. A `records_scheduler_error`
+means stop and look before walking away.
+
+So does a `pulled` count while the fill is paused — but **only before the first 06:00 planner
+run**. Until the planner has run there is nothing legitimate in the queue, so a pull is a
+pull that should not be happening. After it, refresh rows exist and drain normally while the
+fill is paused; that is the design, not a leak. What settles it is `trigger_reason` on the
+pulls themselves, not the count in the log line — `queue:refresh`, `queue:button` and
+`queue:follower` are all expected on a paused fill, and `queue:fill` is not:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --command \
+  "SELECT trigger_reason, COUNT(*) FROM record_pulls WHERE retrieved_at >= unixepoch() - 3600
+   GROUP BY trigger_reason"
+```
 
 **5. Check the next 06:00 UTC `records_plan` line.** The planner runs once a day, so this is
 a next-morning check rather than a same-session one. Look for `records_plan` with
@@ -180,14 +193,18 @@ Repeated parking on the same building is a real failure, not a transient one. Re
 
 At full rate, with the fill unpaused:
 
-- **About 80 requests a minute to data.boston.gov.** Four pulls a tick, roughly twenty
-  requests each. That rate is the point: it is polite against a public CKAN endpoint, and it
-  makes the city-wide fill take months rather than hammering the city in an afternoon.
+- **About 110 requests a minute to data.boston.gov.** Four pulls a tick, about 27 requests
+  each: 17 of them 311 (sixteen yearly files plus the new-system resource), one per assessor
+  year, one each for permits, violations, code enforcement and RentSmart. A seeded building
+  needs no parcel-resolution query, because its row already carries the parcel. That rate is
+  the point: it is polite against a public CKAN endpoint, it sits well under the Workers
+  limit of 1,000 subrequests per invocation, and it makes the city-wide fill take months
+  rather than hammering the city in an afternoon.
 - **About 1,440 fill pulls a day** — one a minute, every minute. Against 38,208 seeded
   buildings, a first pass is measured in weeks.
-- **D1 writes around 45,000 rows a day** — roughly twenty `record_pulls` provenance rows per
-  pull plus the typed `building_records` payloads, plus the queue's own claim and complete
-  updates.
+- **About 15,800 `record_pulls` rows a day from the fill** — 11 per pull, one per source,
+  times 1,440. The typed `building_records` payload rows, the people-facing pulls, and the
+  queue's own claim and complete updates all sit on top of that.
 
 While the fill is paused, all three fall to whatever readers and the refresh planner
 generate, which on a normal day is close to zero.
@@ -226,6 +243,12 @@ Both make real requests to the live city API and write real rows to the local da
   building nobody has tried yet. First coverage beats a retry, and a source that is down for
   a week cannot spend the whole fill re-failing the same buildings. `empty` is an answer, not
   a miss: the city having no permits for a building is exactly what the panel shows.
+- **A drain stops claiming after 45 seconds of wall clock** (`DRAIN_BUDGET_MS`) and reports
+  `budgetHit: true` on its `records_drain` line, plus a `records_drain_budget_hit` line of
+  its own. The cron fires every minute whether or not the previous tick has finished, so the
+  ceiling is what keeps a slow city from stacking overlapping drains instead of throttling
+  them. One such line is a slow minute at data.boston.gov. A run of them means the queue is
+  draining more slowly than it fills, and the fill is the thing to pause.
 - **The queue is a working set, not a copy of the city.** The fill is topped up to 2,000
   pending rows, so queue depth is not a progress bar. Coverage is a question for
   `record_pulls`, not `records_queue`.

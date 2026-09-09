@@ -17,9 +17,19 @@ package against the `node:sqlite` D1 double.
 | `* * * * *` | every minute | `drain` — claims up to 3 people-facing rows plus 1 city-wide fill row, pulls each building's records for real, logs `records_drain`. Skips the fill row entirely while the fill is paused. |
 | `0 6 * * *` | 06:00 UTC daily | `plan` — in this order: purges finished rows, enqueues refreshes, tops the fill queue back up, runs the Lanark fixture and the source error-rate check, then trips the circuit breaker (pausing the fill and emailing once) if either fails. The order is the point: the breaker is judged on the day's pulls and stops the fill before the next drain. Logs `records_plan`. |
 
-A pull is roughly twenty requests to `data.boston.gov`, so a full minute tick is about
-eighty requests. That rate is deliberate: it is polite against a public CKAN endpoint, and
-it makes the city-wide fill take months rather than hammering the city in an afternoon.
+A seeded building's pull is about 27 requests to `data.boston.gov` — 17 of them 311 (sixteen
+yearly files plus the new-system resource), one per assessor year, one each for permits,
+violations, code enforcement and RentSmart, and none for parcel resolution, which a seeded
+row already carries — and it writes 11 `record_pulls` rows, one per source. A full minute
+tick is therefore about 110 requests, well inside the Workers limit of 1,000 subrequests per
+invocation, and the fill alone writes about 15,800 pull rows a day. That rate is deliberate:
+it is polite against a public CKAN endpoint, and it makes the city-wide fill take months
+rather than hammering the city in an afternoon.
+
+`drain` also stops claiming after `DRAIN_BUDGET_MS` (45 s) of wall clock and reports
+`budgetHit: true`. The cron fires every minute whether or not the previous tick has
+finished, so without that ceiling a slow city would not throttle the system, it would stack
+overlapping drains on top of each other.
 
 At 06:00 UTC the two crons overlap. That is by design and it is safe: they are separate
 invocations, `plan` holds no locks, and every row `drain` claims is claimed with a
@@ -113,8 +123,9 @@ the pause flag has to be on production *before* the Worker is.
    npx wrangler tail ratemyplace-records-scheduler --format pretty
    ```
    Expect a `records_drain` line every minute with `fillPaused: true` and `pulled: 0` on a
-   quiet queue. Anything else — `records_scheduler_error`, or a `pulled` count on a paused
-   fill — means stop and look before walking away.
+   quiet queue. `records_scheduler_error` means stop and look before walking away. So does a
+   `pulled` count on a paused fill, but only before the first 06:00 planner run — after it,
+   refresh rows drain legitimately while the fill is paused. See the runbook's step 4.
 
 Unpausing the city-wide fill is a separate, deliberate step (sub-project C3), not part of
 this deploy.

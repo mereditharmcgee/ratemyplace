@@ -198,8 +198,18 @@ Not added on purpose: a per-building view counter (no analytics, by policy) and 
 > is what makes `drain` and `plan` testable against the `node:sqlite` D1 double. The Worker
 > imports `drain`, `plan` and `liveDeps` and does nothing else.
 >
-> **Workers Paid is confirmed** (5 min CPU, 10,000 subrequests per invocation), so the plan
-> caveat above is closed.
+> **Workers Paid is confirmed** (5 min CPU, 1,000 subrequests per invocation — not 10,000,
+> which an earlier draft of this block and the C2 plan both got wrong), so the plan caveat
+> above is closed. A full drain tick is four pulls at about 27 requests each, roughly 110
+> subrequests, so the real limit is comfortable but not the order of magnitude assumed.
+>
+> **Per-pull numbers, measured against the built sources.** A seeded building's pull is about
+> **27 requests** to data.boston.gov — 17 of them 311 (sixteen yearly files plus the
+> new-system resource), one per assessor year, one each for permits, violations, code
+> enforcement and RentSmart, and **none** for parcel resolution, because a seeded row already
+> carries its parcel — and it writes **11 `record_pulls` rows**, one per source. At full rate
+> that is about 110 requests a minute and about 15,800 pull rows a day from the fill. This
+> supersedes the "about 20 requests and about 30 stored rows" estimate in Section 1.
 >
 > Details that differ from the text above:
 >
@@ -210,14 +220,24 @@ Not added on purpose: a per-building view counter (no analytics, by policy) and 
 >   an hour and a half instead of inside one drain. Counting claims is what stops a row whose
 >   pull kills the runner outright — an OOM, a CPU-limit kill, anything that never reaches a
 >   catch — from being claimed forever by the one process that cannot report the failure.
-> - **`LOCK_TTL_SECONDS = 1800`, not 600.** A single pull's worst case is about twenty requests
->   at the 10 s per-source timeout, so 600 s was too close to the work it covers. Half an hour
->   is the delay before a genuinely dead run's row is retried; nothing is gained by cutting it
->   fine.
+> - **`LOCK_TTL_SECONDS = 1800`, not 600.** A single pull is about 27 requests, so its worst
+>   case at the 10 s per-source timeout is 270 s and 600 s was too close to the work it
+>   covers. Half an hour is the delay before a genuinely dead run's row is retried; nothing is
+>   gained by cutting it fine.
 > - **`drain` claims one row at a time, immediately before pulling it**, re-reading the clock
 >   per claim, rather than claiming the tick's three-plus-one up front. Claiming a batch would
 >   date every lease from the start of the run and spend an attempt on rows that never got
 >   pulled.
+> - **`drain` has a wall-clock budget, `DRAIN_BUDGET_MS = 45_000`**, checked before every claim
+>   (never after — a claim spends an attempt) and reported as `budgetHit` in `DrainResult`.
+>   The cron fires every minute whether or not the previous tick finished, so without it a
+>   slow upstream does not throttle the system, it compounds: a three-minute tick is overlapped
+>   by two more, each claiming its own rows and opening its own connections to the city.
+> - **`enqueue` will not replace a pending row whose lease is live.** A higher-priority request
+>   normally deletes and re-inserts the pending row, but a leased row is being pulled right now
+>   and that pull is already doing the requester's work; deleting it would orphan a run in
+>   flight, whose `completeRow` would then mark nothing. It answers `already_queued` instead,
+>   using claimBatch's liveness test, boundary included.
 > - **The pull is `pullBuildingRecords(db, building, { triggeredBy: null, triggerReason: 'queue:<reason>' })`.**
 >   `triggered_by` is a `users(id)` foreign key and stays NULL; the reason goes in
 >   `record_pulls.trigger_reason`, whose values are `admin`, `correction`, `seed`,
@@ -350,7 +370,14 @@ On a match: set `google_place_id`, and `latitude`/`longitude` if null, and retur
 >   claims counting attempts, parking at three, `failRow` keeping the lock.
 > - `recordsQueuePlanner.test.ts` — the refresh interest set, fill top-up order and target,
 >   purge retention, error-rate windows, queue stats, and that migration `0032`'s three
->   indexes exist and are used.
+>   indexes exist. An `EXPLAIN QUERY PLAN` assertion over the statements the module actually
+>   prepares pins which of them SQLite uses: the breaker's window is a covering seek on
+>   `idx_record_pulls_retrieved`, and the interest set's saved-buildings union is a covering
+>   scan of `idx_saved_buildings_building`. **`idx_records_queue_building` is not used by
+>   either planner** — both pending-row lookups prefer 0031's narrower partial index, and the
+>   finished-button leg of the interest set filters on `reason` and `done_at`, neither of
+>   which a building_id index carries, so it scans. 0032's own comment claims otherwise and is
+>   wrong; making that leg indexed is a migration, not a comment, and is not done here.
 > - `recordsScheduler.test.ts` — `drain` and `plan` against injected deps: the one-at-a-time
 >   claim, the paused fill, breaker thresholds in both directions, the single alert, the
 >   stored fixture result.

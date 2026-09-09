@@ -300,12 +300,16 @@ Things that have already cost time. Read before debugging.
 - **Public records are never fetched on a public page view.** Pulls are admin-triggered and
   stored in D1; the panel reads only what was stored. Lazy pull-on-view is permanently
   rejected: it is an amplification vector and ties page latency to a third-party API.
-- **Nothing re-pulls on demand.** A request — the admin button, a correction, a reader
-  pressing "get this building's records" — enqueues a `records_queue` row; the companion
-  Worker pulls it on a later minute tick. No request path calls `pullBuildingRecords`
-  synchronously, and the admin retry endpoint un-parks a row rather than pulling it (it
-  refuses a row whose lease is still live with a 409). "I clicked it and nothing happened"
-  is expected for up to a minute.
+- **Two admin paths pull synchronously; everything else is the Worker's.** The admin pull
+  button (`src/pages/api/admin/buildings/[id]/records/pull.ts`) and the correction re-pull
+  (`src/pages/api/admin/records/corrections/[id]/repull.ts`) call `pullBuildingRecords`
+  inside the request and answer with the summary — an admin is waiting on their own click,
+  and both are rate-limited and audited. Every `records_queue` row is pulled by the companion
+  Cron Worker on a later minute tick instead, never by a request; the admin retry endpoint
+  un-parks a row rather than pulling it (it refuses a row whose lease is still live with a
+  409); and the reader-facing button, which enqueues rather than pulls, arrives in C3. So
+  "I clicked it and nothing happened" is expected for up to a minute on anything queued — but
+  not on those two admin buttons, which either return a summary or fail in front of you.
 - **An `_`-prefixed file under `src/pages/` is not a route.** Astro excludes it from
   file-based routing, which is how `src/pages/api/admin/records/queue/_json.ts` can be a
   shared helper next to the endpoints that import it. The rule cuts the other way for

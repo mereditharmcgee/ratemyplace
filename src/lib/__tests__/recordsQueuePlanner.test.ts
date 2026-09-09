@@ -70,6 +70,48 @@ function countingBatch(db: TestD1Database): { db: RecordsDb; sizes: number[] } {
   };
 }
 
+/**
+ * Captures the SQL and the bindings a module prepares, so `EXPLAIN QUERY PLAN` runs against
+ * the query the planner actually issues rather than a copy pasted into the test, which would
+ * go on passing after the real one changed.
+ */
+function capturingSql(db: TestD1Database): { db: RecordsDb; find: (needle: string) => { sql: string; values: unknown[] } } {
+  const calls: Array<{ sql: string; values: unknown[] }> = [];
+  return {
+    find(needle: string) {
+      const call = calls.find((c) => c.sql.includes(needle));
+      if (!call) throw new Error(`no prepared statement containing ${needle}`);
+      return call;
+    },
+    db: {
+      prepare(sql: string): RecordsPreparedStatement {
+        const inner = db.prepare(sql);
+        const self: RecordsPreparedStatement = {
+          bind(...values: unknown[]) {
+            calls.push({ sql, values });
+            inner.bind(...(values as never[]));
+            return self;
+          },
+          first: <T>() => inner.first<T>(),
+          all: <T>() => inner.all<T>(),
+          run: () => inner.run(),
+        };
+        return self;
+      },
+      batch: (statements: RecordsPreparedStatement[]) => db.batch(statements as never),
+    },
+  };
+}
+
+/** The plan SQLite chooses for one captured statement, as newline-joined `detail` lines. */
+async function queryPlan(db: TestD1Database, call: { sql: string; values: unknown[] }): Promise<string> {
+  const rows = await db
+    .prepare(`EXPLAIN QUERY PLAN ${call.sql}`)
+    .bind(...(call.values as never[]))
+    .all<{ detail: string }>();
+  return rows.results.map((row) => row.detail).join('\n');
+}
+
 describe('migration 0032 indexes', () => {
   it('creates the three lookup indexes the planner and the breaker depend on', async () => {
     const db = createRecordsTestDb();
@@ -81,6 +123,33 @@ describe('migration 0032 indexes', () => {
       'idx_records_queue_building',
       'idx_saved_buildings_building',
     ]);
+  });
+
+  it('answers the breaker window and the interest set from indexes rather than table scans', async () => {
+    const db = createRecordsTestDb();
+    const capture = capturingSql(db);
+    await planRefresh(capture.db, { now: NOW, deeperSourceIds: DEEPER });
+    await errorRateBySource(capture.db, { now: NOW, windowSeconds: DAY });
+
+    const rates = await queryPlan(db, capture.find('GROUP BY source_id'));
+    // The breaker's trailing window is the read that gets slower every month the fill runs.
+    // retrieved_at leads the index so the window is a range seek, and source_id and status
+    // ride along, so the grouping and the error count never touch the table.
+    expect(rates).toContain('COVERING INDEX idx_record_pulls_retrieved');
+
+    const interest = await queryPlan(db, capture.find('WITH interest'));
+    expect(interest).toContain('COVERING INDEX idx_saved_buildings_building');
+    // Both pending-row lookups take 0031's partial index, which is narrower than a plain
+    // building_id index and already carries the `done_at IS NULL` predicate.
+    expect(interest).toContain('idx_records_queue_pending_building');
+
+    // Recorded, not endorsed. 0032's own comment claims idx_records_queue_building covers
+    // the finished-button leg of the interest set; SQLite disagrees, and it is right —
+    // that leg filters on `reason` and `done_at`, neither of which is in a building_id
+    // index, so it scans however much data is there. The index earns nothing on this query.
+    // Fixing that means indexing the columns the leg actually filters on, which is a
+    // migration, not a comment. Until then this line is the record that it does not help.
+    expect(interest).not.toContain('idx_records_queue_building');
   });
 });
 

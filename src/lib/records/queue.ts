@@ -18,10 +18,11 @@ export type { QueueReason };
 export const PRIORITY: Record<QueueReason, number> = { button: 0, follower: 0, refresh: 1, fill: 2 };
 /**
  * A lock older than this is a Worker run that died mid-pull; the row is claimable again.
- * The drain claims one row at a time immediately before pulling it, and a single pull's
- * worst case is about 20 requests at the 10s per-source timeout — call it 200s. Half an
- * hour is comfortably clear of that, and it is the delay before a genuinely dead run's row
- * is retried, so there is nothing to gain by cutting it fine.
+ * The drain claims one row at a time immediately before pulling it, and a seeded building's
+ * pull is about 27 requests to the city — 17 of them 311, which is sixteen yearly files plus
+ * the new-system resource — so the worst case at the 10 s per-source timeout is 270 s. Half
+ * an hour is comfortably clear of that, and it is the delay before a genuinely dead run's
+ * row is retried, so there is nothing to gain by cutting it fine.
  */
 export const LOCK_TTL_SECONDS = 1800;
 /** After this many claims the row is parked for a human. See the claim-counting note above. */

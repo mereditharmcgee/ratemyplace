@@ -165,12 +165,21 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   for a human at three claims. Counting claims rather than failures is what stops a building
   whose pull kills the runner outright — an OOM, a CPU-limit kill — from being claimed
   forever by the one process that cannot report it. The admin retry endpoint refuses a row
-  whose lease is still live with a 409 rather than starting a second concurrent pull.
+  whose lease is still live with a 409 rather than starting a second concurrent pull, and
+  `enqueue` refuses to replace one for the same reason: a leased row is being pulled right
+  now, and that pull writes exactly the records the higher-priority request is asking for, so
+  the answer is `already_queued`. Replacing it would delete the row out from under the run
+  holding it.
 - **`scheduler.ts` is pure functions over injected dependencies.** `SchedulerDeps` carries
   the db, clock, pull, fixture, alert, and log, so `drain` and `plan` are unit-tested against
   the `node:sqlite` D1 double and `workers/records-scheduler/` stays a wiring file. `drain`
   claims **one row at a time immediately before pulling it**, so a lease covers a request
-  genuinely in flight. The circuit breaker lives at the end of `plan`, not in the Worker: it
+  genuinely in flight, and it stops claiming once `DRAIN_BUDGET_MS` (45 s) of wall clock is
+  gone, reporting `budgetHit` — the cron fires every minute whether or not the previous tick
+  finished, so without the ceiling a slow city stacks overlapping drains instead of
+  throttling them. The budget reads `deps.clockMs` (milliseconds, injectable, defaults to
+  `Date.now`); `deps.now` stays seconds and stays the clock for stored timestamps. The
+  circuit breaker lives at the end of `plan`, not in the Worker: it
   trips on any fixture failure or on a source with at least 20 attempts and over 50% errors
   in 24 hours (the assessor years are counted on purpose — parcel resolution runs through
   the assessor, so its outage fails every other source), pauses the fill, and emails once.
