@@ -27,8 +27,13 @@ import {
 } from './types';
 
 export interface PullOptions {
-  /** Admin user id, or null when a scheduled Worker runs the pull (sub-project C). */
+  /** Admin user id, or null when no admin is behind the pull (seed, queue). */
   triggeredBy: string | null;
+  /**
+   * Why the pull ran, stored in record_pulls.trigger_reason: 'admin', 'correction',
+   * 'seed', or 'queue:<reason>'. Defaults to 'admin' when triggeredBy is set.
+   */
+  triggerReason?: string | null;
   correctionId?: string | null;
   /** Injectable for tests. Defaults to global fetch. */
   fetchImpl?: FetchLike;
@@ -38,8 +43,8 @@ export interface PullOptions {
 const MAX_ERROR_LENGTH = 500;
 
 const PULL_INSERT_SQL =
-  'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, row_count, error_message, triggered_by, correction_id) ' +
-  'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+  'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, row_count, error_message, triggered_by, correction_id, trigger_reason) ' +
+  'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
 const RECORD_INSERT_SQL =
   'INSERT INTO building_records (id, building_id, pull_id, kind, source_key, payload, source_url) VALUES (?, ?, ?, ?, ?, ?, ?)';
@@ -55,6 +60,7 @@ interface PullRowValues {
   errorMessage: string | null;
   triggeredBy: string | null;
   correctionId: string | null;
+  triggerReason: string | null;
 }
 
 function messageOf(err: unknown): string {
@@ -81,6 +87,7 @@ function pullRowStatement(db: RecordsDb, values: PullRowValues): RecordsPrepared
       values.errorMessage,
       values.triggeredBy,
       values.correctionId,
+      values.triggerReason,
     );
 }
 
@@ -185,6 +192,9 @@ export async function pullBuildingRecords(
   const fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
   const correctionId = options.correctionId ?? null;
   const triggeredBy = options.triggeredBy;
+  // An admin pull that names no reason is still an admin pull. A pull with nobody behind it
+  // (seed, queue) has to say why it ran, because triggered_by is a users(id) FK and cannot.
+  const triggerReason = options.triggerReason ?? (options.triggeredBy ? 'admin' : null);
   const sources = sourcesForCity(building.city);
 
   let identity: BuildingIdentity | null = null;
@@ -206,7 +216,7 @@ export async function pullBuildingRecords(
 
   for (const source of sources) {
     const pullId = crypto.randomUUID();
-    const base = { pullId, buildingId: building.id, jurisdiction, source, triggeredBy, correctionId };
+    const base = { pullId, buildingId: building.id, jurisdiction, source, triggeredBy, correctionId, triggerReason };
 
     if (!identity || resolutionError) {
       // Belt and braces: a null identity always comes with a resolutionError set above,

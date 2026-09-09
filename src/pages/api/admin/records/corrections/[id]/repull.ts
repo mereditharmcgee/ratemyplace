@@ -79,6 +79,7 @@ export const POST: APIRoute = async (context: APIContext) => {
 
     const summary = await pullBuildingRecords(db, building, {
       triggeredBy: context.locals.user.id,
+      triggerReason: 'correction',
       correctionId,
     });
 

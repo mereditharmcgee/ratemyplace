@@ -482,6 +482,36 @@ suite('pullBuildingRecords', () => {
     expect(pulls.results.every((p) => p.correction_id === 'corr-9')).toBe(true);
   });
 
+  it('writes the trigger reason on every pull row and leaves triggered_by null for a non-admin pull', async () => {
+    const db = createRecordsTestDb();
+    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const building = await loadBuilding(db, buildingId);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
+
+    await pullBuildingRecords(db, building, { triggeredBy: null, triggerReason: 'queue:fill', fetchImpl });
+
+    const rows = await db
+      .prepare('SELECT DISTINCT trigger_reason, triggered_by FROM record_pulls WHERE building_id = ?')
+      .bind(buildingId)
+      .all<{ trigger_reason: string | null; triggered_by: string | null }>();
+    expect(rows.results).toEqual([{ trigger_reason: 'queue:fill', triggered_by: null }]);
+  });
+
+  it('defaults trigger_reason to admin when an admin id is given and no reason is', async () => {
+    const db = await createDbWithAdmin();
+    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const building = await loadBuilding(db, buildingId);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
+
+    await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl });
+
+    const rows = await db
+      .prepare('SELECT DISTINCT trigger_reason FROM record_pulls WHERE building_id = ?')
+      .bind(buildingId)
+      .all<{ trigger_reason: string | null }>();
+    expect(rows.results).toEqual([{ trigger_reason: 'admin' }]);
+  });
+
   it('reports an unparseable address as a resolution error instead of throwing', async () => {
     const db = await createDbWithAdmin();
     const buildingId = await insertBuilding(db, { id: 'bldg-noaddr', address: 'Lanark Road' });
