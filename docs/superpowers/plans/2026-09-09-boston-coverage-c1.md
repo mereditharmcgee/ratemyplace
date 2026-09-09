@@ -50,12 +50,12 @@
 **Files:**
 - Create: `migrations/0031_boston_coverage.sql`
 - Modify: `src/lib/__tests__/helpers/recordsDb.ts`
-- Test: `src/lib/__tests__/migration0031.test.ts`
+- Test: `src/lib/__tests__/recordsMigration0031.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
 ```ts
-// src/lib/__tests__/migration0031.test.ts
+// src/lib/__tests__/recordsMigration0031.test.ts
 import { describe, expect, it } from 'vitest';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 
@@ -199,7 +199,7 @@ Run: `npx wrangler d1 migrations apply ratemyplace-db --local`
 Expected: `0031_boston_coverage.sql` applied.
 
 ```bash
-git add migrations/0031_boston_coverage.sql src/lib/__tests__/helpers/recordsDb.ts src/lib/__tests__/migration0031.test.ts
+git add migrations/0031_boston_coverage.sql src/lib/__tests__/helpers/recordsDb.ts src/lib/__tests__/recordsMigration0031.test.ts
 git commit -m "feat(records): migration 0031 for Boston coverage (queue, settings, address keys)"
 ```
 
@@ -209,12 +209,12 @@ git commit -m "feat(records): migration 0031 for Boston coverage (queue, setting
 
 **Files:**
 - Modify: `src/lib/records/identity.ts`
-- Test: `src/lib/__tests__/addressKey.test.ts`
+- Test: `src/lib/__tests__/recordsAddressKey.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
 ```ts
-// src/lib/__tests__/addressKey.test.ts
+// src/lib/__tests__/recordsAddressKey.test.ts
 import { describe, expect, it } from 'vitest';
 import { addressKey, splitSuffix, streetKey } from '../records/identity';
 
@@ -328,7 +328,7 @@ Expected: PASS, and the existing identity tests still pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/lib/records/identity.ts src/lib/__tests__/addressKey.test.ts
+git add src/lib/records/identity.ts src/lib/__tests__/recordsAddressKey.test.ts
 git commit -m "feat(records): streetKey and addressKey for seed matching and reviewer dedupe"
 ```
 
@@ -338,14 +338,14 @@ git commit -m "feat(records): streetKey and addressKey for seed matching and rev
 
 **Files:**
 - Create: `src/lib/searchQuery.ts`
-- Test: `src/lib/__tests__/searchQuery.test.ts`
+- Test: `src/lib/__tests__/recordsSearchQuery.test.ts`
 
 The search page (C3) will AND one `LIKE` clause per term. This task ships only the pure term splitter with suffix expansion to the long spelling, because stored addresses use long spellings ("Commonwealth Avenue").
 
 - [ ] **Step 1: Write the failing test**
 
 ```ts
-// src/lib/__tests__/searchQuery.test.ts
+// src/lib/__tests__/recordsSearchQuery.test.ts
 import { describe, expect, it } from 'vitest';
 import { normalizeSearchQuery } from '../searchQuery';
 
@@ -416,7 +416,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/lib/searchQuery.ts src/lib/__tests__/searchQuery.test.ts
+git add src/lib/searchQuery.ts src/lib/__tests__/recordsSearchQuery.test.ts
 git commit -m "feat(search): normalizeSearchQuery splits terms and expands suffix abbreviations"
 ```
 
@@ -426,12 +426,12 @@ git commit -m "feat(search): normalizeSearchQuery splits terms and expands suffi
 
 **Files:**
 - Modify: `src/lib/records/ckan.ts`
-- Test: `src/lib/__tests__/ckanPaging.test.ts`
+- Test: `src/lib/__tests__/recordsCkanPaging.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
 ```ts
-// src/lib/__tests__/ckanPaging.test.ts
+// src/lib/__tests__/recordsCkanPaging.test.ts
 import { describe, expect, it } from 'vitest';
 import { CKAN_SEARCH_ENDPOINT, fetchAllRows } from '../records/ckan';
 import type { FetchLike } from '../records/types';
@@ -539,7 +539,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/lib/records/ckan.ts src/lib/__tests__/ckanPaging.test.ts
+git add src/lib/records/ckan.ts src/lib/__tests__/recordsCkanPaging.test.ts
 git commit -m "feat(records): fetchAllRows pages a CKAN resource for bulk downloads"
 ```
 
@@ -549,12 +549,12 @@ git commit -m "feat(records): fetchAllRows pages a CKAN resource for bulk downlo
 
 **Files:**
 - Modify: `src/lib/records/sources/boston/assessor.ts`
-- Test: `src/lib/__tests__/assessmentFromRow.test.ts`
+- Test: `src/lib/__tests__/recordsAssessmentFromRow.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
 ```ts
-// src/lib/__tests__/assessmentFromRow.test.ts
+// src/lib/__tests__/recordsAssessmentFromRow.test.ts
 import { describe, expect, it } from 'vitest';
 import { ASSESSOR_YEARS, MODERN_COLUMNS, assessmentFromRow } from '../records/sources/boston/assessor';
 
@@ -604,7 +604,7 @@ Expected: PASS, nothing else changes behavior.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/lib/records/sources/boston/assessor.ts src/lib/__tests__/assessmentFromRow.test.ts
+git add src/lib/records/sources/boston/assessor.ts src/lib/__tests__/recordsAssessmentFromRow.test.ts
 git commit -m "refactor(records): export assessmentFromRow and the assessor column lists for the seed"
 ```
 
@@ -615,7 +615,7 @@ git commit -m "refactor(records): export assessmentFromRow and the assessor colu
 **Files:**
 - Create: `src/lib/records/seed/types.ts`
 - Create: `src/lib/records/seed/filters.ts`
-- Test: `src/lib/__tests__/seedFilters.test.ts`
+- Test: `src/lib/__tests__/recordsSeedFilters.test.ts`
 
 - [ ] **Step 1: Write the types (no test; they are shapes)**
 
@@ -679,7 +679,7 @@ export interface ExistingBuilding {
 - [ ] **Step 2: Write the failing filter test**
 
 ```ts
-// src/lib/__tests__/seedFilters.test.ts
+// src/lib/__tests__/recordsSeedFilters.test.ts
 import { describe, expect, it } from 'vitest';
 import { HOUSING_A_DESCRIPTIONS, SEED_LAND_USES, isSeedParcelRow } from '../records/seed/filters';
 
@@ -769,7 +769,7 @@ Run: `npx vitest run seedFilters`
 Expected: PASS.
 
 ```bash
-git add src/lib/records/seed/types.ts src/lib/records/seed/filters.ts src/lib/__tests__/seedFilters.test.ts
+git add src/lib/records/seed/types.ts src/lib/records/seed/filters.ts src/lib/__tests__/recordsSeedFilters.test.ts
 git commit -m "feat(records): seed types and the land-use filter"
 ```
 
@@ -779,12 +779,12 @@ git commit -m "feat(records): seed types and the land-use filter"
 
 **Files:**
 - Create: `src/lib/records/seed/format.ts`
-- Test: `src/lib/__tests__/seedFormat.test.ts`
+- Test: `src/lib/__tests__/recordsSeedFormat.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
 ```ts
-// src/lib/__tests__/seedFormat.test.ts
+// src/lib/__tests__/recordsSeedFormat.test.ts
 import { describe, expect, it } from 'vitest';
 import { buildingTypeFor, formatSeedAddress, seedSlug, titleCaseNeighborhood } from '../records/seed/format';
 
@@ -912,7 +912,7 @@ Run: `npx vitest run seedFormat`
 Expected: PASS.
 
 ```bash
-git add src/lib/records/seed/format.ts src/lib/__tests__/seedFormat.test.ts
+git add src/lib/records/seed/format.ts src/lib/__tests__/recordsSeedFormat.test.ts
 git commit -m "feat(records): seed address, slug, type, and neighborhood formatting"
 ```
 
@@ -922,12 +922,12 @@ git commit -m "feat(records): seed address, slug, type, and neighborhood formatt
 
 **Files:**
 - Create: `src/lib/records/seed/sam.ts`
-- Test: `src/lib/__tests__/seedSam.test.ts`
+- Test: `src/lib/__tests__/recordsSeedSam.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
 ```ts
-// src/lib/__tests__/seedSam.test.ts
+// src/lib/__tests__/recordsSeedSam.test.ts
 import { describe, expect, it } from 'vitest';
 import { SAM_FIELDS, SAM_RESOURCE_ID, indexSamByParcel } from '../records/seed/sam';
 import type { SamRow } from '../records/seed/types';
@@ -1024,7 +1024,7 @@ Run: `npx vitest run seedSam`
 Expected: PASS.
 
 ```bash
-git add src/lib/records/seed/sam.ts src/lib/__tests__/seedSam.test.ts
+git add src/lib/records/seed/sam.ts src/lib/__tests__/recordsSeedSam.test.ts
 git commit -m "feat(records): index SAM address points by parcel for the seed"
 ```
 
@@ -1034,12 +1034,12 @@ git commit -m "feat(records): index SAM address points by parcel for the seed"
 
 **Files:**
 - Create: `src/lib/records/seed/collapse.ts`
-- Test: `src/lib/__tests__/seedCollapse.test.ts`
+- Test: `src/lib/__tests__/recordsSeedCollapse.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
 ```ts
-// src/lib/__tests__/seedCollapse.test.ts
+// src/lib/__tests__/recordsSeedCollapse.test.ts
 import { describe, expect, it } from 'vitest';
 import { ASSESSOR_SEED_FIELDS, collapseAssessorRows } from '../records/seed/collapse';
 import type { AssessorRow, SamPoint } from '../records/seed/types';
@@ -1228,7 +1228,7 @@ Run: `npx vitest run seedCollapse`
 Expected: PASS.
 
 ```bash
-git add src/lib/records/seed/collapse.ts src/lib/__tests__/seedCollapse.test.ts
+git add src/lib/records/seed/collapse.ts src/lib/__tests__/recordsSeedCollapse.test.ts
 git commit -m "feat(records): collapse assessor rows into seed buildings"
 ```
 
@@ -1238,12 +1238,12 @@ git commit -m "feat(records): collapse assessor rows into seed buildings"
 
 **Files:**
 - Create: `src/lib/records/seed/match.ts`
-- Test: `src/lib/__tests__/seedMatch.test.ts`
+- Test: `src/lib/__tests__/recordsSeedMatch.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
 ```ts
-// src/lib/__tests__/seedMatch.test.ts
+// src/lib/__tests__/recordsSeedMatch.test.ts
 import { describe, expect, it } from 'vitest';
 import { matchExistingBuildings } from '../records/seed/match';
 import type { ExistingBuilding, SeedBuilding } from '../records/seed/types';
@@ -1356,7 +1356,7 @@ Run: `npx vitest run seedMatch`
 Expected: PASS.
 
 ```bash
-git add src/lib/records/seed/match.ts src/lib/__tests__/seedMatch.test.ts
+git add src/lib/records/seed/match.ts src/lib/__tests__/recordsSeedMatch.test.ts
 git commit -m "feat(records): match existing Boston buildings onto seeded parcels"
 ```
 
@@ -1366,14 +1366,14 @@ git commit -m "feat(records): match existing Boston buildings onto seeded parcel
 
 **Files:**
 - Create: `src/lib/records/seed/sql.ts`
-- Test: `src/lib/__tests__/seedSql.test.ts`
+- Test: `src/lib/__tests__/recordsSeedSql.test.ts`
 
 The emitter returns SQL strings with literals inlined (the file is applied by `wrangler d1 execute --file`, which has no parameter binding). Every string value goes through one `lit()` function that doubles single quotes; every number is validated finite. The test executes the emitted SQL against the test D1 to prove it is valid and idempotent.
 
 - [ ] **Step 1: Write the failing test**
 
 ```ts
-// src/lib/__tests__/seedSql.test.ts
+// src/lib/__tests__/recordsSeedSql.test.ts
 import { describe, expect, it } from 'vitest';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import { SEED_TRIGGER_REASON, lit, seedStatements } from '../records/seed/sql';
@@ -1554,7 +1554,7 @@ Run: `npx vitest run seedSql`
 Expected: PASS (the test D1 double runs the upserts; if `ON CONFLICT ... DO UPDATE` with `excluded` fails in `node:sqlite`, it is a helper limitation, not a D1 one; D1's SQLite supports it. Report it rather than weakening the SQL).
 
 ```bash
-git add src/lib/records/seed/sql.ts src/lib/__tests__/seedSql.test.ts
+git add src/lib/records/seed/sql.ts src/lib/__tests__/recordsSeedSql.test.ts
 git commit -m "feat(records): emit idempotent seed SQL for buildings, pulls, and assessments"
 ```
 
