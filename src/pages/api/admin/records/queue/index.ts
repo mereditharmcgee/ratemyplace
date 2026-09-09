@@ -2,28 +2,45 @@ import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../../../../lib/db';
 import { logError } from '../../../../../lib/logger';
 import { MAX_ATTEMPTS, queueStats } from '../../../../../lib/records/queue';
-import type { RecordsQueueParkedRow } from '../../../../../lib/api-types';
-
-function json(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
+import type { RecordsQueueFixtureResult, RecordsQueueParkedRow } from '../../../../../lib/api-types';
+import { json } from './_json';
 
 /** Key the scheduler stamps with its last circuit-breaker fixture run (0031 `app_settings`). */
 const FIXTURE_LAST_KEY = 'records_fixture_last';
 
 /**
  * Columns listed explicitly rather than `q.*`/`b.*` — the join means a `SELECT *`
- * would drag every buildings column into an admin JSON response. Capped at 100:
- * the parked list is a work queue meant to be emptied, not paginated, and a
- * hundred parked pulls already means something upstream is broken.
+ * would drag every buildings column into an admin JSON response. `locked_at` is in
+ * the list because a row reaches MAX_ATTEMPTS at the moment of its last CLAIM, so it
+ * appears here while its pull may still be in flight; the panel needs the lease to
+ * know whether Retry is safe to offer. Capped at 100: the parked list is a work queue
+ * meant to be emptied, not paginated, and a hundred parked pulls already means
+ * something upstream is broken. `q.id` breaks requested_at ties so two rows queued in
+ * the same second do not swap places between polls.
  */
 const PARKED_SQL =
-  'SELECT q.id, q.reason, q.attempts, q.last_error, q.requested_at, b.address, b.slug ' +
+  'SELECT q.id, q.reason, q.attempts, q.last_error, q.requested_at, q.locked_at, b.address, b.slug ' +
   'FROM records_queue q JOIN buildings b ON b.id = q.building_id ' +
-  'WHERE q.done_at IS NULL AND q.attempts >= ? ORDER BY q.requested_at LIMIT 100';
+  'WHERE q.done_at IS NULL AND q.attempts >= ? ORDER BY q.requested_at, q.id LIMIT 100';
+
+/**
+ * A settings row the scheduler wrote in a shape this build does not understand must not
+ * take the whole panel down with it — the counts still matter. `at` and `failures` are
+ * the two fields the panel cannot render without; anything else missing degrades in the
+ * panel rather than here.
+ */
+function parseFixture(value: string): RecordsQueueFixtureResult | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const raw = parsed as Record<string, unknown>;
+  if (typeof raw.at !== 'number' || typeof raw.failures !== 'number') return null;
+  return parsed as RecordsQueueFixtureResult;
+}
 
 /**
  * GET /api/admin/records/queue
@@ -48,18 +65,9 @@ export const GET: APIRoute = async (context: APIContext) => {
       .bind(FIXTURE_LAST_KEY)
       .first<{ value: string }>();
 
-    // A settings row the scheduler wrote in a shape this build does not understand
-    // must not take the whole panel down with it — the counts still matter.
-    let lastFixture: unknown = null;
-    if (fixture?.value) {
-      try {
-        lastFixture = JSON.parse(fixture.value);
-      } catch {
-        lastFixture = null;
-      }
-    }
+    const lastFixture = fixture?.value ? parseFixture(fixture.value) : null;
 
-    return json({ stats, parked: parked.results, lastFixture }, 200);
+    return json({ data: { stats, parked: parked.results, lastFixture } }, 200);
   } catch (error) {
     logError('records_queue_stats_failed', {
       endpoint: 'admin/records/queue',

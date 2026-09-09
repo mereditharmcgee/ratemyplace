@@ -5,6 +5,9 @@
  * Import these in components that consume APIs for type safety.
  */
 
+// Type-only, so nothing from lib/records/ reaches a browser bundle through this file.
+import type { QueueReason } from './records/types';
+
 // =============================================================================
 // Common Types
 // =============================================================================
@@ -402,13 +405,44 @@ export interface RecordsQueueStats {
 /**
  * One parked `records_queue` row joined to its building: a pull that failed its
  * way out of the queue and is waiting for an admin to press Retry.
+ *
+ * `locked_at` is here because "parked" and "still running" overlap: `attempts`
+ * counts CLAIMS, so a row hits MAX_ATTEMPTS at the moment of its last claim and
+ * looks parked while its pull is still in flight for up to LOCK_TTL_SECONDS. The
+ * panel compares this against the clock to decide whether Retry is safe to offer.
  */
 export interface RecordsQueueParkedRow {
   id: number;
-  reason: string;
+  reason: QueueReason;
   attempts: number;
   last_error: string | null;
   requested_at: number;
+  /** Unix seconds of the lease held by the claim that is (or was) pulling this row. */
+  locked_at: number | null;
   address: string;
   slug: string;
+}
+
+/**
+ * What the daily scheduler stamps into `app_settings.records_fixture_last` — the
+ * last circuit-breaker fixture run against the Lanark address. Written by `plan`
+ * in lib/records/scheduler.ts and read back by GET /api/admin/records/queue; the
+ * shape lives here so the writer and the panel cannot drift apart.
+ *
+ * A stored row that does not match is reported as `null` rather than thrown at the
+ * panel: a settings row from a newer scheduler must not take the counts down with it.
+ */
+export interface RecordsQueueFixtureResult {
+  /** Unix seconds of the plan run that wrote this. */
+  at: number;
+  /** `checksFailed` plus `sourceErrors.length` — the one number that decides pass/fail. */
+  failures: number;
+  /** Checks that came back not-ok, counted separately from the sources that threw. */
+  checksFailed: number;
+  /** Labels of the checks that came back not-ok. */
+  failed: string[];
+  /** Sources whose run() threw, by label. */
+  sourceErrors: Array<{ label: string; message: string }>;
+  /** Row count per source label, for the sources that ran. One that threw is absent, not zero. */
+  rowsBySource: Record<string, number>;
 }

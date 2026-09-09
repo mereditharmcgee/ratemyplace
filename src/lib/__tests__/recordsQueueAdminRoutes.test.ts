@@ -3,15 +3,28 @@ import { describe, expect, it } from 'vitest';
 import { GET } from '../../pages/api/admin/records/queue/index';
 import { POST as PAUSE } from '../../pages/api/admin/records/queue/pause';
 import { POST as RETRY } from '../../pages/api/admin/records/queue/retry';
-import { MAX_ATTEMPTS } from '../records/queue';
+import { LOCK_TTL_SECONDS, MAX_ATTEMPTS } from '../records/queue';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
-import type { RecordsQueueParkedRow, RecordsQueueStats } from '../api-types';
+import type { RecordsQueueFixtureResult, RecordsQueueParkedRow, RecordsQueueStats } from '../api-types';
 
 const suite = sqliteAvailable ? describe : describe.skip;
 
 /** The routes stamp `now` from the real clock, so the fixture timestamps hang off it too. */
 const NOW = Math.floor(Date.now() / 1000);
+
+interface QueuePayload {
+  stats: RecordsQueueStats;
+  parked: RecordsQueueParkedRow[];
+  lastFixture: RecordsQueueFixtureResult | null;
+}
+
+/** Every success on these routes is a `{ data }` envelope; every failure is a bare `{ error }`. */
+async function data<T>(response: Response): Promise<T> {
+  const payload = (await response.json()) as { data: T };
+  expect(payload).toHaveProperty('data');
+  return payload.data;
+}
 
 interface ContextOptions {
   user?: { id: string; isAdmin: boolean } | null;
@@ -79,6 +92,13 @@ async function insertQueueRow(
   return inserted!.id;
 }
 
+async function readRow(db: TestD1Database, id: number) {
+  return db
+    .prepare('SELECT attempts, last_error, locked_at, done_at FROM records_queue WHERE id = ?')
+    .bind(id)
+    .first<{ attempts: number; last_error: string | null; locked_at: number | null; done_at: number | null }>();
+}
+
 suite('admin records queue routes', () => {
   describe('auth', () => {
     it('403s a non-admin on all three routes', async () => {
@@ -114,15 +134,12 @@ suite('admin records queue routes', () => {
         requestedAt: NOW - 900,
         attempts: MAX_ATTEMPTS,
         lastError: 'network down',
+        lockedAt: NOW - 30,
       });
       await insertQueueRow(db, { buildingId: 'healthy', reason: 'button', priority: 0, requestedAt: NOW - 100 });
 
       const response = await GET(createContext(db, { method: 'GET' }));
-      const payload = (await response.json()) as {
-        stats: RecordsQueueStats;
-        parked: RecordsQueueParkedRow[];
-        lastFixture: unknown;
-      };
+      const payload = await data<QueuePayload>(response);
 
       expect(response.status).toBe(200);
       expect(payload.stats.pendingByReason).toEqual({ button: 1, follower: 0, refresh: 0, fill: 0 });
@@ -140,6 +157,8 @@ suite('admin records queue routes', () => {
         attempts: MAX_ATTEMPTS,
         last_error: 'network down',
         requested_at: NOW - 900,
+        // The panel needs the lease to tell a parked row from one whose pull is still running.
+        locked_at: NOW - 30,
         address: '1 Parked St, Boston, MA 02135',
         slug: 'parked',
       });
@@ -148,16 +167,35 @@ suite('admin records queue routes', () => {
       expect(payload.lastFixture).toBeNull();
     });
 
+    it('orders parked rows oldest request first, breaking ties by id', async () => {
+      const db = createRecordsTestDb();
+      await insertBuilding(db, { id: 'newer', slug: 'newer', address: '3 Newer St, Boston, MA 02135' });
+      await insertBuilding(db, { id: 'older', slug: 'older', address: '4 Older St, Boston, MA 02135' });
+      await insertQueueRow(db, { buildingId: 'newer', requestedAt: NOW - 100, attempts: MAX_ATTEMPTS });
+      await insertQueueRow(db, { buildingId: 'older', requestedAt: NOW - 900, attempts: MAX_ATTEMPTS });
+
+      const payload = await data<QueuePayload>(await GET(createContext(db, { method: 'GET' })));
+
+      expect(payload.parked.map((row) => row.slug)).toEqual(['older', 'newer']);
+    });
+
     it('parses the stored records_fixture_last setting', async () => {
       const db = createRecordsTestDb();
-      const fixture = { at: NOW, failures: 0, checks: 16 };
+      const fixture: RecordsQueueFixtureResult = {
+        at: NOW,
+        failures: 2,
+        checksFailed: 1,
+        failed: ['assessor parcel'],
+        sourceErrors: [{ label: '311 requests', message: 'HTTP 500' }],
+        rowsBySource: { 'Assessor FY2026': 3 },
+      };
       await db
         .prepare('INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)')
         .bind('records_fixture_last', JSON.stringify(fixture), NOW)
         .run();
 
       const response = await GET(createContext(db, { method: 'GET' }));
-      const payload = (await response.json()) as { lastFixture: unknown };
+      const payload = await data<QueuePayload>(response);
 
       expect(response.status).toBe(200);
       expect(payload.lastFixture).toEqual(fixture);
@@ -171,22 +209,46 @@ suite('admin records queue routes', () => {
         .run();
 
       const response = await GET(createContext(db, { method: 'GET' }));
-      const payload = (await response.json()) as { lastFixture: unknown };
 
       expect(response.status).toBe(200);
-      expect(payload.lastFixture).toBeNull();
+      expect((await data<QueuePayload>(response)).lastFixture).toBeNull();
+    });
+
+    it('reports a fixture setting in an unrecognized shape as null', async () => {
+      const db = createRecordsTestDb();
+      await db
+        .prepare('INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)')
+        .bind('records_fixture_last', JSON.stringify({ at: 'yesterday', failures: 'some' }), NOW)
+        .run();
+
+      const response = await GET(createContext(db, { method: 'GET' }));
+
+      expect(response.status).toBe(200);
+      expect((await data<QueuePayload>(response)).lastFixture).toBeNull();
     });
   });
 
   describe('POST /api/admin/records/queue/pause', () => {
-    it('400s a body that is not application/json', async () => {
+    it('415s a body that is not application/json', async () => {
       const db = createRecordsTestDb();
       const response = await PAUSE(
         createContext(db, { contentType: 'text/plain', body: JSON.stringify({ paused: true }) }),
       );
 
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({ error: 'Expected application/json' });
+      expect(response.status).toBe(415);
+      expect(await response.json()).toEqual({ error: 'Unsupported Media Type' });
+    });
+
+    it('400s a body that is not a JSON object', async () => {
+      const db = createRecordsTestDb();
+
+      const broken = await PAUSE(createContext(db, { body: '{ not json' }));
+      expect(broken.status).toBe(400);
+      expect(await broken.json()).toMatchObject({ error: 'Invalid JSON body' });
+
+      const array = await PAUSE(createContext(db, { body: [1, 2, 3] }));
+      expect(array.status).toBe(400);
+      expect(await array.json()).toMatchObject({ error: 'Invalid JSON body' });
     });
 
     it('400s a non-boolean paused value', async () => {
@@ -202,33 +264,35 @@ suite('admin records queue routes', () => {
 
       const paused = await PAUSE(createContext(db, { body: { paused: true } }));
       expect(paused.status).toBe(200);
-      expect(((await paused.json()) as { stats: RecordsQueueStats }).stats.fillPaused).toBe(true);
+      expect((await data<{ stats: RecordsQueueStats }>(paused)).stats.fillPaused).toBe(true);
       const stored = await db
-        .prepare("SELECT value FROM app_settings WHERE key = 'records_fill_paused'")
+        .prepare('SELECT value FROM app_settings WHERE key = ?')
+        .bind('records_fill_paused')
         .first<{ value: string }>();
       expect(stored?.value).toBe('1');
 
       const resumed = await PAUSE(createContext(db, { body: { paused: false } }));
       expect(resumed.status).toBe(200);
-      expect(((await resumed.json()) as { stats: RecordsQueueStats }).stats.fillPaused).toBe(false);
+      expect((await data<{ stats: RecordsQueueStats }>(resumed)).stats.fillPaused).toBe(false);
     });
   });
 
   describe('POST /api/admin/records/queue/retry', () => {
-    it('400s a body that is not application/json', async () => {
+    it('415s a body that is not application/json', async () => {
       const db = createRecordsTestDb();
       const response = await RETRY(createContext(db, { contentType: 'text/plain', body: JSON.stringify({ id: 1 }) }));
 
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({ error: 'Expected application/json' });
+      expect(response.status).toBe(415);
+      expect(await response.json()).toEqual({ error: 'Unsupported Media Type' });
     });
 
-    it('400s a non-integer id', async () => {
+    it('400s an id that is not a positive integer', async () => {
       const db = createRecordsTestDb();
-      const response = await RETRY(createContext(db, { body: { id: 'x' } }));
-
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({ error: 'Validation failed' });
+      for (const id of ['x', 0, -1, 1.5]) {
+        const response = await RETRY(createContext(db, { body: { id } }));
+        expect(response.status, `id ${JSON.stringify(id)}`).toBe(400);
+        expect(await response.json()).toMatchObject({ error: 'Validation failed' });
+      }
     });
 
     it('clears the attempts, error and lock of a parked row and returns the new stats', async () => {
@@ -238,21 +302,53 @@ suite('admin records queue routes', () => {
         buildingId: 'parked',
         attempts: MAX_ATTEMPTS,
         lastError: 'network down',
-        lockedAt: NOW - 10,
       });
 
       const response = await RETRY(createContext(db, { body: { id } }));
-      const payload = (await response.json()) as { stats: RecordsQueueStats };
+      const payload = await data<{ stats: RecordsQueueStats }>(response);
 
       expect(response.status).toBe(200);
       expect(payload.stats.parked).toBe(0);
       expect(payload.stats.pendingByReason.fill).toBe(1);
 
-      const row = await db
-        .prepare('SELECT attempts, last_error, locked_at, done_at FROM records_queue WHERE id = ?')
-        .bind(id)
-        .first<{ attempts: number; last_error: string | null; locked_at: number | null; done_at: number | null }>();
-      expect(row).toMatchObject({ attempts: 0, last_error: null, locked_at: null, done_at: null });
+      expect(await readRow(db, id)).toMatchObject({ attempts: 0, last_error: null, locked_at: null, done_at: null });
+    });
+
+    it('409s a parked row whose pull is still in flight, and leaves it alone', async () => {
+      const db = createRecordsTestDb();
+      await insertBuilding(db, { id: 'running', slug: 'running' });
+      const id = await insertQueueRow(db, {
+        buildingId: 'running',
+        attempts: MAX_ATTEMPTS,
+        lastError: 'network down',
+        lockedAt: NOW - 10,
+      });
+
+      const response = await RETRY(createContext(db, { body: { id } }));
+
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ error: 'That pull is still running; retry after its lease expires' });
+      expect(await readRow(db, id)).toMatchObject({
+        attempts: MAX_ATTEMPTS,
+        last_error: 'network down',
+        locked_at: NOW - 10,
+      });
+    });
+
+    it('retries a parked row whose lease has expired', async () => {
+      const db = createRecordsTestDb();
+      await insertBuilding(db, { id: 'expired', slug: 'expired' });
+      const id = await insertQueueRow(db, {
+        buildingId: 'expired',
+        attempts: MAX_ATTEMPTS,
+        lastError: 'network down',
+        lockedAt: NOW - LOCK_TTL_SECONDS - 1,
+      });
+
+      const response = await RETRY(createContext(db, { body: { id } }));
+
+      expect(response.status).toBe(200);
+      expect(await readRow(db, id)).toMatchObject({ attempts: 0, last_error: null, locked_at: null });
     });
 
     it('404s an unknown id', async () => {
@@ -276,11 +372,8 @@ suite('admin records queue routes', () => {
       const response = await RETRY(createContext(db, { body: { id } }));
 
       expect(response.status).toBe(404);
-      const row = await db
-        .prepare('SELECT attempts, done_at FROM records_queue WHERE id = ?')
-        .bind(id)
-        .first<{ attempts: number; done_at: number | null }>();
-      expect(row).toMatchObject({ attempts: MAX_ATTEMPTS, done_at: NOW - 5 });
+      expect(await response.json()).toEqual({ error: 'Queue row not found' });
+      expect(await readRow(db, id)).toMatchObject({ attempts: MAX_ATTEMPTS, done_at: NOW - 5 });
     });
   });
 });

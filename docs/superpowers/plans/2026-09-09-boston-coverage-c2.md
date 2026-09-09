@@ -1256,7 +1256,7 @@ git commit -m "feat(records): companion Worker that drains the queue every minut
 
 - [ ] **Step 1: Write the failing test**
 
-Cover: non-admin gets 403 on all three; GET returns `stats`, `parked` (id, building address, slug, reason, attempts, last_error), `lastFixture` (parsed JSON or null); POST pause with a non-JSON content type is 400, with `{paused:true}` sets the flag and returns the new stats; POST retry resets `attempts` and `last_error` for a parked row and 404s for an unknown id.
+Cover: non-admin gets 403 on all three; GET returns `stats`, `parked` (id, building address, slug, reason, attempts, last_error), `lastFixture` (parsed JSON or null); POST pause with a non-JSON content type is 415, with `{paused:true}` sets the flag and returns the new stats; POST retry resets `attempts` and `last_error` for a parked row and 404s for an unknown id.
 
 - [ ] **Step 2: Implement**
 
