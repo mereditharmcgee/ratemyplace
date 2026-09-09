@@ -396,8 +396,8 @@ describe('release workflow contracts', () => {
 
   it('rejects audit text left only in a YAML comment', () => {
     const ciWithoutAudit = readWorkflow('ci.yml').replace(
-      '      - name: Audit critical vulnerabilities\n        run: npm audit --audit-level=critical\n',
-      '      # run: npm audit --audit-level=critical\n',
+      '      - name: Audit critical vulnerabilities\n        run: node scripts/audit-critical.mjs\n',
+      '      # run: node scripts/audit-critical.mjs\n',
     );
 
     expect(() => assertCiAuditGate(ciWithoutAudit)).toThrow();
@@ -405,12 +405,12 @@ describe('release workflow contracts', () => {
 
   it('rejects audit text left only in a non-executable block scalar', () => {
     const ciWithoutAudit = readWorkflow('ci.yml').replace(
-      '      - name: Audit critical vulnerabilities\n        run: npm audit --audit-level=critical\n',
+      '      - name: Audit critical vulnerabilities\n        run: node scripts/audit-critical.mjs\n',
       [
         '      - name: Preserve audit command as data',
         '        env:',
         '          NOTE: |',
-        '            run: npm audit --audit-level=critical',
+        '            run: node scripts/audit-critical.mjs',
         '        run: echo "$NOTE"',
         '',
       ].join('\n'),
