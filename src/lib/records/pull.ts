@@ -40,7 +40,7 @@ export interface PullOptions {
 }
 
 /** error_message is provenance, not a log: enough to diagnose, short enough not to bloat the row. */
-const MAX_ERROR_LENGTH = 500;
+export const MAX_ERROR_LENGTH = 500;
 
 const PULL_INSERT_SQL =
   'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, row_count, error_message, triggered_by, correction_id, trigger_reason) ' +
@@ -63,13 +63,21 @@ interface PullRowValues {
   triggerReason: string | null;
 }
 
-function messageOf(err: unknown): string {
+/** Shared with the queue, so `record_pulls.error_message` and `records_queue.last_error` read the same. */
+export function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-/** The ellipsis is part of the budget, so a truncated message is still MAX_ERROR_LENGTH characters. */
-function truncate(message: string): string {
-  return message.length > MAX_ERROR_LENGTH ? `${message.slice(0, MAX_ERROR_LENGTH - 1)}…` : message;
+/** The ellipsis is part of the budget: a cut message is MAX_ERROR_LENGTH characters, or one fewer per the note below. */
+export function truncateError(message: string): string {
+  if (message.length <= MAX_ERROR_LENGTH) return message;
+  const cut = message.slice(0, MAX_ERROR_LENGTH - 1);
+  // The cut can fall between a surrogate pair and leave a lone high surrogate: half a
+  // character, which renders as a replacement glyph and does not survive a JSON round
+  // trip. Drop it. That message is then one under budget, which nothing depends on.
+  const last = cut.charCodeAt(cut.length - 1);
+  const whole = last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
+  return `${whole}…`;
 }
 
 function pullRowStatement(db: RecordsDb, values: PullRowValues): RecordsPreparedStatement {
@@ -152,7 +160,7 @@ async function resolveIdentityParcel(db: RecordsDb, identity: BuildingIdentity, 
   try {
     resolution = await resolveParcel(identity, fetchImpl);
   } catch (err) {
-    return `Parcel resolution failed: ${messageOf(err)}`;
+    return `Parcel resolution failed: ${errorMessage(err)}`;
   }
   if (resolution.parcelId) {
     try {
@@ -160,7 +168,7 @@ async function resolveIdentityParcel(db: RecordsDb, identity: BuildingIdentity, 
       // this", and record_pulls.retrieved_at already dates the resolution.
       await db.prepare('UPDATE buildings SET parcel_id = ? WHERE id = ?').bind(resolution.parcelId, identity.buildingId).run();
     } catch (err) {
-      return `Parcel write failed: ${messageOf(err)}`;
+      return `Parcel write failed: ${errorMessage(err)}`;
     }
     // Assigned only after the write succeeds, so the identity the sources key on and the
     // buildings row never disagree about the parcel.
@@ -204,11 +212,11 @@ export async function pullBuildingRecords(
   } catch (err) {
     // An address we cannot parse is a resolution failure like any other: every source
     // gets an error row saying so, and the caller still gets a summary back.
-    resolutionError = truncate(messageOf(err));
+    resolutionError = truncateError(errorMessage(err));
   }
   if (identity && !identity.parcelId) {
     const failure = await resolveIdentityParcel(db, identity, fetchImpl);
-    if (failure) resolutionError = truncate(failure);
+    if (failure) resolutionError = truncateError(failure);
   }
 
   const summaries: PullSourceSummary[] = [];
@@ -221,9 +229,9 @@ export async function pullBuildingRecords(
     if (!identity || resolutionError) {
       // Belt and braces: a null identity always comes with a resolutionError set above,
       // so the fallback text is unreachable unless that pairing is broken later.
-      const errorMessage = resolutionError ?? 'Building identity could not be resolved';
-      await pullRowStatement(db, { ...base, query: NO_QUERY, status: 'error', rowCount: 0, errorMessage }).run();
-      summaries.push({ sourceId: source.id, label: source.label, status: 'error', rowCount: 0, error: errorMessage });
+      const message = resolutionError ?? 'Building identity could not be resolved';
+      await pullRowStatement(db, { ...base, query: NO_QUERY, status: 'error', rowCount: 0, errorMessage: message }).run();
+      summaries.push({ sourceId: source.id, label: source.label, status: 'error', rowCount: 0, error: message });
       continue;
     }
 
@@ -231,10 +239,10 @@ export async function pullBuildingRecords(
     try {
       result = await source.run(identity, fetchImpl);
     } catch (err) {
-      const errorMessage = truncate(messageOf(err));
+      const message = truncateError(errorMessage(err));
       const query = err instanceof SourceError ? err.query : NO_QUERY;
-      await pullRowStatement(db, { ...base, query, status: 'error', rowCount: 0, errorMessage }).run();
-      summaries.push({ sourceId: source.id, label: source.label, status: 'error', rowCount: 0, error: errorMessage });
+      await pullRowStatement(db, { ...base, query, status: 'error', rowCount: 0, errorMessage: message }).run();
+      summaries.push({ sourceId: source.id, label: source.label, status: 'error', rowCount: 0, error: message });
       continue;
     }
 
@@ -250,9 +258,9 @@ export async function pullBuildingRecords(
       // rows survive untouched — the deletes rolled back with the inserts. Record the
       // failure as its own pull row (same query, so the provenance still says what ran)
       // and keep going: a write failure must not cost the sources after this one.
-      const errorMessage = truncate(`Write failed: ${messageOf(err)}`);
-      await pullRowStatement(db, { ...base, query: result.query, status: 'error', rowCount: 0, errorMessage }).run();
-      summaries.push({ sourceId: source.id, label: source.label, status: 'error', rowCount: 0, error: errorMessage });
+      const message = truncateError(`Write failed: ${errorMessage(err)}`);
+      await pullRowStatement(db, { ...base, query: result.query, status: 'error', rowCount: 0, errorMessage: message }).run();
+      summaries.push({ sourceId: source.id, label: source.label, status: 'error', rowCount: 0, error: message });
       continue;
     }
     summaries.push({ sourceId: source.id, label: source.label, status, rowCount: result.rows.length });
