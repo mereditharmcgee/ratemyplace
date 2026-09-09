@@ -32,12 +32,18 @@ and `sam_id` present; the three records tables and all four `idx_audit_*` indexe
 `audit_logs_v4` left behind. Like `0025` through `0028`, wrangler's migration tracking does
 not know these ran. Do not re-run either file.
 
-**`0031` (Boston coverage) is the same kind of hazard, and is NOT yet applied to
-production.** It adds five columns with `ALTER TABLE ... ADD COLUMN` — `buildings.source`,
-`buildings.street_key`, `buildings.st_num_lo`, `buildings.st_num_hi`, and
-`record_pulls.trigger_reason` — and creates two tables, `records_queue` and `app_settings`.
-Apply it once with `wrangler d1 execute --remote --file`, never `migrations apply --remote`,
-and before running the seed script. Update this paragraph when it lands.
+**`0031` (Boston coverage) is the same kind of hazard.** It adds five columns with
+`ALTER TABLE ... ADD COLUMN` — `buildings.source`, `buildings.street_key`,
+`buildings.st_num_lo`, `buildings.st_num_hi`, and `record_pulls.trigger_reason` — and
+creates two tables, `records_queue` and `app_settings`. Apply it once with
+`wrangler d1 execute --remote --file`, never `migrations apply --remote`, and before running
+the seed script.
+
+**APPLIED TO PRODUCTION 2026-09-09** via `wrangler d1 execute --remote --file`, in one run
+(106 rows written). Verified afterwards: all four `buildings` columns,
+`record_pulls.trigger_reason`, `records_queue`, `app_settings`, and the three indexes exist;
+the 93 existing buildings read `source = 'user'`; the 22 pull rows are untouched. Wrangler's
+migration tracking does not know it ran. Do not re-run the file.
 
 Its statements are ordered idempotent-first as far as they can be, but not entirely:
 `idx_buildings_street` indexes `buildings(city, street_key)`, so it has to come after the
