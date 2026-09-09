@@ -24,6 +24,9 @@ export function createRecordsStubDb(): TestD1Database {
       year_built INTEGER,
       unit_count INTEGER,
       building_type TEXT,
+      latitude REAL,
+      longitude REAL,
+      google_place_id TEXT,
       owner_name TEXT,
       owner_entity TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
@@ -52,7 +55,7 @@ export function createRecordsStubDb(): TestD1Database {
 }
 
 export function applyRecordsMigrations(db: TestD1Database): void {
-  for (const file of ['0029_building_records.sql', '0030_audit_records_actions.sql']) {
+  for (const file of ['0029_building_records.sql', '0030_audit_records_actions.sql', '0031_boston_coverage.sql']) {
     db.exec(readFileSync(join(process.cwd(), 'migrations', file), 'utf8'));
   }
 }
