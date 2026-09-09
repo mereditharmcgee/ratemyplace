@@ -134,3 +134,48 @@ export function buildIdentity(building: BuildingRowForIdentity): BuildingIdentit
     samId: building.sam_id,
   };
 }
+
+export { SUFFIX_SPELLINGS };
+
+/** Public form of the normalize-then-split step: uppercase, unit- and punctuation-free, suffix split off. */
+export function splitSuffix(street: string): { base: string; spellings: readonly string[] | null } {
+  return splitStreet(normalizeStreet(street));
+}
+
+/**
+ * The lookup key shared by seeded rows and reviewer dedupe: base name plus the assessor's
+ * spelling of the suffix ('LANARK RD'), or the bare base when there is no suffix.
+ */
+export function streetKey(street: string): string {
+  const { base, spellings } = splitSuffix(street);
+  return spellings ? `${base} ${spellings[0]}` : base;
+}
+
+export interface AddressKey {
+  streetKey: string;
+  numLo: number;
+  numHi: number;
+}
+
+/**
+ * Street key plus house-number range for one address line. A lettered number ('12A')
+ * keys on its digits; a range is ordered low to high. Null when there is no leading
+ * number or the street is degenerate (the same rule buildIdentity throws on).
+ */
+export function addressKey(address: string): AddressKey | null {
+  const parsed = parseStreetAddress(address.trim());
+  if (!parsed) return null;
+  const numbers = parsed.number
+    .toUpperCase()
+    .split('-')
+    .map((p) => Number.parseInt(p.replace(/[A-Z]+$/, ''), 10))
+    .filter((n) => Number.isFinite(n));
+  if (numbers.length === 0) return null;
+  const { base, spellings } = splitSuffix(parsed.street);
+  if (!base || (!spellings && SUFFIX_ROW_BY_SPELLING.has(base)) || /^[^A-Z0-9]/.test(base)) return null;
+  return {
+    streetKey: spellings ? `${base} ${spellings[0]}` : base,
+    numLo: Math.min(...numbers),
+    numHi: Math.max(...numbers),
+  };
+}
