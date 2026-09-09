@@ -33,7 +33,7 @@ const PARKED_ROW: RecordsQueueParkedRow = {
   reason: 'fill',
   attempts: 5,
   last_error: LONG_ERROR,
-  requested_at: 1_700_000_000,
+  requested_at: NOW - 3 * 3600 - 60,
   locked_at: null,
   address: '23-27 Lanark Rd, Boston, MA 02135',
   slug: '23-27-lanark-rd',
@@ -70,6 +70,17 @@ function rowFor(container: HTMLElement, address: string): HTMLElement {
 function retryButton(container: HTMLElement, address: string): HTMLButtonElement {
   return rowFor(container, address).querySelector('button') as HTMLButtonElement;
 }
+
+/** The cell under a named column header — indexed by header, so a reordered table fails loudly. */
+function cellOf(container: HTMLElement, address: string, column: string): HTMLElement {
+  const headers = Array.from(container.querySelectorAll('thead th'));
+  const index = headers.findIndex((th) => th.textContent?.trim() === column);
+  if (index < 0) throw new Error('no ' + column + ' column');
+  return rowFor(container, address).querySelectorAll('td')[index] as HTMLElement;
+}
+
+const LANARK = '23-27 Lanark Rd, Boston, MA 02135';
+const RUNNING = '1 Running St, Boston, MA 02135';
 
 describe('RecordsQueuePanel', () => {
   it('renders the four pending counts, parked, completed, oldest age, and the paused state', async () => {
@@ -156,10 +167,14 @@ describe('RecordsQueuePanel', () => {
 
     expect(container.querySelector('a[href="/building/23-27-lanark-rd"]')).toBeTruthy();
 
-    const errorCell = container.querySelector('[title]') as HTMLElement | null;
+    const errorCell = cellOf(container, LANARK, 'Last error').querySelector('[title]') as HTMLElement | null;
     expect(errorCell?.getAttribute('title')).toBe(LONG_ERROR);
     expect((errorCell?.textContent ?? '').length).toBeLessThanOrEqual(120);
     expect(errorCell?.textContent).not.toBe(LONG_ERROR);
+
+    // "3 h" answers the question an admin actually has — how far behind is this row? — where
+    // a bare date only answers it for rows parked days ago.
+    expect(cellOf(container, LANARK, 'Requested').textContent?.trim()).toBe('3 h');
 
     const callsBefore = fetchMock.mock.calls.length;
     fireEvent.click(getByText('Retry'));
@@ -180,22 +195,59 @@ describe('RecordsQueuePanel', () => {
     expect(RETRY_LOCK_TTL_SECONDS).toBe(LOCK_TTL_SECONDS);
   });
 
-  it('disables Retry on a row whose pull is still holding the lease', async () => {
+  it('refuses Retry on a row whose pull still holds the lease, in words, without posting', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(queuePayload({ parked: [RUNNING_ROW, PARKED_ROW] })));
     vi.stubGlobal('fetch', fetchMock);
 
     const { container } = render(<RecordsQueuePanel />);
-    await waitFor(() => expect(container.textContent).toContain('1 Running St, Boston, MA 02135'));
+    await waitFor(() => expect(container.textContent).toContain(RUNNING));
 
-    const running = retryButton(container, '1 Running St, Boston, MA 02135');
-    expect(running.disabled).toBe(true);
+    const running = retryButton(container, RUNNING);
+    // aria-disabled, not disabled: a disabled button leaves the tab order, so a keyboard
+    // admin cannot reach it to find out WHY it is refusing.
+    expect(running.disabled).toBe(false);
+    expect(running.getAttribute('aria-disabled')).toBe('true');
     expect(running.getAttribute('title')).toBe('Pull still running; retry after its lease expires');
-    expect(rowFor(container, '1 Running St, Boston, MA 02135').textContent).toContain('running');
+    expect(rowFor(container, RUNNING).textContent).toContain('running');
+
+    const callsBefore = fetchMock.mock.calls.length;
+    fireEvent.click(running);
+    await waitFor(() =>
+      expect(container.textContent).toContain('Pull still running; retry after its lease expires'),
+    );
+    // The refusal is the panel's own; nothing was posted for the endpoint to 409.
+    expect(fetchMock.mock.calls.length).toBe(callsBefore);
 
     // A row with no lease at all is retryable, and so the button stays live.
-    const parked = retryButton(container, '23-27 Lanark Rd, Boston, MA 02135');
+    const parked = retryButton(container, LANARK);
     expect(parked.disabled).toBe(false);
-    expect(rowFor(container, '23-27 Lanark Rd, Boston, MA 02135').textContent).not.toContain('running');
+    expect(parked.getAttribute('aria-disabled')).toBe('false');
+    expect(rowFor(container, LANARK).textContent).not.toContain('running');
+  });
+
+  it('names the row being retried in the button label while the POST is in flight', async () => {
+    let release: (value: unknown) => void = () => {};
+    const inFlight = new Promise((resolve) => {
+      release = resolve;
+    });
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.endsWith('/retry')) return inFlight;
+      return Promise.resolve(jsonResponse(queuePayload({ parked: [PARKED_ROW] })));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { container } = render(<RecordsQueuePanel />);
+    await waitFor(() => expect(container.textContent).toContain(LANARK));
+    expect(retryButton(container, LANARK).getAttribute('aria-label')).toBe('Retry ' + LANARK);
+
+    fireEvent.click(retryButton(container, LANARK));
+
+    // A screen reader told "Retry" while that row is already retrying has been told the
+    // wrong thing; the visible label changes, so the accessible one has to change with it.
+    await waitFor(() => expect(retryButton(container, LANARK).getAttribute('aria-label')).toBe('Retrying ' + LANARK));
+
+    release(jsonResponse({ data: { stats: RUNNING_STATS } }));
+    await waitFor(() => expect(retryButton(container, LANARK).getAttribute('aria-label')).toBe('Retry ' + LANARK));
   });
 
   it('offers Retry again once the lease has expired', async () => {
@@ -205,8 +257,8 @@ describe('RecordsQueuePanel', () => {
     const { container } = render(<RecordsQueuePanel />);
     await waitFor(() => expect(container.textContent).toContain('1 Running St, Boston, MA 02135'));
 
-    expect(retryButton(container, '1 Running St, Boston, MA 02135').disabled).toBe(false);
-    expect(rowFor(container, '1 Running St, Boston, MA 02135').textContent).not.toContain('running');
+    expect(retryButton(container, RUNNING).getAttribute('aria-disabled')).toBe('false');
+    expect(rowFor(container, RUNNING).textContent).not.toContain('running');
   });
 
   it('explains a 409 from retry instead of showing the generic failure', async () => {
@@ -286,6 +338,7 @@ describe('RecordsQueuePanel', () => {
               at: 1_757_000_000,
               failures: 0,
               checksFailed: 0,
+              checksTotal: 9,
               failed: [],
               sourceErrors: [],
               rowsBySource: {},
@@ -295,7 +348,9 @@ describe('RecordsQueuePanel', () => {
       ),
     );
     const { container } = render(<RecordsQueuePanel />);
-    await waitFor(() => expect(container.textContent).toContain('Fixture: all checks passed at'));
+    // "all 9 checks passed" is a different claim from "nothing failed", which is also true
+    // of a fixture that ran no checks at all.
+    await waitFor(() => expect(container.textContent).toContain('Fixture: all 9 checks passed at'));
     expect(container.textContent).toContain(
       new Date(1_757_000_000 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     );
@@ -311,6 +366,7 @@ describe('RecordsQueuePanel', () => {
               at: 1_757_000_000,
               failures: 3,
               checksFailed: 2,
+              checksTotal: 9,
               failed: ['assessor parcel', 'violations count'],
               sourceErrors: [{ label: '311 requests', message: 'HTTP 500' }],
               rowsBySource: { 'Assessor FY2026': 3 },
@@ -336,6 +392,49 @@ describe('RecordsQueuePanel', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Failed to load the queue' }, false)));
     const { container } = render(<RecordsQueuePanel />);
     await waitFor(() => expect(container.textContent).toContain('Could not load the queue'));
+  });
+
+  it('keeps the last good numbers when a background poll fails, and recovers on Try again', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(queuePayload({ parked: [PARKED_ROW] })))
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue(jsonResponse(queuePayload({ parked: [PARKED_ROW] })));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { container, getByText } = render(<RecordsQueuePanel />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(statValue(container, 'Button')).toBe('2');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    // One dropped poll is not a reason to throw away a panel that is still telling the
+    // truth: the numbers stay, and the banner says they are the last good ones.
+    expect(statValue(container, 'Button')).toBe('2');
+    expect(statValue(container, 'Parked')).toBe('1');
+    expect(container.textContent).toContain(LANARK);
+    expect(container.textContent).toContain("Couldn't refresh the queue; showing the last good numbers");
+    expect(container.textContent).not.toContain('Could not load the queue');
+
+    fireEvent.click(getByText('Try again'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(container.textContent).not.toContain("Couldn't refresh the queue");
+    expect(statValue(container, 'Button')).toBe('2');
+  });
+
+  it('shows the error card only while there is nothing to show', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+
+    const { container } = render(<RecordsQueuePanel />);
+    await waitFor(() => expect(container.textContent).toContain('Could not load the queue'));
+    expect(container.textContent).not.toContain("Couldn't refresh the queue");
   });
 
   it('re-fetches every 60 seconds and stops polling once unmounted', async () => {

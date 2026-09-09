@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RecordsQueueFixtureResult, RecordsQueueParkedRow, RecordsQueueStats } from '../../lib/api-types';
 
 /** The queue moves on a one-minute Worker tick, so a one-minute poll is as fresh as the data gets. */
@@ -12,7 +12,7 @@ const POLL_INTERVAL_MS = 60_000;
  */
 export const RETRY_LOCK_TTL_SECONDS = 1800;
 
-/** Shown on the disabled Retry button, and inline when the endpoint answers 409. */
+/** Shown on a running row's Retry button, inline when it is pressed anyway, and on a 409. */
 const STILL_RUNNING = 'Pull still running; retry after its lease expires';
 
 /**
@@ -30,6 +30,9 @@ const MAX_ERROR_CHARS = 120;
 
 const LOAD_ERROR = 'Could not load the queue';
 
+/** Shown over numbers that are still on screen because a later poll failed, not because they are fresh. */
+const REFRESH_ERROR = "Couldn't refresh the queue; showing the last good numbers";
+
 const REASON_LABELS: Array<[keyof RecordsQueueStats['pendingByReason'], string]> = [
   ['button', 'Button'],
   ['follower', 'Follower'],
@@ -43,12 +46,15 @@ const REASON_LABELS: Array<[keyof RecordsQueueStats['pendingByReason'], string]>
  * a settings row written by a newer scheduler must degrade to "not run yet" rather than
  * throw the panel away.
  */
-type LastFixture = Pick<RecordsQueueFixtureResult, 'at' | 'failures' | 'failed' | 'sourceErrors'>;
+type LastFixture = Pick<RecordsQueueFixtureResult, 'at' | 'failures' | 'checksTotal' | 'failed' | 'sourceErrors'>;
 
 function parseFixture(value: unknown): LastFixture | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const raw = value as Record<string, unknown>;
   if (typeof raw.at !== 'number' || typeof raw.failures !== 'number') return null;
+  // The pass line names this number out loud ("all 9 checks passed"), so a row without it
+  // is a row this panel cannot describe honestly.
+  if (typeof raw.checksTotal !== 'number') return null;
 
   const failed = Array.isArray(raw.failed) ? raw.failed.filter((label): label is string => typeof label === 'string') : [];
 
@@ -62,7 +68,7 @@ function parseFixture(value: unknown): LastFixture | null {
     }
   }
 
-  return { at: raw.at, failures: raw.failures, failed, sourceErrors };
+  return { at: raw.at, failures: raw.failures, checksTotal: raw.checksTotal, failed, sourceErrors };
 }
 
 function formatDate(timestamp: number): string {
@@ -88,7 +94,7 @@ function truncate(text: string, max: number): string {
 
 function fixtureHeadline(fixture: LastFixture | null): string {
   if (!fixture) return 'Fixture: not run yet';
-  if (fixture.failures === 0) return `Fixture: all checks passed at ${formatDate(fixture.at)}`;
+  if (fixture.failures === 0) return `Fixture: all ${fixture.checksTotal} checks passed at ${formatDate(fixture.at)}`;
   return `Fixture: ${fixture.failed.length} check(s) failed, ${fixture.sourceErrors.length} source(s) threw at ${formatDate(fixture.at)}`;
 }
 
@@ -113,9 +119,26 @@ export default function RecordsQueuePanel() {
   const [lastFixture, setLastFixture] = useState<LastFixture | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pauseBusy, setPauseBusy] = useState(false);
   const [retryingId, setRetryingId] = useState<number | null>(null);
+
+  /**
+   * Whether a load has ever succeeded. A ref, not state: `load` is built once and reads this
+   * from inside its own closure, where a state value would be the one captured on first render.
+   */
+  const hasData = useRef(false);
+
+  /**
+   * A dropped poll must not replace a panel that is still telling the truth. Before the first
+   * successful load there is nothing to keep, so the failure IS the panel; after one, the
+   * numbers stay and a banner says they are the last good ones.
+   */
+  const reportLoadFailure = useCallback(() => {
+    if (hasData.current) setRefreshError(REFRESH_ERROR);
+    else setError(LOAD_ERROR);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -124,7 +147,7 @@ export default function RecordsQueuePanel() {
       if (!response.ok) {
         // The endpoint's own message describes a server-side failure; the panel says
         // the one thing the admin can act on instead.
-        setError(LOAD_ERROR);
+        reportLoadFailure();
         return;
       }
       // Success is a `{ data }` envelope (AGENTS.md); failures are a bare `{ error }`.
@@ -136,13 +159,15 @@ export default function RecordsQueuePanel() {
       setStats(data.stats ?? null);
       setParked(Array.isArray(data.parked) ? (data.parked as RecordsQueueParkedRow[]) : []);
       setLastFixture(parseFixture(data.lastFixture));
+      hasData.current = true;
       setError(null);
+      setRefreshError(null);
     } catch {
-      setError(LOAD_ERROR);
+      reportLoadFailure();
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [reportLoadFailure]);
 
   useEffect(() => {
     void load();
@@ -177,7 +202,14 @@ export default function RecordsQueuePanel() {
     }
   };
 
-  const retryRow = async (id: number) => {
+  const retryRow = async (row: RecordsQueueParkedRow, running: boolean) => {
+    // The endpoint would 409 this, but a POST that can only be refused is not worth sending:
+    // the panel already holds the lease that decides it.
+    if (running) {
+      setActionError(STILL_RUNNING);
+      return;
+    }
+    const id = row.id;
     setRetryingId(id);
     setActionError(null);
     try {
@@ -239,6 +271,24 @@ export default function RecordsQueuePanel() {
 
   return (
     <div className="space-y-4">
+      {refreshError && (
+        <div
+          role="status"
+          className="rounded-[6px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-center justify-between gap-4"
+        >
+          <span>{refreshError}</span>
+          <button
+            type="button"
+            onClick={() => {
+              void load();
+            }}
+            className="h-11 px-4 text-sm font-medium rounded-[4px] bg-amber-100 text-amber-900 hover:bg-amber-200 shrink-0"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
       <div className="rounded-[6px] border border-gray-200 bg-white p-6 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -352,17 +402,25 @@ export default function RecordsQueuePanel() {
                         <span className="text-gray-400">—</span>
                       )}
                     </td>
-                    <td className="py-2 pr-4 text-gray-700 whitespace-nowrap">{formatDate(row.requested_at)}</td>
+                    <td className="py-2 pr-4 text-gray-700 whitespace-nowrap">
+                      {formatAge(nowSeconds - row.requested_at)}
+                    </td>
                     <td className="py-2">
+                      {/* A running row is refused with aria-disabled rather than `disabled`: a
+                          disabled button leaves the tab order, so a keyboard admin cannot reach
+                          the one control that would tell them why nothing is happening. */}
                       <button
                         type="button"
                         onClick={() => {
-                          void retryRow(row.id);
+                          void retryRow(row, running);
                         }}
-                        disabled={retryingId === row.id || running}
+                        disabled={retryingId === row.id}
+                        aria-disabled={running}
                         title={running ? STILL_RUNNING : undefined}
-                        aria-label={`Retry ${row.address}`}
-                        className="h-11 px-4 rounded-[4px] bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        aria-label={`${retryingId === row.id ? 'Retrying' : 'Retry'} ${row.address}`}
+                        className={`h-11 px-4 rounded-[4px] bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed${
+                          running ? ' opacity-50 cursor-not-allowed' : ''
+                        }`}
                       >
                         {retryingId === row.id ? 'Retrying…' : 'Retry'}
                       </button>
