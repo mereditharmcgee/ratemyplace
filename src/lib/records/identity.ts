@@ -96,10 +96,11 @@ function splitStreet(streetUpper: string): { base: string; spellings: readonly s
  * a suffix word itself ("10 Park St" -> base "PARK", suffix "ST"). An empty base, or one
  * starting with punctuation, is never usable.
  *
- * One rule, three callers: `buildIdentity` throws on it, `streetKey` and `addressKey`
- * return null. They must not fork.
+ * One rule, four callers: `buildIdentity` throws on it, `streetKey` and `addressKey`
+ * return null, and the seed's `formatSeedAddress` returns null. They must not fork, which
+ * is why this is exported rather than re-derived in the seed.
  */
-function isDegenerateStreet(base: string, spellings: readonly string[] | null): boolean {
+export function isDegenerateStreet(base: string, spellings: readonly string[] | null): boolean {
   return !base || (!spellings && SUFFIX_ROW_BY_SPELLING.has(base)) || /^[^A-Z0-9]/.test(base);
 }
 
