@@ -11,10 +11,11 @@ import {
   plan,
   type SchedulerDeps,
 } from '../records/scheduler';
-import { enqueue, getFillPaused, setFillPaused, MAX_ATTEMPTS } from '../records/queue';
+import { enqueue, getFillPaused, setFillPaused } from '../records/queue';
+import { sourcesForCity } from '../records/jurisdictions';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import type { FixtureResult } from '../records/fixture';
-import type { PullSummary } from '../records/types';
+import type { PullSummary, RecordsDb, RecordsPreparedStatement } from '../records/types';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 import type { TestD1Database } from './helpers/sqliteD1';
 
@@ -82,6 +83,32 @@ async function pullRow(db: TestD1Database, id: string, sourceId: string, status:
 async function settingOf(db: TestD1Database, key: string): Promise<string | null> {
   const row = await db.prepare('SELECT value FROM app_settings WHERE key = ?').bind(key).first<{ value: string }>();
   return row?.value ?? null;
+}
+
+/**
+ * Wraps the test db so the one statement `failRow` runs throws, standing in for a D1 blip on
+ * the failure write itself. Every other statement passes straight through.
+ */
+function failWriteThrows(db: TestD1Database): RecordsDb {
+  return {
+    prepare(sql: string): RecordsPreparedStatement {
+      const inner = db.prepare(sql);
+      const self: RecordsPreparedStatement = {
+        bind(...values: unknown[]) {
+          inner.bind(...(values as never[]));
+          return self;
+        },
+        first: <T>() => inner.first<T>(),
+        all: <T>() => inner.all<T>(),
+        async run() {
+          if (sql.startsWith('UPDATE records_queue SET last_error')) throw new Error('D1_ERROR: storage unavailable');
+          return inner.run();
+        },
+      };
+      return self;
+    },
+    batch: (statements: RecordsPreparedStatement[]) => db.batch(statements as never),
+  };
 }
 
 describe('drain', () => {
@@ -156,8 +183,67 @@ describe('drain', () => {
     expect(await drain(d)).toEqual({ pulled: 0, failed: 1, fillPaused: false });
 
     const row = await db.prepare("SELECT attempts FROM records_queue WHERE building_id = 'p1'").first<{ attempts: number }>();
+    // One claim spent of MAX_ATTEMPTS, not three: the kept lease is what stops the run from
+    // coming straight back round to the same row and parking it inside a single tick.
     expect(row?.attempts).toBe(1);
-    expect(row!.attempts).toBeLessThan(MAX_ATTEMPTS);
+  });
+
+  it('claims one row at a time, so a row finished mid-run is never pulled', async () => {
+    const db = createRecordsTestDb();
+    for (const id of ['p1', 'p2', 'p3']) await insertBuilding(db, { id, slug: id });
+    for (const id of ['p1', 'p2', 'p3']) await enqueue(db, { buildingId: id, reason: 'button', now: NOW });
+
+    const d = deps(db);
+    const record = d.pull;
+    // Someone else finishes p2 while p1 is in flight. A drain that claimed all three up front
+    // would already hold p2 and pull a building whose records had just been written.
+    d.pull = async (dbArg, building, options) => {
+      if (building.id === 'p1') {
+        await db.prepare("UPDATE records_queue SET done_at = ? WHERE building_id = 'p2'").bind(NOW).run();
+      }
+      return record(dbArg, building, options);
+    };
+
+    expect(await drain(d)).toEqual({ pulled: 2, failed: 0, fillPaused: false });
+    expect(d.pulled).toEqual(['p1:queue:button', 'p3:queue:button']);
+  });
+
+  it('does not let a failing priority row cost the tick its fill row', async () => {
+    const db = createRecordsTestDb();
+    for (const id of ['p1', 'f1']) await insertBuilding(db, { id, slug: id });
+    await enqueue(db, { buildingId: 'p1', reason: 'button', now: NOW });
+    await enqueue(db, { buildingId: 'f1', reason: 'fill', now: NOW });
+
+    const d = deps(db);
+    const record = d.pull;
+    d.pull = async (dbArg, building, options) => {
+      if (building.id === 'p1') throw new Error('network down');
+      return record(dbArg, building, options);
+    };
+
+    // The priority loop ends early — p1 holds its lease, so there is nothing left to claim —
+    // but the fill loop is a separate budget and still gets its row.
+    expect(await drain(d)).toEqual({ pulled: 1, failed: 1, fillPaused: false });
+    expect(d.pulled).toEqual(['f1:queue:fill']);
+  });
+
+  it('logs and keeps draining when the failure write itself fails', async () => {
+    const db = createRecordsTestDb();
+    for (const id of ['p1', 'p2']) await insertBuilding(db, { id, slug: id });
+    for (const id of ['p1', 'p2']) await enqueue(db, { buildingId: id, reason: 'button', now: NOW });
+
+    const d = deps(db);
+    const record = d.pull;
+    d.pull = async (dbArg, building, options) => {
+      if (building.id === 'p1') throw new Error('network down');
+      return record(dbArg, building, options);
+    };
+    d.db = failWriteThrows(db);
+
+    // A lost `last_error` costs a diagnostic line; aborting the drain would strand p2.
+    expect(await drain(d)).toEqual({ pulled: 1, failed: 1, fillPaused: false });
+    expect(d.pulled).toEqual(['p2:queue:button']);
+    expect(d.logs).toEqual(['records_queue_pull_failed', 'records_queue_fail_write_failed']);
   });
 
   it('re-reads the clock before each claim, so a slow run does not date its later work from the start', async () => {
@@ -240,6 +326,8 @@ describe('plan', () => {
     expect(await getFillPaused(db)).toBe(true);
     expect(d.alerts).toHaveLength(1);
     expect(d.alerts[0]).toContain('1 check failed, 1 source threw');
+    // The headline is the fixture report's first line and nothing repeats it above.
+    expect(d.alerts[0].split('1 check failed, 1 source threw')).toHaveLength(2);
     expect(d.alerts[0]).toContain('parcel resolves to 2102098000: got null');
     expect(d.alerts[0]).toContain('RentSmart threw: HTTP 503');
     expect(d.alerts[0]).toContain('Approved Building Permits: 0');
@@ -281,14 +369,53 @@ describe('plan', () => {
     await setFillPaused(db, true, NOW);
     expect(await plan(deps(db))).toMatchObject({ paused: true, alerted: false });
     expect(await getFillPaused(db)).toBe(true);
+    // The fixture ran and its result is stored even though the pause predates it: the panel
+    // needs today's fixture to tell "still broken" from "fixed, waiting for a human".
+    expect(JSON.parse((await settingOf(db, SCHEDULER_SETTING_KEYS.lastFixture))!)).toMatchObject({ at: NOW, failures: 0 });
+  });
+
+  it('records the pause before sending the alert, so a failing mailer cannot lose it', async () => {
+    const db = createRecordsTestDb();
+    const d = deps(db, {
+      fixture: async () =>
+        fixtureResult({
+          checks: [{ label: 'parcel resolves to 2102098000', ok: false, detail: 'got null' }],
+          checksFailed: 1,
+          failures: 1,
+        }),
+      alert: async () => {
+        throw new Error('mailer down');
+      },
+    });
+
+    await expect(plan(d)).rejects.toThrow('mailer down');
+    expect(await getFillPaused(db)).toBe(true);
+    expect(d.logs).toContain('records_fill_paused');
   });
 });
 
 describe('DEEPER_SOURCE_IDS', () => {
-  it('is every Boston source id except the assessor years', () => {
-    expect(DEEPER_SOURCE_IDS.length).toBeGreaterThanOrEqual(4);
+  /** Named rather than filtered, so re-deriving the list cannot re-derive the bug with it. */
+  const DEEPER_LABELS = [
+    'Approved Building Permits',
+    'Building and Property Violations',
+    'Public Works Code Enforcement',
+    '311 Service Requests',
+    'RentSmart',
+  ];
+
+  it('is exactly the five non-assessor Boston sources, in source-list order', () => {
+    const sources = sourcesForCity('Boston');
+    const expected = DEEPER_LABELS.map((label) => {
+      const source = sources.find((s) => s.label === label);
+      if (!source) throw new Error(`no Boston source labelled ${label}`);
+      return source.id;
+    });
+    expect(DEEPER_SOURCE_IDS).toEqual(expected);
+    // The six assessor years are the whole point of the exclusion: the seed wrote an FY2026
+    // pull row for every seeded building, so counting them marks the city done on day one.
+    expect(sources).toHaveLength(DEEPER_LABELS.length + 6);
     expect(DEEPER_SOURCE_IDS).not.toContain(FY2026_RESOURCE_ID);
-    expect(new Set(DEEPER_SOURCE_IDS).size).toBe(DEEPER_SOURCE_IDS.length);
   });
 });
 

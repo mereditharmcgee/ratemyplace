@@ -8,6 +8,7 @@
 // claims means such a row parks itself after MAX_ATTEMPTS and waits for a human, while a row
 // that merely fails cleanly still gets its MAX_ATTEMPTS tries and a `last_error` each time.
 import { truncateError } from './errors';
+import { SETTING_KEYS, readSetting, writeSetting } from './settings';
 import type { QueueReason, RecordsDb } from './types';
 import type { BuildingRowForIdentity } from './identity';
 
@@ -212,7 +213,6 @@ export const REFRESH_AFTER_SECONDS = 30 * 86_400;
 export const FINISHED_RETENTION_SECONDS = 90 * 86_400;
 /** Ceiling on pending fill rows, so the queue table stays a working set, not a copy of the city. */
 export const FILL_TARGET = 2000;
-const FILL_PAUSED_KEY = 'records_fill_paused';
 
 export interface PlannerOptions {
   now: number;
@@ -362,19 +362,11 @@ export async function errorRateBySource(
 }
 
 export async function getFillPaused(db: RecordsDb): Promise<boolean> {
-  const row = await db.prepare('SELECT value FROM app_settings WHERE key = ?').bind(FILL_PAUSED_KEY).first<{ value: string }>();
-  return row?.value === '1';
+  return (await readSetting(db, SETTING_KEYS.fillPaused)) === '1';
 }
 
-/** `app_settings.updated_at` defaults on insert but does not self-update (0031), so it is set explicitly. */
 export async function setFillPaused(db: RecordsDb, paused: boolean, now: number): Promise<void> {
-  await db
-    .prepare(
-      'INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?) ' +
-        'ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
-    )
-    .bind(FILL_PAUSED_KEY, paused ? '1' : '0', now)
-    .run();
+  await writeSetting(db, SETTING_KEYS.fillPaused, paused ? '1' : '0', now);
 }
 
 export interface QueueStats {

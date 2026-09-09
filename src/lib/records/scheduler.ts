@@ -17,6 +17,7 @@ import {
   topUpFill,
   type ClaimedRow,
 } from './queue';
+import { SETTING_KEYS, writeSetting } from './settings';
 import type { FixtureResult } from './fixture';
 import type { BuildingRowForIdentity } from './identity';
 import type { PullSummary, RecordsDb } from './types';
@@ -33,8 +34,6 @@ export const ERROR_RATE_THRESHOLD = 0.5;
 /** Below this many attempts a rate means nothing: three failures out of three is a quiet hour, not an outage. */
 export const MIN_ATTEMPTS = 20;
 export const ERROR_WINDOW_SECONDS = 86_400;
-const LAST_ALERT_KEY = 'records_breaker_last_alert';
-const LAST_FIXTURE_KEY = 'records_fixture_last';
 
 /**
  * Every Boston source except the assessor years: a building "has records" when one of these
@@ -76,11 +75,6 @@ export function liveDeps(db: RecordsDb, extra: Pick<SchedulerDeps, 'fixture' | '
   return { db, now: () => Math.floor(Date.now() / 1000), pull: pullBuildingRecords, ...extra };
 }
 
-interface DrainFailure {
-  id: number;
-  message: string;
-}
-
 /**
  * One cron tick: people-facing rows first, then one fill row unless the fill is paused.
  *
@@ -89,23 +83,22 @@ interface DrainFailure {
  * flight. Claiming the whole tick's worth up front would date every lease from the start of
  * the run, and the last row's lease would already be minutes old before its pull began.
  *
- * Failures are recorded at the END of the run, not as they happen: the backoff is the lease,
- * which `failRow` deliberately leaves running, and flushing after the loop keeps the failed
- * row out of this tick's own claims as well. Belt and braces — either alone would do. If the
- * run dies before the flush the lease still expires on its own after LOCK_TTL_SECONDS, and
- * the row is retried then.
+ * A failure is recorded where it happens. The lease ALONE is the backoff: `failRow`
+ * deliberately leaves `locked_at` set, so the row it just failed is unclaimable for the rest
+ * of this tick and for LOCK_TTL_SECONDS after it, and nothing has to be held back to the end
+ * of the run to keep it out of the next claim. If the run dies before the write lands, the
+ * lease still expires on its own and the row is retried then.
  */
 export async function drain(deps: SchedulerDeps): Promise<DrainResult> {
   const fillPaused = await getFillPaused(deps.db);
-  const failures: DrainFailure[] = [];
   let pulled = 0;
+  let failed = 0;
 
   const claimAndRun = async (bounds: { priorityMin?: number; priorityMax: number }): Promise<boolean> => {
     const [row] = await claimBatch(deps.db, { now: deps.now(), limit: 1, ...bounds });
     if (!row) return false;
-    const failure = await runRow(deps, row);
-    if (failure) failures.push(failure);
-    else pulled += 1;
+    if (await runRow(deps, row)) pulled += 1;
+    else failed += 1;
     return true;
   };
 
@@ -118,12 +111,22 @@ export async function drain(deps: SchedulerDeps): Promise<DrainResult> {
     }
   }
 
-  for (const failure of failures) await failRow(deps.db, failure.id, failure.message);
-  return { pulled, failed: failures.length, fillPaused };
+  return { pulled, failed, fillPaused };
 }
 
-/** Returns null when the pull succeeded, or the failure to record once the run is over. */
-async function runRow(deps: SchedulerDeps, row: ClaimedRow): Promise<DrainFailure | null> {
+/**
+ * Runs one claimed row. Returns true when the pull succeeded.
+ *
+ * `completeRow` sits OUTSIDE the try: a pull that worked but could not be marked done is a
+ * database problem, not a pull failure, and recording it as one would leave the row looking
+ * retryable while its records are already written. It surfaces instead.
+ *
+ * The `failRow` write gets its own try/catch because it is the one write a failing tick
+ * must not fail at: the lease is already the backoff, so a lost `last_error` costs one
+ * diagnostic line, while a throw here would abort the drain and strand every row behind
+ * this one.
+ */
+async function runRow(deps: SchedulerDeps, row: ClaimedRow): Promise<boolean> {
   try {
     await deps.pull(deps.db, row.building, { triggeredBy: null, triggerReason: `queue:${row.reason}` });
   } catch (err) {
@@ -135,27 +138,26 @@ async function runRow(deps: SchedulerDeps, row: ClaimedRow): Promise<DrainFailur
       attempts: row.attempts,
       error: message,
     });
-    return { id: row.id, message };
+    try {
+      await failRow(deps.db, row.id, message);
+    } catch (writeErr) {
+      deps.log('records_queue_fail_write_failed', {
+        queueId: row.id,
+        buildingId: row.buildingId,
+        error: errorMessage(writeErr),
+      });
+    }
+    return false;
   }
   await completeRow(deps.db, row.id, deps.now());
-  return null;
-}
-
-async function writeSetting(db: RecordsDb, key: string, value: string, now: number): Promise<void> {
-  await db
-    .prepare(
-      'INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?) ' +
-        'ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
-    )
-    .bind(key, value, now)
-    .run();
+  return true;
 }
 
 function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
 
-/** The one line that says how the fixture went, reused as the trip reason and in the email. */
+/** The one line that says how the fixture went: the breaker trip reason, and the report's first line. */
 function fixtureHeadline(fixture: FixtureResult): string {
   return `Lanark fixture: ${plural(fixture.checksFailed, 'check')} failed, ${plural(fixture.sourceErrors.length, 'source')} threw`;
 }
@@ -198,7 +200,7 @@ export async function plan(deps: SchedulerDeps): Promise<PlanResult> {
   const fixture = await deps.fixture();
   await writeSetting(
     deps.db,
-    LAST_FIXTURE_KEY,
+    SETTING_KEYS.fixtureLast,
     JSON.stringify({
       at: now,
       failures: fixture.failures,
@@ -211,33 +213,36 @@ export async function plan(deps: SchedulerDeps): Promise<PlanResult> {
   );
 
   const rates = await errorRateBySource(deps.db, { now, windowSeconds: ERROR_WINDOW_SECONDS });
+  // Every source counts here, the six assessor years included, even though the fill's notion of
+  // "covered" excludes them. That is deliberate: parcel resolution runs through the assessor, so
+  // an assessor outage fails every other source for the same building, and a breaker blind to it
+  // would watch five sources fail without ever naming the one thing that broke them.
   const tripped = rates.filter((rate) => rate.attempts >= MIN_ATTEMPTS && rate.rate > ERROR_RATE_THRESHOLD);
 
-  const reasons: string[] = [];
-  if (fixture.failures > 0) reasons.push(fixtureHeadline(fixture));
-  for (const rate of tripped) {
-    reasons.push(`Source ${rate.sourceId}: ${rate.errors} of ${rate.attempts} pulls failed in the last 24 hours`);
-  }
+  // The rate trips are listed in the email; the fixture headline is not, because
+  // `fixtureReport` prints it two lines further down and once is enough.
+  const rateReasons = tripped.map(
+    (rate) => `Source ${rate.sourceId}: ${rate.errors} of ${rate.attempts} pulls failed in the last 24 hours`,
+  );
+  const reasons = fixture.failures > 0 ? [fixtureHeadline(fixture), ...rateReasons] : rateReasons;
 
   const wasPaused = await getFillPaused(deps.db);
   let alerted = false;
   if (reasons.length > 0 && !wasPaused) {
     await setFillPaused(deps.db, true, now);
-    await deps.alert(
-      'RateMyPlace records fill paused',
-      [
-        'The city-wide records fill was paused automatically.',
-        '',
-        ...reasons,
-        '',
-        fixtureReport(fixture),
-        '',
-        'Button and refresh pulls keep running. Clear the pause from /admin/records once the cause is understood.',
-      ].join('\n'),
-    );
-    await writeSetting(deps.db, LAST_ALERT_KEY, String(now), now);
-    alerted = true;
+    // Logged before the alert goes out: the pause is what happened, and a mail provider having
+    // a bad minute must not be the reason nothing recorded it.
     deps.log('records_fill_paused', { reasons });
+    const body = ['The city-wide records fill was paused automatically.', ''];
+    if (rateReasons.length > 0) body.push(...rateReasons, '');
+    body.push(
+      fixtureReport(fixture),
+      '',
+      'Button and refresh pulls keep running. Clear the pause from /admin/records once the cause is understood.',
+    );
+    await deps.alert('RateMyPlace records fill paused', body.join('\n'));
+    await writeSetting(deps.db, SETTING_KEYS.breakerLastAlert, String(now), now);
+    alerted = true;
   }
 
   return {
@@ -250,5 +255,12 @@ export async function plan(deps: SchedulerDeps): Promise<PlanResult> {
   };
 }
 
-/** The `app_settings` keys this module owns, so the admin panel reads them by name, not by literal. */
-export const SCHEDULER_SETTING_KEYS = { lastAlert: LAST_ALERT_KEY, lastFixture: LAST_FIXTURE_KEY } as const;
+/**
+ * The `app_settings` keys this module writes, under the names its own callers use. The keys
+ * themselves live in `settings.ts`, a leaf module anything can import; this is an alias, not
+ * a second copy.
+ */
+export const SCHEDULER_SETTING_KEYS = {
+  lastAlert: SETTING_KEYS.breakerLastAlert,
+  lastFixture: SETTING_KEYS.fixtureLast,
+} as const;
