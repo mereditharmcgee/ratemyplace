@@ -50,4 +50,6 @@ export interface ExistingBuilding {
   parcel_id: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** As stored, in any shape: the matcher normalizes it before comparing. */
+  zip_code: string | null;
 }

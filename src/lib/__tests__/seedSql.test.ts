@@ -60,7 +60,7 @@ describe('seedStatements', () => {
     const db = createRecordsTestDb();
     const id = await insertBuilding(db, { id: 'b1', address: '23 Lanark Rd' });
     // The helper writes no coordinate, so the COALESCE in the UPDATE takes the parcel's.
-    const building: ExistingBuilding = { id, address: '23 Lanark Rd', slug: 'b1', parcel_id: null, latitude: 1, longitude: 2 };
+    const building: ExistingBuilding = { id, address: '23 Lanark Rd', slug: 'b1', parcel_id: null, latitude: 1, longitude: 2, zip_code: '02135' };
     const statements = seedStatements({ created: [], matched: [{ building, parcel }] });
     await apply(db, statements);
     const b = await db.prepare("SELECT address, parcel_id, sam_id, street_key, st_num_lo, st_num_hi, latitude, longitude, source FROM buildings WHERE id = 'b1'").first<Record<string, unknown>>();
