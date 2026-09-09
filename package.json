@@ -20,7 +20,8 @@
     "db:seed": "npx tsx scripts/db-seed.ts",
     "db:setup": "npm run db:fresh && npm run db:seed",
     "ops:metrics": "tsx scripts/ops-metrics.ts",
-    "records:check": "npx tsx scripts/records-fixture-check.ts"
+    "records:check": "npx tsx scripts/records-fixture-check.ts",
+    "records:seed": "npx tsx scripts/records-seed-boston.ts"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.12",

@@ -3,6 +3,8 @@ dist/
 
 # wrangler local state
 .wrangler/
+# seed script downloads and generated SQL batches
+.cache/
 # generated types
 .astro/
 
