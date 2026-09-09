@@ -19,13 +19,13 @@ export interface MailColumnMap {
 export interface AssessorYear {
   fiscalYear: string;
   resourceId: string;
-  columns: MailColumnMap;
+  columns: Readonly<MailColumnMap>;
 }
 
-export const MODERN_COLUMNS: MailColumnMap = {
+export const MODERN_COLUMNS: Readonly<MailColumnMap> = Object.freeze({
   mailAddressee: 'MAIL_ADDRESSEE', mailStreet: 'MAIL_STREET_ADDRESS', mailCombined: null,
   mailCity: 'MAIL_CITY', mailState: 'MAIL_STATE', mailZip: 'MAIL_ZIP_CODE',
-};
+});
 const FY2023_COLUMNS: MailColumnMap = {
   mailAddressee: null, mailStreet: null, mailCombined: 'OWNER MAIL ADDRESS',
   mailCity: null, mailState: null, mailZip: null,
@@ -53,7 +53,7 @@ const FIXED_COLUMNS = ['PID', 'OWNER', 'LU', 'LU_DESC', 'YR_BUILT', 'YR_REMODEL'
 /** The columns every fiscal year carries, so a bulk download selects exactly what `assessmentFromRow` reads. */
 export const ASSESSOR_FIXED_COLUMNS: readonly string[] = FIXED_COLUMNS;
 
-function selectList(columns: MailColumnMap): string {
+function selectList(columns: Readonly<MailColumnMap>): string {
   const names = [...FIXED_COLUMNS, ...Object.values(columns).filter((c): c is string => Boolean(c))];
   return names.map((c) => `"${c}"`).join(',');
 }
