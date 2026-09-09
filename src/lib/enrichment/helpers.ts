@@ -10,8 +10,9 @@ export function inferOwnerEntity(ownerName: string): string | null {
 }
 
 export function parseStreetAddress(address: string): { number: string; street: string } | null {
-  // Handle addresses like "123 Main St", "123-125 Main St", "123A Main St"
-  const match = address.match(/^(\d+[\-\d]*[A-Z]?)\s+(.+)/i);
+  // Handle addresses like "123 Main St", "123-125 Main St", "123A Main St", and a
+  // lettered range like "12A-14 Beacon St" (either end of a range may carry a letter).
+  const match = address.match(/^(\d+[A-Z]?(?:-\d+[A-Z]?)*)\s+(.+)/i);
   if (!match) return null;
   return { number: match[1], street: match[2] };
 }
