@@ -29,6 +29,21 @@ import type { PullSummary, RecordsDb } from './types';
  */
 export const PRIORITY_PER_RUN = 3;
 export const FILL_PER_RUN = 1;
+/**
+ * Wall-clock ceiling on one drain, checked before every claim.
+ *
+ * The cron fires every minute whether or not the previous tick has finished, and Cloudflare
+ * does not queue or skip a tick because one is still running. Without a budget a slow
+ * upstream does not throttle the system, it compounds it: a tick that takes three minutes is
+ * overlapped by two more, each claiming its own rows and opening its own connections to
+ * data.boston.gov, and the pile-up grows for as long as the city is slow. Stopping short of
+ * the next tick keeps at most one drain in flight, so a slow upstream costs throughput
+ * instead of multiplying load.
+ *
+ * 45 s, not 60: the check happens before a claim, so the pull it lets through still has to
+ * finish, and a pull's own worst case is bounded by the per-source timeout, not by this.
+ */
+export const DRAIN_BUDGET_MS = 45_000;
 /** The breaker trips when a source fails more than this share of its attempts in the window. */
 export const ERROR_RATE_THRESHOLD = 0.5;
 /** Below this many attempts a rate means nothing: three failures out of three is a quiet hour, not an outage. */
@@ -48,6 +63,13 @@ export interface SchedulerDeps {
   db: RecordsDb;
   /** Unix seconds. Read fresh per claim, not once per run — a drain takes real time. */
   now: () => number;
+  /**
+   * Milliseconds, for the drain's own budget only — never for a stored timestamp. Separate
+   * from `now` because a second-resolution clock cannot measure a 45 s budget without
+   * rounding a whole tick away, and because a test that advances one must be free to leave
+   * the other alone. Defaults to `Date.now`.
+   */
+  clockMs?: () => number;
   pull: (db: RecordsDb, building: BuildingRowForIdentity, options: PullOptions) => Promise<PullSummary>;
   fixture: () => Promise<FixtureResult>;
   alert: (subject: string, body: string) => Promise<void>;
@@ -58,6 +80,8 @@ export interface DrainResult {
   pulled: number;
   failed: number;
   fillPaused: boolean;
+  /** True when the run stopped claiming early because DRAIN_BUDGET_MS was spent. */
+  budgetHit: boolean;
 }
 
 export interface PlanResult {
@@ -88,13 +112,25 @@ export function liveDeps(db: RecordsDb, extra: Pick<SchedulerDeps, 'fixture' | '
  * of this tick and for LOCK_TTL_SECONDS after it, and nothing has to be held back to the end
  * of the run to keep it out of the next claim. If the run dies before the write lands, the
  * lease still expires on its own and the row is retried then.
+ *
+ * Both claim loops also stop when DRAIN_BUDGET_MS of wall clock is gone, so a slow city does
+ * not leave three ticks' worth of drains running at once. See the constant.
  */
 export async function drain(deps: SchedulerDeps): Promise<DrainResult> {
+  const clockMs = deps.clockMs ?? Date.now;
+  const startedAt = clockMs();
   const fillPaused = await getFillPaused(deps.db);
   let pulled = 0;
   let failed = 0;
+  let budgetHit = false;
 
   const claimAndRun = async (bounds: { priorityMin?: number; priorityMax: number }): Promise<boolean> => {
+    // Checked before the claim, never after: a claim spends an attempt, so a row taken and
+    // then abandoned for the budget would be one try closer to parking for nothing.
+    if (clockMs() - startedAt >= DRAIN_BUDGET_MS) {
+      budgetHit = true;
+      return false;
+    }
     const [row] = await claimBatch(deps.db, { now: deps.now(), limit: 1, ...bounds });
     if (!row) return false;
     if (await runRow(deps, row)) pulled += 1;
@@ -111,7 +147,12 @@ export async function drain(deps: SchedulerDeps): Promise<DrainResult> {
     }
   }
 
-  return { pulled, failed, fillPaused };
+  // Logged as well as returned. The Worker's `records_drain` line carries the flag either
+  // way, but a run that ran out of clock is the one thing in this result worth searching
+  // for by event name when the queue starts falling behind.
+  if (budgetHit) deps.log('records_drain_budget_hit', { pulled, failed, budgetMs: DRAIN_BUDGET_MS });
+
+  return { pulled, failed, fillPaused, budgetHit };
 }
 
 /**

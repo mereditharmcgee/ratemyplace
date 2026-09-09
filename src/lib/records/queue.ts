@@ -62,6 +62,7 @@ interface PendingRow {
   id: number;
   reason: QueueReason;
   priority: number;
+  locked_at: number | null;
 }
 
 interface CandidateRow {
@@ -98,7 +99,7 @@ function isPendingRowConflict(err: unknown): boolean {
 export async function enqueue(db: RecordsDb, input: EnqueueInput): Promise<{ status: 'queued' | 'already_queued' }> {
   const priority = PRIORITY[input.reason];
   const pending = await db
-    .prepare('SELECT id, reason, priority FROM records_queue WHERE building_id = ? AND done_at IS NULL')
+    .prepare('SELECT id, reason, priority, locked_at FROM records_queue WHERE building_id = ? AND done_at IS NULL')
     .bind(input.buildingId)
     .first<PendingRow>();
   const insert = db
@@ -114,6 +115,18 @@ export async function enqueue(db: RecordsDb, input: EnqueueInput): Promise<{ sta
     return { status: 'queued' };
   }
   if (priority >= pending.priority) return { status: 'already_queued' };
+  // A live lease means a Worker is pulling this building RIGHT NOW, and that pull writes
+  // exactly the records the higher-priority request is asking for — so the honest answer is
+  // "already queued", not a replacement. Replacing it would delete the row out from under
+  // the run holding it: `completeRow` would then mark nothing, the pull's records would land
+  // with no row to show for them, and the fresh row would queue a second pull of the same
+  // building a minute later. The person waiting gets their records either way, and sooner.
+  //
+  // The liveness test is claimBatch's, boundary included (a lock exactly LOCK_TTL_SECONDS
+  // old is still live there), so a row can never be replaceable here and unclaimable there.
+  if (pending.locked_at !== null && pending.locked_at >= input.now - LOCK_TTL_SECONDS) {
+    return { status: 'already_queued' };
+  }
   // The replacement is a fresh row, so the parked row's `attempts` and `last_error` go with
   // the old one. That is deliberate, not an oversight: a better priority means a person is
   // waiting, and the history that parked the fill row is not a reason to refuse them. The

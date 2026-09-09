@@ -84,6 +84,42 @@ describe('enqueue', () => {
     expect(await queueRows(db)).toMatchObject([{ building_id: 'b1', reason: 'button', priority: 0 }]);
   });
 
+  it('leaves a pending row alone while its lease is live, because that pull is already the requester’s work', async () => {
+    const db = createRecordsTestDb();
+    for (const id of ['fresh', 'edge']) await insertBuilding(db, { id, slug: id });
+    for (const id of ['fresh', 'edge']) await enqueue(db, { buildingId: id, reason: 'fill', now: NOW });
+    // `fresh` was claimed ten seconds ago; `edge` sits exactly on the TTL, which claimBatch
+    // still treats as locked. The two must agree, or a row is replaceable and unclaimable at
+    // the same moment.
+    await db.prepare("UPDATE records_queue SET locked_at = ? WHERE building_id = 'fresh'").bind(NOW - 10).run();
+    await db
+      .prepare("UPDATE records_queue SET locked_at = ? WHERE building_id = 'edge'")
+      .bind(NOW - LOCK_TTL_SECONDS)
+      .run();
+
+    expect(await enqueue(db, { buildingId: 'fresh', reason: 'button', now: NOW })).toEqual({ status: 'already_queued' });
+    expect(await enqueue(db, { buildingId: 'edge', reason: 'button', now: NOW })).toEqual({ status: 'already_queued' });
+    // Still the fill rows, still leased: deleting them would have orphaned a pull in flight,
+    // whose completeRow would then find nothing to mark done.
+    expect(await queueRows(db)).toMatchObject([
+      { building_id: 'fresh', reason: 'fill', locked_at: NOW - 10 },
+      { building_id: 'edge', reason: 'fill', locked_at: NOW - LOCK_TTL_SECONDS },
+    ]);
+  });
+
+  it('replaces a pending row whose lease has expired, since nothing is pulling it', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'b1' });
+    await enqueue(db, { buildingId: 'b1', reason: 'fill', now: NOW });
+    await db
+      .prepare("UPDATE records_queue SET locked_at = ? WHERE building_id = 'b1'")
+      .bind(NOW - LOCK_TTL_SECONDS - 1)
+      .run();
+
+    expect(await enqueue(db, { buildingId: 'b1', reason: 'button', now: NOW })).toEqual({ status: 'queued' });
+    expect(await queueRows(db)).toMatchObject([{ building_id: 'b1', reason: 'button', priority: 0, locked_at: null }]);
+  });
+
   it('allows a new pending row once the previous one is done', async () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'b1' });

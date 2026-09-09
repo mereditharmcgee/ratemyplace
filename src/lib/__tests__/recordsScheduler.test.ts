@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEEPER_SOURCE_IDS,
+  DRAIN_BUDGET_MS,
   ERROR_WINDOW_SECONDS,
   FILL_PER_RUN,
   MIN_ATTEMPTS,
@@ -119,7 +120,7 @@ describe('drain', () => {
     for (const id of ['f1', 'f2']) await enqueue(db, { buildingId: id, reason: 'fill', now: NOW });
 
     const d = deps(db);
-    expect(await drain(d)).toEqual({ pulled: PRIORITY_PER_RUN + FILL_PER_RUN, failed: 0, fillPaused: false });
+    expect(await drain(d)).toEqual({ pulled: PRIORITY_PER_RUN + FILL_PER_RUN, failed: 0, fillPaused: false, budgetHit: false });
     expect(d.pulled).toEqual(['p1:queue:button', 'p2:queue:button', 'p3:queue:button', 'f1:queue:fill']);
 
     const done = await db.prepare('SELECT COUNT(*) AS n FROM records_queue WHERE done_at IS NOT NULL').first<{ n: number }>();
@@ -132,7 +133,7 @@ describe('drain', () => {
     await enqueue(db, { buildingId: 'p1', reason: 'button', now: NOW });
 
     const d = deps(db);
-    expect(await drain(d)).toEqual({ pulled: 1, failed: 0, fillPaused: false });
+    expect(await drain(d)).toEqual({ pulled: 1, failed: 0, fillPaused: false, budgetHit: false });
     expect(d.pulled).toEqual(['p1:queue:button']);
   });
 
@@ -144,7 +145,7 @@ describe('drain', () => {
     await setFillPaused(db, true, NOW);
 
     const d = deps(db);
-    expect(await drain(d)).toEqual({ pulled: 1, failed: 0, fillPaused: true });
+    expect(await drain(d)).toEqual({ pulled: 1, failed: 0, fillPaused: true, budgetHit: false });
     expect(d.pulled).toEqual(['p1:queue:refresh']);
   });
 
@@ -159,7 +160,7 @@ describe('drain', () => {
         return { buildingId: building.id, jurisdiction: 'boston', parcelId: null, condominium: false, sources: [] };
       },
     });
-    expect(await drain(d)).toEqual({ pulled: 1, failed: 1, fillPaused: false });
+    expect(await drain(d)).toEqual({ pulled: 1, failed: 1, fillPaused: false, budgetHit: false });
 
     const row = await db
       .prepare("SELECT attempts, last_error, locked_at, done_at FROM records_queue WHERE building_id = 'p1'")
@@ -180,7 +181,7 @@ describe('drain', () => {
         throw new Error('network down');
       },
     });
-    expect(await drain(d)).toEqual({ pulled: 0, failed: 1, fillPaused: false });
+    expect(await drain(d)).toEqual({ pulled: 0, failed: 1, fillPaused: false, budgetHit: false });
 
     const row = await db.prepare("SELECT attempts FROM records_queue WHERE building_id = 'p1'").first<{ attempts: number }>();
     // One claim spent of MAX_ATTEMPTS, not three: the kept lease is what stops the run from
@@ -204,7 +205,7 @@ describe('drain', () => {
       return record(dbArg, building, options);
     };
 
-    expect(await drain(d)).toEqual({ pulled: 2, failed: 0, fillPaused: false });
+    expect(await drain(d)).toEqual({ pulled: 2, failed: 0, fillPaused: false, budgetHit: false });
     expect(d.pulled).toEqual(['p1:queue:button', 'p3:queue:button']);
   });
 
@@ -223,7 +224,7 @@ describe('drain', () => {
 
     // The priority loop ends early — p1 holds its lease, so there is nothing left to claim —
     // but the fill loop is a separate budget and still gets its row.
-    expect(await drain(d)).toEqual({ pulled: 1, failed: 1, fillPaused: false });
+    expect(await drain(d)).toEqual({ pulled: 1, failed: 1, fillPaused: false, budgetHit: false });
     expect(d.pulled).toEqual(['f1:queue:fill']);
   });
 
@@ -241,7 +242,7 @@ describe('drain', () => {
     d.db = failWriteThrows(db);
 
     // A lost `last_error` costs a diagnostic line; aborting the drain would strand p2.
-    expect(await drain(d)).toEqual({ pulled: 1, failed: 1, fillPaused: false });
+    expect(await drain(d)).toEqual({ pulled: 1, failed: 1, fillPaused: false, budgetHit: false });
     expect(d.pulled).toEqual(['p2:queue:button']);
     expect(d.logs).toEqual(['records_queue_pull_failed', 'records_queue_fail_write_failed']);
   });
@@ -260,6 +261,54 @@ describe('drain', () => {
       .all<{ building_id: string; done_at: number }>();
     expect(rows.results.map((r) => r.building_id)).toEqual(['p1', 'p2']);
     expect(rows.results[1].done_at).toBeGreaterThan(rows.results[0].done_at);
+  });
+
+  it('stops claiming once the wall-clock budget is spent, and says so', async () => {
+    const db = createRecordsTestDb();
+    for (const id of ['p1', 'p2', 'p3', 'f1']) await insertBuilding(db, { id, slug: id });
+    for (const id of ['p1', 'p2', 'p3']) await enqueue(db, { buildingId: id, reason: 'button', now: NOW });
+    await enqueue(db, { buildingId: 'f1', reason: 'fill', now: NOW });
+
+    let ms = 0;
+    const d = deps(db, { clockMs: () => ms });
+    const record = d.pull;
+    // One slow upstream pull spends the whole tick's budget.
+    d.pull = async (dbArg, building, options) => {
+      ms += DRAIN_BUDGET_MS + 1;
+      return record(dbArg, building, options);
+    };
+
+    expect(await drain(d)).toEqual({ pulled: 1, failed: 0, fillPaused: false, budgetHit: true });
+    expect(d.pulled).toEqual(['p1:queue:button']);
+    // The fill loop is checked too, not just the priority one: an over-budget tick claims
+    // nothing more, so p2, p3 and f1 keep their attempts for the next minute.
+    const untouched = await db
+      .prepare("SELECT COUNT(*) AS n FROM records_queue WHERE attempts = 0 AND locked_at IS NULL AND done_at IS NULL")
+      .first<{ n: number }>();
+    expect(untouched?.n).toBe(3);
+    expect(d.logged).toContainEqual({
+      event: 'records_drain_budget_hit',
+      context: { pulled: 1, failed: 0, budgetMs: DRAIN_BUDGET_MS },
+    });
+  });
+
+  it('keeps claiming while the budget holds', async () => {
+    const db = createRecordsTestDb();
+    for (const id of ['p1', 'p2']) await insertBuilding(db, { id, slug: id });
+    for (const id of ['p1', 'p2']) await enqueue(db, { buildingId: id, reason: 'button', now: NOW });
+
+    let ms = 0;
+    const d = deps(db, { clockMs: () => ms });
+    const record = d.pull;
+    d.pull = async (dbArg, building, options) => {
+      ms += DRAIN_BUDGET_MS - 1;
+      return record(dbArg, building, options);
+    };
+
+    // The check is "has the budget been exceeded", not "would the next pull fit": a tick
+    // that is still inside its budget claims one more row.
+    expect(await drain(d)).toEqual({ pulled: 2, failed: 0, fillPaused: false, budgetHit: true });
+    expect(d.pulled).toEqual(['p1:queue:button', 'p2:queue:button']);
   });
 });
 
