@@ -21,7 +21,9 @@
     "db:setup": "npm run db:fresh && npm run db:seed",
     "ops:metrics": "tsx scripts/ops-metrics.ts",
     "records:check": "npx tsx scripts/records-fixture-check.ts",
-    "records:seed": "npx tsx scripts/records-seed-boston.ts"
+    "records:seed": "npx tsx scripts/records-seed-boston.ts",
+    "records:worker": "npx wrangler dev --config workers/records-scheduler/wrangler.jsonc --test-scheduled --persist-to .wrangler/state",
+    "records:worker:deploy": "npx wrangler deploy --config workers/records-scheduler/wrangler.jsonc"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.12",

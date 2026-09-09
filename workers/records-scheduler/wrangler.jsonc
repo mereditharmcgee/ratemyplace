@@ -1,0 +1,32 @@
+// The companion Cron Worker for the building-records queue. Separate from the site's
+// `wrangler.jsonc` (Pages) on purpose: Pages has no Cron Triggers, and the Pages build
+// only ever looks at `src/`, so nothing here ships with the site.
+{
+	"name": "ratemyplace-records-scheduler",
+	"main": "src/index.ts",
+	"compatibility_date": "2024-12-01",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"workers_dev": false,
+	"triggers": {
+		// Every minute: drain. 06:00 UTC daily: plan (refresh, fill top-up, purge, breaker).
+		"crons": [
+			"* * * * *",
+			"0 6 * * *"
+		]
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "ratemyplace-db",
+			"database_id": "7dd2a722-fdd3-4986-b2f7-6d61d069438e"
+		}
+	],
+	"vars": {
+		"SITE_URL": "https://ratemyplace.org",
+		"RECORDS_ALERT_EMAIL": "meredith.ar.mcgee@gmail.com"
+	}
+	// Secret, set once:
+	// npx wrangler secret put RESEND_API_KEY --config workers/records-scheduler/wrangler.jsonc
+}
