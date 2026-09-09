@@ -130,6 +130,8 @@ describe('RecordsQueuePanel', () => {
       return Promise.resolve(jsonResponse(queuePayload()));
     });
     vi.stubGlobal('fetch', fetchMock);
+    const confirmMock = vi.fn().mockReturnValue(true);
+    vi.stubGlobal('confirm', confirmMock);
 
     const { container, getByText } = render(<RecordsQueuePanel />);
     await waitFor(() => expect(getByText('Resume fill')).toBeTruthy());
@@ -151,6 +153,36 @@ describe('RecordsQueuePanel', () => {
       const calls = fetchMock.mock.calls.filter((call) => String(call[0]).endsWith('/pause'));
       expect(JSON.parse(calls[calls.length - 1][1].body)).toEqual({ paused: true });
     });
+    // Resuming asked; pausing did not. Pausing is always the safe direction.
+    expect(confirmMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not resume the fill when the confirm is dismissed', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(queuePayload()));
+    vi.stubGlobal('fetch', fetchMock);
+    const confirmMock = vi.fn().mockReturnValue(false);
+    vi.stubGlobal('confirm', confirmMock);
+
+    const { container, getByText } = render(<RecordsQueuePanel />);
+    await waitFor(() => expect(getByText('Resume fill')).toBeTruthy());
+    const callsBefore = fetchMock.mock.calls.length;
+
+    fireEvent.click(getByText('Resume fill'));
+
+    expect(confirmMock).toHaveBeenCalledTimes(1);
+    expect(String(confirmMock.mock.calls[0][0])).toContain('Resume the city-wide fill?');
+    // Nothing posted, and the panel still reads paused: a dismissed confirm is a no-op, not
+    // an optimistic flip the next poll has to undo.
+    expect(fetchMock.mock.calls.filter((call) => String(call[0]).endsWith('/pause'))).toHaveLength(0);
+    expect(fetchMock.mock.calls.length).toBe(callsBefore);
+    expect(container.textContent).toContain('Fill paused');
+  });
+
+  it('says out loud that the fill is meant to stay paused until the C3 site release', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(queuePayload())));
+    const { container } = render(<RecordsQueuePanel />);
+    await waitFor(() => expect(container.textContent).toContain('Fill paused'));
+    expect(container.textContent).toContain('meant to stay paused until the C3 site release');
   });
 
   it('renders parked rows with a truncated error and retries one by id, then re-fetches', async () => {
@@ -189,6 +221,26 @@ describe('RecordsQueuePanel', () => {
     // Retry POST plus the follow-up GET.
     await waitFor(() => expect(fetchMock.mock.calls.length).toBe(callsBefore + 2));
     expect(String(fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0])).toBe('/api/admin/records/queue');
+  });
+
+  it('does not leave half a character behind when the cut lands inside a surrogate pair', async () => {
+    // MAX_ERROR_CHARS is 120, so the cut is at 119 and the emoji's high surrogate sits on it.
+    // Keeping it would render a replacement glyph — the same reason truncateError in
+    // lib/records/errors.ts drops it, and these two strings are read side by side.
+    const surrogateError = `${'x'.repeat(118)}\u{1F600} and then some detail`;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(queuePayload({ parked: [{ ...PARKED_ROW, last_error: surrogateError }] }))),
+    );
+
+    const { container } = render(<RecordsQueuePanel />);
+    await waitFor(() => expect(container.textContent).toContain(LANARK));
+
+    const cell = cellOf(container, LANARK, 'Last error').querySelector('[title]') as HTMLElement;
+    expect(cell.textContent).toBe(`${'x'.repeat(118)}…`);
+    expect(cell.textContent).not.toMatch(/[\uD800-\uDBFF]/);
+    // The full text is still one `title` away, surrogate pair intact.
+    expect(cell.getAttribute('title')).toBe(surrogateError);
   });
 
   it('reads the lease TTL the queue module actually uses', () => {

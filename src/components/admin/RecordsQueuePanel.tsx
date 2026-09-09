@@ -30,6 +30,14 @@ const MAX_ERROR_CHARS = 120;
 
 const LOAD_ERROR = 'Could not load the queue';
 
+/**
+ * Resuming is the direction that starts sending traffic to a public city API for months, and
+ * the button sits one click from a page an admin visits for other reasons. Pausing needs no
+ * confirmation — stopping is always the safe direction.
+ */
+const RESUME_CONFIRM =
+  'Resume the city-wide fill? It pulls one building a minute until every seeded building has records.';
+
 /** Shown over numbers that are still on screen because a later poll failed, not because they are fresh. */
 const REFRESH_ERROR = "Couldn't refresh the queue; showing the last good numbers";
 
@@ -88,8 +96,18 @@ function formatAge(seconds: number | null): string {
   return `${Math.floor(seconds / 86_400)} d`;
 }
 
+/**
+ * Mirrors `truncateError` in lib/records/errors.ts, guard included: the cut can fall between
+ * a surrogate pair and leave a lone high surrogate, which renders as a replacement glyph. An
+ * admin comparing this cell against the stored `last_error` should not see the two disagree
+ * about where a message ends.
+ */
 function truncate(text: string, max: number): string {
-  return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  const last = cut.charCodeAt(cut.length - 1);
+  const whole = last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
+  return `${whole}…`;
 }
 
 function fixtureHeadline(fixture: LastFixture | null): string {
@@ -180,6 +198,7 @@ export default function RecordsQueuePanel() {
   const togglePause = async () => {
     if (!stats) return;
     const paused = !stats.fillPaused;
+    if (!paused && !window.confirm(RESUME_CONFIRM)) return;
     setPauseBusy(true);
     setActionError(null);
     try {
@@ -295,6 +314,9 @@ export default function RecordsQueuePanel() {
             <p className="text-base font-semibold text-gray-900">{stats?.fillPaused ? 'Fill paused' : 'Fill running'}</p>
             <p className="text-sm text-gray-600 mt-1">
               Button, follower, and refresh pulls run either way. Only the city-wide fill pauses.
+            </p>
+            <p className="text-sm text-gray-600 mt-1">
+              The fill is meant to stay paused until the C3 site release.
             </p>
           </div>
           <button
