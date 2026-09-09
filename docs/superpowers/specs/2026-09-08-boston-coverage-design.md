@@ -66,7 +66,40 @@ Per building a deep pull is about 20 requests to data.boston.gov (311 alone span
 | `source` | `seed` |
 | `slug` | existing convention `<address-slug>-boston`, numeric suffix on collision |
 
+> **Amended 2026-09-09, as built (C1):**
+>
+> - **Neighborhood and ZIP come from SAM first.** Both read the `MAILING_NEIGHBORHOOD` and
+>   `ZIP_CODE` of the parcel's primary SAM address point, falling back to the assessor's
+>   `CITY` and `ZIP_CODE` only when the parcel has no SAM point. SAM is the address
+>   authority; the assessor's `CITY` is a postal district.
+> - **ZIPs go through `zip5`** (`src/lib/records/seed/sam.ts`), the one normalizer for both
+>   feeds: it restores a leading zero lost to a numeric column and trims a ZIP+4, and
+>   returns null rather than a plausible-looking wrong answer for anything that is not four
+>   or five digits.
+> - **Units for R2 and R3 rows the assessor leaves blank are implied**, 2 and 3
+>   respectively. Caveat: on a multi-building lot the implied count is per assessor row, so
+>   a two-building R3 parcel with both `RES_UNITS` blank reads as 6, not 3. Any row that
+>   does carry `RES_UNITS` is used as given, and the parcel's rows are summed.
+> - **A parcel whose `ST_NUM` is 0** (the assessor's placeholder for an unnumbered lot) is
+>   skipped, not seeded as "0 Something Street".
+> - **A comma tail in `ST_NAME` renders in parentheses**: `LANARK RD, REAR` becomes
+>   `23-27 Lanark Road (Rear)`. The suffix table keys off the street alone, so the tail
+>   never confuses the street key.
+> - **Real count: 38,221 buildings**, not the ~38,400 estimated from the land-use table
+>   above. The difference is the skipped rows — no parcel id, no usable address, `ST_NUM` 0.
+
 **Existing buildings first.** Before inserting, the script loads every production building with `city = 'Boston'` and matches each onto a parcel by street key and number range. A match sets `parcel_id`, `sam_id`, `street_key`, and the range on the existing row and skips creating a twin. Rows it cannot match are printed for the owner to resolve by hand; nothing is guessed.
+
+> **Amended 2026-09-09, as built (C1):** matching runs parcel id first — an existing row that
+> already carries a `parcel_id` matches on it outright, because that is the assessor's own
+> identifier rather than an inference. Only rows without one fall through to street key plus
+> number-range containment, and a tie between two parcels on the same street and number is
+> broken by the existing row's ZIP, because street keys repeat across neighborhoods. A tie the
+> ZIP cannot break, a range that overlaps a parcel boundary without containing it, a range
+> that swallows a whole parcel, and a row whose `parcel_id` disagrees with the address match
+> are all reported, not resolved. Every parcel referenced by any of those ambiguous or
+> conflicting matches is held back from creation, so a parcel waiting on the owner's
+> resolution is never seeded as a twin of the row that may turn out to be it.
 
 **Records.** For every building the script writes one `record_pulls` row for the assessor resource (`triggered_by = 'seed'`) and one `building_records` row of kind `assessment` for FY2026, so the facts strip renders on day one. The other four sources stay "Not retrieved yet".
 
@@ -102,6 +135,25 @@ Indexes: `idx_buildings_parcel (parcel_id)`, `idx_buildings_street (city, street
 Index: `idx_records_queue_pending (priority, requested_at) WHERE done_at IS NULL`.
 
 **`app_settings`, new.** `key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER`. First key: `records_fill_paused` (`'1'`/`'0'`).
+
+> **Amended 2026-09-09, as built (C1):** `record_pulls.triggered_by` is a foreign key to
+> `users` (0029), so it cannot carry `'seed'` or `'queue:<reason>'`. Migration 0031 adds a
+> nullable `record_pulls.trigger_reason TEXT` for that; `triggered_by` stays the admin
+> user id or NULL. Seed pulls write `trigger_reason = 'seed'`; the Worker (C2) writes
+> `'queue:<reason>'`.
+>
+> Three further details settled while building 0031:
+>
+> - `records_queue.id` is `INTEGER PRIMARY KEY AUTOINCREMENT`, not a bare `INTEGER PRIMARY
+>   KEY`, so a queue id is never reused after a delete — queue ids appear in the admin UI
+>   and in logs, and a reused one would silently re-point an old reference.
+> - `app_settings.updated_at` is `INTEGER NOT NULL DEFAULT (unixepoch())`. SQLite has no
+>   `ON UPDATE`, so it stamps on insert and does not maintain itself; a writer that flips a
+>   value must set it explicitly.
+> - Statement order in the file is deliberate: the idempotent `CREATE TABLE IF NOT EXISTS`
+>   and `CREATE INDEX IF NOT EXISTS` statements come first and the five non-idempotent
+>   `ALTER TABLE ... ADD COLUMN` statements last, so a partial apply is recovered by
+>   re-running only the `ALTER`s that did not land.
 
 `building_records` and `record_pulls` are unchanged. Every queued pull writes the same provenance rows as the admin button, with `triggered_by = 'queue:<reason>'`, so the panel, the correction flow, and the "as of" labels need no branch for seeded buildings. "Last pulled" and "interesting" are queries over existing tables, not columns.
 
@@ -160,6 +212,19 @@ ORDER BY (source = 'user') DESC, created_at LIMIT 1
 On a match: set `google_place_id`, and `latitude`/`longitude` if null, and return the existing slug. On no match: create a `user` row as today, now also populating the three key columns. Addresses outside Boston keep today's behavior exactly.
 
 **Range addresses.** A parcel addressed "23-27 Lanark Road" is one page; a reviewer choosing "25 Lanark Rd" lands on it. The page title keeps the assessor's range.
+
+> **Amended 2026-09-09, as built (C1):** `normalizeSearchQuery` returns `string[][]`, not
+> `string[]`: one array of alternative spellings per term. Expanding an abbreviation to a
+> single long spelling would have lost the buildings stored with the short one, so the search
+> ORs the spellings inside a term and ANDs across terms — "comm ave" matches an address
+> stored either way, and still requires both terms.
+>
+> Two things the C3 dedupe has to do that this section did not call out. Manual-entry
+> addresses (and Google Places results) carry a trailing city/state token — "23-27 Lanark Rd,
+> Boston, MA" — which must be stripped before `addressKey` runs, or the street key comes out
+> wrong. And the dedupe query needs the same ZIP tiebreaker `seed/match.ts` uses: street keys
+> repeat across neighborhoods, so `(city, street_key)` plus range containment can return two
+> genuinely different buildings.
 
 ## Section 6: Sitemap, metadata, docs
 
