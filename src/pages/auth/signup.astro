@@ -196,6 +196,12 @@ if (Astro.locals.user) {
     // 100 ticks at 100ms = 10s, then give up.
     let turnstilePollAttempts = 0;
     const turnstileInterval: ReturnType<typeof setInterval> = setInterval(() => {
+      // The page can be rendered outside a browser (container tests); a tick after that
+      // teardown must stop rather than touch a window that no longer exists.
+      if (typeof window === 'undefined') {
+        clearInterval(turnstileInterval);
+        return;
+      }
       turnstilePollAttempts++;
       if ((window as any).turnstile) {
         clearInterval(turnstileInterval);

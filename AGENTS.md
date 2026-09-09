@@ -85,6 +85,7 @@ npm run e2e        # fresh local D1 + seed + build + Playwright
 npm run db:setup   # db:fresh then db:seed (local D1 only)
 npm run ops:metrics   # regenerate ops/METRICS.md from production (read-only)
 npm run records:check   # live Lanark fixture check (hits data.boston.gov), run by hand
+npm run records:seed -- --dry-run   # Boston bulk seed; --write / --apply --local / --apply --remote
 ```
 
 `npm run smoke` has no default target. Supply an explicit `--environment` and
@@ -281,6 +282,9 @@ Things that have already cost time. Read before debugging.
   pull until someone updates `LEGACY_311_RESOURCES`; it does not clear on its own.
 - **CKAN rejects `ESCAPE '\'`** with `HTTP 409 Query is not a single statement`. LIKE
   clauses against `data.boston.gov` use `ESCAPE '!'` instead. See `src/lib/records/ckan.ts`.
+- **Seeded buildings** (`buildings.source = 'seed'`, ids `seed-<parcel>`) come from
+  `npm run records:seed`, which is idempotent and applied by hand. Never regenerate slugs
+  for them; the slug is the public URL.
 - **Public records are never fetched on a public page view.** Pulls are admin-triggered and
   stored in D1; the panel reads only what was stored. Lazy pull-on-view is permanently
   rejected: it is an amplification vector and ties page latency to a third-party API.

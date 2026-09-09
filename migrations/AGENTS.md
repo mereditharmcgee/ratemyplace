@@ -1,6 +1,6 @@
 # `migrations/` — D1 Schema Changes
 
-Cloudflare D1 (SQLite). 30 migrations, `0001` through `0030`.
+Cloudflare D1 (SQLite). 31 migrations, `0001` through `0031`.
 
 ---
 
@@ -31,6 +31,51 @@ count matches afterwards; the copy is the whole risk in a table rebuild.
 and `sam_id` present; the three records tables and all four `idx_audit_*` indexes exist; no
 `audit_logs_v4` left behind. Like `0025` through `0028`, wrangler's migration tracking does
 not know these ran. Do not re-run either file.
+
+**`0031` (Boston coverage) is the same kind of hazard.** It adds five columns with
+`ALTER TABLE ... ADD COLUMN` — `buildings.source`, `buildings.street_key`,
+`buildings.st_num_lo`, `buildings.st_num_hi`, and `record_pulls.trigger_reason` — and
+creates two tables, `records_queue` and `app_settings`. Apply it once with
+`wrangler d1 execute --remote --file`, never `migrations apply --remote`, and before running
+the seed script.
+
+**APPLIED TO PRODUCTION 2026-09-09** via `wrangler d1 execute --remote --file`, in one run
+(106 rows written). Verified afterwards: all four `buildings` columns,
+`record_pulls.trigger_reason`, `records_queue`, `app_settings`, and the three indexes exist;
+the 93 existing buildings read `source = 'user'`; the 22 pull rows are untouched. Wrangler's
+migration tracking does not know it ran. Do not re-run the file.
+
+Its statements are ordered idempotent-first as far as they can be, but not entirely:
+`idx_buildings_street` indexes `buildings(city, street_key)`, so it has to come after the
+`ALTER` that adds `street_key`. Recovering a partial apply is therefore two steps, in this
+order: read the live schema, see which of the five columns exist, and **re-run by hand only
+the `ALTER`s that did not land**; then **re-run the file's `CREATE INDEX IF NOT EXISTS`
+statements**, which are idempotent and no-ops for an index that already exists. Do not
+reorder the file to collapse that into one step — the index cannot be created before its
+column. Note that `app_settings.updated_at` defaults on insert but does not self-update; a
+writer that flips a value must set it.
+
+**The seed that follows.** `npm run records:seed` populates the new `buildings` columns for
+Boston from the FY2026 assessor plus SAM. Its modes are `-- --dry-run` (compute and print the
+summary, write nothing), `-- --write` (also write the SQL), `-- --apply --local`, and
+`-- --apply --remote` (needs `CLOUDFLARE_API_TOKEN`). `--refresh` re-downloads instead of
+reusing the day-old cache in `.cache/`. Operational facts worth knowing before you run it:
+
+- It writes SQL batch files of 999 statements each under `.cache/seed/`: a multiple of three,
+  so every file holds whole buildings (row, pull, record), and under 1,000 because
+  2,000-statement files hang the local D1 for five minutes and then fail with a
+  `Body Timeout Error`, rolling the whole file back. Do not raise it.
+- `-- --apply --remote --from 12` resumes applying at batch file 12 after a failure; the
+  script names the file it is on as it goes. A resume applies the batch files **already on
+  disk** and regenerates nothing — the downloads are only cached for a day, and a re-download
+  that gains or loses one parcel shifts every later building across a file boundary. It fails
+  loudly if `.cache/seed/` holds no files or fewer than the number asked for. A bare `--from`
+  with no number is an error, not a silent "start from the beginning".
+- `wrangler d1 execute --json` renders a SQL `NULL` as the JSON *string* `"null"`. The script
+  folds that back to `null` when it reads existing rows; anything else that shells out to
+  wrangler has to do the same.
+- The whole apply is idempotent — seeded rows have deterministic ids (`seed-<parcel>`) and are
+  upserted — so a remote apply that fails partway is safely re-run from the start.
 
 Before touching production schema: check the live schema directly, confirm what has
 actually been applied, and apply deliberately. Do not assume wrangler's state is accurate.
@@ -94,6 +139,8 @@ Dropping a column that deployed code still reads takes the site down.
 | `saved_buildings` | Bookmarks |
 | `record_pulls`, `building_records` | Public building records from city open data. `record_pulls` is insert-only provenance, one row per source run; `building_records` holds the typed JSON payloads, unique on `(building_id, kind, source_key)` |
 | `record_corrections` | Public "report a record error" claims and their resolutions. Stores the claim and an optional email, nothing else about the filer |
+| `records_queue` | Pending record pulls, one pending row per building, with reason and priority; drained by the records-scheduler Worker (sub-project C) |
+| `app_settings` | Operator switches, e.g. `records_fill_paused` |
 | `rate_limits` | Fail-closed rate limiting, keyed and windowed |
 | `contact_messages`, `bug_reports` | Inbound forms with admin queues |
 | `password_reset_tokens` | Reset flow |

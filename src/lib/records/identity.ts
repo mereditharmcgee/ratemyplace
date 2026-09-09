@@ -90,6 +90,25 @@ function splitStreet(streetUpper: string): { base: string; spellings: readonly s
   return { base: baseWords.join(' '), spellings };
 }
 
+/**
+ * A suffix word is only degenerate when it stood alone with nothing before it to split
+ * off ("5 Ave"); once a suffix has actually been split off, the base can legitimately be
+ * a suffix word itself ("10 Park St" -> base "PARK", suffix "ST"). An empty base, or one
+ * starting with punctuation, is never usable.
+ *
+ * One rule, four callers: `buildIdentity` throws on it, `streetKey` and `addressKey`
+ * return null, and the seed's `formatSeedAddress` returns null. They must not fork, which
+ * is why this is exported rather than re-derived in the seed.
+ */
+export function isDegenerateStreet(base: string, spellings: readonly string[] | null): boolean {
+  return !base || (!spellings && SUFFIX_ROW_BY_SPELLING.has(base)) || /^[^A-Z0-9]/.test(base);
+}
+
+/** The one key builder: base plus the assessor's spelling, or the bare base with no suffix. */
+function keyOf(base: string, spellings: readonly string[] | null): string {
+  return spellings ? `${base} ${spellings[0]}` : base;
+}
+
 export function buildIdentity(building: BuildingRowForIdentity): BuildingIdentity {
   const parsed = parseStreetAddress(building.address.trim());
   if (!parsed) throw new Error(`Could not parse street address: ${building.address}`);
@@ -101,15 +120,12 @@ export function buildIdentity(building: BuildingRowForIdentity): BuildingIdentit
   const numbers = Array.from(new Set(parts.flatMap((p) => (/[A-Z]$/.test(p) ? [p, p.replace(/[A-Z]+$/, '')] : [p])))).filter(Boolean);
 
   const { base, spellings } = splitStreet(normalizeStreet(parsed.street));
-  // A suffix word is only degenerate when it stood alone with nothing before it to split
-  // off ("5 Ave"); once a suffix has actually been split off, the base can legitimately
-  // be a suffix word itself ("10 Park St" -> base "PARK", suffix "ST").
-  if (!base || (!spellings && SUFFIX_ROW_BY_SPELLING.has(base)) || /^[^A-Z0-9]/.test(base)) {
+  if (isDegenerateStreet(base, spellings)) {
     throw new Error(`Degenerate street name from address: ${building.address}`);
   }
 
   const streetForms = spellings ? Array.from(new Set(spellings.map((s) => `${base} ${s}`))) : [base];
-  const streetShort = spellings ? `${base} ${spellings[0]}` : base;
+  const streetShort = keyOf(base, spellings);
   const longest = spellings ? spellings.reduce((a, b) => (b.length > a.length ? b : a)) : null;
   const streetLong = longest ? `${base} ${longest}` : base;
 
@@ -132,5 +148,53 @@ export function buildIdentity(building: BuildingRowForIdentity): BuildingIdentit
     condominium: false,
     zip: building.zip_code,
     samId: building.sam_id,
+  };
+}
+
+export { SUFFIX_SPELLINGS };
+
+/** Public form of the normalize-then-split step: uppercase, unit- and punctuation-free, suffix split off. */
+export function splitSuffix(street: string): { base: string; spellings: readonly string[] | null } {
+  return splitStreet(normalizeStreet(street));
+}
+
+/**
+ * The lookup key shared by seeded rows and reviewer dedupe: base name plus the assessor's
+ * spelling of the suffix ('LANARK RD'), or the bare base when there is no suffix. Null
+ * when the street is degenerate — the same rule `buildIdentity` throws on, so a bare
+ * suffix ('Ave') or an empty street never becomes a key that silently collides.
+ */
+export function streetKey(street: string): string | null {
+  const { base, spellings } = splitSuffix(street);
+  if (isDegenerateStreet(base, spellings)) return null;
+  return keyOf(base, spellings);
+}
+
+export interface AddressKey {
+  streetKey: string;
+  numLo: number;
+  numHi: number;
+}
+
+/**
+ * Street key plus house-number range for one address line. A lettered number ('12A')
+ * keys on its digits; a range is ordered low to high. Null when there is no leading
+ * number or the street is degenerate (the same rule buildIdentity throws on).
+ */
+export function addressKey(address: string): AddressKey | null {
+  const parsed = parseStreetAddress(address.trim());
+  if (!parsed) return null;
+  const numbers = parsed.number
+    .toUpperCase()
+    .split('-')
+    .map((p) => Number.parseInt(p.replace(/[A-Z]+$/, ''), 10))
+    .filter((n) => Number.isFinite(n));
+  if (numbers.length === 0) return null;
+  const { base, spellings } = splitSuffix(parsed.street);
+  if (isDegenerateStreet(base, spellings)) return null;
+  return {
+    streetKey: keyOf(base, spellings),
+    numLo: Math.min(...numbers),
+    numHi: Math.max(...numbers),
   };
 }

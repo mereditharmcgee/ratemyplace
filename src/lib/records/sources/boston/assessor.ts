@@ -19,13 +19,13 @@ export interface MailColumnMap {
 export interface AssessorYear {
   fiscalYear: string;
   resourceId: string;
-  columns: MailColumnMap;
+  columns: Readonly<MailColumnMap>;
 }
 
-const MODERN_COLUMNS: MailColumnMap = {
+export const MODERN_COLUMNS: Readonly<MailColumnMap> = Object.freeze({
   mailAddressee: 'MAIL_ADDRESSEE', mailStreet: 'MAIL_STREET_ADDRESS', mailCombined: null,
   mailCity: 'MAIL_CITY', mailState: 'MAIL_STATE', mailZip: 'MAIL_ZIP_CODE',
-};
+});
 const FY2023_COLUMNS: MailColumnMap = {
   mailAddressee: null, mailStreet: null, mailCombined: 'OWNER MAIL ADDRESS',
   mailCity: null, mailState: null, mailZip: null,
@@ -50,7 +50,10 @@ type Row = Record<string, unknown>;
 
 const FIXED_COLUMNS = ['PID', 'OWNER', 'LU', 'LU_DESC', 'YR_BUILT', 'YR_REMODEL', 'GROSS_AREA', 'LIVING_AREA', 'RES_UNITS', 'COM_UNITS', 'TOTAL_VALUE', 'LAND_VALUE', 'BLDG_VALUE'];
 
-function selectList(columns: MailColumnMap): string {
+/** The columns every fiscal year carries, so a bulk download selects exactly what `assessmentFromRow` reads. */
+export const ASSESSOR_FIXED_COLUMNS: readonly string[] = FIXED_COLUMNS;
+
+function selectList(columns: Readonly<MailColumnMap>): string {
   const names = [...FIXED_COLUMNS, ...Object.values(columns).filter((c): c is string => Boolean(c))];
   return names.map((c) => `"${c}"`).join(',');
 }
@@ -134,7 +137,11 @@ function condominiumPayload(fiscalYear: string): AssessmentPayload {
   };
 }
 
-function mapRow(row: Row, year: AssessorYear): AssessmentPayload {
+/**
+ * One assessor row to the assessment payload the records panel reads. Exported for the
+ * Boston seed, which downloads rows in bulk instead of pulling one building at a time.
+ */
+export function assessmentFromRow(row: Record<string, unknown>, year: AssessorYear): AssessmentPayload {
   const c = year.columns;
   const pick = (col: string | null): string | null => (col ? text(row[col]) : null);
   let mailStreet = pick(c.mailStreet);
@@ -258,7 +265,7 @@ export function assessorSource(year: AssessorYear): RecordSource {
         rows: rows.slice(0, 1).map((row) => ({
           kind: 'assessment' as const,
           sourceKey: year.fiscalYear,
-          payload: mapRow(row, year),
+          payload: assessmentFromRow(row, year),
           sourceUrl: ASSESSOR_PAGE_URL,
         })),
       };

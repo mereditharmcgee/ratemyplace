@@ -154,6 +154,33 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   (short and long, range and split, directional stripped) plus both parcel forms. The
   feeds disagree about how an address is stored; normalization lives here, not in the
   sources.
+- **`seed/` is the bulk pipeline, not a request path.** `scripts/records-seed-boston.ts`
+  downloads the assessor and SAM resources once (`fetchAllRows` in `ckan.ts`), and the pure
+  modules under `records/seed/` filter, collapse, format, match, and emit SQL. Every string
+  in the emitted SQL goes through `lit()`; the file is applied with
+  `wrangler d1 execute --file`, which binds nothing. Seeded rows have `source = 'seed'` and
+  deterministic ids (`seed-<parcel>`), so re-running is an upsert.
+- **`addressKey` / `streetKey` in `identity.ts`** are the lookup keys for seed matching and
+  reviewer dedupe: base street name plus the assessor spelling of the suffix, and a
+  house-number range. A change to the suffix table changes both, on purpose. Both return
+  null for a degenerate street — a bare suffix like `Ave`, or an empty one — rather than a
+  key that silently collides. That rule is `isDegenerateStreet`, defined once in
+  `identity.ts` and called from four places (`buildIdentity`, `streetKey`, `addressKey`, and
+  `seed/format.ts`); change the rule there, not at a call site.
+- **Matching is parcel id first, then address.** `seed/match.ts` trusts an existing row's own
+  `parcel_id` outright, and only falls back to street key plus number-range containment. It
+  breaks a two-parcel tie with the ZIP, because street keys repeat across neighborhoods
+  (`Washington St` runs through most of them). A tie the ZIP cannot break, a partial range
+  overlap, or a disagreeing parcel id is reported for a human, never guessed — and every
+  parcel named by one of those is held back from creation so a reviewed parcel is not seeded
+  as a twin in the meantime.
+- **`zip5` in `seed/sam.ts` is the one ZIP normalizer.** Both SAM and the assessor hand back
+  ZIPs that lost a leading zero to a numeric column, and SAM sometimes adds a +4. Import it;
+  do not write a second `padStart(5, '0')` anywhere.
+- **`searchQuery.ts` returns alternatives per term, not one string per term.**
+  `normalizeSearchQuery` gives back `string[][]`: the search ORs the spellings inside a term
+  and ANDs across terms, so "comm ave" matches both `Avenue` and `Ave` in stored addresses
+  without matching a building that has neither.
 - **`display.ts` holds a privacy gate.** `showMailingAddress` publishes a tax mailing
   address only for an owner that reads as an entity, and `mailingAddressLine` holds the
   addressee to the same test — an entity can list a person as its `C/O ATT`. It errs
