@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  errorRateBySource, getFillPaused, planRefresh, purgeFinished, queueStats, setFillPaused, topUpFill,
+  enqueue, errorRateBySource, getFillPaused, planRefresh, purgeFinished, queueStats, setFillPaused, topUpFill,
   REFRESH_AFTER_SECONDS, FINISHED_RETENTION_SECONDS, FILL_TARGET,
 } from '../records/queue';
+import type { RecordsDb, RecordsPreparedStatement } from '../records/types';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
+import type { TestD1Database } from './helpers/sqliteD1';
 
 const NOW = 1_800_000_000;
 const DAY = 86_400;
@@ -16,9 +18,41 @@ async function pull(db: ReturnType<typeof createRecordsTestDb>, buildingId: stri
     .run();
 }
 
-async function seeded(db: ReturnType<typeof createRecordsTestDb>, id: string, neighborhood: string, street: string, num: number) {
+async function seeded(db: ReturnType<typeof createRecordsTestDb>, id: string, neighborhood: string | null, street: string, num: number) {
   await insertBuilding(db, { id, slug: id, city: 'Boston' });
   await db.prepare("UPDATE buildings SET source = 'seed', neighborhood = ?, street_key = ?, st_num_lo = ?, st_num_hi = ? WHERE id = ?").bind(neighborhood, street, num, num, id).run();
+}
+
+/**
+ * Wraps the test db so `race` runs exactly once, immediately before the first
+ * `INSERT INTO records_queue` — the window in which another writer queues the building a
+ * planner has just decided to queue. The racing write goes through the raw db, outside the
+ * wrapper, so it is not itself intercepted.
+ */
+function raceBeforeInsert(db: TestD1Database, race: () => Promise<unknown>): RecordsDb {
+  let fired = false;
+  return {
+    prepare(sql: string): RecordsPreparedStatement {
+      const inner = db.prepare(sql);
+      const self: RecordsPreparedStatement = {
+        bind(...values: unknown[]) {
+          inner.bind(...(values as never[]));
+          return self;
+        },
+        first: <T>() => inner.first<T>(),
+        all: <T>() => inner.all<T>(),
+        async run() {
+          if (!fired && sql.startsWith('INSERT INTO records_queue')) {
+            fired = true;
+            await race();
+          }
+          return inner.run();
+        },
+      };
+      return self;
+    },
+    batch: (statements: RecordsPreparedStatement[]) => db.batch(statements as never),
+  };
 }
 
 describe('migration 0032 indexes', () => {
@@ -61,6 +95,38 @@ describe('planRefresh', () => {
     expect(rows.results.map((r) => r.building_id)).toEqual(['pressed', 'saved']);
   });
 
+  it('leaves an interesting stale building alone when it already has a pending row', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'b1' });
+    await db.prepare("INSERT INTO reviews (id, building_id, status) VALUES ('r1', 'b1', 'approved')").run();
+    await pull(db, 'b1', DEEPER[0], 'ok', NOW - REFRESH_AFTER_SECONDS - 1);
+    // Someone pressed the button an hour ago and it has not been drained yet. A refresh row
+    // would be a second pending row for the building, which 0031's partial unique index
+    // rejects outright, and the pull it is waiting for is the one it wanted anyway.
+    await enqueue(db, { buildingId: 'b1', reason: 'button', now: NOW - 3600 });
+    expect(await planRefresh(db, { now: NOW, deeperSourceIds: DEEPER })).toBe(0);
+    const rows = await db.prepare('SELECT reason FROM records_queue').all<{ reason: string }>();
+    expect(rows.results.map((r) => r.reason)).toEqual(['button']);
+  });
+
+  it('counts what it actually enqueued, not what it planned to', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'b1' });
+    await db.prepare("INSERT INTO reviews (id, building_id, status) VALUES ('r1', 'b1', 'approved')").run();
+    await pull(db, 'b1', DEEPER[0], 'ok', NOW - REFRESH_AFTER_SECONDS - 1);
+    // A reader presses the button between our SELECT and our INSERT: the row we planned is
+    // not ours to claim credit for, and the button row that won is the better one anyway.
+    const raced = raceBeforeInsert(db, () => enqueue(db, { buildingId: 'b1', reason: 'button', now: NOW }));
+    expect(await planRefresh(raced, { now: NOW, deeperSourceIds: DEEPER })).toBe(0);
+    const rows = await db.prepare('SELECT reason FROM records_queue').all<{ reason: string }>();
+    expect(rows.results.map((r) => r.reason)).toEqual(['button']);
+  });
+
+  it('refuses to run with no deeper sources rather than treating the city as fresh', async () => {
+    const db = createRecordsTestDb();
+    await expect(planRefresh(db, { now: NOW, deeperSourceIds: [] })).rejects.toThrow(/deeperSourceIds/);
+  });
+
   it('ignores a pending review and a building with no deeper pull at all', async () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'b1' });
@@ -89,6 +155,45 @@ describe('topUpFill', () => {
     expect(await topUpFill(db, { now: NOW, deeperSourceIds: DEEPER, target: 10 })).toBe(1);
     expect(FILL_TARGET).toBe(2000);
   });
+
+  it('re-enters an error-only building behind every never-pulled one, and leaves an empty pull alone', async () => {
+    const db = createRecordsTestDb();
+    await seeded(db, 'errored', 'Allston', 'A ST', 1);
+    await seeded(db, 'never', 'Roxbury', 'Z ST', 9);
+    await seeded(db, 'emptied', 'Allston', 'A ST', 3);
+    // Every deeper source threw for this one: nothing was learned about the building, so it
+    // is still uncovered and has to come back round — but behind buildings nobody has tried.
+    for (const source of DEEPER) await pull(db, 'errored', source, 'error', NOW - 100);
+    // 'empty' is an answer: the city has no permits for it. That building is done.
+    await pull(db, 'emptied', DEEPER[0], 'empty', NOW - 100);
+    expect(await topUpFill(db, { now: NOW, deeperSourceIds: DEEPER, target: 10 })).toBe(2);
+    const rows = await db.prepare("SELECT building_id FROM records_queue WHERE reason = 'fill' ORDER BY id").all<{ building_id: string }>();
+    // 'never' sorts after 'errored' by neighborhood, but has_any_pull leads the ORDER BY.
+    expect(rows.results.map((r) => r.building_id)).toEqual(['never', 'errored']);
+  });
+
+  it('sorts a seeded building with no neighborhood last', async () => {
+    const db = createRecordsTestDb();
+    await seeded(db, 'unplaced', null, 'A ST', 1);
+    await seeded(db, 'placed', 'Roxbury', 'Z ST', 99);
+    expect(await topUpFill(db, { now: NOW, deeperSourceIds: DEEPER, target: 10 })).toBe(2);
+    const rows = await db.prepare("SELECT building_id FROM records_queue WHERE reason = 'fill' ORDER BY id").all<{ building_id: string }>();
+    expect(rows.results.map((r) => r.building_id)).toEqual(['placed', 'unplaced']);
+  });
+
+  it('counts what it actually enqueued, not what it planned to', async () => {
+    const db = createRecordsTestDb();
+    await seeded(db, 's1', 'Allston', 'A ST', 1);
+    const raced = raceBeforeInsert(db, () => enqueue(db, { buildingId: 's1', reason: 'button', now: NOW }));
+    expect(await topUpFill(raced, { now: NOW, deeperSourceIds: DEEPER, target: 10 })).toBe(0);
+    const rows = await db.prepare('SELECT reason FROM records_queue').all<{ reason: string }>();
+    expect(rows.results.map((r) => r.reason)).toEqual(['button']);
+  });
+
+  it('refuses to run with no deeper sources rather than queueing the whole city', async () => {
+    const db = createRecordsTestDb();
+    await expect(topUpFill(db, { now: NOW, deeperSourceIds: [], target: 10 })).rejects.toThrow(/deeperSourceIds/);
+  });
 });
 
 describe('purgeFinished', () => {
@@ -116,6 +221,15 @@ describe('errorRateBySource', () => {
       { sourceId: 'permits-res', attempts: 5, errors: 3, rate: 0.6 },
     ]);
   });
+
+  it('reports nothing when no pull landed in the window, rather than a zero-attempt row', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'b1' });
+    await pull(db, 'b1', 'permits-res', 'error', NOW - 2 * DAY);
+    // An empty list is what the breaker needs to see: a source with no attempts has no rate,
+    // and inventing a 0-of-0 row would give it something to compare against MIN_ATTEMPTS.
+    expect(await errorRateBySource(db, { now: NOW, windowSeconds: DAY })).toEqual([]);
+  });
 });
 
 describe('fill pause flag and stats', () => {
@@ -128,6 +242,18 @@ describe('fill pause flag and stats', () => {
     expect(row).toEqual({ value: '1', updated_at: NOW });
     await setFillPaused(db, false, NOW + 1);
     expect(await getFillPaused(db)).toBe(false);
+  });
+
+  it('reports a null oldest age on an empty queue rather than an age since the epoch', async () => {
+    const db = createRecordsTestDb();
+    expect(await queueStats(db, { now: NOW })).toEqual({
+      pendingByReason: { button: 0, follower: 0, refresh: 0, fill: 0 },
+      parked: 0,
+      // MIN() over no rows is NULL, and `now - null` would render as an age of 55 years.
+      oldestPendingAgeSeconds: null,
+      completedLast24h: 0,
+      fillPaused: false,
+    });
   });
 
   it('summarizes the queue for the admin panel', async () => {

@@ -239,16 +239,19 @@ describe('completeRow / failRow', () => {
     expect(await queueRows(db)).toMatchObject([{ attempts: 0, locked_at: null, done_at: NOW + 3 }]);
   });
 
-  it('fail records the error and clears the lock without touching the claim count', async () => {
+  it('fail records the error, keeps the lease as the backoff, and does not touch the claim count', async () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'b1' });
     await enqueue(db, { buildingId: 'b1', reason: 'fill', now: NOW });
     const [row] = await claimBatch(db, { now: NOW, priorityMax: 2, limit: 1 });
     await failRow(db, row.id, 'boom');
-    expect(await queueRows(db)).toMatchObject([{ attempts: 1, locked_at: null, done_at: null }]);
+    expect(await queueRows(db)).toMatchObject([{ attempts: 1, locked_at: NOW, done_at: null }]);
     expect(await lastErrorOf(db, row.id)).toBe('boom');
-    // The lock is gone, so the next claim is immediate - and it counts as the second claim.
-    const [again] = await claimBatch(db, { now: NOW + 2, priorityMax: 2, limit: 1 });
+    // The lease is still running, so the failed row is not claimable again yet: that is the
+    // backoff. A row that fails every time therefore burns its MAX_ATTEMPTS over hours, not
+    // in one run, and the rows behind it keep moving in the meantime.
+    expect(await claimBatch(db, { now: NOW + 2, priorityMax: 2, limit: 1 })).toHaveLength(0);
+    const [again] = await claimBatch(db, { now: NOW + LOCK_TTL_SECONDS + 1, priorityMax: 2, limit: 1 });
     expect(again.attempts).toBe(2);
   });
 

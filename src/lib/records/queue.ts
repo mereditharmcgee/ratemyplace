@@ -38,6 +38,13 @@ export interface ClaimOptions {
   priorityMax: number;
   /** Lowest priority number to claim (inclusive). Defaults to 0. */
   priorityMin?: number;
+  /**
+   * How many rows to claim. Claim ONLY what this run will pull immediately: every claimed
+   * row counts an attempt whether or not it is pulled, so a caller that claims ten and pulls
+   * three has spent an attempt on seven rows for nothing, and three such runs park them for
+   * a human. The claim is a lease on work in flight, not a reservation for later. The drain
+   * claims one at a time for exactly this reason.
+   */
   limit: number;
 }
 
@@ -106,6 +113,12 @@ export async function enqueue(db: RecordsDb, input: EnqueueInput): Promise<{ sta
     return { status: 'queued' };
   }
   if (priority >= pending.priority) return { status: 'already_queued' };
+  // The replacement is a fresh row, so the parked row's `attempts` and `last_error` go with
+  // the old one. That is deliberate, not an oversight: a better priority means a person is
+  // waiting, and the history that parked the fill row is not a reason to refuse them. The
+  // new row gets its own MAX_ATTEMPTS. If the building is genuinely unpullable it parks
+  // again three tries later, with a current `last_error` instead of a stale one.
+  //
   // Delete and insert in ONE batch: the partial unique index on building_id would reject
   // the insert if the two ran as separate statements and the delete were rolled back.
   try {
@@ -179,14 +192,18 @@ export async function completeRow(db: RecordsDb, id: number, now: number): Promi
 }
 
 /**
- * Records why the pull failed and releases the lease so the retry is immediate rather than
- * LOCK_TTL_SECONDS away. It does NOT touch attempts — the claim already counted.
+ * Records why the pull failed and KEEPS the lease. It does NOT touch attempts — the claim
+ * already counted — and it does not clear `locked_at`.
+ *
+ * Holding the lease is the backoff, and it is free: the row is unclaimable until the lease
+ * expires on its own LOCK_TTL_SECONDS later, so a building that fails every time spends its
+ * MAX_ATTEMPTS over an hour and a half instead of inside one drain, and the rows behind it
+ * keep moving in the meantime. Clearing it would make "retry immediately" mean the very next
+ * claim, which is the opposite of what a failure asks for. An admin who wants a parked row
+ * tried now clears the lease from the retry endpoint; nothing else needs to.
  */
 export async function failRow(db: RecordsDb, id: number, error: string): Promise<void> {
-  await db
-    .prepare('UPDATE records_queue SET last_error = ?, locked_at = NULL WHERE id = ?')
-    .bind(truncateError(error), id)
-    .run();
+  await db.prepare('UPDATE records_queue SET last_error = ? WHERE id = ?').bind(truncateError(error), id).run();
 }
 
 /** A deeper pull older than this makes an interesting building due for a refresh. */
@@ -209,9 +226,25 @@ function placeholders(n: number): string {
 }
 
 /**
+ * An empty deeper-source list is a caller bug that both planners would answer plausibly and
+ * wrongly: `IN ()` is a SQLite syntax error, and even if it parsed, "no deeper sources" reads
+ * as every building being both permanently fresh (refresh does nothing) and never pulled
+ * (the fill queues the whole city). Neither is a state to discover in production.
+ */
+function requireDeeperSourceIds(fn: string, ids: string[]): void {
+  if (ids.length === 0) throw new Error(`${fn}: deeperSourceIds must not be empty`);
+}
+
+/**
  * Interesting buildings (an approved review, a saved-building row, or a finished button
  * pull) whose latest deeper pull is older than REFRESH_AFTER_SECONDS and which have no
- * pending row get a refresh row. Returns the number enqueued.
+ * pending row get a refresh row. Returns the number actually enqueued.
+ *
+ * The query drives off the interest set, not off `buildings`. The three ways a building
+ * becomes interesting are each a small indexed read, and their UNION is at most a few
+ * thousand ids; starting from `buildings` instead means asking three EXISTS questions of
+ * all 38,208 seeded rows to find them, every day, for a set that changes by a handful.
+ * UNION (not UNION ALL) deduplicates, so a building that is reviewed AND saved is one id.
  *
  * A building with NO deeper pull at all is skipped for free: MAX() over no rows is NULL,
  * and `NULL < ?` is NULL, not true, so the row never matches. Those buildings are the
@@ -219,46 +252,77 @@ function placeholders(n: number): string {
  */
 export async function planRefresh(db: RecordsDb, options: PlannerOptions): Promise<number> {
   const ids = options.deeperSourceIds;
+  requireDeeperSourceIds('planRefresh', ids);
   const rows = await db
     .prepare(
-      'SELECT b.id FROM buildings b ' +
-        "WHERE (EXISTS (SELECT 1 FROM reviews r WHERE r.building_id = b.id AND r.status = 'approved') " +
-        '   OR EXISTS (SELECT 1 FROM saved_buildings s WHERE s.building_id = b.id) ' +
-        "   OR EXISTS (SELECT 1 FROM records_queue q WHERE q.building_id = b.id AND q.reason = 'button' AND q.done_at IS NOT NULL)) " +
-        'AND NOT EXISTS (SELECT 1 FROM records_queue p WHERE p.building_id = b.id AND p.done_at IS NULL) ' +
-        `AND (SELECT MAX(retrieved_at) FROM record_pulls rp WHERE rp.building_id = b.id AND rp.source_id IN (${placeholders(ids.length)})) < ?`,
+      'WITH interest(id) AS (' +
+        "SELECT building_id FROM reviews WHERE status = 'approved' " +
+        'UNION SELECT building_id FROM saved_buildings ' +
+        "UNION SELECT building_id FROM records_queue WHERE reason = 'button' AND done_at IS NOT NULL" +
+        ') SELECT i.id FROM interest i ' +
+        'WHERE NOT EXISTS (SELECT 1 FROM records_queue p WHERE p.building_id = i.id AND p.done_at IS NULL) ' +
+        `AND (SELECT MAX(retrieved_at) FROM record_pulls rp WHERE rp.building_id = i.id AND rp.source_id IN (${placeholders(ids.length)})) < ?`,
     )
     .bind(...ids, options.now - REFRESH_AFTER_SECONDS)
     .all<{ id: string }>();
-  for (const row of rows.results) await enqueue(db, { buildingId: row.id, reason: 'refresh', now: options.now });
-  return rows.results.length;
+  return countEnqueued(db, rows.results, 'refresh', options.now);
 }
 
 /**
- * Tops the fill queue up to `target` pending rows from seeded buildings that have never had
- * a deeper pull and have no pending row, ordered so a neighborhood completes together.
- * `neighborhood IS NULL` leads the ORDER BY because SQLite sorts NULLs first by default and
- * an unplaced building should not jump ahead of a named neighborhood.
+ * Enqueues each planned building and counts only the rows that landed. A planner's SELECT
+ * and its inserts are not one transaction, so a reader pressing the button in between wins
+ * and `enqueue` reports `already_queued` — a row someone else queued is not this run's work,
+ * and the daily log should not claim it.
+ */
+async function countEnqueued(db: RecordsDb, rows: { id: string }[], reason: QueueReason, now: number): Promise<number> {
+  let queued = 0;
+  for (const row of rows) {
+    const result = await enqueue(db, { buildingId: row.id, reason, now });
+    if (result.status === 'queued') queued += 1;
+  }
+  return queued;
+}
+
+/**
+ * Tops the fill queue up to `target` pending rows from seeded buildings that are not yet
+ * covered and have no pending row, ordered so a neighborhood completes together. Returns the
+ * number actually enqueued.
+ *
+ * "Covered" means at least one deeper pull that came back `ok` or `empty` — an answer. A
+ * building whose every deeper pull errored learned nothing about the city, so it re-enters
+ * the fill rather than being written off by a bad afternoon at data.boston.gov. It re-enters
+ * BEHIND every building nobody has tried, which is what `has_any_pull` leads the ORDER BY
+ * for: first coverage beats a retry, and a source that is down for a week cannot spend the
+ * whole fill re-failing the same buildings. `empty` is an answer, not a miss — the city
+ * having no permits for a building is exactly what the panel wants to show — so an `empty`
+ * pull ends the building's time in the fill.
+ *
+ * `neighborhood IS NULL` sits next because SQLite sorts NULLs first by default and an
+ * unplaced building should not jump ahead of a named neighborhood.
  */
 export async function topUpFill(db: RecordsDb, options: PlannerOptions & { target?: number }): Promise<number> {
+  const ids = options.deeperSourceIds;
+  requireDeeperSourceIds('topUpFill', ids);
   const target = options.target ?? FILL_TARGET;
   const pending = await db
     .prepare("SELECT COUNT(*) AS n FROM records_queue WHERE reason = 'fill' AND done_at IS NULL")
     .first<{ n: number }>();
   const room = target - (pending?.n ?? 0);
   if (room <= 0) return 0;
-  const ids = options.deeperSourceIds;
+  const inList = placeholders(ids.length);
   const rows = await db
     .prepare(
-      "SELECT b.id FROM buildings b WHERE b.source = 'seed' " +
+      'SELECT b.id, ' +
+        `EXISTS (SELECT 1 FROM record_pulls rp WHERE rp.building_id = b.id AND rp.source_id IN (${inList})) AS has_any_pull ` +
+        "FROM buildings b WHERE b.source = 'seed' " +
         'AND NOT EXISTS (SELECT 1 FROM records_queue q WHERE q.building_id = b.id AND q.done_at IS NULL) ' +
-        `AND NOT EXISTS (SELECT 1 FROM record_pulls rp WHERE rp.building_id = b.id AND rp.source_id IN (${placeholders(ids.length)})) ` +
-        'ORDER BY b.neighborhood IS NULL, b.neighborhood, b.street_key, b.st_num_lo, b.id LIMIT ?',
+        'AND NOT EXISTS (SELECT 1 FROM record_pulls rp WHERE rp.building_id = b.id ' +
+        `AND rp.source_id IN (${inList}) AND rp.status IN ('ok','empty')) ` +
+        'ORDER BY has_any_pull, b.neighborhood IS NULL, b.neighborhood, b.street_key, b.st_num_lo, b.id LIMIT ?',
     )
-    .bind(...ids, room)
+    .bind(...ids, ...ids, room)
     .all<{ id: string }>();
-  for (const row of rows.results) await enqueue(db, { buildingId: row.id, reason: 'fill', now: options.now });
-  return rows.results.length;
+  return countEnqueued(db, rows.results, 'fill', options.now);
 }
 
 /** Finished refresh and fill rows are bookkeeping; finished button rows are the record that a reader asked. */

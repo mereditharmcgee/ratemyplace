@@ -33,12 +33,18 @@ function fixtureResult(overrides: Partial<FixtureResult> = {}): FixtureResult {
   };
 }
 
-type TestDeps = SchedulerDeps & { alerts: string[]; pulled: string[]; logs: string[] };
+interface LoggedEvent {
+  event: string;
+  context: Record<string, unknown>;
+}
+
+type TestDeps = SchedulerDeps & { alerts: string[]; pulled: string[]; logs: string[]; logged: LoggedEvent[] };
 
 function deps(db: TestD1Database, overrides: Partial<SchedulerDeps> = {}): TestDeps {
   const alerts: string[] = [];
   const pulled: string[] = [];
   const logs: string[] = [];
+  const logged: LoggedEvent[] = [];
   return {
     db,
     now: () => NOW,
@@ -50,12 +56,14 @@ function deps(db: TestD1Database, overrides: Partial<SchedulerDeps> = {}): TestD
     alert: async (subject, body) => {
       alerts.push(`${subject}\n${body}`);
     },
-    log: (event) => {
+    log: (event, context) => {
       logs.push(event);
+      logged.push({ event, context });
     },
     alerts,
     pulled,
     logs,
+    logged,
     ...overrides,
   };
 }
@@ -129,7 +137,9 @@ describe('drain', () => {
     const row = await db
       .prepare("SELECT attempts, last_error, locked_at, done_at FROM records_queue WHERE building_id = 'p1'")
       .first<{ attempts: number; last_error: string; locked_at: number | null; done_at: number | null }>();
-    expect(row).toEqual({ attempts: 1, last_error: 'network down', locked_at: null, done_at: null });
+    // The lease survives the failure: it is the retry backoff, so the row is not claimable
+    // again until it expires. See failRow.
+    expect(row).toEqual({ attempts: 1, last_error: 'network down', locked_at: NOW, done_at: null });
     expect(d.logs).toEqual(['records_queue_pull_failed']);
   });
 
@@ -187,6 +197,11 @@ describe('plan', () => {
       alerted: false,
     });
     expect(d.alerts).toEqual([]);
+    // The daily numbers are the only record of what the plan did; nothing else logs them.
+    expect(d.logged).toContainEqual({
+      event: 'records_plan_enqueued',
+      context: { purged: 0, refreshEnqueued: 0, fillEnqueued: 1 },
+    });
   });
 
   it('stores the fixture result under the scheduler setting key on a healthy run', async () => {

@@ -89,12 +89,11 @@ interface DrainFailure {
  * flight. Claiming the whole tick's worth up front would date every lease from the start of
  * the run, and the last row's lease would already be minutes old before its pull began.
  *
- * Failures are recorded at the END of the run, not as they happen. `failRow` clears the
- * lease so the retry is immediate, and "immediate" here would mean the very next claim in
- * this same loop: one unreachable building would be claimed three times in one tick and park
- * itself, while the rows behind it never ran. Holding the lease until the loop is done makes
- * "immediate" mean the next tick, a minute later, which is what it is meant to mean. If the
- * run dies before the flush, the lease still expires on its own after LOCK_TTL_SECONDS.
+ * Failures are recorded at the END of the run, not as they happen: the backoff is the lease,
+ * which `failRow` deliberately leaves running, and flushing after the loop keeps the failed
+ * row out of this tick's own claims as well. Belt and braces — either alone would do. If the
+ * run dies before the flush the lease still expires on its own after LOCK_TTL_SECONDS, and
+ * the row is retried then.
  */
 export async function drain(deps: SchedulerDeps): Promise<DrainResult> {
   const fillPaused = await getFillPaused(deps.db);
@@ -191,6 +190,10 @@ export async function plan(deps: SchedulerDeps): Promise<PlanResult> {
   const purged = await purgeFinished(deps.db, { now });
   const refreshEnqueued = await planRefresh(deps.db, { now, deeperSourceIds: DEEPER_SOURCE_IDS });
   const fillEnqueued = await topUpFill(deps.db, { now, deeperSourceIds: DEEPER_SOURCE_IDS });
+  // Rows that actually landed, not rows planned: a reader who pressed the button between a
+  // planner's SELECT and its insert owns that row, and this line is the only lasting record
+  // of how the day's fill went.
+  deps.log('records_plan_enqueued', { purged, refreshEnqueued, fillEnqueued });
 
   const fixture = await deps.fixture();
   await writeSetting(
