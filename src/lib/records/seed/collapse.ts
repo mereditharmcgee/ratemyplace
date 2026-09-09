@@ -46,7 +46,9 @@ export function collapseAssessorRows(rows: Iterable<AssessorRow>, sam: ReadonlyM
       skipped.push({ pid: textOrNull(row.PID), reason: 'no_parcel' });
       continue;
     }
-    if (!isSeedParcelRow(row)) {
+    // Named explicitly: `AssessorRow`'s index signature does not satisfy the filter's
+    // `Pick<AssessorRow, 'LU' | 'LU_DESC'>`, which requires both keys to be present.
+    if (!isSeedParcelRow({ LU: row.LU, LU_DESC: row.LU_DESC })) {
       skipped.push({ pid, reason: 'land_use' });
       continue;
     }
