@@ -126,3 +126,42 @@ export async function ckanSql<T>(sql: string, fetchImpl: FetchLike): Promise<T[]
     clearTimeout(timer);
   }
 }
+
+export const CKAN_SEARCH_ENDPOINT = 'https://data.boston.gov/api/3/action/datastore_search';
+/** data.boston.gov caps datastore_search at 32,000 rows per request (verified 2026-09-09). */
+export const CKAN_MAX_PAGE = 32_000;
+
+export interface FetchAllRowsOptions {
+  /** Columns to return; omit for all. Always name them: `_full_text` alone doubles the payload. */
+  fields?: string[];
+  /** Equality filters; an array value means IN. Sent as CKAN's JSON `filters` parameter. */
+  filters?: Record<string, string | string[]>;
+  pageSize?: number;
+  onPage?: (rowsSoFar: number) => void;
+}
+
+/**
+ * Bulk download of one datastore resource through the paged `datastore_search` action.
+ * Used by the seed script, never by a request handler. `filters` and `fields` are
+ * parameters, not interpolated SQL, so nothing here needs sqlLiteral.
+ */
+export async function fetchAllRows<T>(resourceId: string, options: FetchAllRowsOptions, fetchImpl: FetchLike): Promise<T[]> {
+  const pageSize = options.pageSize ?? CKAN_MAX_PAGE;
+  const rows: T[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const params = new URLSearchParams({ resource_id: resourceId, limit: String(pageSize), offset: String(offset) });
+    if (options.fields) params.set('fields', options.fields.join(','));
+    if (options.filters) params.set('filters', JSON.stringify(options.filters));
+    const response = await fetchImpl(`${CKAN_SEARCH_ENDPOINT}?${params.toString()}`, { method: 'GET' });
+    const body = (await response.json()) as { success?: boolean; result?: { records?: T[] }; error?: { message?: string } };
+    if (!response.ok || !body.success || !body.result?.records) {
+      throw new Error(`CKAN datastore_search failed for ${resourceId} at offset ${offset}: ${body.error?.message ?? response.status}`);
+    }
+    rows.push(...body.result.records);
+    // A resource whose row count is an exact multiple of the page size ends with one
+    // empty page; that page is how the loop learns it is done, not progress to report.
+    if (body.result.records.length > 0) options.onPage?.(rows.length);
+    if (body.result.records.length < pageSize) break;
+  }
+  return rows;
+}
