@@ -91,19 +91,29 @@ export function auditActionTypesFrom0028(): string[] {
 
 export async function insertBuilding(
   db: TestD1Database,
-  overrides: Partial<{ id: string; address: string; slug: string; city: string; zip_code: string; parcel_id: string | null }> = {},
+  overrides: Partial<{
+    id: string;
+    address: string;
+    slug: string;
+    city: string;
+    state: string;
+    zip_code: string;
+    parcel_id: string | null;
+    sam_id: string | null;
+  }> = {},
 ): Promise<string> {
   const id = overrides.id ?? 'bldg-lanark';
   await db
-    .prepare('INSERT INTO buildings (id, address, slug, city, state, zip_code, parcel_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .prepare('INSERT INTO buildings (id, address, slug, city, state, zip_code, parcel_id, sam_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
     .bind(
       id,
       overrides.address ?? '23-27 Lanark Rd, Boston, MA 02135',
       overrides.slug ?? id,
       overrides.city ?? 'Boston',
-      'MA',
+      overrides.state ?? 'MA',
       overrides.zip_code ?? '02135',
       overrides.parcel_id ?? null,
+      overrides.sam_id ?? null,
     )
     .run();
   return id;

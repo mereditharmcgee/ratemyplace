@@ -1,3 +1,13 @@
+// The pull queue: one pending row per building, leased to a Worker run by a conditional UPDATE.
+//
+// `attempts` counts CLAIMS, not caught failures. `claimBatch` increments it as part of the
+// same UPDATE that takes the lease, `completeRow` resets it to 0, and `failRow` only records
+// why the pull went wrong. That is deliberate: a row whose pull kills the runner outright —
+// an OOM, a CPU-limit kill, anything that never reaches a catch — would otherwise be claimed
+// forever, and the runner it kills is the one thing that cannot report the failure. Counting
+// claims means such a row parks itself after MAX_ATTEMPTS and waits for a human, while a row
+// that merely fails cleanly still gets its MAX_ATTEMPTS tries and a `last_error` each time.
+import { truncateError } from './pull';
 import type { RecordsDb } from './types';
 import type { BuildingRowForIdentity } from './identity';
 
@@ -5,11 +15,16 @@ export type QueueReason = 'button' | 'follower' | 'refresh' | 'fill';
 
 /** Lower runs first. Button and follower are a person waiting; refresh keeps interest fresh; fill is the city-wide pass. */
 export const PRIORITY: Record<QueueReason, number> = { button: 0, follower: 0, refresh: 1, fill: 2 };
-/** A lock older than this is a Worker run that died mid-pull; the row is claimable again. */
-export const LOCK_TTL_SECONDS = 600;
-/** After this many thrown pulls the row is parked for a human. Per-source errors do not count. */
+/**
+ * A lock older than this is a Worker run that died mid-pull; the row is claimable again.
+ * The drain claims one row at a time immediately before pulling it, and a single pull's
+ * worst case is about 20 requests at the 10s per-source timeout — call it 200s. Half an
+ * hour is comfortably clear of that, and it is the delay before a genuinely dead run's row
+ * is retried, so there is nothing to gain by cutting it fine.
+ */
+export const LOCK_TTL_SECONDS = 1800;
+/** After this many claims the row is parked for a human. See the claim-counting note above. */
 export const MAX_ATTEMPTS = 3;
-const MAX_ERROR_LENGTH = 500;
 
 export interface EnqueueInput {
   buildingId: string;
@@ -30,6 +45,7 @@ export interface ClaimedRow {
   id: number;
   buildingId: string;
   reason: QueueReason;
+  /** Claims including this one, so a row on its last try before parking reads MAX_ATTEMPTS. */
   attempts: number;
   building: BuildingRowForIdentity;
 }
@@ -54,6 +70,20 @@ interface CandidateRow {
 }
 
 /**
+ * 0031's partial unique index rejects a second pending row for the building. Two callers
+ * pressing the button at once both read "no pending row" and both insert; the loser lands
+ * here, and a row someone else just queued is exactly what `already_queued` means.
+ *
+ * Matched on the message because that is all D1 gives us — it wraps the SQLite text as
+ * "D1_ERROR: UNIQUE constraint failed: records_queue.building_id: SQLITE_CONSTRAINT", so
+ * the table-and-column substring is the stable part. Any other failure is a real bug and
+ * must not be swallowed as "someone else got there first".
+ */
+function isPendingRowConflict(err: unknown): boolean {
+  return err instanceof Error && err.message.includes('UNIQUE constraint failed: records_queue.building_id');
+}
+
+/**
  * One pending row per building (0031's partial unique index). A request at a better
  * priority than the pending row replaces it in one batch; anything else is a no-op.
  */
@@ -67,22 +97,39 @@ export async function enqueue(db: RecordsDb, input: EnqueueInput): Promise<{ sta
     .prepare('INSERT INTO records_queue (building_id, reason, priority, requested_at) VALUES (?, ?, ?, ?)')
     .bind(input.buildingId, input.reason, priority, input.now);
   if (!pending) {
-    await insert.run();
+    try {
+      await insert.run();
+    } catch (err) {
+      if (isPendingRowConflict(err)) return { status: 'already_queued' };
+      throw err;
+    }
     return { status: 'queued' };
   }
   if (priority >= pending.priority) return { status: 'already_queued' };
   // Delete and insert in ONE batch: the partial unique index on building_id would reject
   // the insert if the two ran as separate statements and the delete were rolled back.
-  await db.batch([db.prepare('DELETE FROM records_queue WHERE id = ? AND done_at IS NULL').bind(pending.id), insert]);
+  try {
+    await db.batch([db.prepare('DELETE FROM records_queue WHERE id = ? AND done_at IS NULL').bind(pending.id), insert]);
+  } catch (err) {
+    // Someone replaced the pending row we read: our DELETE matched nothing, so the INSERT
+    // met their row instead. The whole batch rolled back and theirs stands.
+    if (isPendingRowConflict(err)) return { status: 'already_queued' };
+    throw err;
+  }
   return { status: 'queued' };
 }
 
 /**
  * Claims up to `limit` pending rows in (priority, requested_at) order by setting locked_at
- * with a conditional UPDATE per row, so two overlapping Worker runs cannot both take one.
- * Rows locked within LOCK_TTL_SECONDS and rows at MAX_ATTEMPTS are skipped.
+ * and bumping attempts with a conditional UPDATE per row, so two overlapping Worker runs
+ * cannot both take one. Rows locked within LOCK_TTL_SECONDS and rows at MAX_ATTEMPTS are
+ * skipped.
  */
 export async function claimBatch(db: RecordsDb, options: ClaimOptions): Promise<ClaimedRow[]> {
+  // A fractional or negative limit is a caller bug that SQLite would answer with a datatype
+  // mismatch or a surprise; NaN and Infinity are bugs it would answer with a whole queue.
+  if (!Number.isFinite(options.limit)) throw new Error(`claimBatch: limit must be a finite number, got ${options.limit}`);
+  const limit = Math.max(0, Math.floor(options.limit));
   const staleBefore = options.now - LOCK_TTL_SECONDS;
   // Over-fetch: a concurrent run may win some of these conditional updates, so the
   // candidate list has to be longer than the number of rows we intend to claim.
@@ -93,13 +140,16 @@ export async function claimBatch(db: RecordsDb, options: ClaimOptions): Promise<
         'WHERE q.done_at IS NULL AND q.priority BETWEEN ? AND ? AND q.attempts < ? AND (q.locked_at IS NULL OR q.locked_at < ?) ' +
         'ORDER BY q.priority, q.requested_at, q.id LIMIT ?',
     )
-    .bind(options.priorityMin ?? 0, options.priorityMax, MAX_ATTEMPTS, staleBefore, options.limit * 2)
+    .bind(options.priorityMin ?? 0, options.priorityMax, MAX_ATTEMPTS, staleBefore, limit * 2)
     .all<CandidateRow>();
   const claimed: ClaimedRow[] = [];
   for (const row of candidates.results) {
-    if (claimed.length >= options.limit) break;
+    if (claimed.length >= limit) break;
     const result = await db
-      .prepare('UPDATE records_queue SET locked_at = ? WHERE id = ? AND done_at IS NULL AND (locked_at IS NULL OR locked_at < ?)')
+      .prepare(
+        'UPDATE records_queue SET locked_at = ?, attempts = attempts + 1 ' +
+          'WHERE id = ? AND done_at IS NULL AND (locked_at IS NULL OR locked_at < ?)',
+      )
       .bind(options.now, row.id, staleBefore)
       .run();
     if (!Number(result.meta?.changes ?? 0)) continue;
@@ -107,7 +157,8 @@ export async function claimBatch(db: RecordsDb, options: ClaimOptions): Promise<
       id: row.id,
       buildingId: row.building_id,
       reason: row.reason,
-      attempts: row.attempts,
+      // The candidate SELECT ran before the UPDATE, so the stored count is one higher.
+      attempts: row.attempts + 1,
       building: {
         id: row.building_id,
         address: row.address,
@@ -122,15 +173,19 @@ export async function claimBatch(db: RecordsDb, options: ClaimOptions): Promise<
   return claimed;
 }
 
+/** Resets attempts: the claim that finished proved the row is not the one killing runners. */
 export async function completeRow(db: RecordsDb, id: number, now: number): Promise<void> {
-  await db.prepare('UPDATE records_queue SET done_at = ?, locked_at = NULL WHERE id = ?').bind(now, id).run();
+  await db.prepare('UPDATE records_queue SET done_at = ?, locked_at = NULL, attempts = 0 WHERE id = ?').bind(now, id).run();
 }
 
+/**
+ * Records why the pull failed and releases the lease so the retry is immediate rather than
+ * LOCK_TTL_SECONDS away. It does NOT touch attempts — the claim already counted.
+ */
 export async function failRow(db: RecordsDb, id: number, error: string): Promise<void> {
-  const message = error.length > MAX_ERROR_LENGTH ? `${error.slice(0, MAX_ERROR_LENGTH - 1)}…` : error;
   await db
-    .prepare('UPDATE records_queue SET attempts = attempts + 1, last_error = ?, locked_at = NULL WHERE id = ?')
-    .bind(message, id)
+    .prepare('UPDATE records_queue SET last_error = ?, locked_at = NULL WHERE id = ?')
+    .bind(truncateError(error), id)
     .run();
 }
 
