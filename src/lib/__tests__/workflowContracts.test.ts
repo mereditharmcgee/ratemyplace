@@ -180,10 +180,29 @@ const getWorkflowRunCommands = (workflow: string, jobName: string) => {
   return commands;
 };
 
+// The audit gate is scripts/audit-critical.mjs: `npm audit` cannot except one advisory, and
+// a critical with no fix short of a major framework upgrade would otherwise block every PR.
+// The script fails on any unlisted critical or an expired allowlist entry, so this test
+// holds the allowlist to the same rule: every entry says why and until when.
+const assertAuditAllowlist = () => {
+  const entries = JSON.parse(readRepositoryFile('audit-allowlist.json')) as Array<Record<string, unknown>>;
+  expect(Array.isArray(entries)).toBe(true);
+  const today = new Date().toISOString().slice(0, 10);
+  for (const entry of entries) {
+    expect(entry.id).toMatch(/^GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}$/);
+    expect(typeof entry.package).toBe('string');
+    expect(String(entry.reason).length).toBeGreaterThan(40);
+    expect(entry.added).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(entry.expires).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(String(entry.expires) >= today).toBe(true);
+  }
+};
+
 const assertCiAuditGate = (ci: string) => {
-  const auditCommand = 'npm audit --audit-level=critical';
+  const auditCommand = 'node scripts/audit-critical.mjs';
   const runCommands = getWorkflowRunCommands(ci, 'quality');
-  expect(runCommands.filter((command) => command.includes(auditCommand))).toEqual([auditCommand]);
+  expect(runCommands.filter((command) => command.includes('audit'))).toEqual([auditCommand]);
+  assertAuditAllowlist();
 
   const commandPositions = [
     'npm ci',
@@ -377,8 +396,8 @@ describe('release workflow contracts', () => {
 
   it('rejects audit text left only in a YAML comment', () => {
     const ciWithoutAudit = readWorkflow('ci.yml').replace(
-      '      - name: Audit critical vulnerabilities\n        run: npm audit --audit-level=critical\n',
-      '      # run: npm audit --audit-level=critical\n',
+      '      - name: Audit critical vulnerabilities\n        run: node scripts/audit-critical.mjs\n',
+      '      # run: node scripts/audit-critical.mjs\n',
     );
 
     expect(() => assertCiAuditGate(ciWithoutAudit)).toThrow();
@@ -386,12 +405,12 @@ describe('release workflow contracts', () => {
 
   it('rejects audit text left only in a non-executable block scalar', () => {
     const ciWithoutAudit = readWorkflow('ci.yml').replace(
-      '      - name: Audit critical vulnerabilities\n        run: npm audit --audit-level=critical\n',
+      '      - name: Audit critical vulnerabilities\n        run: node scripts/audit-critical.mjs\n',
       [
         '      - name: Preserve audit command as data',
         '        env:',
         '          NOTE: |',
-        '            run: npm audit --audit-level=critical',
+        '            run: node scripts/audit-critical.mjs',
         '        run: echo "$NOTE"',
         '',
       ].join('\n'),

@@ -1,0 +1,10 @@
+[
+  {
+    "id": "GHSA-26w7-cxv4-gfx2",
+    "package": "astro",
+    "title": "Remote code execution through AVIF image optimization",
+    "reason": "Only reachable when Astro's Sharp image service optimizes an untrusted AVIF. This app never calls Sharp, uses no astro:assets or <Image>, stores verification uploads in R2 unprocessed, and Sharp cannot run inside a Cloudflare Worker; Sharp is a build-time dependency only. Fix requires Astro 7.2.8+ (we are on 5.x); the Astro 7 upgrade is tracked as its own task.",
+    "added": "2026-09-09",
+    "expires": "2026-12-31"
+  }
+]

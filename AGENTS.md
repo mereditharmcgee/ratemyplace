@@ -244,6 +244,11 @@ user value goes through that module's local `escapeHtml`. Send with
 
 Things that have already cost time. Read before debugging.
 
+- **The CI audit gate has an allowlist.** `scripts/audit-critical.mjs` fails on any critical
+  npm advisory not listed in `audit-allowlist.json`; each entry carries the reason it does
+  not apply to this deployment and an expiry date, after which CI fails again. Added
+  2026-09-09 for the Astro AVIF advisory (GHSA-26w7-cxv4-gfx2), which needs Astro 7 to
+  fix. Never add an entry without a reason and a date.
 - **Preview deploys cannot exercise Turnstile or the map.** The Turnstile sitekey is not
   allowlisted for `pages.dev`, and preview has no Maps key. Verify those widgets on
   production only — a failure in preview is expected, not a bug.
