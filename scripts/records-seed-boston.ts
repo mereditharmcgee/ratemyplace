@@ -12,9 +12,12 @@
  *
  * Idempotent: re-running updates assessor-owned fields and never creates a twin. Downloads
  * are cached in .cache/ for a day; pass --refresh to re-download.
+ *
+ * `--from N` (N > 1) applies the batch files already under .cache/seed/ and regenerates
+ * nothing. See `existingBatchFiles` for why that is the whole point of the flag.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fetchAllRows } from '../src/lib/records/ckan';
 import { SEED_LAND_USES, isSeedParcelRow, normalizeLandUse } from '../src/lib/records/seed/filters';
@@ -39,12 +42,20 @@ function option(name: string): string | null {
   return inline ? inline.slice(name.length + 3) : null;
 }
 
-/** 1-based batch file to resume applying at, for a run that died partway through. */
-function fromFile(): number {
+/**
+ * 1-based batch file to resume applying at, for a run that died partway through; null when
+ * the flag is absent.
+ *
+ * A bare `--from` throws rather than meaning 1. The flag exists to skip work, so reading a
+ * missing value as "start at the beginning" turns a typo into a silent full re-apply — and
+ * with the resume path below, into regenerating nothing and applying every file again.
+ */
+function fromFile(): number | null {
+  if (!args.has('--from') && !argv.some((a) => a.startsWith('--from='))) return null;
   const raw = option('from');
-  if (raw === null) return 1;
+  if (raw === null || raw.startsWith('--')) throw new Error(`--from needs a batch file number starting at 1, got ${raw === null ? 'nothing' : JSON.stringify(raw)}`);
   const n = Number.parseInt(raw, 10);
-  if (!Number.isInteger(n) || n < 1) throw new Error(`--from takes a batch file number starting at 1, got ${JSON.stringify(raw)}`);
+  if (!Number.isInteger(n) || n < 1 || String(n) !== raw.trim()) throw new Error(`--from takes a batch file number starting at 1, got ${JSON.stringify(raw)}`);
   return n;
 }
 const CACHE_DIR = join(process.cwd(), '.cache');
@@ -169,16 +180,62 @@ function tookCollisionSuffix(slug: string): boolean {
   return /-boston-\d+$/.test(slug);
 }
 
+function batchFilePath(n: number): string {
+  return join(SEED_DIR, `seed-boston-${String(n).padStart(3, '0')}.sql`);
+}
+
+/**
+ * Write the plan out as numbered batch files, and delete any higher-numbered file a
+ * previous, larger run left behind — otherwise a later `--from` resume would apply stale
+ * statements from a plan nobody is running any more.
+ */
+function writeBatchFiles(statements: readonly string[]): string[] {
+  mkdirSync(SEED_DIR, { recursive: true });
+  const files: string[] = [];
+  for (let i = 0; i < statements.length; i += STATEMENTS_PER_FILE) {
+    const path = batchFilePath(files.length + 1);
+    writeFileSync(path, statements.slice(i, i + STATEMENTS_PER_FILE).join('\n') + '\n');
+    files.push(path);
+  }
+  for (let n = files.length + 1; existsSync(batchFilePath(n)); n += 1) rmSync(batchFilePath(n));
+  log(`  wrote ${statements.length} statements to ${files.length} files under .cache/seed/`);
+  return files;
+}
+
+/**
+ * The batch files already on disk, for a `--from` resume. Nothing is regenerated: the
+ * downloads are cached for a day, so a run resumed the next morning re-downloads a fresher
+ * assessor extract, and one added or removed parcel shifts every later building across the
+ * 999-statement boundaries. The files the earlier run was applying are the only ones whose
+ * numbering the `--from` cursor still describes, so a resume applies exactly those.
+ */
+function existingBatchFiles(from: number): string[] {
+  const files: string[] = [];
+  for (let n = 1; existsSync(batchFilePath(n)); n += 1) files.push(batchFilePath(n));
+  if (files.length === 0) {
+    throw new Error(`--from ${from} resumes batch files already written, but ${SEED_DIR} holds none. Re-run without --from to generate them.`);
+  }
+  if (files.length < from) {
+    throw new Error(`--from ${from} is past the last batch file in ${SEED_DIR} (${files.length}). Re-run without --from to regenerate them.`);
+  }
+  log(`  reusing ${files.length} batch files already under .cache/seed/ (not regenerated)`);
+  return files;
+}
+
 async function main(): Promise<void> {
   const dryRun = !flag('write') && !flag('apply');
-  fromFile(); // Parsed up front so a bad --from fails before the download, not after it.
+  // Parsed up front so a bad --from fails before the download, not after it.
+  const from = fromFile();
+  if (from !== null && !flag('apply')) throw new Error('--from resumes an apply; pass --apply --local or --apply --remote with it.');
   log(`\nSeed Boston buildings (${dryRun ? 'dry run' : flag('apply') ? `apply ${target()}` : 'write files'})\n`);
 
+  // `sort: '_id'` on both downloads: CKAN promises no order without it, so two pages of one
+  // download can repeat or drop a row, and the batch files stop being reproducible.
   const assessor = await cached('assessor-fy2026', () =>
-    fetchAllRows<AssessorRow>(FY2026_RESOURCE_ID, { fields: [...ASSESSOR_SEED_FIELDS], filters: { LU: [...SEED_LAND_USES] }, onPage: (n) => log(`  assessor rows: ${n}`) }, fetchImpl),
+    fetchAllRows<AssessorRow>(FY2026_RESOURCE_ID, { fields: [...ASSESSOR_SEED_FIELDS], filters: { LU: [...SEED_LAND_USES] }, sort: '_id', onPage: (n) => log(`  assessor rows: ${n}`) }, fetchImpl),
   );
   const sam = await cached('sam-addresses', () =>
-    fetchAllRows<SamRow>(SAM_RESOURCE_ID, { fields: [...SAM_FIELDS], onPage: (n) => log(`  SAM rows: ${n}`) }, fetchImpl),
+    fetchAllRows<SamRow>(SAM_RESOURCE_ID, { fields: [...SAM_FIELDS], sort: '_id', onPage: (n) => log(`  SAM rows: ${n}`) }, fetchImpl),
   );
   log(`  downloaded ${assessor.length} assessor rows and ${sam.length} SAM rows`);
 
@@ -233,33 +290,37 @@ async function main(): Promise<void> {
   const listed = heldBack.slice(0, HELD_BACK_LISTED);
   log(`  parcels held back for hand review: ${heldBack.length}${listed.length > 0 ? ` (${listed.join(', ')}${heldBack.length > listed.length ? ', …' : ''})` : ''}`);
   log(`  slugs that needed a collision suffix: ${created.filter((c) => tookCollisionSuffix(c.slug)).length}`);
+  // What a complete apply of this plan leaves behind, so the count reported at the end is
+  // checkable rather than merely large.
+  const expected = created.length + match.matched.length;
+  log(`  expected ${expected} buildings written by the seed (${created.length} created + ${match.matched.length} matched)`);
 
   if (dryRun) {
     log('\nDry run complete. Nothing written.');
     return;
   }
 
-  const statements = seedStatements({ created, matched: match.matched });
-  mkdirSync(SEED_DIR, { recursive: true });
-  const files: string[] = [];
-  for (let i = 0; i < statements.length; i += STATEMENTS_PER_FILE) {
-    const path = join(SEED_DIR, `seed-boston-${String(files.length + 1).padStart(3, '0')}.sql`);
-    writeFileSync(path, statements.slice(i, i + STATEMENTS_PER_FILE).join('\n') + '\n');
-    files.push(path);
-  }
-  log(`  wrote ${statements.length} statements to ${files.length} files under .cache/seed/`);
+  // A resume applies the files the earlier run wrote; only a fresh run regenerates them.
+  const files = from !== null && from > 1 ? existingBatchFiles(from) : writeBatchFiles(seedStatements({ created, matched: match.matched }));
 
   if (!flag('apply')) return;
-  const from = fromFile();
-  if (from > files.length) throw new Error(`--from ${from} is past the last batch file (${files.length})`);
-  if (from > 1) log(`  resuming at batch file ${from} of ${files.length}`);
+  const start = from ?? 1;
+  if (start > files.length) throw new Error(`--from ${start} is past the last batch file (${files.length})`);
+  if (start > 1) log(`  resuming at batch file ${start} of ${files.length}`);
   for (const [index, path] of files.entries()) {
-    if (index + 1 < from) continue;
+    if (index + 1 < start) continue;
     log(`  applying ${index + 1}/${files.length} ${target()}`);
     execFileSync('npx', ['wrangler', 'd1', 'execute', DB_NAME, target(), '--file', path].map(shellArg), { stdio: 'inherit', shell: true });
   }
-  const after = wranglerJson<{ n: number }>([target(), '--command', "SELECT COUNT(*) AS n FROM buildings WHERE source = 'seed'"]);
-  log(`\nDone. Seeded buildings in ${target()} database: ${after[0]?.n}`);
+  // Two counts, because a matched building keeps `source = 'user'`: the seed writes to it
+  // but did not create it. The pull row is what every building the seed wrote has in common,
+  // so that is the number `expected` can be compared against.
+  const after = wranglerJson<{ seeded: number; written: number }>([
+    target(),
+    '--command',
+    "SELECT (SELECT COUNT(*) FROM buildings WHERE source = 'seed') AS seeded, (SELECT COUNT(DISTINCT building_id) FROM record_pulls WHERE trigger_reason = 'seed') AS written",
+  ]);
+  log(`\nDone. Seeded buildings in ${target()} database: ${after[0]?.seeded}; buildings written by the seed: ${after[0]?.written}, expected ${expected}.`);
 }
 
 main().catch((err) => {

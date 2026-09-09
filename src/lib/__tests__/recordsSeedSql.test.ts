@@ -103,7 +103,9 @@ describe('seedStatements', () => {
     expect(b).toEqual({ address: '23 Lanark Rd', slug: 'twenty-three-lanark', source: 'user', unit_count: 13 });
     const pulls = await db.prepare("SELECT COUNT(*) AS n, MIN(retrieved_at) AS at FROM record_pulls WHERE building_id = 'b1'").first<{ n: number; at: number }>();
     expect(pulls?.n).toBe(1);
-    expect(pulls!.at).toBeGreaterThan(100);
+    // Not just "moved past 100": the re-stamp has to be now, so a pull row that only
+    // nudged forward would still fail this.
+    expect(pulls!.at).toBeGreaterThanOrEqual(Math.floor(Date.now() / 1000) - 60);
     const records = await db.prepare("SELECT COUNT(*) AS n FROM building_records WHERE building_id = 'b1'").first<{ n: number }>();
     expect(records?.n).toBe(1);
     const record = await db.prepare("SELECT payload FROM building_records WHERE building_id = 'b1'").first<{ payload: string }>();

@@ -146,6 +146,13 @@ export interface FetchAllRowsOptions {
   fields?: string[];
   /** Equality filters; an array value means IN. Sent as CKAN's JSON `filters` parameter. */
   filters?: Record<string, string | string[]>;
+  /**
+   * CKAN's `sort` parameter, e.g. `'_id'`. Without it the datastore does not promise a
+   * stable order across the requests of one download, so a row can appear on two pages or
+   * on none — which a resumed run then turns into buildings that moved between batch
+   * files. `_id` is CKAN's own insertion key and is present on every datastore resource.
+   */
+  sort?: string;
   pageSize?: number;
   onPage?: (rowsSoFar: number) => void;
   /** Per-request timeout; defaults to `CKAN_PAGE_TIMEOUT_MS`. */
@@ -228,6 +235,7 @@ export async function fetchAllRows<T>(resourceId: string, options: FetchAllRowsO
     const params = new URLSearchParams({ resource_id: resourceId, limit: String(pageSize), offset: String(offset) });
     if (options.fields) params.set('fields', options.fields.join(','));
     if (options.filters) params.set('filters', JSON.stringify(options.filters));
+    if (options.sort) params.set('sort', options.sort);
     const url = `${CKAN_SEARCH_ENDPOINT}?${params.toString()}`;
     const where = `CKAN datastore_search failed for ${resourceId} at offset ${offset}`;
 

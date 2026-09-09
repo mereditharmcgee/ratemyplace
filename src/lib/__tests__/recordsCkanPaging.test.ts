@@ -39,6 +39,19 @@ describe('fetchAllRows', () => {
     expect(decodeURIComponent(urls[0])).toContain('filters={"LU":["A","R2"]}');
   });
 
+  it('sends sort on every page so the order is the same one the caller resumes into', async () => {
+    const { fetchImpl, urls } = fakeCkan(5, 2);
+    await fetchAllRows('res-1', { pageSize: 2, sort: '_id' }, fetchImpl);
+    expect(urls).toHaveLength(3);
+    for (const url of urls) expect(decodeURIComponent(url)).toContain('sort=_id');
+  });
+
+  it('omits sort when the caller asks for no particular order', async () => {
+    const { fetchImpl, urls } = fakeCkan(2, 2);
+    await fetchAllRows('res-1', { pageSize: 2 }, fetchImpl);
+    expect(urls[0]).not.toContain('sort=');
+  });
+
   it('asks for JSON explicitly', async () => {
     const seen: (RequestInit | undefined)[] = [];
     const fetchImpl: FetchLike = async (_input, init) => {

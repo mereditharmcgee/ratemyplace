@@ -1,5 +1,6 @@
 import { textOrNull } from '../ckan';
 import { isDegenerateStreet, splitSuffix } from '../identity';
+import { normalizeLandUse } from './filters';
 
 /**
  * Title-case one word, splitting on an apostrophe or hyphen so both halves of a joined
@@ -117,9 +118,13 @@ const BUILDING_TYPE_BY_LU: Record<string, string> = {
  * already rejected every code that is not in the table, so an unrecognized code here means
  * the filter and this map have drifted, and a loud failure beats silently seeding a
  * mislabeled building.
+ *
+ * Normalized through `normalizeLandUse`, the same function the filter used, so this map
+ * sees exactly the string the filter accepted — a second normalizer here is how the two
+ * drift and a parcel passes the filter only to throw on its own code.
  */
 export function buildingTypeFor(landUse: unknown): string {
-  const code = textOrNull(landUse)?.toUpperCase();
+  const code = normalizeLandUse(landUse);
   const type = code ? BUILDING_TYPE_BY_LU[code] : undefined;
   if (!type) throw new Error(`Unrecognized land use for a seed building type: ${JSON.stringify(landUse)}`);
   return type;
