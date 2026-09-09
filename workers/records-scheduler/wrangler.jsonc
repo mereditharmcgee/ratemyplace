@@ -9,8 +9,17 @@
 		"nodejs_compat"
 	],
 	"workers_dev": false,
+	// Workers Logs: without this, `wrangler tail` is the only way to see a run, and only
+	// while you are watching. With it, the structured lines the handler writes are queryable
+	// after the fact — which is the whole point of logging an unattended cron.
+	"observability": {
+		"enabled": true
+	},
 	"triggers": {
 		// Every minute: drain. 06:00 UTC daily: plan (refresh, fill top-up, purge, breaker).
+		// The two overlap at 06:00 and that is fine — they are separate invocations, the
+		// plan takes no locks, and every claim the drain makes is a conditional UPDATE, so
+		// the worst case is one tick claiming a row the plan enqueued a second earlier.
 		"crons": [
 			"* * * * *",
 			"0 6 * * *"
@@ -24,9 +33,9 @@
 		}
 	],
 	"vars": {
-		"SITE_URL": "https://ratemyplace.org",
-		"RECORDS_ALERT_EMAIL": "meredith.ar.mcgee@gmail.com"
+		"SITE_URL": "https://ratemyplace.org"
 	}
-	// Secret, set once:
+	// Secrets, set once each (the alert address is a secret so it is not in git):
 	// npx wrangler secret put RESEND_API_KEY --config workers/records-scheduler/wrangler.jsonc
+	// npx wrangler secret put RECORDS_ALERT_EMAIL --config workers/records-scheduler/wrangler.jsonc
 }

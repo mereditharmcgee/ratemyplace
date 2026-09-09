@@ -15,17 +15,42 @@ package against the `node:sqlite` D1 double.
 | Cron | Runs | What it does |
 |---|---|---|
 | `* * * * *` | every minute | `drain` — claims up to 3 people-facing rows plus 1 city-wide fill row, pulls each building's records for real, logs `records_drain`. Skips the fill row entirely while the fill is paused. |
-| `0 6 * * *` | 06:00 UTC daily | `plan` — enqueues refreshes, tops the fill queue back up, purges finished rows, runs the Lanark fixture and the source error-rate check, trips the circuit breaker (pausing the fill and emailing once) if either fails. Logs `records_plan`. |
+| `0 6 * * *` | 06:00 UTC daily | `plan` — in this order: purges finished rows, enqueues refreshes, tops the fill queue back up, runs the Lanark fixture and the source error-rate check, then trips the circuit breaker (pausing the fill and emailing once) if either fails. The order is the point: the breaker is judged on the day's pulls and stops the fill before the next drain. Logs `records_plan`. |
 
 A pull is roughly twenty requests to `data.boston.gov`, so a full minute tick is about
 eighty requests. That rate is deliberate: it is polite against a public CKAN endpoint, and
 it makes the city-wide fill take months rather than hammering the city in an afternoon.
 
+At 06:00 UTC the two crons overlap. That is by design and it is safe: they are separate
+invocations, `plan` holds no locks, and every row `drain` claims is claimed with a
+conditional `UPDATE ... WHERE done_at IS NULL AND (locked_at IS NULL OR locked_at < ?)`, so
+the worst the overlap can do is have that minute's drain pick up a row the planner enqueued
+a second earlier — which is the intended behaviour anyway.
+
+## Where the logs are
+
 Both handlers write one structured JSON line per run (`records_drain` / `records_plan`),
-plus `records_scheduler_error` if the run throws and `records_breaker_email_failed` if the
-alert email does not send.
+plus `records_scheduler_error` if the run throws, `records_breaker_email_failed` if the
+alert email does not send, `records_breaker_email_skipped` if `RECORDS_ALERT_EMAIL` was
+never set, and `records_scheduler_unknown_cron` if a cron fires that `src/index.ts` does not
+recognise. Those four go to `console.error`, so they surface as errors in the dashboard
+rather than as one more line to scroll past.
+
+`"observability": { "enabled": true }` in `wrangler.jsonc` turns on Workers Logs, which
+retains those lines for the account plan's retention window (days, not weeks — check the
+current number in the Cloudflare docs before relying on it) and makes them searchable under
+Workers → `ratemyplace-records-scheduler` → Logs, where you can filter on `event` or `level`
+to find a run after the fact. Without the setting, `wrangler tail` is the only way to see
+anything, and only while you are sitting there watching it. A failed run also shows up as a
+red row in the Worker's Cron Events tab, which is why `scheduled()` rethrows instead of
+swallowing: an unattended cron has no other alarm.
 
 ## Running it locally
+
+**Stop the site dev server first.** `npm run dev` and `npm run records:worker` both open the
+same local D1 SQLite file under `.wrangler/state`, and two writers on one file give you
+`SQLITE_BUSY` mid-drain — a confusing failure that has nothing to do with the code you are
+testing. Run one at a time.
 
 From the repo root, against the local seeded D1 under `.wrangler/state`:
 
@@ -69,10 +94,16 @@ the pause flag has to be on production *before* the Worker is.
    ```
    Confirm it reads back as `1`. People-facing rows still drain while paused; only the
    city-wide fill is held.
-2. **Set the Resend secret** (once per Worker, not shared with Pages):
+2. **Set both secrets** (once per Worker; Worker secrets are not shared with Pages, so these
+   are separate from the site's):
    ```bash
    npx wrangler secret put RESEND_API_KEY --config workers/records-scheduler/wrangler.jsonc
+   npx wrangler secret put RECORDS_ALERT_EMAIL --config workers/records-scheduler/wrangler.jsonc
    ```
+   `RECORDS_ALERT_EMAIL` is the address the breaker alert goes to. It is a secret rather
+   than a `vars` entry so a personal address is not committed to git. Miss it and the
+   breaker still pauses the fill — it just logs `records_breaker_email_skipped` at error
+   level instead of emailing anyone, which is a silence you would only notice too late.
 3. **Deploy:**
    ```bash
    npm run records:worker:deploy
@@ -104,4 +135,6 @@ this deploy.
   The queue tables live in D1 and survive; nothing drains them until a scheduler is back.
 
 The circuit breaker does the first of these on its own if the Lanark fixture fails or a
-source's error rate crosses the threshold, and emails `RECORDS_ALERT_EMAIL` once.
+source's error rate crosses the threshold, and emails `RECORDS_ALERT_EMAIL` once. That
+email is plain text and ends with `$SITE_URL/admin/records`, so unpausing is one tap from
+the alert on a phone.
