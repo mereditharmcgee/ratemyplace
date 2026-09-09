@@ -154,7 +154,38 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   circuit breaker calls `runLanarkFixture`, which pulls in `seed/sam.ts` for the SAM check.
   Both files — and anything either imports — must stay runtime-agnostic: no `node:` imports,
   no `fs`/`path`/`process`, nothing that only exists under tsx. The rest of `seed/` is
-  script-only and has no such constraint.
+  script-only and has no such constraint. The fixture runs all eleven Boston sources
+  concurrently and applies the results in source order afterwards, so two runs compare label
+  for label; it never throws, because the breaker needs a result, not an exception.
+- **`queue.ts` is the pull queue, and `attempts` counts CLAIMS, not failures.** One pending
+  row per building (0031's partial unique index). `claimBatch` takes a lease by conditional
+  `UPDATE`, incrementing `attempts` as it goes; `completeRow` resets it to 0; `failRow`
+  records `last_error` and deliberately **keeps** the lock, because holding the lease *is*
+  the backoff — the row is unclaimable until `LOCK_TTL_SECONDS` (1800) expires. A row parks
+  for a human at three claims. Counting claims rather than failures is what stops a building
+  whose pull kills the runner outright — an OOM, a CPU-limit kill — from being claimed
+  forever by the one process that cannot report it. The admin retry endpoint refuses a row
+  whose lease is still live with a 409 rather than starting a second concurrent pull.
+- **`scheduler.ts` is pure functions over injected dependencies.** `SchedulerDeps` carries
+  the db, clock, pull, fixture, alert, and log, so `drain` and `plan` are unit-tested against
+  the `node:sqlite` D1 double and `workers/records-scheduler/` stays a wiring file. `drain`
+  claims **one row at a time immediately before pulling it**, so a lease covers a request
+  genuinely in flight. The circuit breaker lives at the end of `plan`, not in the Worker: it
+  trips on any fixture failure or on a source with at least 20 attempts and over 50% errors
+  in 24 hours (the assessor years are counted on purpose — parcel resolution runs through
+  the assessor, so its outage fails every other source), pauses the fill, and emails once.
+  It never unpauses.
+- **`settings.ts` owns three `app_settings` keys** — `records_fill_paused`,
+  `records_breaker_last_alert`, `records_fixture_last` — and is a leaf module that imports
+  only `./types`, so an admin route can read a flag without dragging the whole pull stack
+  into the request path. Import `SETTING_KEYS`; do not retype a key string.
+- **`errors.ts` is the one place a failure becomes a stored string.** `record_pulls.error_message`
+  and `records_queue.last_error` are provenance, not a log, and they must read the same;
+  `truncateError` caps both at 500 characters and will not leave half a surrogate pair behind.
+- **`trigger_reason` on `record_pulls`** says what caused a pull: `admin`, `correction`,
+  `seed`, or `queue:button` / `queue:follower` / `queue:refresh` / `queue:fill`. It is a
+  plain column, not a user reference — `triggered_by` is a `users(id)` foreign key and stays
+  NULL for everything the Worker does.
 - **`identity.ts`** turns a `buildings` row into every address form worth querying
   (short and long, range and split, directional stripped) plus both parcel forms. The
   feeds disagree about how an address is stored; normalization lives here, not in the
