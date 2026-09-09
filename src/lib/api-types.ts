@@ -381,3 +381,34 @@ export interface RecordCorrection {
   building_address: string;
   building_slug: string;
 }
+
+/**
+ * GET /api/admin/records/queue — the pull queue at a glance. Mirrors `QueueStats`
+ * in lib/records/queue.ts, which is the server-side source of truth; this copy
+ * exists so the admin panel does not import the queue module (and its SQL) into
+ * the browser bundle.
+ *
+ * `pendingByReason` counts claimable rows only — a row that has exhausted its
+ * attempts is counted once, under `parked`.
+ */
+export interface RecordsQueueStats {
+  pendingByReason: Record<'button' | 'follower' | 'refresh' | 'fill', number>;
+  parked: number;
+  oldestPendingAgeSeconds: number | null;
+  completedLast24h: number;
+  fillPaused: boolean;
+}
+
+/**
+ * One parked `records_queue` row joined to its building: a pull that failed its
+ * way out of the queue and is waiting for an admin to press Retry.
+ */
+export interface RecordsQueueParkedRow {
+  id: number;
+  reason: string;
+  attempts: number;
+  last_error: string | null;
+  requested_at: number;
+  address: string;
+  slug: string;
+}
