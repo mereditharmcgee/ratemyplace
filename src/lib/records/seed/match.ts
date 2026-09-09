@@ -39,6 +39,21 @@ export interface MatchResult {
  * disagreeing parcel id is reported, not resolved. Parcel ids are canonicalized on both
  * sides before any comparison, since the two feeds disagree about the leading zero.
  */
+/**
+ * A parcel range contains an address range when the numbers fall inside it AND, for a
+ * parcel whose two ends share parity, the address shares that parity too. Boston numbers
+ * the two sides of a street separately: "61-69 Chiswick Rd" is the odd side, so 66 is not
+ * in it even though 61 <= 66 <= 69. A parcel with mixed-parity ends ("6-9") spans both
+ * sides and contains every number in between.
+ */
+export function rangeContains(parcel: { numLo: number; numHi: number }, key: { numLo: number; numHi: number }): boolean {
+  if (!(parcel.numLo <= key.numLo && key.numHi <= parcel.numHi)) return false;
+  const parcelParity = parcel.numLo % 2;
+  const singleSide = parcel.numLo !== parcel.numHi && parcelParity === parcel.numHi % 2;
+  if (!singleSide) return true;
+  return key.numLo % 2 === parcelParity && key.numHi % 2 === parcelParity;
+}
+
 export function matchExistingBuildings(existing: readonly ExistingBuilding[], parcels: readonly SeedBuilding[]): MatchResult {
   const byStreet = new Map<string, SeedBuilding[]>();
   const byParcel = new Map<string, SeedBuilding>();
@@ -75,7 +90,7 @@ export function matchExistingBuildings(existing: readonly ExistingBuilding[], pa
       continue;
     }
     const candidates = byStreet.get(key.streetKey) ?? [];
-    const contained = candidates.filter((p) => p.numLo <= key.numLo && key.numHi <= p.numHi);
+    const contained = candidates.filter((p) => rangeContains(p, key));
 
     if (contained.length > 1) {
       // Same street, same number, two parcels: only the ZIP can separate them, and only
