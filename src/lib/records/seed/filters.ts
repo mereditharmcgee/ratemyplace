@@ -24,8 +24,12 @@ export const HOUSING_A_DESCRIPTIONS = [
 const HOUSING_A = new Set<string>(HOUSING_A_DESCRIPTIONS);
 const ALWAYS = new Set<string>(['R2', 'R3', 'R4', 'RC']);
 
+/**
+ * `textOrNull` already trims, so this only has to collapse the internal whitespace the
+ * assessor is inconsistent about ('SUBSD HOUSING S-  8' has two spaces in some rows).
+ */
 function norm(value: unknown): string {
-  return (textOrNull(value) ?? '').trim().toUpperCase();
+  return (textOrNull(value) ?? '').replace(/\s+/g, ' ').toUpperCase();
 }
 
 /** Whether one assessor row belongs in the seed. Pure; the row shape is whatever CKAN returned. */
