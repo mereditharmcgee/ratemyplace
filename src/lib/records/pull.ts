@@ -9,6 +9,7 @@
 // that changes is one added error pull row. That is what makes a re-pull safe to trigger
 // from anywhere: the worst case is a stale source, never a building whose records were
 // half-replaced.
+import { errorMessage, truncateError } from './errors';
 import { buildIdentity, toNumericParcel, type BuildingRowForIdentity } from './identity';
 import { jurisdictionForCity, sourcesForCity } from './jurisdictions';
 import { ASSESSOR_YEARS, resolveParcel, type ParcelResolution } from './sources/boston/assessor';
@@ -41,9 +42,6 @@ export interface PullOptions {
   fetchImpl?: FetchLike;
 }
 
-/** error_message is provenance, not a log: enough to diagnose, short enough not to bloat the row. */
-export const MAX_ERROR_LENGTH = 500;
-
 const PULL_INSERT_SQL =
   'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, row_count, error_message, triggered_by, correction_id, trigger_reason) ' +
   'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
@@ -63,23 +61,6 @@ interface PullRowValues {
   triggeredBy: string | null;
   correctionId: string | null;
   triggerReason: TriggerReason | null;
-}
-
-/** Shared with the queue, so `record_pulls.error_message` and `records_queue.last_error` read the same. */
-export function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-/** The ellipsis is part of the budget: a cut message is MAX_ERROR_LENGTH characters, or one fewer per the note below. */
-export function truncateError(message: string): string {
-  if (message.length <= MAX_ERROR_LENGTH) return message;
-  const cut = message.slice(0, MAX_ERROR_LENGTH - 1);
-  // The cut can fall between a surrogate pair and leave a lone high surrogate: half a
-  // character, which renders as a replacement glyph and does not survive a JSON round
-  // trip. Drop it. That message is then one under budget, which nothing depends on.
-  const last = cut.charCodeAt(cut.length - 1);
-  const whole = last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
-  return `${whole}…`;
 }
 
 function pullRowStatement(db: RecordsDb, values: PullRowValues): RecordsPreparedStatement {

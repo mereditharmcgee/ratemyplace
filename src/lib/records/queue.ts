@@ -7,7 +7,7 @@
 // forever, and the runner it kills is the one thing that cannot report the failure. Counting
 // claims means such a row parks itself after MAX_ATTEMPTS and waits for a human, while a row
 // that merely fails cleanly still gets its MAX_ATTEMPTS tries and a `last_error` each time.
-import { truncateError } from './pull';
+import { truncateError } from './errors';
 import type { QueueReason, RecordsDb } from './types';
 import type { BuildingRowForIdentity } from './identity';
 

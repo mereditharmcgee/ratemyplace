@@ -3,7 +3,8 @@
 // alert, log — so the whole scheduler is unit-tested against the node:sqlite D1 double and
 // the Worker stays a five-line `scheduled()` handler over `liveDeps`.
 import { sourcesForCity } from './jurisdictions';
-import { errorMessage, pullBuildingRecords, type PullOptions } from './pull';
+import { errorMessage } from './errors';
+import { pullBuildingRecords, type PullOptions } from './pull';
 import {
   claimBatch,
   completeRow,

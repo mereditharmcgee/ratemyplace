@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { claimBatch, completeRow, enqueue, failRow, MAX_ATTEMPTS, LOCK_TTL_SECONDS } from '../records/queue';
-import { MAX_ERROR_LENGTH } from '../records/pull';
+import { MAX_ERROR_LENGTH } from '../records/errors';
 import { buildIdentity } from '../records/identity';
 import type { RecordsDb, RecordsPreparedStatement } from '../records/types';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';

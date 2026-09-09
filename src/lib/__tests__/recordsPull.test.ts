@@ -24,7 +24,7 @@ const BOSTON_SOURCE_COUNT = 11;
 
 const ADMIN_ID = 'admin-1';
 
-/** pull.ts's MAX_ERROR_LENGTH, kept literal so a change to the budget surfaces here. */
+/** errors.ts's MAX_ERROR_LENGTH, kept literal so a change to the budget surfaces here. */
 const MAX_ERROR_LENGTH = 500;
 
 /**
