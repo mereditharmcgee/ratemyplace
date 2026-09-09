@@ -188,9 +188,6 @@ export function applyRecordsMigrations(db: TestD1Database): void {
   }
 }
 ```
-
-Remove the two throwaway lines in the last test (`const cols = ...` and its `expect`); they were a placeholder while writing and add nothing.
-
 - [ ] **Step 5: Run the test and the whole suite**
 
 Run: `npx vitest run migration0031` then `npm test`
