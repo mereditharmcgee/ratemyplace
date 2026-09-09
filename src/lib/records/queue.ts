@@ -273,6 +273,10 @@ export async function planRefresh(db: RecordsDb, options: PlannerOptions): Promi
  * and its inserts are not one transaction, so a reader pressing the button in between wins
  * and `enqueue` reports `already_queued` — a row someone else queued is not this run's work,
  * and the daily log should not claim it.
+ *
+ * The refresh planner uses this row-by-row path on purpose. It plans a handful of rows a day
+ * and `enqueue`'s priority replacement is the behavior it wants; the fill, which plans up to
+ * FILL_TARGET, has its own batched path below.
  */
 async function countEnqueued(db: RecordsDb, rows: { id: string }[], reason: QueueReason, now: number): Promise<number> {
   let queued = 0;
@@ -283,10 +287,53 @@ async function countEnqueued(db: RecordsDb, rows: { id: string }[], reason: Queu
   return queued;
 }
 
+/** Inserts per `db.batch` call. D1 takes far more; this is the size that keeps one statement list sane. */
+export const FILL_INSERT_BATCH = 100;
+
+/**
+ * The fill-only insert. `fill` is the WORST priority there is, so it can never usefully
+ * replace a pending row the way `enqueue` can — "there is already a pending row" and
+ * "do nothing" are the same answer here. That makes the whole SELECT-then-insert dance in
+ * `enqueue` redundant for the fill, and lets the insert be a plain conflict-skip that a
+ * batch can carry.
+ *
+ * The conflict target names 0031's partial unique index, WHERE clause included: without it
+ * SQLite has no index to match and rejects the statement. The interpolated priority is a
+ * code constant read straight off PRIORITY, so the two cannot drift; nothing else in this
+ * SQL is anything but a bound value.
+ */
+const FILL_INSERT_SQL =
+  `INSERT INTO records_queue (building_id, reason, priority, requested_at) VALUES (?, 'fill', ${PRIORITY.fill}, ?) ` +
+  'ON CONFLICT(building_id) WHERE done_at IS NULL DO NOTHING';
+
+/**
+ * Sums `meta.changes` over a batch result, which is how many inserts actually landed: a row
+ * skipped by the conflict clause reports 0. Both D1 and the test double return one result
+ * per statement, in order.
+ */
+function changedRows(results: unknown): number {
+  if (!Array.isArray(results)) {
+    throw new Error('topUpFill: db.batch did not return per-statement results, so the enqueued count would be a guess');
+  }
+  let changed = 0;
+  for (const result of results) changed += Number((result as { meta?: { changes?: number } } | null)?.meta?.changes ?? 0);
+  return changed;
+}
+
+/** Inserts the planned fill rows in batches and returns how many landed. */
+async function insertFillRows(db: RecordsDb, rows: { id: string }[], now: number): Promise<number> {
+  let queued = 0;
+  for (let start = 0; start < rows.length; start += FILL_INSERT_BATCH) {
+    const chunk = rows.slice(start, start + FILL_INSERT_BATCH);
+    queued += changedRows(await db.batch(chunk.map((row) => db.prepare(FILL_INSERT_SQL).bind(row.id, now))));
+  }
+  return queued;
+}
+
 /**
  * Tops the fill queue up to `target` pending rows from seeded buildings that are not yet
  * covered and have no pending row, ordered so a neighborhood completes together. Returns the
- * number actually enqueued.
+ * number actually enqueued, counted off the inserts that landed — see `insertFillRows`.
  *
  * "Covered" means at least one deeper pull that came back `ok` or `empty` — an answer. A
  * building whose every deeper pull errored learned nothing about the city, so it re-enters
@@ -322,7 +369,7 @@ export async function topUpFill(db: RecordsDb, options: PlannerOptions & { targe
     )
     .bind(...ids, ...ids, room)
     .all<{ id: string }>();
-  return countEnqueued(db, rows.results, 'fill', options.now);
+  return insertFillRows(db, rows.results, options.now);
 }
 
 /** Finished refresh and fill rows are bookkeeping; finished button rows are the record that a reader asked. */

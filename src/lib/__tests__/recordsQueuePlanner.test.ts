@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   enqueue, errorRateBySource, getFillPaused, planRefresh, purgeFinished, queueStats, setFillPaused, topUpFill,
-  REFRESH_AFTER_SECONDS, FINISHED_RETENTION_SECONDS, FILL_TARGET,
+  REFRESH_AFTER_SECONDS, FINISHED_RETENTION_SECONDS, FILL_TARGET, FILL_INSERT_BATCH,
 } from '../records/queue';
 import type { RecordsDb, RecordsPreparedStatement } from '../records/types';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
@@ -52,6 +52,21 @@ function raceBeforeInsert(db: TestD1Database, race: () => Promise<unknown>): Rec
       return self;
     },
     batch: (statements: RecordsPreparedStatement[]) => db.batch(statements as never),
+  };
+}
+
+/** Wraps the test db and records how many statements each `batch` call carried. */
+function countingBatch(db: TestD1Database): { db: RecordsDb; sizes: number[] } {
+  const sizes: number[] = [];
+  return {
+    sizes,
+    db: {
+      prepare: (sql: string) => db.prepare(sql) as unknown as RecordsPreparedStatement,
+      batch(statements: RecordsPreparedStatement[]) {
+        sizes.push(statements.length);
+        return db.batch(statements as never);
+      },
+    },
   };
 }
 
@@ -188,6 +203,42 @@ describe('topUpFill', () => {
     expect(await topUpFill(raced, { now: NOW, deeperSourceIds: DEEPER, target: 10 })).toBe(0);
     const rows = await db.prepare('SELECT reason FROM records_queue').all<{ reason: string }>();
     expect(rows.results.map((r) => r.reason)).toEqual(['button']);
+  });
+
+  it('inserts in batches of FILL_INSERT_BATCH and counts the rows that landed', async () => {
+    const db = createRecordsTestDb();
+    const total = 250;
+    for (let i = 0; i < total; i += 1) await seeded(db, `s${String(i).padStart(3, '0')}`, 'Allston', 'A ST', i + 1);
+
+    // A day's top-up is up to FILL_TARGET rows. One round trip per row is 2,000 of them
+    // against D1 in a Worker's daily tick; these are 3.
+    const counted = countingBatch(db);
+    expect(await topUpFill(counted.db, { now: NOW, deeperSourceIds: DEEPER, target: total })).toBe(total);
+    expect(counted.sizes).toEqual([FILL_INSERT_BATCH, FILL_INSERT_BATCH, total - 2 * FILL_INSERT_BATCH]);
+
+    const rows = await db
+      .prepare("SELECT COUNT(*) AS n FROM records_queue WHERE reason = 'fill' AND done_at IS NULL")
+      .first<{ n: number }>();
+    expect(rows?.n).toBe(total);
+  });
+
+  it('skips a building that gained a pending row after the SELECT, without duplicating it', async () => {
+    const db = createRecordsTestDb();
+    await seeded(db, 's1', 'Allston', 'A ST', 1);
+    await seeded(db, 's2', 'Allston', 'A ST', 2);
+    // The button row lands after the candidate SELECT and before the insert. The partial
+    // unique index would reject a second pending row outright, so the insert has to skip it
+    // — and skipping it means it is not this run's work to count.
+    const raced = raceBeforeInsert(db, () => enqueue(db, { buildingId: 's1', reason: 'button', now: NOW }));
+    expect(await topUpFill(raced, { now: NOW, deeperSourceIds: DEEPER, target: 10 })).toBe(1);
+
+    const rows = await db
+      .prepare('SELECT building_id, reason FROM records_queue ORDER BY building_id')
+      .all<{ building_id: string; reason: string }>();
+    expect(rows.results).toEqual([
+      { building_id: 's1', reason: 'button' },
+      { building_id: 's2', reason: 'fill' },
+    ]);
   });
 
   it('refuses to run with no deeper sources rather than queueing the whole city', async () => {
