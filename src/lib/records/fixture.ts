@@ -1,4 +1,4 @@
-import { fetchAllRows } from './ckan';
+import { FETCH_TIMEOUT_MS, fetchAllRows } from './ckan';
 import { buildIdentity } from './identity';
 import { sourcesForCity } from './jurisdictions';
 import { SAM_FIELDS, SAM_RESOURCE_ID, indexSamByParcel } from './seed/sam';
@@ -19,12 +19,25 @@ export interface FixtureCheck {
   detail: string;
 }
 
+export interface FixtureOptions {
+  /** Per-request timeout for the direct SAM fetch; defaults to `FETCH_TIMEOUT_MS`. */
+  timeoutMs?: number;
+  /** Injected so tests exercise the SAM retry path without waiting out the backoff. */
+  sleep?: (ms: number) => Promise<void>;
+}
+
 export interface FixtureResult {
   checks: FixtureCheck[];
+  /** Checks that came back not-ok. Reported separately from `failures` so a caller can say "N checks failed, M sources threw". */
+  checksFailed: number;
+  /** `checksFailed` plus `sourceErrors.length` — the one number that decides pass/fail. */
   failures: number;
   /** Sources whose run() threw, by label. A thrown source is a failure in its own right. */
   sourceErrors: Array<{ label: string; message: string }>;
+  /** Row count per source label, for the sources that ran. A source that threw is absent, not zero. */
+  rowsBySource: Record<string, number>;
   parcelId: string | null;
+  condominium: boolean;
 }
 
 /** 23-27 Lanark Rd, Brighton: the one address every Boston adapter is verified against. */
@@ -58,7 +71,7 @@ function messageOf(err: unknown): string {
  * recorded failure carrying the reason, never a skipped check, so two runs compare label
  * for label.
  */
-export async function runLanarkFixture(fetchImpl: FetchLike): Promise<FixtureResult> {
+export async function runLanarkFixture(fetchImpl: FetchLike, options: FixtureOptions = {}): Promise<FixtureResult> {
   const checks: FixtureCheck[] = [];
   const sourceErrors: FixtureResult['sourceErrors'] = [];
   const check = (label: string, ok: boolean, detail: string): void => {
@@ -223,7 +236,18 @@ export async function runLanarkFixture(fetchImpl: FetchLike): Promise<FixtureRes
   try {
     const samRows = await fetchAllRows<SamRow>(
       SAM_RESOURCE_ID,
-      { fields: [...SAM_FIELDS], filters: { PARCEL_ID: LANARK_FIXTURE.parcelId } },
+      {
+        fields: [...SAM_FIELDS],
+        filters: { PARCEL_ID: LANARK_FIXTURE.parcelId },
+        // fetchAllRows defaults to the 120s bulk-page budget, sized for a 32,000-row
+        // download. This is a one-row filtered query, so it gets the single-building
+        // budget instead: a hung SAM request must not hold the breaker's run open for
+        // two minutes per attempt.
+        timeoutMs: options.timeoutMs ?? FETCH_TIMEOUT_MS,
+        // The 1s + 4s retry backoff stays — a blip at data.boston.gov must not trip the
+        // breaker — but tests inject a no-op sleep so they do not wait it out.
+        sleep: options.sleep,
+      },
       fetchImpl,
     );
     const samPoint = indexSamByParcel(samRows).get(LANARK_FIXTURE.parcelId);
@@ -239,6 +263,18 @@ export async function runLanarkFixture(fetchImpl: FetchLike): Promise<FixtureRes
   }
   check('SAM primary point for Lanark: id 83763, Brighton, inside Boston', samOk, samDetail);
 
-  const failures = checks.filter((c) => !c.ok).length + sourceErrors.length;
-  return { checks, failures, sourceErrors, parcelId: identity.parcelId };
+  const rowsBySource: Record<string, number> = {};
+  for (const [label, rows] of rowsBySourceLabel) rowsBySource[label] = rows.length;
+
+  const checksFailed = checks.filter((c) => !c.ok).length;
+  const failures = checksFailed + sourceErrors.length;
+  return {
+    checks,
+    checksFailed,
+    failures,
+    sourceErrors,
+    rowsBySource,
+    parcelId: identity.parcelId,
+    condominium: identity.condominium,
+  };
 }

@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { LANARK_FIXTURE, runLanarkFixture } from '../records/fixture';
+import { sourcesForCity } from '../records/jurisdictions';
 import type { FetchLike } from '../records/types';
 
 /** A fetch that answers every CKAN call with an empty result set. */
 const emptyFetch: FetchLike = async () =>
   new Response(JSON.stringify({ success: true, result: { records: [] } }), { status: 200 });
+
+/** Every Boston adapter runs for the fixture, so this is the arity both accountings add up to. */
+const BOSTON_SOURCE_COUNT = sourcesForCity('Boston').length;
 
 describe('runLanarkFixture', () => {
   it('names the fixture parcel and address', () => {
@@ -15,22 +19,35 @@ describe('runLanarkFixture', () => {
   it('returns one check per assertion and counts failures without throwing', async () => {
     const result = await runLanarkFixture(emptyFetch);
     expect(result.checks.length).toBeGreaterThanOrEqual(12);
-    expect(result.checks.every((c) => typeof c.label === 'string' && typeof c.ok === 'boolean' && typeof c.detail === 'string')).toBe(true);
     // Empty responses fail the parcel resolution and every value check.
     expect(result.failures).toBeGreaterThan(0);
     expect(result.checks.find((c) => c.label === 'parcel resolves to 2102098000')?.ok).toBe(false);
+    expect(result.parcelId).toBeNull();
+    expect(result.condominium).toBe(false);
+    // Every source is accounted for exactly once: it either threw or reported a row count.
+    // With no parcel id the six assessor sources throw, so the rest are what ran.
+    expect(result.sourceErrors.length + Object.keys(result.rowsBySource).length).toBe(BOSTON_SOURCE_COUNT);
+    for (const err of result.sourceErrors) expect(result.rowsBySource[err.label]).toBeUndefined();
+    expect(Object.values(result.rowsBySource).every((n) => n === 0)).toBe(true);
   });
 
-  // 10s, not the 5s default: the SAM fetch goes through `fetchAllRows`, which retries a
-  // network failure twice behind a 1s + 4s backoff. That backoff is wanted in production —
-  // a blip at data.boston.gov must not trip the scheduler's breaker — so the test waits it
-  // out rather than the fixture giving it up.
   it('reports a source that throws as a failed check, not an exception', async () => {
     const throwingFetch: FetchLike = async () => {
       throw new Error('boom');
     };
-    const result = await runLanarkFixture(throwingFetch);
-    expect(result.failures).toBeGreaterThan(0);
-    expect(result.sourceErrors.length).toBeGreaterThan(0);
-  }, 10_000);
+    // The injected no-op sleep skips the SAM fetch's 1s + 4s retry backoff. The retry is
+    // wanted in production — a blip at data.boston.gov must not trip the scheduler's
+    // breaker — so it is stubbed here rather than given up.
+    const result = await runLanarkFixture(throwingFetch, { sleep: async () => {} });
+    // RentSmart is the one source that never reaches fetch without a parcel id: it returns
+    // an empty result instead of throwing. The other ten all report the fetch failure.
+    expect(result.sourceErrors).toHaveLength(BOSTON_SOURCE_COUNT - 1);
+    expect(Object.keys(result.rowsBySource)).toEqual(['RentSmart']);
+    expect(result.checksFailed).toBeGreaterThan(0);
+    expect(result.failures).toBe(result.checksFailed + result.sourceErrors.length);
+    expect(result.checks.find((c) => c.label === 'parcel resolves to 2102098000')?.detail).toContain(
+      'parcel resolution failed',
+    );
+    expect(result.checks.find((c) => c.label.startsWith('SAM primary point'))?.detail).toContain('SAM fetch failed');
+  });
 });

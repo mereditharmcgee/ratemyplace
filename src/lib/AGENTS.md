@@ -150,6 +150,11 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   columns still exist. Boston retires 311 resource ids without notice, and a retired id
   fails that whole source on every pull until someone updates `LEGACY_311_RESOURCES` —
   it does not heal on its own. Run it before trusting a source failure.
+- **`fixture.ts` runs inside a Worker**, not just under that script: the scheduler's daily
+  circuit breaker calls `runLanarkFixture`, which pulls in `seed/sam.ts` for the SAM check.
+  Both files — and anything either imports — must stay runtime-agnostic: no `node:` imports,
+  no `fs`/`path`/`process`, nothing that only exists under tsx. The rest of `seed/` is
+  script-only and has no such constraint.
 - **`identity.ts`** turns a `buildings` row into every address form worth querying
   (short and long, range and split, directional stripped) plus both parcel forms. The
   feeds disagree about how an address is stored; normalization lives here, not in the

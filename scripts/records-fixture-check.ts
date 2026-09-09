@@ -29,15 +29,30 @@ const fetchImpl: FetchLike = (input, init) => fetch(input, init);
 async function main(): Promise<void> {
   const result = await runLanarkFixture(fetchImpl);
 
+  console.log(`Resolved parcelId=${result.parcelId} condominium=${result.condominium}`);
+  console.log('');
+
+  // Row counts before the checks: a check that failed because its source came back empty
+  // reads very differently from one that failed on a changed value, and only these lines
+  // tell them apart.
+  for (const [label, rows] of Object.entries(result.rowsBySource)) {
+    console.log(`${label}: ${rows} rows`);
+  }
   for (const err of result.sourceErrors) {
     console.log(`${err.label}: FAILED — ${err.message}`);
   }
+  console.log('');
+
   for (const c of result.checks) {
     console.log(c.ok ? `PASS ${c.label}` : `FAIL ${c.label} — ${c.detail}`);
   }
 
   console.log('');
-  console.log(result.failures === 0 ? 'ALL PASS' : `${result.failures} failure(s)`);
+  console.log(
+    result.failures === 0
+      ? 'ALL PASS'
+      : `${result.failures} failure(s): ${result.checksFailed} check(s) failed, ${result.sourceErrors.length} source(s) threw`,
+  );
   process.exit(result.failures === 0 ? 0 : 1);
 }
 
