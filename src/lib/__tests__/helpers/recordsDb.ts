@@ -4,8 +4,10 @@ import { createMemoryDatabase, TestD1Database } from './sqliteD1';
 
 /**
  * Minimal schema for records tests: the parent tables the 0029/0030 migrations
- * reference. Keeps tests honest about the SQL that ships without applying all
- * 30 migrations.
+ * reference, plus the two tables the queue planner reads (`reviews.building_id`
+ * and `status`, `saved_buildings.building_id`). Column names mirror the real
+ * migrations (0001, 0023); the unused columns are left out. Keeps tests honest
+ * about the SQL that ships without applying all 31 migrations.
  */
 export function createRecordsStubDb(): TestD1Database {
   const db = new TestD1Database(createMemoryDatabase());
@@ -49,6 +51,19 @@ export function createRecordsStubDb(): TestD1Database {
       old_value TEXT,
       new_value TEXT,
       notes TEXT
+    );
+    CREATE TABLE reviews (
+      id TEXT PRIMARY KEY,
+      building_id TEXT NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'flagged')),
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+    CREATE TABLE saved_buildings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      building_id TEXT NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+      created_at INTEGER DEFAULT (unixepoch()),
+      UNIQUE(user_id, building_id)
     );
   `);
   return db;
