@@ -69,8 +69,18 @@ export function createRecordsStubDb(): TestD1Database {
   return db;
 }
 
+/**
+ * 0032 indexes `saved_buildings(building_id)`, a table the real 0023 creates and the stub
+ * above stands in for, so the stub has to exist before this runs — `createRecordsTestDb`
+ * is the only correct order. The other two indexes are over tables 0029 and 0031 create.
+ */
 export function applyRecordsMigrations(db: TestD1Database): void {
-  for (const file of ['0029_building_records.sql', '0030_audit_records_actions.sql', '0031_boston_coverage.sql']) {
+  for (const file of [
+    '0029_building_records.sql',
+    '0030_audit_records_actions.sql',
+    '0031_boston_coverage.sql',
+    '0032_records_queue_indexes.sql',
+  ]) {
     db.exec(readFileSync(join(process.cwd(), 'migrations', file), 'utf8'));
   }
 }

@@ -21,6 +21,20 @@ async function seeded(db: ReturnType<typeof createRecordsTestDb>, id: string, ne
   await db.prepare("UPDATE buildings SET source = 'seed', neighborhood = ?, street_key = ?, st_num_lo = ?, st_num_hi = ? WHERE id = ?").bind(neighborhood, street, num, num, id).run();
 }
 
+describe('migration 0032 indexes', () => {
+  it('creates the three lookup indexes the planner and the breaker depend on', async () => {
+    const db = createRecordsTestDb();
+    const rows = await db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('idx_records_queue_building','idx_saved_buildings_building','idx_record_pulls_retrieved') ORDER BY name")
+      .all<{ name: string }>();
+    expect(rows.results.map((r) => r.name)).toEqual([
+      'idx_record_pulls_retrieved',
+      'idx_records_queue_building',
+      'idx_saved_buildings_building',
+    ]);
+  });
+});
+
 describe('planRefresh', () => {
   it('enqueues refresh for a reviewed building whose deeper pulls are older than REFRESH_AFTER_SECONDS', async () => {
     const db = createRecordsTestDb();
