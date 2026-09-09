@@ -1,3 +1,4 @@
+import { sqlLiteral } from '../ckan';
 import { ASSESSOR_PAGE_URL, ASSESSOR_YEARS, FY2026_RESOURCE_ID } from '../sources/boston/assessor';
 import type { ExistingBuilding, SeedBuilding } from './types';
 
@@ -11,7 +12,14 @@ export interface SeedPlan {
 
 /**
  * SQL literal for a file applied with `wrangler d1 execute --file`, which binds nothing.
- * Strings double their quotes; numbers must be finite; null renders as NULL.
+ * Strings go through the same `sqlLiteral` the live CKAN sources use, so there is one
+ * quoting rule in the records code, not two. Numbers must be finite; null renders as NULL.
+ *
+ * A control character is rejected rather than escaped: the statement file is newline-
+ * delimited and read back by eye, a raw newline or NUL inside a literal has no escape that
+ * survives that, and no assessor value legitimately contains one (JSON.stringify already
+ * escapes them out of the assessment payload). Anything that is not a string or a number
+ * is a programming error, and says so instead of being coerced into a plausible literal.
  */
 export function lit(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return 'NULL';
@@ -19,7 +27,9 @@ export function lit(value: string | number | null | undefined): string {
     if (!Number.isFinite(value)) throw new Error(`Non-finite number in seed SQL: ${value}`);
     return String(value);
   }
-  return `'${value.replace(/'/g, "''")}'`;
+  if (typeof value !== 'string') throw new Error(`Unsupported ${typeof value} in seed SQL: ${String(value)}`);
+  if (Array.from(value).some((c) => c.charCodeAt(0) < 0x20)) throw new Error(`Control character in a seed SQL literal: ${JSON.stringify(value)}`);
+  return sqlLiteral(value);
 }
 
 function pullIdFor(buildingId: string): string {
@@ -31,7 +41,10 @@ function pullStatement(buildingId: string): string {
   return (
     'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, row_count, error_message, triggered_by, correction_id, trigger_reason) VALUES (' +
     [lit(pullId), lit(buildingId), lit('boston'), lit(FY2026_RESOURCE_ID), lit(`Property Assessment ${CURRENT_YEAR.fiscalYear}`), lit(`seed: bulk ${CURRENT_YEAR.fiscalYear} assessor download`), lit('ok'), '1', 'NULL', 'NULL', 'NULL', lit(SEED_TRIGGER_REASON)].join(', ') +
-    ') ON CONFLICT(id) DO NOTHING;'
+    // One pull row per building per fiscal year, re-stamped rather than duplicated: the
+    // panel shows retrieved_at as the "as of" date, so a re-seed has to move it or the
+    // page claims data is older than it is.
+    ') ON CONFLICT(id) DO UPDATE SET retrieved_at = unixepoch();'
   );
 }
 
@@ -54,6 +67,19 @@ function createStatement(parcel: SeedBuilding, slug: string): string {
   );
 }
 
+/**
+ * The same COALESCE direction as the create path: what the row already knows about itself
+ * wins (a human's coordinate, neighborhood, or ZIP is not overwritten by a parcel
+ * centroid), what the assessor owns is refreshed, and the street key and number range are
+ * ours to compute. An assessor NULL is an absence, not an erasure, so a blank year or unit
+ * count leaves whatever the row had.
+ *
+ * The WHERE guard is for the gap between planning and applying: the plan is computed from
+ * a snapshot of `buildings`, and `matchExistingBuildings` never puts a row with a
+ * disagreeing parcel id in `matched`, but if one acquires a different parcel id in between,
+ * this statement declines rather than overwriting it. (Its pull and record rows still
+ * write; they are provenance for the parcel and are visible to the same human.)
+ */
 function matchStatement(building: ExistingBuilding, parcel: SeedBuilding): string {
   const { numLo, numHi } = addressRangeOf(building.address, parcel);
   return (
@@ -61,14 +87,19 @@ function matchStatement(building: ExistingBuilding, parcel: SeedBuilding): strin
     [
       `parcel_id = ${lit(parcel.parcelId)}`,
       `sam_id = COALESCE(sam_id, ${lit(parcel.samId)})`,
+      `neighborhood = COALESCE(neighborhood, ${lit(parcel.neighborhood)})`,
+      `zip_code = COALESCE(zip_code, ${lit(parcel.zip)})`,
+      `latitude = COALESCE(latitude, ${lit(parcel.latitude)})`,
+      `longitude = COALESCE(longitude, ${lit(parcel.longitude)})`,
+      `year_built = COALESCE(${lit(parcel.yearBuilt)}, year_built)`,
+      `unit_count = COALESCE(${lit(parcel.unitCount)}, unit_count)`,
+      `building_type = COALESCE(${lit(parcel.buildingType)}, building_type)`,
       `street_key = ${lit(parcel.streetKey)}`,
       `st_num_lo = ${lit(numLo)}`,
       `st_num_hi = ${lit(numHi)}`,
-      `latitude = COALESCE(latitude, ${lit(parcel.latitude)})`,
-      `longitude = COALESCE(longitude, ${lit(parcel.longitude)})`,
       'updated_at = unixepoch()',
     ].join(', ') +
-    ` WHERE id = ${lit(building.id)};`
+    ` WHERE id = ${lit(building.id)} AND (parcel_id IS NULL OR parcel_id = ${lit(parcel.parcelId)});`
   );
 }
 
