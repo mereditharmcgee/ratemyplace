@@ -5,11 +5,14 @@
 -- has no IF NOT EXISTS for columns). Apply once with `wrangler d1 execute --remote --file`,
 -- never `migrations apply --remote`. See migrations/AGENTS.md.
 --
--- Statement order is deliberate: the idempotent CREATE TABLE / CREATE INDEX statements run
--- first and the five non-idempotent ALTERs last, so a partial failure can be recovered by
--- re-running only the ALTERs that did not land. Before applying, read the live schema and
--- confirm buildings has none of source, street_key, st_num_lo, st_num_hi and record_pulls
--- has no trigger_reason.
+-- Statement order is deliberate but not purely idempotent-first: idx_buildings_street sits
+-- after three of the ALTERs because it indexes street_key, a column those ALTERs add.
+-- Recovering a partial failure is therefore two steps, in this order: re-run only the ALTERs
+-- that did not land, THEN re-run this file's CREATE INDEX IF NOT EXISTS statements, which are
+-- idempotent and cost nothing when the index already exists. Do not reorder the statements to
+-- make the recovery one step; the index cannot be created before its column. Before applying,
+-- read the live schema and confirm buildings has none of source, street_key, st_num_lo,
+-- st_num_hi and record_pulls has no trigger_reason.
 
 -- One row per pending pull. A building has at most one pending row; finished rows are
 -- kept (button rows forever, as the record that a reader asked; refresh/fill rows 90 days).

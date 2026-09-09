@@ -85,6 +85,7 @@ npm run e2e        # fresh local D1 + seed + build + Playwright
 npm run db:setup   # db:fresh then db:seed (local D1 only)
 npm run ops:metrics   # regenerate ops/METRICS.md from production (read-only)
 npm run records:check   # live Lanark fixture check (hits data.boston.gov), run by hand
+npm run records:seed -- --dry-run   # Boston bulk seed; --write / --apply --local / --apply --remote
 ```
 
 `npm run smoke` has no default target. Supply an explicit `--environment` and

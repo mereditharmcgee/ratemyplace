@@ -39,11 +39,15 @@ production.** It adds five columns with `ALTER TABLE ... ADD COLUMN` — `buildi
 Apply it once with `wrangler d1 execute --remote --file`, never `migrations apply --remote`,
 and before running the seed script. Update this paragraph when it lands.
 
-Its statements are deliberately ordered idempotent-first: the `CREATE TABLE IF NOT EXISTS`
-and `CREATE INDEX IF NOT EXISTS` statements run before the five `ALTER`s, so a partial apply
-is recovered by re-running only the `ALTER`s that did not land — read the live schema, see
-which of the five columns exist, and run the rest by hand. Note that `app_settings.updated_at`
-defaults on insert but does not self-update; a writer that flips a value must set it.
+Its statements are ordered idempotent-first as far as they can be, but not entirely:
+`idx_buildings_street` indexes `buildings(city, street_key)`, so it has to come after the
+`ALTER` that adds `street_key`. Recovering a partial apply is therefore two steps, in this
+order: read the live schema, see which of the five columns exist, and **re-run by hand only
+the `ALTER`s that did not land**; then **re-run the file's `CREATE INDEX IF NOT EXISTS`
+statements**, which are idempotent and no-ops for an index that already exists. Do not
+reorder the file to collapse that into one step — the index cannot be created before its
+column. Note that `app_settings.updated_at` defaults on insert but does not self-update; a
+writer that flips a value must set it.
 
 **The seed that follows.** `npm run records:seed` populates the new `buildings` columns for
 Boston from the FY2026 assessor plus SAM. Its modes are `-- --dry-run` (compute and print the
@@ -56,7 +60,11 @@ reusing the day-old cache in `.cache/`. Operational facts worth knowing before y
   2,000-statement files hang the local D1 for five minutes and then fail with a
   `Body Timeout Error`, rolling the whole file back. Do not raise it.
 - `-- --apply --remote --from 12` resumes applying at batch file 12 after a failure; the
-  script names the file it is on as it goes.
+  script names the file it is on as it goes. A resume applies the batch files **already on
+  disk** and regenerates nothing — the downloads are only cached for a day, and a re-download
+  that gains or loses one parcel shifts every later building across a file boundary. It fails
+  loudly if `.cache/seed/` holds no files or fewer than the number asked for. A bare `--from`
+  with no number is an error, not a silent "start from the beginning".
 - `wrangler d1 execute --json` renders a SQL `NULL` as the JSON *string* `"null"`. The script
   folds that back to `null` when it reads existing rows; anything else that shells out to
   wrangler has to do the same.

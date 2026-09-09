@@ -105,6 +105,22 @@ Per building a deep pull is about 20 requests to data.boston.gov (311 alone span
 
 **Output.** A generated SQL file in batches of 500 statements, applied with `wrangler d1 execute --remote --file`, and a summary of matched, created, updated, skipped, and unmatched. `--dry-run` prints the summary and writes nothing.
 
+> **Amended 2026-09-09, as built (C1):** the batch files hold **999 statements**, not 500 —
+> a multiple of three, so every file holds whole buildings (row, pull, record), and under the
+> 1,000 the local D1 handles (2,000-statement files hang miniflare for five minutes and then
+> fail with a `Body Timeout Error`, rolling the whole file back). The script has four modes,
+> not two: `--dry-run` (the default — compute and print the summary, write nothing),
+> `--write` (also write the batch files under `.cache/seed/`), `--apply --local`, and
+> `--apply --remote`. `--refresh` re-downloads instead of reusing the day-old cache in
+> `.cache/`. `--from N` resumes an apply at batch file N and applies the files **already on
+> disk**, regenerating nothing: the cache expires after a day, so a re-download that gains or
+> loses one parcel would shift every later building across a file boundary and silently skip
+> some. A bare `--from` with no number is an error. Two things the script has to work around:
+> `wrangler d1 execute --json` renders a SQL `NULL` as the JSON *string* `"null"`, which the
+> script folds back to `null` when it reads existing rows, and both bulk downloads pass
+> `sort: '_id'` so CKAN pages in a deterministic order rather than whatever the datastore
+> happens to return.
+
 ## Section 2: Schema (migration `0031_boston_coverage.sql`)
 
 Additive only. Applied by hand like 0029; `ALTER TABLE ... ADD COLUMN` has no `IF NOT EXISTS`, so it is run once and recorded in `migrations/AGENTS.md`.
