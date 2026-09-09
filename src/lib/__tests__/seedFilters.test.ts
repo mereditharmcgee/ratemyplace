@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { HOUSING_A_DESCRIPTIONS, SEED_LAND_USES, isSeedParcelRow } from '../records/seed/filters';
+import { HOUSING_A_DESCRIPTIONS, SEED_LAND_USES, isSeedParcelRow, normalizeLandUse } from '../records/seed/filters';
+
+describe('normalizeLandUse', () => {
+  it('trims, collapses internal whitespace, and upper-cases', () => {
+    expect(normalizeLandUse(' r3 ')).toBe('R3');
+    expect(normalizeLandUse('subsd housing  s- 8')).toBe('SUBSD HOUSING S- 8');
+    expect(normalizeLandUse('APT\t7-30  UNITS')).toBe('APT 7-30 UNITS');
+    expect(normalizeLandUse(null)).toBe('');
+  });
+});
 
 describe('isSeedParcelRow', () => {
   it('accepts every R2, R3, R4, and RC row regardless of description', () => {

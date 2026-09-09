@@ -51,6 +51,37 @@ describe('collapseAssessorRows', () => {
     expect(buildings[0].buildingType).toBe('three_family');
   });
 
+  it('infers per row, so a blank second building on an R3 lot adds its own three units', () => {
+    const { buildings } = collapseAssessorRows(
+      [
+        { ...base, PID: '0100037000', LU: 'R3', BLDG_SEQ: '1', RES_UNITS: '8' },
+        { ...base, PID: '0100037000', LU: 'R3', BLDG_SEQ: '2', RES_UNITS: null },
+      ],
+      new Map(),
+    );
+    expect(buildings[0].unitCount).toBe(11);
+  });
+
+  it('leaves units null for a land use with nothing to imply', () => {
+    const { buildings } = collapseAssessorRows([{ ...base, PID: '0100037000', RES_UNITS: null }], new Map());
+    expect(buildings[0].buildingType).toBe('apartment');
+    expect(buildings[0].unitCount).toBeNull();
+  });
+
+  it('normalizes the assessor ZIP the same way SAM ZIPs are normalized', () => {
+    const padded = collapseAssessorRows([{ ...base, PID: '0100037000', ZIP_CODE: 2135 }], new Map());
+    expect(padded.buildings[0].zip).toBe('02135');
+    // Three digits is not a ZIP that lost a leading zero; padding it would invent an answer.
+    const nonsense = collapseAssessorRows([{ ...base, PID: '0100037000', ZIP_CODE: '123' }], new Map());
+    expect(nonsense.buildings[0].zip).toBeNull();
+  });
+
+  it('normalizes the land use the same way the filter does before mapping it to a type', () => {
+    const { buildings, skipped } = collapseAssessorRows([{ ...base, PID: '0100037000', LU: ' r3 ' }], new Map());
+    expect(skipped).toEqual([]);
+    expect(buildings[0].buildingType).toBe('three_family');
+  });
+
   it('falls back to the assessor CITY and zip without a SAM point', () => {
     const { buildings } = collapseAssessorRows([{ ...base, PID: '0100037000' }], new Map());
     expect(buildings[0].neighborhood).toBe('Brighton');

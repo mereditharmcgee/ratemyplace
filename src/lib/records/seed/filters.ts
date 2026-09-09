@@ -25,17 +25,22 @@ const HOUSING_A = new Set<string>(HOUSING_A_DESCRIPTIONS);
 const ALWAYS = new Set<string>(['R2', 'R3', 'R4', 'RC']);
 
 /**
- * `textOrNull` already trims, so this only has to collapse the internal whitespace the
- * assessor is inconsistent about ('SUBSD HOUSING S-  8' has two spaces in some rows).
+ * The one normalizer for a land-use code or description. `textOrNull` already trims, so
+ * this only has to collapse the internal whitespace the assessor is inconsistent about
+ * ('SUBSD HOUSING S-  8' has two spaces in some rows) and upper-case.
+ *
+ * Exported because the seed's building-type map has to see exactly the string this filter
+ * accepted: normalizing twice, in two places, is how the filter and the type map drift
+ * apart and a parcel gets through the filter only to throw on an unrecognized code.
  */
-function norm(value: unknown): string {
+export function normalizeLandUse(value: unknown): string {
   return (textOrNull(value) ?? '').replace(/\s+/g, ' ').toUpperCase();
 }
 
 /** Whether one assessor row belongs in the seed. Pure; the row shape is whatever CKAN returned. */
 export function isSeedParcelRow(row: Pick<AssessorRow, 'LU' | 'LU_DESC'>): boolean {
-  const lu = norm(row.LU);
+  const lu = normalizeLandUse(row.LU);
   if (ALWAYS.has(lu)) return true;
-  if (lu === 'A') return HOUSING_A.has(norm(row.LU_DESC));
+  if (lu === 'A') return HOUSING_A.has(normalizeLandUse(row.LU_DESC));
   return false;
 }

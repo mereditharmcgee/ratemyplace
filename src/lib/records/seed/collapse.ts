@@ -1,8 +1,9 @@
 import { parseIntOrNull, textOrNull } from '../ckan';
 import { addressKey, toCanonicalParcel } from '../identity';
 import { ASSESSOR_FIXED_COLUMNS, ASSESSOR_YEARS, MODERN_COLUMNS, assessmentFromRow } from '../sources/boston/assessor';
-import { isSeedParcelRow } from './filters';
+import { isSeedParcelRow, normalizeLandUse } from './filters';
 import { buildingTypeFor, formatSeedAddress, titleCaseNeighborhood } from './format';
+import { zip5 } from './sam';
 import type { AssessorRow, SamPoint, SeedBuilding } from './types';
 
 /** Everything the adapter reads plus the address and district columns the seed needs. */
@@ -21,21 +22,25 @@ export interface CollapseResult {
   skipped: Array<{ pid: string | null; reason: SkipReason }>;
 }
 
+/**
+ * Units a land-use code implies for one building when the assessor leaves RES_UNITS blank.
+ * LU describes the *parcel*, so on a multi-building lot applying it per building is a
+ * stated guess, not a fact: a second, blank R3 row is credited three units on the theory
+ * that a three-family lot's second structure is also a three-family. Rows the assessor did
+ * count are always preferred; nothing is implied for A, R4, or RC.
+ */
 const IMPLIED_UNITS: Record<string, number> = { R2: 2, R3: 3 };
 
 function seq(row: AssessorRow): number {
   return parseIntOrNull(textOrNull(row.BLDG_SEQ)) ?? 1;
 }
 
-function zip5(value: unknown): string | null {
-  const text = textOrNull(value)?.replace(/\D/g, '');
-  return text ? text.padStart(5, '0').slice(0, 5) : null;
-}
-
 /**
  * Filters, then collapses the assessor's one-row-per-building-per-parcel into one
- * SeedBuilding per parcel: lowest BLDG_SEQ row supplies the address, year, and assessment;
- * residential units are summed across rows. Pure; the row order is not assumed.
+ * SeedBuilding per parcel: the lowest *surviving* BLDG_SEQ row supplies the address, year,
+ * and assessment, and residential units are summed across the parcel's rows. Pure; the row
+ * order is not assumed. `skipped` counts rows, not parcels — one parcel can contribute
+ * several skipped rows.
  */
 export function collapseAssessorRows(rows: Iterable<AssessorRow>, sam: ReadonlyMap<string, SamPoint>): CollapseResult {
   const byParcel = new Map<string, AssessorRow[]>();
@@ -67,9 +72,10 @@ export function collapseAssessorRows(rows: Iterable<AssessorRow>, sam: ReadonlyM
       skipped.push({ pid, reason: 'no_address' });
       continue;
     }
-    const landUse = (textOrNull(first.LU) ?? '').trim().toUpperCase();
-    const summed = list.map((r) => parseIntOrNull(textOrNull(r.RES_UNITS))).filter((n): n is number => n !== null);
-    const unitCount = summed.length > 0 ? summed.reduce((a, b) => a + b, 0) : (IMPLIED_UNITS[landUse] ?? null);
+    const landUse = normalizeLandUse(first.LU);
+    const implied = IMPLIED_UNITS[landUse] ?? null;
+    const perRow = list.map((r) => parseIntOrNull(textOrNull(r.RES_UNITS)) ?? implied).filter((n): n is number => n !== null);
+    const unitCount = perRow.length > 0 ? perRow.reduce((a, b) => a + b, 0) : null;
     const point = sam.get(pid) ?? null;
     buildings.push({
       parcelId: pid,
@@ -78,7 +84,7 @@ export function collapseAssessorRows(rows: Iterable<AssessorRow>, sam: ReadonlyM
       numLo: key.numLo,
       numHi: key.numHi,
       neighborhood: titleCaseNeighborhood(point?.neighborhood ?? textOrNull(first.CITY)),
-      zip: point?.zip ? zip5(point.zip) : zip5(first.ZIP_CODE),
+      zip: point?.zip ?? zip5(first.ZIP_CODE),
       unitCount,
       yearBuilt: parseIntOrNull(textOrNull(first.YR_BUILT)),
       buildingType: buildingTypeFor(landUse),
