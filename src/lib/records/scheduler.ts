@@ -205,6 +205,7 @@ export async function plan(deps: SchedulerDeps): Promise<PlanResult> {
       at: now,
       failures: fixture.failures,
       checksFailed: fixture.checksFailed,
+      checksTotal: fixture.checks.length,
       failed: fixture.checks.filter((check) => !check.ok).map((check) => check.label),
       sourceErrors: fixture.sourceErrors,
       rowsBySource: fixture.rowsBySource,

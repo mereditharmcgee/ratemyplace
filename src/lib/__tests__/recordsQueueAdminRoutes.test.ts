@@ -4,6 +4,7 @@ import { GET } from '../../pages/api/admin/records/queue/index';
 import { POST as PAUSE } from '../../pages/api/admin/records/queue/pause';
 import { POST as RETRY } from '../../pages/api/admin/records/queue/retry';
 import { LOCK_TTL_SECONDS, MAX_ATTEMPTS } from '../records/queue';
+import { SETTING_KEYS } from '../records/settings';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 import type { RecordsQueueFixtureResult, RecordsQueueParkedRow, RecordsQueueStats } from '../api-types';
@@ -185,13 +186,14 @@ suite('admin records queue routes', () => {
         at: NOW,
         failures: 2,
         checksFailed: 1,
+        checksTotal: 6,
         failed: ['assessor parcel'],
         sourceErrors: [{ label: '311 requests', message: 'HTTP 500' }],
         rowsBySource: { 'Assessor FY2026': 3 },
       };
       await db
         .prepare('INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)')
-        .bind('records_fixture_last', JSON.stringify(fixture), NOW)
+        .bind(SETTING_KEYS.fixtureLast, JSON.stringify(fixture), NOW)
         .run();
 
       const response = await GET(createContext(db, { method: 'GET' }));
@@ -205,7 +207,7 @@ suite('admin records queue routes', () => {
       const db = createRecordsTestDb();
       await db
         .prepare('INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)')
-        .bind('records_fixture_last', 'not json', NOW)
+        .bind(SETTING_KEYS.fixtureLast, 'not json', NOW)
         .run();
 
       const response = await GET(createContext(db, { method: 'GET' }));
@@ -218,7 +220,62 @@ suite('admin records queue routes', () => {
       const db = createRecordsTestDb();
       await db
         .prepare('INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)')
-        .bind('records_fixture_last', JSON.stringify({ at: 'yesterday', failures: 'some' }), NOW)
+        .bind(SETTING_KEYS.fixtureLast, JSON.stringify({ at: 'yesterday', failures: 'some' }), NOW)
+        .run();
+
+      const response = await GET(createContext(db, { method: 'GET' }));
+
+      expect(response.status).toBe(200);
+      expect((await data<QueuePayload>(response)).lastFixture).toBeNull();
+    });
+
+    // Half a fixture is worse than none: the panel would render a headline off a row whose
+    // lists it cannot read, so every field is checked, not only the two the headline needs.
+    it('reports a fixture row whose later fields are the wrong shape as null', async () => {
+      const db = createRecordsTestDb();
+      await db
+        .prepare('INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)')
+        .bind(SETTING_KEYS.fixtureLast, JSON.stringify({ at: 1, failures: 0, failed: 'nope' }), NOW)
+        .run();
+
+      const response = await GET(createContext(db, { method: 'GET' }));
+
+      expect(response.status).toBe(200);
+      expect((await data<QueuePayload>(response)).lastFixture).toBeNull();
+    });
+
+    it.each([
+      ['checksFailed missing', { at: 1, failures: 0, checksTotal: 0, failed: [], sourceErrors: [], rowsBySource: {} }],
+      ['checksTotal missing', { at: 1, failures: 0, checksFailed: 0, failed: [], sourceErrors: [], rowsBySource: {} }],
+      [
+        'a sourceErrors entry without a message',
+        {
+          at: 1,
+          failures: 1,
+          checksFailed: 0,
+          checksTotal: 1,
+          failed: [],
+          sourceErrors: [{ label: 'RentSmart' }],
+          rowsBySource: {},
+        },
+      ],
+      [
+        'rowsBySource holding something other than numbers',
+        {
+          at: 1,
+          failures: 0,
+          checksFailed: 0,
+          checksTotal: 1,
+          failed: [],
+          sourceErrors: [],
+          rowsBySource: { RentSmart: 'four' },
+        },
+      ],
+    ])('reports a fixture row with %s as null', async (_label, stored) => {
+      const db = createRecordsTestDb();
+      await db
+        .prepare('INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)')
+        .bind(SETTING_KEYS.fixtureLast, JSON.stringify(stored), NOW)
         .run();
 
       const response = await GET(createContext(db, { method: 'GET' }));

@@ -2,11 +2,9 @@ import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../../../../lib/db';
 import { logError } from '../../../../../lib/logger';
 import { MAX_ATTEMPTS, queueStats } from '../../../../../lib/records/queue';
+import { SETTING_KEYS, readSetting } from '../../../../../lib/records/settings';
 import type { RecordsQueueFixtureResult, RecordsQueueParkedRow } from '../../../../../lib/api-types';
 import { json } from './_json';
-
-/** Key the scheduler stamps with its last circuit-breaker fixture run (0031 `app_settings`). */
-const FIXTURE_LAST_KEY = 'records_fixture_last';
 
 /**
  * Columns listed explicitly rather than `q.*`/`b.*` — the join means a `SELECT *`
@@ -23,11 +21,41 @@ const PARKED_SQL =
   'FROM records_queue q JOIN buildings b ON b.id = q.building_id ' +
   'WHERE q.done_at IS NULL AND q.attempts >= ? ORDER BY q.requested_at, q.id LIMIT 100';
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+}
+
+function isSourceErrors(value: unknown): value is RecordsQueueFixtureResult['sourceErrors'] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (entry) =>
+        !!entry &&
+        typeof entry === 'object' &&
+        typeof (entry as Record<string, unknown>).label === 'string' &&
+        typeof (entry as Record<string, unknown>).message === 'string',
+    )
+  );
+}
+
+function isNumberRecord(value: unknown): value is Record<string, number> {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.values(value as Record<string, unknown>).every((entry) => typeof entry === 'number')
+  );
+}
+
 /**
  * A settings row the scheduler wrote in a shape this build does not understand must not
- * take the whole panel down with it — the counts still matter. `at` and `failures` are
- * the two fields the panel cannot render without; anything else missing degrades in the
- * panel rather than here.
+ * take the whole panel down with it — the counts still matter, so a row that does not
+ * match is reported as `null` rather than thrown.
+ *
+ * EVERY field is checked, not just the two the headline needs: a half-valid row is worse
+ * than no row, because the panel would render a confident "all checks passed" headline off
+ * numbers whose supporting lists it cannot read. Cast-after-check is only honest when the
+ * check covers the whole type.
  */
 function parseFixture(value: string): RecordsQueueFixtureResult | null {
   let parsed: unknown;
@@ -39,6 +67,10 @@ function parseFixture(value: string): RecordsQueueFixtureResult | null {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
   const raw = parsed as Record<string, unknown>;
   if (typeof raw.at !== 'number' || typeof raw.failures !== 'number') return null;
+  if (typeof raw.checksFailed !== 'number' || typeof raw.checksTotal !== 'number') return null;
+  if (!isStringArray(raw.failed)) return null;
+  if (!isSourceErrors(raw.sourceErrors)) return null;
+  if (!isNumberRecord(raw.rowsBySource)) return null;
   return parsed as RecordsQueueFixtureResult;
 }
 
@@ -60,12 +92,11 @@ export const GET: APIRoute = async (context: APIContext) => {
 
     const stats = await queueStats(db, { now });
     const parked = await db.prepare(PARKED_SQL).bind(MAX_ATTEMPTS).all<RecordsQueueParkedRow>();
-    const fixture = await db
-      .prepare('SELECT value FROM app_settings WHERE key = ?')
-      .bind(FIXTURE_LAST_KEY)
-      .first<{ value: string }>();
+    // `settings.ts` is a leaf module — the key and its reader come from there rather than
+    // from the scheduler, whose import would drag every source adapter into this request.
+    const fixture = await readSetting(db, SETTING_KEYS.fixtureLast);
 
-    const lastFixture = fixture?.value ? parseFixture(fixture.value) : null;
+    const lastFixture = fixture ? parseFixture(fixture) : null;
 
     return json({ data: { stats, parked: parked.results, lastFixture } }, 200);
   } catch (error) {

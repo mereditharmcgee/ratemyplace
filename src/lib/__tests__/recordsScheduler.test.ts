@@ -293,15 +293,26 @@ describe('plan', () => {
   it('stores the fixture result under the scheduler setting key on a healthy run', async () => {
     const db = createRecordsTestDb();
     const d = deps(db, {
-      fixture: async () => fixtureResult({ rowsBySource: { 'Approved Building Permits': 0, RentSmart: 4 } }),
+      fixture: async () =>
+        fixtureResult({
+          checks: [
+            { label: 'parcel resolves to 2102098000', ok: true, detail: '2102098000' },
+            { label: 'RentSmart rows', ok: true, detail: '4 rows' },
+          ],
+          rowsBySource: { 'Approved Building Permits': 0, RentSmart: 4 },
+        }),
     });
     await plan(d);
 
+    // `checksTotal` is the denominator the panel needs to say "all 2 checks passed" — a pass
+    // line without it can only claim that nothing failed, which is also true of a fixture
+    // that ran no checks at all.
     const stored = await settingOf(db, SCHEDULER_SETTING_KEYS.lastFixture);
     expect(JSON.parse(stored!)).toEqual({
       at: NOW,
       failures: 0,
       checksFailed: 0,
+      checksTotal: 2,
       failed: [],
       sourceErrors: [],
       rowsBySource: { 'Approved Building Permits': 0, RentSmart: 4 },
@@ -323,6 +334,11 @@ describe('plan', () => {
     });
 
     expect(await plan(d)).toMatchObject({ paused: true, alerted: true, fixtureFailures: 2 });
+    expect(JSON.parse((await settingOf(db, SCHEDULER_SETTING_KEYS.lastFixture))!)).toMatchObject({
+      checksFailed: 1,
+      checksTotal: 1,
+      failed: ['parcel resolves to 2102098000'],
+    });
     expect(await getFillPaused(db)).toBe(true);
     expect(d.alerts).toHaveLength(1);
     expect(d.alerts[0]).toContain('1 check failed, 1 source threw');

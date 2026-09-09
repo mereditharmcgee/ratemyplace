@@ -5,7 +5,8 @@
  * Import these in components that consume APIs for type safety.
  */
 
-// Type-only, so nothing from lib/records/ reaches a browser bundle through this file.
+// Type-only: the import is erased at build time, so this file pulls no lib/records/ code
+// into a browser bundle. A runtime import from here would.
 import type { QueueReason } from './records/types';
 
 // =============================================================================
@@ -388,14 +389,14 @@ export interface RecordCorrection {
 /**
  * GET /api/admin/records/queue — the pull queue at a glance. Mirrors `QueueStats`
  * in lib/records/queue.ts, which is the server-side source of truth; this copy
- * exists so the admin panel does not import the queue module (and its SQL) into
- * the browser bundle.
+ * exists so the admin panel does not run the queue module (and its SQL) in the
+ * browser bundle.
  *
  * `pendingByReason` counts claimable rows only — a row that has exhausted its
  * attempts is counted once, under `parked`.
  */
 export interface RecordsQueueStats {
-  pendingByReason: Record<'button' | 'follower' | 'refresh' | 'fill', number>;
+  pendingByReason: Record<QueueReason, number>;
   parked: number;
   oldestPendingAgeSeconds: number | null;
   completedLast24h: number;
@@ -429,8 +430,10 @@ export interface RecordsQueueParkedRow {
  * in lib/records/scheduler.ts and read back by GET /api/admin/records/queue; the
  * shape lives here so the writer and the panel cannot drift apart.
  *
- * A stored row that does not match is reported as `null` rather than thrown at the
- * panel: a settings row from a newer scheduler must not take the counts down with it.
+ * A stored row that does not match — in ANY field, not only the two the headline reads —
+ * is reported as `null` rather than thrown at the panel: a settings row from a newer or
+ * older scheduler must not take the counts down with it, and half of one must not be
+ * rendered as though it were whole.
  */
 export interface RecordsQueueFixtureResult {
   /** Unix seconds of the plan run that wrote this. */
@@ -439,6 +442,8 @@ export interface RecordsQueueFixtureResult {
   failures: number;
   /** Checks that came back not-ok, counted separately from the sources that threw. */
   checksFailed: number;
+  /** How many checks ran, so a clean run can say "all 9 checks passed" rather than only "nothing failed". */
+  checksTotal: number;
   /** Labels of the checks that came back not-ok. */
   failed: string[];
   /** Sources whose run() threw, by label. */
