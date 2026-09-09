@@ -9,6 +9,7 @@
 // that changes is one added error pull row. That is what makes a re-pull safe to trigger
 // from anywhere: the worst case is a stale source, never a building whose records were
 // half-replaced.
+import { errorMessage, truncateError } from './errors';
 import { buildIdentity, toNumericParcel, type BuildingRowForIdentity } from './identity';
 import { jurisdictionForCity, sourcesForCity } from './jurisdictions';
 import { ASSESSOR_YEARS, resolveParcel, type ParcelResolution } from './sources/boston/assessor';
@@ -24,22 +25,26 @@ import {
   type RecordsDb,
   type RecordsPreparedStatement,
   type SourceResult,
+  type TriggerReason,
 } from './types';
 
 export interface PullOptions {
-  /** Admin user id, or null when a scheduled Worker runs the pull (sub-project C). */
+  /** Admin user id, or null when no admin is behind the pull (seed, queue). */
   triggeredBy: string | null;
+  /**
+   * Why the pull ran, stored in record_pulls.trigger_reason. Defaults to 'admin' when
+   * triggeredBy is set, and stays null when nothing else says why. A union, not a string,
+   * so a caller cannot invent a reason the queue and the admin panel do not recognize.
+   */
+  triggerReason?: TriggerReason | null;
   correctionId?: string | null;
   /** Injectable for tests. Defaults to global fetch. */
   fetchImpl?: FetchLike;
 }
 
-/** error_message is provenance, not a log: enough to diagnose, short enough not to bloat the row. */
-const MAX_ERROR_LENGTH = 500;
-
 const PULL_INSERT_SQL =
-  'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, row_count, error_message, triggered_by, correction_id) ' +
-  'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+  'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, row_count, error_message, triggered_by, correction_id, trigger_reason) ' +
+  'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
 const RECORD_INSERT_SQL =
   'INSERT INTO building_records (id, building_id, pull_id, kind, source_key, payload, source_url) VALUES (?, ?, ?, ?, ?, ?, ?)';
@@ -55,15 +60,7 @@ interface PullRowValues {
   errorMessage: string | null;
   triggeredBy: string | null;
   correctionId: string | null;
-}
-
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-/** The ellipsis is part of the budget, so a truncated message is still MAX_ERROR_LENGTH characters. */
-function truncate(message: string): string {
-  return message.length > MAX_ERROR_LENGTH ? `${message.slice(0, MAX_ERROR_LENGTH - 1)}…` : message;
+  triggerReason: TriggerReason | null;
 }
 
 function pullRowStatement(db: RecordsDb, values: PullRowValues): RecordsPreparedStatement {
@@ -81,6 +78,7 @@ function pullRowStatement(db: RecordsDb, values: PullRowValues): RecordsPrepared
       values.errorMessage,
       values.triggeredBy,
       values.correctionId,
+      values.triggerReason,
     );
 }
 
@@ -145,7 +143,7 @@ async function resolveIdentityParcel(db: RecordsDb, identity: BuildingIdentity, 
   try {
     resolution = await resolveParcel(identity, fetchImpl);
   } catch (err) {
-    return `Parcel resolution failed: ${messageOf(err)}`;
+    return `Parcel resolution failed: ${errorMessage(err)}`;
   }
   if (resolution.parcelId) {
     try {
@@ -153,7 +151,7 @@ async function resolveIdentityParcel(db: RecordsDb, identity: BuildingIdentity, 
       // this", and record_pulls.retrieved_at already dates the resolution.
       await db.prepare('UPDATE buildings SET parcel_id = ? WHERE id = ?').bind(resolution.parcelId, identity.buildingId).run();
     } catch (err) {
-      return `Parcel write failed: ${messageOf(err)}`;
+      return `Parcel write failed: ${errorMessage(err)}`;
     }
     // Assigned only after the write succeeds, so the identity the sources key on and the
     // buildings row never disagree about the parcel.
@@ -185,6 +183,9 @@ export async function pullBuildingRecords(
   const fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
   const correctionId = options.correctionId ?? null;
   const triggeredBy = options.triggeredBy;
+  // An admin pull that names no reason is still an admin pull. A pull with nobody behind it
+  // (seed, queue) has to say why it ran, because triggered_by is a users(id) FK and cannot.
+  const triggerReason = options.triggerReason ?? (options.triggeredBy ? 'admin' : null);
   const sources = sourcesForCity(building.city);
 
   let identity: BuildingIdentity | null = null;
@@ -194,11 +195,11 @@ export async function pullBuildingRecords(
   } catch (err) {
     // An address we cannot parse is a resolution failure like any other: every source
     // gets an error row saying so, and the caller still gets a summary back.
-    resolutionError = truncate(messageOf(err));
+    resolutionError = truncateError(errorMessage(err));
   }
   if (identity && !identity.parcelId) {
     const failure = await resolveIdentityParcel(db, identity, fetchImpl);
-    if (failure) resolutionError = truncate(failure);
+    if (failure) resolutionError = truncateError(failure);
   }
 
   const summaries: PullSourceSummary[] = [];
@@ -206,14 +207,14 @@ export async function pullBuildingRecords(
 
   for (const source of sources) {
     const pullId = crypto.randomUUID();
-    const base = { pullId, buildingId: building.id, jurisdiction, source, triggeredBy, correctionId };
+    const base = { pullId, buildingId: building.id, jurisdiction, source, triggeredBy, correctionId, triggerReason };
 
     if (!identity || resolutionError) {
       // Belt and braces: a null identity always comes with a resolutionError set above,
       // so the fallback text is unreachable unless that pairing is broken later.
-      const errorMessage = resolutionError ?? 'Building identity could not be resolved';
-      await pullRowStatement(db, { ...base, query: NO_QUERY, status: 'error', rowCount: 0, errorMessage }).run();
-      summaries.push({ sourceId: source.id, label: source.label, status: 'error', rowCount: 0, error: errorMessage });
+      const message = resolutionError ?? 'Building identity could not be resolved';
+      await pullRowStatement(db, { ...base, query: NO_QUERY, status: 'error', rowCount: 0, errorMessage: message }).run();
+      summaries.push({ sourceId: source.id, label: source.label, status: 'error', rowCount: 0, error: message });
       continue;
     }
 
@@ -221,10 +222,10 @@ export async function pullBuildingRecords(
     try {
       result = await source.run(identity, fetchImpl);
     } catch (err) {
-      const errorMessage = truncate(messageOf(err));
+      const message = truncateError(errorMessage(err));
       const query = err instanceof SourceError ? err.query : NO_QUERY;
-      await pullRowStatement(db, { ...base, query, status: 'error', rowCount: 0, errorMessage }).run();
-      summaries.push({ sourceId: source.id, label: source.label, status: 'error', rowCount: 0, error: errorMessage });
+      await pullRowStatement(db, { ...base, query, status: 'error', rowCount: 0, errorMessage: message }).run();
+      summaries.push({ sourceId: source.id, label: source.label, status: 'error', rowCount: 0, error: message });
       continue;
     }
 
@@ -240,9 +241,9 @@ export async function pullBuildingRecords(
       // rows survive untouched — the deletes rolled back with the inserts. Record the
       // failure as its own pull row (same query, so the provenance still says what ran)
       // and keep going: a write failure must not cost the sources after this one.
-      const errorMessage = truncate(`Write failed: ${messageOf(err)}`);
-      await pullRowStatement(db, { ...base, query: result.query, status: 'error', rowCount: 0, errorMessage }).run();
-      summaries.push({ sourceId: source.id, label: source.label, status: 'error', rowCount: 0, error: errorMessage });
+      const message = truncateError(`Write failed: ${errorMessage(err)}`);
+      await pullRowStatement(db, { ...base, query: result.query, status: 'error', rowCount: 0, errorMessage: message }).run();
+      summaries.push({ sourceId: source.id, label: source.label, status: 'error', rowCount: 0, error: message });
       continue;
     }
     summaries.push({ sourceId: source.id, label: source.label, status, rowCount: result.rows.length });

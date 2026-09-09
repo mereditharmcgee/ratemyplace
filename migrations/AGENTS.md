@@ -1,6 +1,6 @@
 # `migrations/` — D1 Schema Changes
 
-Cloudflare D1 (SQLite). 31 migrations, `0001` through `0031`.
+Cloudflare D1 (SQLite). 32 migrations, `0001` through `0032`.
 
 ---
 
@@ -76,6 +76,39 @@ reusing the day-old cache in `.cache/`. Operational facts worth knowing before y
   wrangler has to do the same.
 - The whole apply is idempotent — seeded rows have deterministic ids (`seed-<parcel>`) and are
   upserted — so a remote apply that fails partway is safely re-run from the start.
+
+**RUN AGAINST PRODUCTION 2026-09-09**, after `0031`: 38,208 seeded buildings, each with an
+FY2026 assessor pull row and its record. Re-running is an upsert and is safe, but there is no
+reason to — check `SELECT COUNT(*) FROM buildings WHERE source = 'seed'` before assuming
+otherwise.
+
+**`0032` (records queue indexes) is the exception: it is FULLY IDEMPOTENT.** Three
+`CREATE INDEX IF NOT EXISTS` statements and nothing else — no `ALTER TABLE`, no table
+rebuild — so it cannot half-apply and re-running it costs nothing. It is the only file since
+`0024` with no re-run hazard, and it is safe either way: `wrangler d1 execute --remote --file`
+or `migrations apply`. Do not add a non-idempotent statement to it. The three indexes are
+`idx_records_queue_building` on `records_queue(building_id)` (the partial unique index from
+`0031` only covers pending rows, so the planner's finished-`button` lookup had nothing to
+use), `idx_saved_buildings_building` on `saved_buildings(building_id)` (`0023` indexes
+`user_id`, and the UNIQUE leads with it), and `idx_record_pulls_retrieved` on
+`record_pulls(retrieved_at, source_id, status)` for the circuit breaker's trailing-24-hour
+`GROUP BY source_id` — the one scan that gets slower every month the fill runs.
+
+**APPLIED TO PRODUCTION 2026-09-09** by hand, alongside `0031` and the seed. Wrangler's
+migration tracking does not know it ran; unlike every other file above, re-running it is
+harmless.
+
+**`app_settings` keys in use.** The table is a key/value store for operator switches; the
+records pipeline owns three, defined once in `SETTING_KEYS` in `src/lib/records/settings.ts`:
+
+| Key | Value |
+|-----|-------|
+| `records_fill_paused` | `'1'` or `'0'`. The city-wide fill brake. Set by the circuit breaker, cleared only by a human from `/admin/records` |
+| `records_breaker_last_alert` | Unix seconds of the last breaker email, so a paused fill does not alert again |
+| `records_fixture_last` | JSON: what the daily Lanark fixture saw. Rendered by the admin queue panel |
+
+`updated_at` defaults on insert and does not self-update, so every writer sets it explicitly
+(`writeSetting` does).
 
 Before touching production schema: check the live schema directly, confirm what has
 actually been applied, and apply deliberately. Do not assume wrangler's state is accurate.

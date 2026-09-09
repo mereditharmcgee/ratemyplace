@@ -5,6 +5,10 @@
  * Import these in components that consume APIs for type safety.
  */
 
+// Type-only: the import is erased at build time, so this file pulls no lib/records/ code
+// into a browser bundle. A runtime import from here would.
+import type { QueueReason } from './records/types';
+
 // =============================================================================
 // Common Types
 // =============================================================================
@@ -380,4 +384,70 @@ export interface RecordCorrection {
   created_at: number;
   building_address: string;
   building_slug: string;
+}
+
+/**
+ * GET /api/admin/records/queue — the pull queue at a glance. Mirrors `QueueStats`
+ * in lib/records/queue.ts, which is the server-side source of truth; this copy
+ * exists so the admin panel does not run the queue module (and its SQL) in the
+ * browser bundle.
+ *
+ * `pendingByReason` counts claimable rows only — a row that has exhausted its
+ * attempts is counted once, under `parked`.
+ */
+export interface RecordsQueueStats {
+  pendingByReason: Record<QueueReason, number>;
+  parked: number;
+  oldestPendingAgeSeconds: number | null;
+  completedLast24h: number;
+  fillPaused: boolean;
+}
+
+/**
+ * One parked `records_queue` row joined to its building: a pull that failed its
+ * way out of the queue and is waiting for an admin to press Retry.
+ *
+ * `locked_at` is here because "parked" and "still running" overlap: `attempts`
+ * counts CLAIMS, so a row hits MAX_ATTEMPTS at the moment of its last claim and
+ * looks parked while its pull is still in flight for up to LOCK_TTL_SECONDS. The
+ * panel compares this against the clock to decide whether Retry is safe to offer.
+ */
+export interface RecordsQueueParkedRow {
+  id: number;
+  reason: QueueReason;
+  attempts: number;
+  last_error: string | null;
+  requested_at: number;
+  /** Unix seconds of the lease held by the claim that is (or was) pulling this row. */
+  locked_at: number | null;
+  address: string;
+  slug: string;
+}
+
+/**
+ * What the daily scheduler stamps into `app_settings.records_fixture_last` — the
+ * last circuit-breaker fixture run against the Lanark address. Written by `plan`
+ * in lib/records/scheduler.ts and read back by GET /api/admin/records/queue; the
+ * shape lives here so the writer and the panel cannot drift apart.
+ *
+ * A stored row that does not match — in ANY field, not only the two the headline reads —
+ * is reported as `null` rather than thrown at the panel: a settings row from a newer or
+ * older scheduler must not take the counts down with it, and half of one must not be
+ * rendered as though it were whole.
+ */
+export interface RecordsQueueFixtureResult {
+  /** Unix seconds of the plan run that wrote this. */
+  at: number;
+  /** `checksFailed` plus `sourceErrors.length` — the one number that decides pass/fail. */
+  failures: number;
+  /** Checks that came back not-ok, counted separately from the sources that threw. */
+  checksFailed: number;
+  /** How many checks ran, so a clean run can say "all 9 checks passed" rather than only "nothing failed". */
+  checksTotal: number;
+  /** Labels of the checks that came back not-ok. */
+  failed: string[];
+  /** Sources whose run() threw, by label. */
+  sourceErrors: Array<{ label: string; message: string }>;
+  /** Row count per source label, for the sources that ran. One that threw is absent, not zero. */
+  rowsBySource: Record<string, number>;
 }

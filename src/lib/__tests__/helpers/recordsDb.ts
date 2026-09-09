@@ -4,8 +4,10 @@ import { createMemoryDatabase, TestD1Database } from './sqliteD1';
 
 /**
  * Minimal schema for records tests: the parent tables the 0029/0030 migrations
- * reference. Keeps tests honest about the SQL that ships without applying all
- * 30 migrations.
+ * reference, plus the two tables the queue planner reads (`reviews.building_id`
+ * and `status`, `saved_buildings.building_id`). Column names mirror the real
+ * migrations (0001, 0023); the unused columns are left out. Keeps tests honest
+ * about the SQL that ships without applying all 31 migrations.
  */
 export function createRecordsStubDb(): TestD1Database {
   const db = new TestD1Database(createMemoryDatabase());
@@ -50,12 +52,35 @@ export function createRecordsStubDb(): TestD1Database {
       new_value TEXT,
       notes TEXT
     );
+    CREATE TABLE reviews (
+      id TEXT PRIMARY KEY,
+      building_id TEXT NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'flagged')),
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+    CREATE TABLE saved_buildings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      building_id TEXT NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+      created_at INTEGER DEFAULT (unixepoch()),
+      UNIQUE(user_id, building_id)
+    );
   `);
   return db;
 }
 
+/**
+ * 0032 indexes `saved_buildings(building_id)`, a table the real 0023 creates and the stub
+ * above stands in for, so the stub has to exist before this runs — `createRecordsTestDb`
+ * is the only correct order. The other two indexes are over tables 0029 and 0031 create.
+ */
 export function applyRecordsMigrations(db: TestD1Database): void {
-  for (const file of ['0029_building_records.sql', '0030_audit_records_actions.sql', '0031_boston_coverage.sql']) {
+  for (const file of [
+    '0029_building_records.sql',
+    '0030_audit_records_actions.sql',
+    '0031_boston_coverage.sql',
+    '0032_records_queue_indexes.sql',
+  ]) {
     db.exec(readFileSync(join(process.cwd(), 'migrations', file), 'utf8'));
   }
 }
@@ -76,19 +101,29 @@ export function auditActionTypesFrom0028(): string[] {
 
 export async function insertBuilding(
   db: TestD1Database,
-  overrides: Partial<{ id: string; address: string; slug: string; city: string; zip_code: string; parcel_id: string | null }> = {},
+  overrides: Partial<{
+    id: string;
+    address: string;
+    slug: string;
+    city: string;
+    state: string;
+    zip_code: string;
+    parcel_id: string | null;
+    sam_id: string | null;
+  }> = {},
 ): Promise<string> {
   const id = overrides.id ?? 'bldg-lanark';
   await db
-    .prepare('INSERT INTO buildings (id, address, slug, city, state, zip_code, parcel_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .prepare('INSERT INTO buildings (id, address, slug, city, state, zip_code, parcel_id, sam_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
     .bind(
       id,
       overrides.address ?? '23-27 Lanark Rd, Boston, MA 02135',
       overrides.slug ?? id,
       overrides.city ?? 'Boston',
-      'MA',
+      overrides.state ?? 'MA',
       overrides.zip_code ?? '02135',
       overrides.parcel_id ?? null,
+      overrides.sam_id ?? null,
     )
     .run();
   return id;

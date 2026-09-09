@@ -192,6 +192,99 @@ Not added on purpose: a per-building view counter (no analytics, by policy) and 
 
 **Plan check.** Cron Triggers exist on the free Workers plan, but its CPU limit is tight for parsing 20 responses per building. The owner confirms in the Cloudflare dashboard (Workers & Pages → Plans) before chunk C2 starts; if the account is on the free plan, the $5 Workers Paid plan is required.
 
+> **Amended 2026-09-09, as built (C2):** the Worker is a wiring file over
+> `src/lib/records/scheduler.ts`, which is where every decision above actually lives, as pure
+> functions over an injected `SchedulerDeps` bag (db, clock, pull, fixture, alert, log). That
+> is what makes `drain` and `plan` testable against the `node:sqlite` D1 double. The Worker
+> imports `drain`, `plan` and `liveDeps` and does nothing else.
+>
+> **Workers Paid is confirmed** (5 min CPU, 1,000 subrequests per invocation — not 10,000,
+> which an earlier draft of this block and the C2 plan both got wrong), so the plan caveat
+> above is closed. A full drain tick is four pulls at about 27 requests each, roughly 110
+> subrequests, so the real limit is comfortable but not the order of magnitude assumed.
+>
+> **Per-pull numbers, measured against the built sources.** A seeded building's pull is about
+> **27 requests** to data.boston.gov — 17 of them 311 (sixteen yearly files plus the
+> new-system resource), one per assessor year, one each for permits, violations, code
+> enforcement and RentSmart, and **none** for parcel resolution, because a seeded row already
+> carries its parcel — and it writes **11 `record_pulls` rows**, one per source. At full rate
+> that is about 110 requests a minute and about 15,800 pull rows a day from the fill. This
+> supersedes the "about 20 requests and about 30 stored rows" estimate in Section 1.
+>
+> Details that differ from the text above:
+>
+> - **`attempts` counts CLAIMS, not caught failures.** `claimBatch` increments it in the same
+>   conditional `UPDATE` that takes the lease; `completeRow` resets it to 0; `failRow` records
+>   `last_error` and **keeps** the lock rather than clearing it. Holding the lease *is* the
+>   backoff, and it is free: a building that fails every time spends its three attempts over
+>   an hour and a half instead of inside one drain. Counting claims is what stops a row whose
+>   pull kills the runner outright — an OOM, a CPU-limit kill, anything that never reaches a
+>   catch — from being claimed forever by the one process that cannot report the failure.
+> - **`LOCK_TTL_SECONDS = 1800`, not 600.** A single pull is about 27 requests, so its worst
+>   case at the 10 s per-source timeout is 270 s and 600 s was too close to the work it
+>   covers. Half an hour is the delay before a genuinely dead run's row is retried; nothing is
+>   gained by cutting it fine.
+> - **`drain` claims one row at a time, immediately before pulling it**, re-reading the clock
+>   per claim, rather than claiming the tick's three-plus-one up front. Claiming a batch would
+>   date every lease from the start of the run and spend an attempt on rows that never got
+>   pulled.
+> - **`drain` has a wall-clock budget, `DRAIN_BUDGET_MS = 45_000`**, checked before every claim
+>   (never after — a claim spends an attempt) and reported as `budgetHit` in `DrainResult`.
+>   The cron fires every minute whether or not the previous tick finished, so without it a
+>   slow upstream does not throttle the system, it compounds: a three-minute tick is overlapped
+>   by two more, each claiming its own rows and opening its own connections to the city.
+> - **`enqueue` will not replace a pending row whose lease is live.** A higher-priority request
+>   normally deletes and re-inserts the pending row, but a leased row is being pulled right now
+>   and that pull is already doing the requester's work; deleting it would orphan a run in
+>   flight, whose `completeRow` would then mark nothing. It answers `already_queued` instead,
+>   using claimBatch's liveness test, boundary included.
+> - **The pull is `pullBuildingRecords(db, building, { triggeredBy: null, triggerReason: 'queue:<reason>' })`.**
+>   `triggered_by` is a `users(id)` foreign key and stays NULL; the reason goes in
+>   `record_pulls.trigger_reason`, whose values are `admin`, `correction`, `seed`,
+>   `queue:button`, `queue:follower`, `queue:refresh`, `queue:fill`.
+> - **`plan` runs purge first**, then refresh, then the fill top-up, then the fixture, then the
+>   error rates, then the breaker — so a trip is judged on the day's pulls and stops the fill
+>   before the next drain. The fill top-up inserts in batches of `FILL_INSERT_BATCH = 100` via
+>   `db.batch`, each statement an `ON CONFLICT ... DO NOTHING` against 0031's partial unique
+>   index, and counts the inserts that actually landed rather than the rows it planned.
+> - **The fixture runs all eleven Boston sources concurrently**, applying results in source
+>   order afterwards so two runs compare label for label; a source that throws is caught inside
+>   its own task. Run in sequence, a data.boston.gov outage would cost eleven consecutive 10 s
+>   timeouts before the breaker could say so. The Worker gives the fixture's one direct SAM
+>   request a 15 s budget; every other request keeps `ckanSql`'s own 10 s timeout.
+> - **The fixture result is stored** as JSON in `app_settings.records_fixture_last` every day,
+>   pass or fail, and the admin panel renders it. The breaker also stamps
+>   `records_breaker_last_alert`.
+> - **The breaker counts the six assessor years** in the per-source error rates, even though
+>   the fill's notion of "covered" excludes them: parcel resolution runs through the assessor,
+>   so an assessor outage fails every other source for the same building, and a breaker blind
+>   to it would watch five sources fail without naming the one thing that broke them.
+> - **Two secrets, not one.** `RESEND_API_KEY` and `RECORDS_ALERT_EMAIL` — the alert address is
+>   a secret rather than a `vars` entry so a personal address is not committed to git. An unset
+>   address logs `records_breaker_email_skipped` at error level; the pause still holds.
+> - **No `waitUntil`.** `scheduled()` awaits `drain`/`plan` directly, logs one structured line,
+>   and rethrows on failure: a red row in the Cron Events tab is the only alarm an unattended
+>   cron gets. `observability` is enabled so those lines are queryable after the fact.
+> - **Local run** is `npm run records:worker` (`wrangler dev --test-scheduled`) plus a curl to
+>   `/__scheduled?cron=...`, not `-- --once`; deploy is `npm run records:worker:deploy` from the
+>   repo root with `--config`, not `wrangler deploy` from the Worker folder. **Stop the site dev
+>   server first** — both open the same local D1 file and two writers give you `SQLITE_BUSY`.
+> - **Admin API, three routes** under `src/pages/api/admin/records/queue/`:
+>   `GET /api/admin/records/queue` returns `{ data: { stats, parked, lastFixture } }`,
+>   `POST .../pause` takes `{ paused: boolean }`, `POST .../retry` takes `{ id: number }`. Both
+>   POSTs answer 415 on a non-JSON content type, per the CSRF rules in root `AGENTS.md`. **None
+>   of the three writes an audit row** — pausing and retrying are non-destructive operational
+>   switches, not admin actions on someone's data, and the flag's own `updated_at` records when
+>   it last moved. The shared `_json.ts` helper sits in that directory because Astro excludes
+>   `_`-prefixed files from routing.
+> - **Retry answers 409 when the lease is still live.** A row crosses three attempts at the
+>   moment of its last *claim*, so it appears parked while its pull may still be running;
+>   clearing the lease then would start a second concurrent pull of the same building. 404
+>   covers "no such row" and "already finished".
+> - **Operating it** is [`docs/runbooks/records-scheduler.md`](../../runbooks/records-scheduler.md).
+> - **Not in C2:** the follower enqueue, the public button endpoint, and unpausing. All three
+>   are C3, after the site release.
+
 ## Section 4: Public page and button
 
 **Seeded page with no reviews.** Same building page. The score block becomes a card: "No reviews yet. Lived here? Rate this place." with the existing write-a-review button. The rating sidebar reads "Rating breakdown appears after the first review." The records panel renders where it does today; the facts strip is the first substantial thing on the page.
@@ -269,6 +362,36 @@ On a match: set `google_place_id`, and `latitude`/`longitude` if null, and retur
 - Panel: the four page states; `PANEL_COPY` scan covers the new copy.
 
 **Live checks:** seed `--dry-run`; Worker `--once` locally; `npm run records:check` extended with the SAM resource.
+
+> **Amended 2026-09-09, as built (C2):** the queue line above landed as six test files, all
+> named `records*` so `npx vitest run records` finds them:
+>
+> - `recordsQueue.test.ts` — enqueue and priority replacement, claim order, lease expiry,
+>   claims counting attempts, parking at three, `failRow` keeping the lock.
+> - `recordsQueuePlanner.test.ts` — the refresh interest set, fill top-up order and target,
+>   purge retention, error-rate windows, queue stats, and that migration `0032`'s three
+>   indexes exist. An `EXPLAIN QUERY PLAN` assertion over the statements the module actually
+>   prepares pins which of them SQLite uses: the breaker's window is a covering seek on
+>   `idx_record_pulls_retrieved`, and the interest set's saved-buildings union is a covering
+>   scan of `idx_saved_buildings_building`. **`idx_records_queue_building` is not used by
+>   either planner** — both pending-row lookups prefer 0031's narrower partial index, and the
+>   finished-button leg of the interest set filters on `reason` and `done_at`, neither of
+>   which a building_id index carries, so it scans. 0032's own comment claims otherwise and is
+>   wrong; making that leg indexed is a migration, not a comment, and is not done here.
+> - `recordsScheduler.test.ts` — `drain` and `plan` against injected deps: the one-at-a-time
+>   claim, the paused fill, breaker thresholds in both directions, the single alert, the
+>   stored fixture result.
+> - `recordsQueueAdminRoutes.test.ts` — each guard in order on all three routes, the 415 and
+>   400 bodies, the pause round trip, the retry 409 on a live lease, and the two 404s (unknown
+>   id, finished row).
+> - `recordsQueuePanel.test.tsx` — the panel's states, the pause toggle, the disabled Retry
+>   button on a live lease.
+> - `recordsFixture.test.ts` — `runLanarkFixture` as a library: every check recorded, a source
+>   that throws becoming a `sourceErrors` entry rather than an exception.
+>
+> `recordsPull.test.ts` gained the `trigger_reason` cases, and the test-db helper gained stub
+> `reviews` and `saved_buildings` tables plus `0032`. The live check is `npm run records:worker`
+> against the local D1 with the two `__scheduled` curls, not `-- --once`.
 
 **Failure modes:** city API down → error rows, prior rows kept, fill paused, one email. Worker broken → queue grows, site unaffected, admin shows depth. Seed interrupted → re-run. Duplicate page slips through → the dedupe tests and the seed's unmatched list are the nets; an admin merge tool is out of scope.
 

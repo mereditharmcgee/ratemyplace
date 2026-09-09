@@ -1,6 +1,7 @@
 ---
 import AdminLayout from '../../components/admin/AdminLayout.astro';
 import RecordCorrectionsQueue from '../../components/admin/RecordCorrectionsQueue';
+import RecordsQueuePanel from '../../components/admin/RecordsQueuePanel';
 
 const user = Astro.locals.user;
 
@@ -15,15 +16,24 @@ if (!user.isAdmin) {
 }
 ---
 
-<AdminLayout title="Record corrections" currentPage="records">
-  <div class="space-y-6">
+<AdminLayout title="Public records" currentPage="records">
+  <div class="space-y-8">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900">Record corrections</h1>
+      <h1 class="text-2xl font-bold text-gray-900">Public records</h1>
       <p class="text-gray-600 mt-1">
-        Reports that a public record is wrong. The only resolution is a re-pull from the primary source.
+        The pull queue that fills and refreshes city records for every building, and the reports that a
+        published record is wrong — whose only resolution is a re-pull from the primary source.
       </p>
     </div>
 
-    <RecordCorrectionsQueue client:load />
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-gray-900">Pull queue</h2>
+      <RecordsQueuePanel client:load />
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-gray-900">Record corrections</h2>
+      <RecordCorrectionsQueue client:load />
+    </section>
   </div>
 </AdminLayout>

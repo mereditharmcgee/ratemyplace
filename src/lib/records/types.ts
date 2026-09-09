@@ -170,6 +170,16 @@ export class SourceError extends Error {
   }
 }
 
+/** Why a queue row exists. Mirrors 0031's CHECK on records_queue.reason. */
+export type QueueReason = 'button' | 'follower' | 'refresh' | 'fill';
+
+/**
+ * Why a pull ran, written verbatim to `record_pulls.trigger_reason`. It lives here, not in
+ * queue.ts, so `pull.ts` can name the union without importing the queue — and so a new queue
+ * reason cannot reach the column without first appearing in `QueueReason` above.
+ */
+export type TriggerReason = 'admin' | 'correction' | 'seed' | `queue:${QueueReason}`;
+
 export interface PullSourceSummary {
   sourceId: string;
   label: string;
@@ -190,7 +200,13 @@ export interface PullSummary {
 export interface RecordsStatement {
   first<T = unknown>(): Promise<T | null>;
   all<T = unknown>(): Promise<{ results: T[] }>;
-  run(): Promise<unknown>;
+  /**
+   * D1's `D1Response` shape, narrowed to the two fields this codebase reads. Both are
+   * optional so a conditional UPDATE that reports no count reads as zero — fail closed,
+   * the way the correction-resolve endpoint treats it. Real `D1Database` and the
+   * `TestD1Database` double both satisfy this.
+   */
+  run(): Promise<{ success?: boolean; meta?: { changes?: number } }>;
 }
 export interface RecordsPreparedStatement extends RecordsStatement {
   bind(...values: unknown[]): RecordsPreparedStatement;

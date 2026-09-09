@@ -1,0 +1,41 @@
+// The companion Cron Worker for the building-records queue. Separate from the site's
+// `wrangler.jsonc` (Pages) on purpose: Pages has no Cron Triggers, and the Pages build
+// only ever looks at `src/`, so nothing here ships with the site.
+{
+	"name": "ratemyplace-records-scheduler",
+	"main": "src/index.ts",
+	"compatibility_date": "2024-12-01",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"workers_dev": false,
+	// Workers Logs: without this, `wrangler tail` is the only way to see a run, and only
+	// while you are watching. With it, the structured lines the handler writes are queryable
+	// after the fact — which is the whole point of logging an unattended cron.
+	"observability": {
+		"enabled": true
+	},
+	"triggers": {
+		// Every minute: drain. 06:00 UTC daily: plan (refresh, fill top-up, purge, breaker).
+		// The two overlap at 06:00 and that is fine — they are separate invocations, the
+		// plan takes no locks, and every claim the drain makes is a conditional UPDATE, so
+		// the worst case is one tick claiming a row the plan enqueued a second earlier.
+		"crons": [
+			"* * * * *",
+			"0 6 * * *"
+		]
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "ratemyplace-db",
+			"database_id": "7dd2a722-fdd3-4986-b2f7-6d61d069438e"
+		}
+	],
+	"vars": {
+		"SITE_URL": "https://ratemyplace.org"
+	}
+	// Secrets, set once each (the alert address is a secret so it is not in git):
+	// npx wrangler secret put RESEND_API_KEY --config workers/records-scheduler/wrangler.jsonc
+	// npx wrangler secret put RECORDS_ALERT_EMAIL --config workers/records-scheduler/wrangler.jsonc
+}

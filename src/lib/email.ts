@@ -695,3 +695,50 @@ export async function sendRecordCorrectionOutcomeEmail(
     return { success: false, error: 'Failed to send email' };
   }
 }
+
+/**
+ * The one email the records scheduler sends: the city-wide fill just paused itself, either
+ * because the Lanark fixture failed or because a source is erroring past its threshold.
+ *
+ * Plain text, not HTML. This goes to the maintainer, not to a member of the public, and its
+ * body is a diagnostic report — failed check labels, per-source row counts, error rates —
+ * that reads better monospaced in a terminal-shaped inbox than dressed up in a template.
+ * Nothing in it is user-supplied, so there is nothing here for escapeHtml to protect.
+ *
+ * @param apiKey - Resend API key
+ * @param toEmail - Maintainer address (the Worker binding, not a user record)
+ * @param subject - Subject line, composed by the scheduler
+ * @param body - Plain-text body, composed by the scheduler
+ */
+export async function sendRecordsBreakerEmail(
+  apiKey: string,
+  toEmail: string,
+  subject: string,
+  body: string
+): Promise<EmailResult> {
+  if (!apiKey) {
+    console.error('RESEND_API_KEY not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  const resend = new Resend(apiKey);
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+      to: toEmail,
+      subject,
+      text: body,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err) {
+    console.error('Email send exception:', err);
+    return { success: false, error: 'Failed to send email' };
+  }
+}

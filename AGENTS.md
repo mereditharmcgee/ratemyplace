@@ -86,6 +86,8 @@ npm run db:setup   # db:fresh then db:seed (local D1 only)
 npm run ops:metrics   # regenerate ops/METRICS.md from production (read-only)
 npm run records:check   # live Lanark fixture check (hits data.boston.gov), run by hand
 npm run records:seed -- --dry-run   # Boston bulk seed; --write / --apply --local / --apply --remote
+npm run records:worker        # run the records-scheduler Worker locally (stop `npm run dev` first)
+npm run records:worker:deploy # deploy the records-scheduler Worker — separate from the site deploy
 ```
 
 `npm run smoke` has no default target. Supply an explicit `--environment` and
@@ -249,6 +251,16 @@ Things that have already cost time. Read before debugging.
   not apply to this deployment and an expiry date, after which CI fails again. Added
   2026-09-09 for the Astro AVIF advisory (GHSA-26w7-cxv4-gfx2), which needs Astro 7 to
   fix. Never add an entry without a reason and a date.
+- **There is a second deployable.** `workers/records-scheduler/` is a Cron Worker that runs
+  the records queue; Pages has no cron triggers. Pushing `main` deploys the site and nothing
+  else, so a change to `src/lib/records/scheduler.ts` or `queue.ts` is live in the admin
+  routes but not in the cron until someone runs `npm run records:worker:deploy`. Its secrets
+  (`RESEND_API_KEY`, `RECORDS_ALERT_EMAIL`) are Worker secrets, separate from the site's.
+  See [`docs/runbooks/records-scheduler.md`](docs/runbooks/records-scheduler.md).
+- **`app_settings.records_fill_paused` is the brake on the city-wide fill.** `'1'` stops the
+  fill; button, follower and refresh pulls keep running. The circuit breaker sets it and
+  never clears it — a human unpauses from `/admin/records`. Deploy the Worker with it set,
+  and never assume a quiet queue means the Worker is broken until you have checked the flag.
 - **Preview deploys cannot exercise Turnstile or the map.** The Turnstile sitekey is not
   allowlisted for `pages.dev`, and preview has no Maps key. Verify those widgets on
   production only — a failure in preview is expected, not a bug.
@@ -288,6 +300,21 @@ Things that have already cost time. Read before debugging.
 - **Public records are never fetched on a public page view.** Pulls are admin-triggered and
   stored in D1; the panel reads only what was stored. Lazy pull-on-view is permanently
   rejected: it is an amplification vector and ties page latency to a third-party API.
+- **Two admin paths pull synchronously; everything else is the Worker's.** The admin pull
+  button (`src/pages/api/admin/buildings/[id]/records/pull.ts`) and the correction re-pull
+  (`src/pages/api/admin/records/corrections/[id]/repull.ts`) call `pullBuildingRecords`
+  inside the request and answer with the summary — an admin is waiting on their own click,
+  and both are rate-limited and audited. Every `records_queue` row is pulled by the companion
+  Cron Worker on a later minute tick instead, never by a request; the admin retry endpoint
+  un-parks a row rather than pulling it (it refuses a row whose lease is still live with a
+  409); and the reader-facing button, which enqueues rather than pulls, arrives in C3. So
+  "I clicked it and nothing happened" is expected for up to a minute on anything queued — but
+  not on those two admin buttons, which either return a summary or fail in front of you.
+- **An `_`-prefixed file under `src/pages/` is not a route.** Astro excludes it from
+  file-based routing, which is how `src/pages/api/admin/records/queue/_json.ts` can be a
+  shared helper next to the endpoints that import it. The rule cuts the other way for
+  Markdown: any `.md` under `src/pages/` **is** routed and served as a public page, which is
+  why there is no nested `AGENTS.md` in that tree.
 
 ## Pre-deploy QA
 

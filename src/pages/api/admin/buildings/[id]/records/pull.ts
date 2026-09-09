@@ -105,7 +105,10 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
-    const summary = await pullBuildingRecords(db, building, { triggeredBy: context.locals.user.id });
+    const summary = await pullBuildingRecords(db, building, {
+      triggeredBy: context.locals.user.id,
+      triggerReason: 'admin',
+    });
 
     await createAuditLog(db, {
       adminUserId: context.locals.user.id,

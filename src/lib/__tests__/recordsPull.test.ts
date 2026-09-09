@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { pullBuildingRecords } from '../records/pull';
 import type { BuildingRowForIdentity } from '../records/identity';
 import { NO_QUERY, type AssessmentPayload, type FetchLike, type RecordsDb, type RecordsPreparedStatement } from '../records/types';
-import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
+import { ASSESSOR_YEARS, FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import { ENFORCEMENT_RESOURCE_ID } from '../records/sources/boston/enforcement';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
 import { RENTSMART_RESOURCE_ID } from '../records/sources/boston/rentsmart';
@@ -24,7 +24,7 @@ const BOSTON_SOURCE_COUNT = 11;
 
 const ADMIN_ID = 'admin-1';
 
-/** pull.ts's MAX_ERROR_LENGTH, kept literal so a change to the budget surfaces here. */
+/** errors.ts's MAX_ERROR_LENGTH, kept literal so a change to the budget surfaces here. */
 const MAX_ERROR_LENGTH = 500;
 
 /**
@@ -50,7 +50,7 @@ class TrackingStatement implements RecordsPreparedStatement {
     return this.inner.all<T>();
   }
 
-  run(): Promise<unknown> {
+  run(): Promise<{ success?: boolean; meta?: { changes?: number } }> {
     return this.inner.run();
   }
 }
@@ -480,6 +480,78 @@ suite('pullBuildingRecords', () => {
       .all<{ correction_id: string | null }>();
     expect(pulls.results).toHaveLength(BOSTON_SOURCE_COUNT);
     expect(pulls.results.every((p) => p.correction_id === 'corr-9')).toBe(true);
+  });
+
+  it('writes the trigger reason on every pull row and leaves triggered_by null for a non-admin pull', async () => {
+    const db = createRecordsTestDb();
+    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const building = await loadBuilding(db, buildingId);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
+
+    await pullBuildingRecords(db, building, { triggeredBy: null, triggerReason: 'queue:fill', fetchImpl });
+
+    const rows = await db
+      .prepare('SELECT DISTINCT trigger_reason, triggered_by FROM record_pulls WHERE building_id = ?')
+      .bind(buildingId)
+      .all<{ trigger_reason: string | null; triggered_by: string | null }>();
+    expect(rows.results).toEqual([{ trigger_reason: 'queue:fill', triggered_by: null }]);
+  });
+
+  it('defaults trigger_reason to admin when an admin id is given and no reason is', async () => {
+    const db = await createDbWithAdmin();
+    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const building = await loadBuilding(db, buildingId);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
+
+    await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl });
+
+    const rows = await db
+      .prepare('SELECT DISTINCT trigger_reason FROM record_pulls WHERE building_id = ?')
+      .bind(buildingId)
+      .all<{ trigger_reason: string | null }>();
+    expect(rows.results).toEqual([{ trigger_reason: 'admin' }]);
+  });
+
+  // The whole provenance tuple, not one column at a time: every value pull.ts binds into
+  // record_pulls has to be right at once, and a column silently dropped from PULL_INSERT_SQL
+  // would still pass the per-column assertions above. `id`, `query` and `retrieved_at` are
+  // left out — a uuid, a long SQL string, and a clock.
+  it('stamps the whole provenance tuple on a correction re-pull', async () => {
+    const db = await createDbWithAdmin();
+    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const building = await loadBuilding(db, buildingId);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
+    const currentYear = ASSESSOR_YEARS[0];
+
+    await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl });
+    await pullBuildingRecords(db, building, {
+      triggeredBy: ADMIN_ID,
+      triggerReason: 'correction',
+      correctionId: 'corr-1',
+      fetchImpl,
+    });
+
+    const row = await db
+      .prepare(
+        'SELECT building_id, jurisdiction, source_id, source_label, status, row_count, error_message, ' +
+          'triggered_by, correction_id, trigger_reason FROM record_pulls ' +
+          'WHERE building_id = ? AND source_id = ? AND correction_id = ?',
+      )
+      .bind(buildingId, currentYear.resourceId, 'corr-1')
+      .first<Record<string, unknown>>();
+
+    expect(row).toEqual({
+      building_id: buildingId,
+      jurisdiction: 'boston',
+      source_id: currentYear.resourceId,
+      source_label: `Property Assessment ${currentYear.fiscalYear}`,
+      status: 'ok',
+      row_count: 1,
+      error_message: null,
+      triggered_by: ADMIN_ID,
+      correction_id: 'corr-1',
+      trigger_reason: 'correction',
+    });
   });
 
   it('reports an unparseable address as a resolution error instead of throwing', async () => {

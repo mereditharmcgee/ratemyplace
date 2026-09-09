@@ -1,0 +1,151 @@
+# `ratemyplace-records-scheduler`
+
+The companion Cron Worker for the building-records queue. The Pages site cannot run cron
+triggers, so this Worker exists purely to call into the site's own code on a schedule: it
+binds the same `ratemyplace-db` D1 database and imports `drain` and `plan` from
+[`src/lib/records/scheduler.ts`](../../src/lib/records/scheduler.ts).
+
+There is no logic here. `src/index.ts` builds a `SchedulerDeps` bag from the Worker's
+bindings (D1, Resend key, alert address) and calls one of two functions. Everything that
+decides *what* to pull, *when* to pause, and *whether* to alert is unit-tested in the site
+package against the `node:sqlite` D1 double.
+
+## The two crons
+
+| Cron | Runs | What it does |
+|---|---|---|
+| `* * * * *` | every minute | `drain` — claims up to 3 people-facing rows plus 1 city-wide fill row, pulls each building's records for real, logs `records_drain`. Skips the fill row entirely while the fill is paused. |
+| `0 6 * * *` | 06:00 UTC daily | `plan` — in this order: purges finished rows, enqueues refreshes, tops the fill queue back up, runs the Lanark fixture and the source error-rate check, then trips the circuit breaker (pausing the fill and emailing once) if either fails. The order is the point: the breaker is judged on the day's pulls and stops the fill before the next drain. Logs `records_plan`. |
+
+A seeded building's pull is about 27 requests to `data.boston.gov` — 17 of them 311 (sixteen
+yearly files plus the new-system resource), one per assessor year, one each for permits,
+violations, code enforcement and RentSmart, and none for parcel resolution, which a seeded
+row already carries — and it writes 11 `record_pulls` rows, one per source. A full minute
+tick is therefore about 110 requests, well inside the Workers limit of 1,000 subrequests per
+invocation, and the fill alone writes about 15,800 pull rows a day. That rate is deliberate:
+it is polite against a public CKAN endpoint, and it makes the city-wide fill take months
+rather than hammering the city in an afternoon.
+
+`drain` also stops claiming after `DRAIN_BUDGET_MS` (45 s) of wall clock and reports
+`budgetHit: true`. The cron fires every minute whether or not the previous tick has
+finished, so without that ceiling a slow city would not throttle the system, it would stack
+overlapping drains on top of each other.
+
+At 06:00 UTC the two crons overlap. That is by design and it is safe: they are separate
+invocations, `plan` holds no locks, and every row `drain` claims is claimed with a
+conditional `UPDATE ... WHERE done_at IS NULL AND (locked_at IS NULL OR locked_at < ?)`, so
+the worst the overlap can do is have that minute's drain pick up a row the planner enqueued
+a second earlier — which is the intended behaviour anyway.
+
+## Where the logs are
+
+Both handlers write one structured JSON line per run (`records_drain` / `records_plan`),
+plus `records_scheduler_error` if the run throws, `records_breaker_email_failed` if the
+alert email does not send, `records_breaker_email_skipped` if `RECORDS_ALERT_EMAIL` was
+never set, and `records_scheduler_unknown_cron` if a cron fires that `src/index.ts` does not
+recognise. Those four go to `console.error`, so they surface as errors in the dashboard
+rather than as one more line to scroll past.
+
+`"observability": { "enabled": true }` in `wrangler.jsonc` turns on Workers Logs, which
+retains those lines for the account plan's retention window (days, not weeks — check the
+current number in the Cloudflare docs before relying on it) and makes them searchable under
+Workers → `ratemyplace-records-scheduler` → Logs, where you can filter on `event` or `level`
+to find a run after the fact. Without the setting, `wrangler tail` is the only way to see
+anything, and only while you are sitting there watching it. A failed run also shows up as a
+red row in the Worker's Cron Events tab, which is why `scheduled()` rethrows instead of
+swallowing: an unattended cron has no other alarm.
+
+## Running it locally
+
+**Stop the site dev server first.** `npm run dev` and `npm run records:worker` both open the
+same local D1 SQLite file under `.wrangler/state`, and two writers on one file give you
+`SQLITE_BUSY` mid-drain — a confusing failure that has nothing to do with the code you are
+testing. Run one at a time.
+
+From the repo root, against the local seeded D1 under `.wrangler/state`:
+
+```bash
+npm run records:worker
+```
+
+That starts `wrangler dev --test-scheduled` on `http://localhost:8787`. Nothing fires on a
+schedule in dev; trigger a run by hand:
+
+```bash
+# the daily planner
+curl "http://localhost:8787/__scheduled?cron=0%206%20*%20*%20*"
+# one drain tick
+curl "http://localhost:8787/__scheduled?cron=*%20*%20*%20*%20*"
+```
+
+Both make real requests to the live city API and write real rows to the local database.
+Inspect the result with:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --local --command \
+  "SELECT reason, COUNT(*) FROM records_queue WHERE done_at IS NULL GROUP BY reason;
+   SELECT trigger_reason, COUNT(*) FROM record_pulls GROUP BY trigger_reason;
+   SELECT key, value FROM app_settings"
+```
+
+If the local database is behind, apply migrations first:
+`npx wrangler d1 migrations apply ratemyplace-db --local`.
+
+## First deploy
+
+Deploy it paused. The first minute tick starts pulling the moment the Worker is live, so
+the pause flag has to be on production *before* the Worker is.
+
+1. **Pause the fill on production.** Toggle it off in the admin records panel, or:
+   ```bash
+   npx wrangler d1 execute ratemyplace-db --remote --command \
+     "INSERT INTO app_settings (key, value, updated_at) VALUES ('records_fill_paused', '1', unixepoch())
+      ON CONFLICT(key) DO UPDATE SET value = '1', updated_at = unixepoch()"
+   ```
+   Confirm it reads back as `1`. People-facing rows still drain while paused; only the
+   city-wide fill is held.
+2. **Set both secrets** (once per Worker; Worker secrets are not shared with Pages, so these
+   are separate from the site's):
+   ```bash
+   npx wrangler secret put RESEND_API_KEY --config workers/records-scheduler/wrangler.jsonc
+   npx wrangler secret put RECORDS_ALERT_EMAIL --config workers/records-scheduler/wrangler.jsonc
+   ```
+   `RECORDS_ALERT_EMAIL` is the address the breaker alert goes to. It is a secret rather
+   than a `vars` entry so a personal address is not committed to git. Miss it and the
+   breaker still pauses the fill — it just logs `records_breaker_email_skipped` at error
+   level instead of emailing anyone, which is a silence you would only notice too late.
+3. **Deploy:**
+   ```bash
+   npm run records:worker:deploy
+   ```
+4. **Watch the first few ticks:**
+   ```bash
+   npx wrangler tail ratemyplace-records-scheduler --format pretty
+   ```
+   Expect a `records_drain` line every minute with `fillPaused: true` and `pulled: 0` on a
+   quiet queue. `records_scheduler_error` means stop and look before walking away. So does a
+   `pulled` count on a paused fill, but only before the first 06:00 planner run — after it,
+   refresh rows drain legitimately while the fill is paused. See the runbook's step 4.
+
+Unpausing the city-wide fill is a separate, deliberate step (sub-project C3), not part of
+this deploy.
+
+## Stopping it
+
+- **Stop the city-wide fill, keep people-facing pulls:** flip the pause switch in the admin
+  records panel (or the `records_fill_paused` SQL above with `'1'`). This is the normal
+  brake and needs no deploy.
+- **Stop everything, keep the Worker:** remove the `crons` array from
+  `workers/records-scheduler/wrangler.jsonc` and redeploy, or disable the triggers under
+  Workers → `ratemyplace-records-scheduler` → Settings → Triggers in the Cloudflare
+  dashboard.
+- **Stop everything, remove the Worker:**
+  ```bash
+  npx wrangler delete --config workers/records-scheduler/wrangler.jsonc
+  ```
+  The queue tables live in D1 and survive; nothing drains them until a scheduler is back.
+
+The circuit breaker does the first of these on its own if the Lanark fixture fails or a
+source's error rate crosses the threshold, and emails `RECORDS_ALERT_EMAIL` once. That
+email is plain text and ends with `$SITE_URL/admin/records`, so unpausing is one tap from
+the alert on a phone.
