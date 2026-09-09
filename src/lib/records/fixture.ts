@@ -104,17 +104,34 @@ export async function runLanarkFixture(fetchImpl: FetchLike, options: FixtureOpt
   const failedSourceLabels = new Map<string, string>();
   const allRows: RecordRow[] = [];
 
-  for (const source of sourcesForCity('Boston')) {
-    try {
-      const result = await source.run(identity, fetchImpl);
-      rowsBySourceLabel.set(source.label, result.rows);
-      allRows.push(...result.rows);
-    } catch (err) {
-      const message = messageOf(err);
-      failedSourceLabels.set(source.label, message);
-      sourceErrors.push({ label: source.label, message });
+  // The eleven sources run together. They are independent queries against one host for one
+  // address, and the daily breaker calls this: run in sequence, a data.boston.gov outage
+  // costs eleven consecutive 10s timeouts before the alert can say so. Each source's throw is
+  // caught inside its own task, so `Promise.all` never rejects and no rejection goes unhandled.
+  //
+  // Results are applied AFTERWARDS, walking the source list in order, so `sourceErrors`,
+  // `allRows` and the insertion order of `rowsBySource` read the same on every run whatever
+  // order the responses arrived in. Two fixture runs have to compare label for label.
+  const sources = sourcesForCity('Boston');
+  const settled = await Promise.all(
+    sources.map(async (source): Promise<{ rows: RecordRow[] } | { error: string }> => {
+      try {
+        return { rows: (await source.run(identity, fetchImpl)).rows };
+      } catch (err) {
+        return { error: messageOf(err) };
+      }
+    }),
+  );
+  sources.forEach((source, index) => {
+    const result = settled[index];
+    if ('error' in result) {
+      failedSourceLabels.set(source.label, result.error);
+      sourceErrors.push({ label: source.label, message: result.error });
+      return;
     }
-  }
+    rowsBySourceLabel.set(source.label, result.rows);
+    allRows.push(...result.rows);
+  });
 
   /**
    * Rows for a source that returned successfully — 0 rows for a source that never ran

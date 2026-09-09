@@ -10,6 +10,15 @@ const emptyFetch: FetchLike = async () =>
 /** Every Boston adapter runs for the fixture, so this is the arity both accountings add up to. */
 const BOSTON_SOURCE_COUNT = sourcesForCity('Boston').length;
 
+/** Resource id by source label, so a test can single a source out without hardcoding one. */
+const SOURCE_ID_BY_LABEL = new Map(sourcesForCity('Boston').map((source) => [source.label, source.id]));
+
+function sourceId(label: string): string {
+  const id = SOURCE_ID_BY_LABEL.get(label);
+  if (!id) throw new Error(`no Boston source labelled ${label}`);
+  return id;
+}
+
 describe('runLanarkFixture', () => {
   it('names the fixture parcel and address', () => {
     expect(LANARK_FIXTURE.parcelId).toBe('2102098000');
@@ -29,6 +38,46 @@ describe('runLanarkFixture', () => {
     expect(result.sourceErrors.length + Object.keys(result.rowsBySource).length).toBe(BOSTON_SOURCE_COUNT);
     for (const err of result.sourceErrors) expect(result.rowsBySource[err.label]).toBeUndefined();
     expect(Object.values(result.rowsBySource).every((n) => n === 0)).toBe(true);
+  });
+
+  it('records every other source when one throws, in source-list order however the answers arrive', async () => {
+    const throwing = sourceId('Approved Building Permits');
+    const slow = sourceId('311 Service Requests');
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const fetchImpl: FetchLike = async (input) => {
+      const url = String(input);
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      try {
+        // Every call yields, and 311 comes back last: the sources run concurrently, so the
+        // recorded order has to be the source list's, not the order the answers arrived in.
+        await new Promise((resolve) => setTimeout(resolve, url.includes(slow) ? 10 : 1));
+        if (url.includes(throwing)) throw new Error('permits down');
+        return new Response(JSON.stringify({ success: true, result: { records: [] } }), { status: 200 });
+      } finally {
+        inFlight -= 1;
+      }
+    };
+
+    const result = await runLanarkFixture(fetchImpl, { sleep: async () => {} });
+
+    // The sources are in flight together, not one after another: the daily breaker should not
+    // spend eleven sequential timeouts finding out that data.boston.gov is down.
+    expect(maxInFlight).toBeGreaterThan(1);
+
+    expect(result.sourceErrors.find((e) => e.label === 'Approved Building Permits')?.message).toContain(
+      'permits down',
+    );
+    // The one that threw is absent; every other source that could run without a parcel id
+    // still recorded its count, and they are in source-list order.
+    expect(Object.keys(result.rowsBySource)).toEqual([
+      'Building and Property Violations',
+      'Public Works Code Enforcement',
+      '311 Service Requests',
+      'RentSmart',
+    ]);
+    expect(result.sourceErrors.length + Object.keys(result.rowsBySource).length).toBe(BOSTON_SOURCE_COUNT);
   });
 
   it('reports a source that throws as a failed check, not an exception', async () => {
