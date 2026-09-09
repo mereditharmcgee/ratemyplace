@@ -51,9 +51,12 @@ summary, write nothing), `-- --write` (also write the SQL), `-- --apply --local`
 `-- --apply --remote` (needs `CLOUDFLARE_API_TOKEN`). `--refresh` re-downloads instead of
 reusing the day-old cache in `.cache/`. Operational facts worth knowing before you run it:
 
-- It writes SQL batch files of 1,000 statements each under `.cache/seed/`. That number is not
-  arbitrary: 2,000-statement files hang the local D1 for five minutes and then fail with a
+- It writes SQL batch files of 999 statements each under `.cache/seed/`: a multiple of three,
+  so every file holds whole buildings (row, pull, record), and under 1,000 because
+  2,000-statement files hang the local D1 for five minutes and then fail with a
   `Body Timeout Error`, rolling the whole file back. Do not raise it.
+- `-- --apply --remote --from 12` resumes applying at batch file 12 after a failure; the
+  script names the file it is on as it goes.
 - `wrangler d1 execute --json` renders a SQL `NULL` as the JSON *string* `"null"`. The script
   folds that back to `null` when it reads existing rows; anything else that shells out to
   wrangler has to do the same.
