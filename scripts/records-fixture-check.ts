@@ -18,7 +18,10 @@
  * Usage: npm run records:check
  */
 
+import { fetchAllRows } from '../src/lib/records/ckan';
 import { buildIdentity } from '../src/lib/records/identity';
+import { SAM_FIELDS, SAM_RESOURCE_ID, indexSamByParcel } from '../src/lib/records/seed/sam';
+import type { SamRow } from '../src/lib/records/seed/types';
 import { resolveParcel } from '../src/lib/records/sources/boston/assessor';
 import { sourcesForCity } from '../src/lib/records/jurisdictions';
 import type {
@@ -199,6 +202,27 @@ async function main(): Promise<void> {
   // --- RentSmart ---
   const rentsmartRows = rowsBySourceLabel.get('RentSmart') ?? [];
   check('RentSmart rows present', rentsmartRows.length > 0, `got ${rentsmartRows.length} rows`);
+
+  // --- SAM address points ---
+  // SAM is the seed's coordinate, neighborhood, and zip source (src/lib/records/seed/sam.ts).
+  // It is not one of the sourcesForCity adapters, so it is fetched here directly, filtered to
+  // the fixture parcel so this is one request rather than the 400,000-row bulk download.
+  const samRows = await fetchAllRows<SamRow>(
+    SAM_RESOURCE_ID,
+    { fields: [...SAM_FIELDS], filters: { PARCEL_ID: '2102098000' } },
+    fetchImpl,
+  );
+  const samPoint = indexSamByParcel(samRows).get('2102098000');
+  check(
+    'SAM primary point for Lanark: id 83763, Brighton, inside Boston',
+    samPoint?.samId === '83763'
+      && samPoint.neighborhood === 'Brighton'
+      && samPoint.latitude > 42.2
+      && samPoint.latitude < 42.4
+      && samPoint.longitude > -71.2
+      && samPoint.longitude < -70.9,
+    `got ${JSON.stringify(samPoint ?? null)} from ${samRows.length} SAM rows`,
+  );
 
   console.log('');
   if (failures === 0) {
