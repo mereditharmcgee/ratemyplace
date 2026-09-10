@@ -71,6 +71,16 @@ suite('POST /api/buildings/[id]/save enqueues a follower pull', () => {
     expect(await pendingReasons(db, id)).toEqual(['button']);
   });
 
+  // Priority-sensitive where the case above is not: follower (0) outranks refresh (1), so
+  // `enqueue` on its own would replace this row. What keeps it is the save path's guard —
+  // it enqueues only from `never_pulled`, and a pending refresh row reads `requested`.
+  it('does not promote a pending refresh row to a follower', async () => {
+    await enqueue(db, { buildingId: id, reason: 'refresh', now: 1_000 });
+    const res = await POST(createContext(db, id));
+    expect(res.status).toBe(200);
+    expect(await pendingReasons(db, id)).toEqual(['refresh']);
+  });
+
   it('a second save is idempotent and still leaves one pending row', async () => {
     await POST(createContext(db, id));
     const res = await POST(createContext(db, id));

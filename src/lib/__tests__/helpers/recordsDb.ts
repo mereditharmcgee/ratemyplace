@@ -182,13 +182,13 @@ export async function insertBuilding(db: TestD1Database, overrides: Partial<Buil
 /**
  * A finished pull row for one source, so the coverage reads can see it. The id folds in
  * `status` so one building can hold both an `ok` and an `error` row for the same source.
- * `trigger_reason` is fixed: nothing asserts it, and the column only needs to be non-null.
+ * `trigger_reason` is fixed: nothing asserts it, and any value the union allows will do.
  */
 export async function insertPull(
   db: TestD1Database,
   buildingId: string,
   sourceId: string,
-  status = 'ok',
+  status: 'ok' | 'empty' | 'error' = 'ok',
 ): Promise<void> {
   await db
     .prepare(
