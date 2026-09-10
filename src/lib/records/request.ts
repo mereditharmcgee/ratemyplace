@@ -1,6 +1,6 @@
 // Limits and validation for the reader-facing records request. The route in
-// `src/pages/api/records/request.ts` is the only writer; keep the numbers here so the test,
-// the privacy page, and the route agree.
+// `src/pages/api/records/request.ts` is the only writer; keep the numbers here so the route,
+// its tests, and the privacy-page copy cannot fork.
 import type { ValidationError } from '../validation';
 import type { RecordsDb } from './types';
 
@@ -11,18 +11,19 @@ export const REQUEST_WINDOW_SECONDS = 3600;
 export const REQUEST_DAILY_CAP = 300;
 export const REQUEST_CAP_WINDOW_SECONDS = 86_400;
 
-export async function buttonRequestsSince(db: RecordsDb, since: number): Promise<number> {
+export async function buttonRequestsSince(db: RecordsDb, since: number): Promise<{ count: number; oldest: number | null }> {
   const row = await db
-    .prepare("SELECT COUNT(*) AS n FROM records_queue WHERE reason = 'button' AND requested_at >= ?")
+    .prepare("SELECT COUNT(*) AS n, MIN(requested_at) AS oldest FROM records_queue WHERE reason = 'button' AND requested_at >= ?")
     .bind(since)
-    .first<{ n: number }>();
-  return row?.n ?? 0;
+    .first<{ n: number; oldest: number | null }>();
+  return { count: row?.n ?? 0, oldest: row?.oldest ?? null };
 }
 
-export function validateRequestBody(body: Record<string, unknown>): ValidationError[] {
+export type ParsedRequestBody = { errors: ValidationError[]; buildingId: null } | { errors: []; buildingId: string };
+export function parseRequestBody(body: Record<string, unknown>): ParsedRequestBody {
   const { buildingId } = body;
-  if (!buildingId || typeof buildingId !== 'string' || !buildingId.trim()) {
-    return [{ field: 'buildingId', message: 'Building is required.' }];
+  if (typeof buildingId !== 'string' || !buildingId.trim()) {
+    return { errors: [{ field: 'buildingId', message: 'Building is required.' }], buildingId: null };
   }
-  return [];
+  return { errors: [], buildingId: buildingId.trim() };
 }

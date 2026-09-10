@@ -12,7 +12,7 @@ import {
   REQUEST_PER_IP,
   REQUEST_WINDOW_SECONDS,
   buttonRequestsSince,
-  validateRequestBody,
+  parseRequestBody,
 } from '../../../lib/records/request';
 
 /**
@@ -22,9 +22,9 @@ import {
  * companion Worker; it never pulls anything itself (AGENTS.md: no fetch from a city API in a
  * request). Unauthenticated JSON POST, so the guard order is the corrections route's:
  * content type -> per-IP rate limit -> body shape -> site-wide daily cap -> Turnstile ->
- * validation -> building -> coverage -> enqueue. Nothing about the presser is stored: the
- * queue row carries the building and the time, and the rate limiter keeps the IP for an hour
- * as it does for every public form.
+ * validation -> coverage (one statement answers building, eligibility, and pull state) ->
+ * enqueue. Nothing about the presser is stored: the queue row carries the building and the
+ * time, and the rate limiter keeps the IP for an hour as it does for every public form.
  */
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
@@ -70,11 +70,22 @@ export const POST: APIRoute = async (context: APIContext) => {
     const record = body as Record<string, unknown>;
 
     const now = Math.floor(Date.now() / 1000);
-    if ((await buttonRequestsSince(db, now - REQUEST_CAP_WINDOW_SECONDS)) >= REQUEST_DAILY_CAP) {
+    // The cap is a local D1 read and Turnstile is an outbound subrequest, so the cap runs
+    // first: in the flood this cap exists for, that saves a network call per request. Two
+    // knowingly-accepted costs. The count has no covering index today (0031/0032 index other
+    // columns) and button rows are never purged, so a `records_queue(reason, requested_at)`
+    // index is a planned follow-up migration. And concurrent presses can overshoot the cap by
+    // the concurrency, which is fine for a soft daily budget.
+    const buttons = await buttonRequestsSince(db, now - REQUEST_CAP_WINDOW_SECONDS);
+    if (buttons.count >= REQUEST_DAILY_CAP) {
+      // Only Retry-After: `limitHeaders` came from an allowed per-IP check and would claim
+      // remaining presses on a refusal. A slot frees when the oldest counted row leaves the
+      // window.
+      const retryAfter = Math.max(1, (buttons.oldest ?? now) + REQUEST_CAP_WINDOW_SECONDS - now);
       return json(
         429,
-        { error: "Today's limit for city-records requests has been reached. Please try again tomorrow." },
-        limitHeaders,
+        { error: 'The daily limit for city-records requests has been reached. Please try again later.' },
+        { 'Retry-After': String(retryAfter) },
       );
     }
 
@@ -87,19 +98,18 @@ export const POST: APIRoute = async (context: APIContext) => {
       return json(400, { error: turnstile.error || 'Bot verification failed. Please try again.' });
     }
 
-    const errors = validateRequestBody(record);
-    if (errors.length > 0) return json(400, { error: 'Validation failed', details: errors });
-    const buildingId = (record.buildingId as string).trim();
+    const parsed = parseRequestBody(record);
+    if (parsed.buildingId === null) return json(400, { error: 'Validation failed', details: parsed.errors });
 
     // Unknown building, a city no jurisdiction pulls for, and a building with no parcel id
     // are one answer on purpose: there is nothing to offer and nothing to tell a prober.
-    const state = await recordsRequestState(db, buildingId);
+    const state = await recordsRequestState(db, parsed.buildingId);
     if (state === 'ineligible') return json(404, { error: 'Building not found' });
     if (state === 'pulled') {
       return json(409, { error: 'City records for this building have already been retrieved.' });
     }
 
-    const result = await enqueue(db, { buildingId, reason: 'button', now });
+    const result = await enqueue(db, { buildingId: parsed.buildingId, reason: 'button', now });
     return json(202, { data: { status: result.status } }, limitHeaders);
   } catch (error) {
     logError('records_request_failed', {

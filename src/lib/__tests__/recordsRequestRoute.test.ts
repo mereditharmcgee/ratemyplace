@@ -5,7 +5,7 @@ import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
 import { enqueue } from '../records/queue';
-import { REQUEST_DAILY_CAP, REQUEST_PER_IP } from '../records/request';
+import { REQUEST_CAP_WINDOW_SECONDS, REQUEST_DAILY_CAP, REQUEST_PER_IP } from '../records/request';
 
 // Mock Turnstile BEFORE importing the route so it picks up the mock instead of making a
 // real network call. Token 'good' succeeds; anything else fails.
@@ -50,6 +50,18 @@ async function insertPull(db: TestD1Database, buildingId: string, sourceId: stri
     .run();
 }
 
+/** Enqueue exactly the cap's worth of button rows, timestamped now, on other buildings. */
+async function fillDailyCap(db: TestD1Database): Promise<void> {
+  const now = Math.floor(Date.now() / 1000);
+  for (let i = 0; i < REQUEST_DAILY_CAP; i += 1) {
+    const other = await insertBuilding(db, {
+      id: `cap-${i}`,
+      parcel_id: `21023960${String(i).padStart(2, '0')}`,
+    });
+    await enqueue(db, { buildingId: other, reason: 'button', now });
+  }
+}
+
 async function pendingRows(db: TestD1Database, buildingId: string): Promise<Array<{ reason: string }>> {
   const { results } = await db
     .prepare('SELECT reason FROM records_queue WHERE building_id = ? AND done_at IS NULL')
@@ -74,6 +86,8 @@ suite('POST /api/records/request', () => {
     const res = await POST(createContext(db, { contentType: 'text/plain', body: 'x' }));
     expect(res.status).toBe(415);
     expect(await res.json()).toEqual({ error: 'Unsupported Media Type' });
+    // "Before anything else" means the rate limiter never ran either.
+    expect(((await db.prepare('SELECT COUNT(*) AS n FROM rate_limits').first<{ n: number }>()) ?? { n: 0 }).n).toBe(0);
   });
 
   it('429 after three requests from one IP in an hour', async () => {
@@ -93,19 +107,47 @@ suite('POST /api/records/request', () => {
     });
   });
 
-  it('429 with its own message once 300 button rows were created today', async () => {
-    for (let i = 0; i < REQUEST_DAILY_CAP; i += 1) {
-      const other = await insertBuilding(db, {
-        id: `cap-${i}`,
-        parcel_id: `21023960${String(i).padStart(2, '0')}`,
-      });
-      await enqueue(db, { buildingId: other, reason: 'button', now: Math.floor(Date.now() / 1000) });
+  it('a malformed body still consumes a per-IP slot', async () => {
+    for (let i = 0; i < REQUEST_PER_IP; i += 1) {
+      const rejected = await POST(createContext(db, { body: 'null' }));
+      expect(rejected.status).toBe(400);
     }
     const res = await POST(createContext(db, { body: good(id) }));
     expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: 'Too many requests. Please try again later.' });
+  });
+
+  it('429 with its own message once 300 button rows were created today', async () => {
+    await fillDailyCap(db);
+    const res = await POST(createContext(db, { body: good(id) }));
+    expect(res.status).toBe(429);
     expect(await res.json()).toEqual({
-      error: "Today's limit for city-records requests has been reached. Please try again tomorrow.",
+      error: 'The daily limit for city-records requests has been reached. Please try again later.',
     });
+    // Retry-After is when the oldest counted row leaves the window — the rows above were
+    // enqueued with `now`, so that is a positive number of seconds no larger than the window.
+    const retryAfter = Number(res.headers.get('Retry-After'));
+    expect(Number.isInteger(retryAfter)).toBe(true);
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(retryAfter).toBeLessThanOrEqual(REQUEST_CAP_WINDOW_SECONDS);
+    // The per-IP headers would have claimed remaining presses on a refusal.
+    expect(res.headers.get('X-RateLimit-Remaining')).toBeNull();
+  });
+
+  it('the daily cap is checked before Turnstile', async () => {
+    await fillDailyCap(db);
+    const res = await POST(createContext(db, { body: { buildingId: id, turnstileToken: 'bad' } }));
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({
+      error: 'The daily limit for city-records requests has been reached. Please try again later.',
+    });
+    expect(await pendingRows(db, id)).toEqual([]);
+  });
+
+  it('Turnstile is checked before field validation', async () => {
+    const res = await POST(createContext(db, { body: { turnstileToken: 'bad' } }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Bot verification failed. Please try again.' });
   });
 
   it('400 on a failed Turnstile check', async () => {
