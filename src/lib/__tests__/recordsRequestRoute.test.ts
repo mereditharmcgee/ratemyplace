@@ -4,8 +4,15 @@ import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding, insertPull, pendingReasons } from './helpers/recordsDb';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
-import { enqueue } from '../records/queue';
-import { REQUEST_CAP_WINDOW_SECONDS, REQUEST_DAILY_CAP, REQUEST_PER_IP } from '../records/request';
+import { MAX_ATTEMPTS, enqueue } from '../records/queue';
+import { recordsRequestState } from '../records/coverage';
+import {
+  REQUEST_CAP_WINDOW_SECONDS,
+  REQUEST_DAILY_CAP,
+  REQUEST_PER_IP,
+  buttonRequestsSince,
+} from '../records/request';
+import type { RecordsDb } from '../records/types';
 
 // Mock Turnstile BEFORE importing the route so it picks up the mock instead of making a
 // real network call. Token 'good' succeeds; anything else fails.
@@ -98,7 +105,7 @@ suite('POST /api/records/request', () => {
     expect(await res.json()).toEqual({ error: 'Too many requests. Please try again later.' });
   });
 
-  it('429 with its own message once 300 button rows were created today', async () => {
+  it('429 with its own message once 300 button rows were created in the last 24 hours', async () => {
     await fillDailyCap(db);
     const res = await POST(createContext(db, { body: good(id) }));
     expect(res.status).toBe(429);
@@ -180,5 +187,75 @@ suite('POST /api/records/request', () => {
     expect(res.status).toBe(202);
     expect(await res.json()).toEqual({ data: { status: 'queued' } });
     expect(await pendingReasons(db, id)).toEqual(['button']);
+  });
+
+  // `parked` is a page state, not a refusal: the panel stops offering the button, but a
+  // press that arrives anyway (a stale page, a direct POST) must not 404 or 409. It falls
+  // through to `enqueue` exactly as `requested` does.
+  it('a parked pending row answers 202 already_queued rather than 404 or 409', async () => {
+    await enqueue(db, { buildingId: id, reason: 'button', now: 1_000 });
+    await db
+      .prepare('UPDATE records_queue SET attempts = ? WHERE building_id = ? AND done_at IS NULL')
+      .bind(MAX_ATTEMPTS, id)
+      .run();
+    expect(await recordsRequestState(db, id)).toBe('parked');
+
+    const res = await POST(createContext(db, { body: good(id) }));
+
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ data: { status: 'already_queued' } });
+    expect(await pendingReasons(db, id)).toEqual(['button']);
+  });
+});
+
+/**
+ * The daily cap runs on every unauthenticated press, and button rows are never purged, so
+ * the count behind it is the one read in this route that grows without bound. Migration
+ * 0033 is the index that keeps it a range seek. `EXPLAIN QUERY PLAN` over the statement the
+ * module actually prepares, in the style of `recordsQueuePlanner.test.ts`, so a rewrite of
+ * the query cannot leave this test passing about the old one.
+ */
+suite('migration 0033 covers the daily-cap count', () => {
+  it('creates idx_records_queue_reason_requested', async () => {
+    const db = createRecordsTestDb();
+    const row = await db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_records_queue_reason_requested'")
+      .first<{ name: string }>();
+    expect(row?.name).toBe('idx_records_queue_reason_requested');
+  });
+
+  it('answers the cap count from that index rather than a table scan', async () => {
+    const db = createRecordsTestDb();
+    let captured: { sql: string; values: unknown[] } | null = null;
+    const capturing = {
+      prepare(sql: string) {
+        const inner = db.prepare(sql);
+        const self = {
+          bind(...values: unknown[]) {
+            captured = { sql, values };
+            inner.bind(...(values as never[]));
+            return self;
+          },
+          first: <T>() => inner.first<T>(),
+          all: <T>() => inner.all<T>(),
+          run: () => inner.run(),
+        };
+        return self;
+      },
+      batch: (statements: unknown[]) => db.batch(statements as never),
+    } as unknown as RecordsDb;
+
+    await buttonRequestsSince(capturing, 1_000);
+    if (!captured) throw new Error('buttonRequestsSince prepared no statement');
+    const call: { sql: string; values: unknown[] } = captured;
+
+    const plan = await db
+      .prepare(`EXPLAIN QUERY PLAN ${call.sql}`)
+      .bind(...(call.values as never[]))
+      .all<{ detail: string }>();
+    const detail = plan.results.map((r) => r.detail).join('\n');
+
+    expect(detail).toContain('idx_records_queue_reason_requested');
+    expect(detail).not.toContain('SCAN records_queue');
   });
 });

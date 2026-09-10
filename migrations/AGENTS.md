@@ -1,6 +1,6 @@
 # `migrations/` — D1 Schema Changes
 
-Cloudflare D1 (SQLite). 32 migrations, `0001` through `0032`.
+Cloudflare D1 (SQLite). 33 migrations, `0001` through `0033`.
 
 ---
 
@@ -97,6 +97,25 @@ use), `idx_saved_buildings_building` on `saved_buildings(building_id)` (`0023` i
 **APPLIED TO PRODUCTION 2026-09-09** by hand, alongside `0031` and the seed. Wrangler's
 migration tracking does not know it ran; unlike every other file above, re-running it is
 harmless.
+
+**`0033` (records queue reason/requested index) is idempotent too, and is NOT YET APPLIED TO
+PRODUCTION.** One `CREATE INDEX IF NOT EXISTS` over `records_queue(reason, requested_at)`,
+which is the daily-cap count behind the public records button:
+`SELECT COUNT(*), MIN(requested_at) … WHERE reason = 'button' AND requested_at >= ?`. Neither
+`0031` nor `0032` covers those two columns, and `button` rows are never purged, so that count
+scanned a growing table on every unauthenticated press. **Apply it by hand before the
+city-wide fill is unpaused** — see the runbook's first-unpause checklist:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --file migrations/0033_records_queue_reason_requested.sql
+```
+
+Then confirm it landed:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --command \
+  "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_records_queue_reason_requested'"
+```
 
 **`app_settings` keys in use.** The table is a key/value store for operator switches; the
 records pipeline owns three, defined once in `SETTING_KEYS` in `src/lib/records/settings.ts`:

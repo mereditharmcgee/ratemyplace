@@ -271,6 +271,13 @@ export const REQUEST_BUTTON_HELP =
 export const REQUEST_VERIFYING_COPY = 'Checking that you are a person, then sending the request.';
 export const REQUESTED_COPY = 'Records requested. They usually appear within a few minutes; reload to check.';
 export const FILL_QUEUED_COPY = 'Queued for the city-wide pass.';
+/**
+ * The queue row for this building used up its claims, so nothing will happen to it until a
+ * human looks. `REQUESTED_COPY` would keep telling the reader to reload a page that is not
+ * going to change, so this says what is true and stops asking.
+ */
+export const REQUEST_PARKED_COPY =
+  'These records could not be retrieved yet. The request is queued for another attempt.';
 export const REQUEST_ALREADY_PULLED_COPY = 'These records have already been retrieved. Reload to see them.';
 export const REQUEST_FAILED_COPY = 'The request did not go through. Please try again.';
 
@@ -395,6 +402,7 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   REQUEST_VERIFYING_COPY,
   REQUESTED_COPY,
   FILL_QUEUED_COPY,
+  REQUEST_PARKED_COPY,
   REQUEST_ALREADY_PULLED_COPY,
   REQUEST_FAILED_COPY,
   NO_REVIEWS_CARD_TITLE,

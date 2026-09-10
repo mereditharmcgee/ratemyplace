@@ -71,13 +71,13 @@ export const POST: APIRoute = async (context: APIContext) => {
 
     const now = Math.floor(Date.now() / 1000);
     // The cap is a local D1 read and Turnstile is an outbound subrequest, so the cap runs
-    // first: in the flood this cap exists for, that saves a network call per request. Two
-    // knowingly-accepted costs. The count has no covering index today (0031/0032 index other
-    // columns) and button rows are never purged, so a `records_queue(reason, requested_at)`
-    // index is a planned follow-up migration. And concurrent presses can overshoot the cap by
-    // the concurrency, which is fine for a soft daily budget — when the cap has overshot that
-    // way, the `Retry-After` below is early by that many rows, which is accepted for an
-    // advisory header.
+    // first: in the flood this cap exists for, that saves a network call per request. The
+    // count is a range seek off `idx_records_queue_reason_requested` (migration 0033, apply
+    // by hand) — button rows are never purged, so without that index it scanned a table that
+    // only grows. One knowingly-accepted cost remains: concurrent presses can overshoot the
+    // cap by the concurrency, which is fine for a soft daily budget — when the cap has
+    // overshot that way, the `Retry-After` below is early by that many rows, which is
+    // accepted for an advisory header.
     const buttons = await buttonRequestsSince(db, now - REQUEST_CAP_WINDOW_SECONDS);
     if (buttons.count >= REQUEST_DAILY_CAP) {
       // Only Retry-After: `limitHeaders` came from an ALLOWED per-IP check, so it carries no

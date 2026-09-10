@@ -99,6 +99,35 @@ suite('POST /api/buildings/[id]/save enqueues a follower pull', () => {
     expect((await POST(createContext(db, 'nope'))).status).toBe(404);
   });
 
+  // The follower enqueue is a priority-0 queue row asked for with no Turnstile and no daily
+  // cap, so the save is the only place that can bound it. 20 an hour per user, the same
+  // budget as `building-create`.
+  it('429s the 21st save in an hour, after 20 distinct buildings went through', async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 20; i += 1) {
+      const other = await insertBuilding(db, {
+        id: `save-${i}`,
+        parcel_id: `31023960${String(i).padStart(2, '0')}`,
+      });
+      await insertPull(db, other, FY2026_RESOURCE_ID);
+      ids.push(other);
+      const res = await POST(createContext(db, other));
+      expect(res.status).toBe(200);
+    }
+
+    const refused = await POST(createContext(db, id));
+    expect(refused.status).toBe(429);
+    expect(await refused.json()).toEqual({ error: 'Too many requests. Please try again later.' });
+    expect(refused.headers.get('Retry-After')).not.toBeNull();
+    expect(refused.headers.get('X-RateLimit-Limit')).toBe('20');
+    // Refused before the insert: nothing was saved and nothing was queued for it.
+    expect(await savedCount(db, id)).toBe(0);
+    expect(await pendingReasons(db, id)).toEqual([]);
+
+    // The twenty that were allowed each got their follower row.
+    for (const allowed of ids) expect(await pendingReasons(db, allowed)).toEqual(['follower']);
+  });
+
   it('a records read or queue failure does not turn a successful save into an error', async () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     // Dropping the table breaks the coverage read before `enqueue` is even reached, so this

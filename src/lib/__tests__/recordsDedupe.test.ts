@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { sqliteAvailable } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 import { findBuildingByAddress } from '../records/dedupe';
-import { isBostonLocality } from '../locality';
+import { BOSTON_NEIGHBORHOODS, isBostonLocality } from '../locality';
+import { TRAILING_LOCALITIES } from '../records/identity';
 
 const suite = sqliteAvailable ? describe : describe.skip;
 
@@ -91,5 +92,19 @@ describe('isBostonLocality', () => {
   it('accepts Boston and its neighborhoods in any case, rejects other cities', () => {
     for (const city of ['Boston', 'boston', 'BOSTON ', 'Allston', 'Jamaica Plain', 'Hyde Park', 'Dorchester', 'Boston, MA']) expect(isBostonLocality(city)).toBe(true);
     for (const city of ['New Haven', 'Cambridge', 'Westville', '', null]) expect(isBostonLocality(city)).toBe(false);
+  });
+
+  /**
+   * One Boston vocabulary in two spellings: `identity.ts` keeps it uppercase and
+   * space-preserving to strip a trailing locality off a street, `locality.ts` keeps it
+   * lowercase and squashed to recognise a city field. A name added to one and not the other
+   * is a silent hole — an address whose tail is stripped but whose city is not read as
+   * Boston, or the reverse — so the two are held together here rather than by a comment.
+   * 'boston' is in the identity set and not the neighborhood one, because a neighborhood
+   * list that contained the city would be a different thing.
+   */
+  it('keeps the identity and locality Boston vocabularies identical', () => {
+    const squashed = new Set([...TRAILING_LOCALITIES].map((name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '')));
+    expect(squashed).toEqual(new Set([...BOSTON_NEIGHBORHOODS, 'boston']));
   });
 });

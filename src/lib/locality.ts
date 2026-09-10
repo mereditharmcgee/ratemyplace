@@ -27,7 +27,12 @@ interface LocalityBuilding {
 // vocabulary (`TRAILING_LOCALITIES`, plus 'BOSTON' itself) for stripping a trailing
 // locality off a street. Keep the two lists in step; worth folding into one data module
 // later.
-const BOSTON_NEIGHBORHOODS = new Set([
+/**
+ * Exported so one test can hold it against `identity.ts`'s `TRAILING_LOCALITIES`: the same
+ * vocabulary in two spellings cannot be kept in step by a comment alone. Read-only to
+ * callers — `isBostonLocality` is the predicate to use.
+ */
+export const BOSTON_NEIGHBORHOODS: ReadonlySet<string> = new Set([
   'allston',
   'brighton',
   'charlestown',

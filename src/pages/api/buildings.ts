@@ -1,19 +1,36 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../lib/db';
 import { generateIdFromEntropySize } from 'lucia';
-import { checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
+import { checkRateLimit, buildRateLimitHeaders, getClientIP } from '../../lib/rateLimit';
 import { escapeLikePattern, sanitizeText, isValidZipCode } from '../../lib/validation';
 import { findBuildingByAddress } from '../../lib/records/dedupe';
 import { addressKey } from '../../lib/records/identity';
 
 export async function GET(context: APIContext): Promise<Response> {
-  const query = context.url.searchParams.get('q') || '';
+  const query = (context.url.searchParams.get('q') || '').trim();
   const placeId = context.url.searchParams.get('placeId') || '';
+  const db = getDB(context);
+
+  // Rate limit: 120 lookups a minute per IP. This is the review form's address typeahead,
+  // so it fires per keystroke and has to allow a real burst — but it is unauthenticated and
+  // runs a double `LIKE '%…%'` over 38,000 seeded buildings, which is not something an
+  // anonymous caller may do without a ceiling. Both branches are covered: the place-id
+  // lookup is cheap, and one budget per IP is simpler to reason about than two.
+  const rateLimit = await checkRateLimit(db, getClientIP(context), 'building-lookup', 120, 60);
+  if (!rateLimit.allowed) {
+    const status = rateLimit.error ? 503 : 429;
+    const message = rateLimit.error
+      ? 'Service temporarily unavailable. Please try again in a few minutes.'
+      : 'Too many requests. Please try again later.';
+    return new Response(JSON.stringify({ error: message }), {
+      status,
+      headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 120) }
+    });
+  }
 
   // Look up by Google Place ID
   if (placeId) {
     try {
-      const db = getDB(context);
       const building = await db.prepare(`
         SELECT id, address, neighborhood, city, state, slug, google_place_id
         FROM buildings
@@ -32,15 +49,17 @@ export async function GET(context: APIContext): Promise<Response> {
     }
   }
 
-  if (!query) {
+  // A one-character `q` matches most of the city, so the LIKE scan does its full work to
+  // return ten arbitrary rows nobody typed toward. Two characters is the shortest prefix
+  // that means anything as an address fragment, and an empty answer here is the same shape
+  // the caller already handles for "no matches".
+  if (query.length < 2) {
     return new Response(JSON.stringify({ buildings: [] }), {
       headers: { 'Content-Type': 'application/json' }
     });
   }
 
   try {
-    const db = getDB(context);
-
     const pattern = `%${escapeLikePattern(query)}%`;
     const result = await db.prepare(`
       SELECT id, address, neighborhood, city, state, slug

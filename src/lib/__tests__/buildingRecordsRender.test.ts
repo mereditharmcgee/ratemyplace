@@ -17,11 +17,12 @@ import {
   OTHER_REQUESTS_COPY,
   REQUESTED_COPY,
   REQUEST_BUTTON_LABEL,
+  REQUEST_PARKED_COPY,
 } from '../records/display';
 import { ROW_CAP } from '../records/ckan';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding, insertPull } from './helpers/recordsDb';
-import { enqueue } from '../records/queue';
+import { MAX_ATTEMPTS, enqueue } from '../records/queue';
 import { fixtureFetch, type FixtureRoute } from './helpers/records/fixtureFetch';
 import lanark2026 from './helpers/records/assessor-fy2026-lanark.json';
 import lanark2025 from './helpers/records/assessor-fy2025-lanark.json';
@@ -598,6 +599,22 @@ suite('BuildingRecords.astro request button states', () => {
     const text = panelText(await renderPanel(db, 'bldg-state-3'));
 
     expect(text).toContain(REQUESTED_COPY);
+    expect(text).not.toContain(REQUEST_BUTTON_LABEL);
+  });
+
+  it('tells a reader the truth when the queue row has used all its attempts', async () => {
+    const db = await seededBuilding('bldg-state-5');
+    await enqueue(db, { buildingId: 'bldg-state-5', reason: 'button', now: 1_000 });
+    await db
+      .prepare('UPDATE records_queue SET attempts = ? WHERE building_id = ? AND done_at IS NULL')
+      .bind(MAX_ATTEMPTS, 'bldg-state-5')
+      .run();
+
+    const text = panelText(await renderPanel(db, 'bldg-state-5'));
+
+    // Not "reload to check": the row is not going to be claimed again on its own.
+    expect(text).toContain(REQUEST_PARKED_COPY);
+    expect(text).not.toContain(REQUESTED_COPY);
     expect(text).not.toContain(REQUEST_BUTTON_LABEL);
   });
 

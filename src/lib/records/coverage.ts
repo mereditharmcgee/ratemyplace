@@ -2,6 +2,7 @@
 // that must not pull anything themselves: the reader-facing button, the follower enqueue on
 // save, and the panel's page state. Read-only; the queue module owns every write.
 import { jurisdictionForCity, sourcesForCity } from './jurisdictions';
+import { MAX_ATTEMPTS, requireDeeperSourceIds } from './queue';
 import type { QueueReason, RecordsDb } from './types';
 
 /**
@@ -17,6 +18,7 @@ const DEEPER_PLACEHOLDERS = DEEPER_SOURCE_IDS.map(() => '?').join(', ');
 
 /** Any deeper pull row at all, whatever its status — the `planRefresh` notion, not the fill's. */
 export async function hasDeeperPull(db: RecordsDb, buildingId: string): Promise<boolean> {
+  requireDeeperSourceIds('hasDeeperPull', DEEPER_SOURCE_IDS);
   const row = await db
     .prepare(
       `SELECT 1 FROM record_pulls WHERE building_id = ? AND source_id IN (${DEEPER_PLACEHOLDERS}) LIMIT 1`,
@@ -36,13 +38,14 @@ export async function pendingQueueReason(db: RecordsDb, buildingId: string): Pro
 }
 
 /** Listed in the precedence order `recordsRequestState` applies. */
-export type RecordsRequestState = 'ineligible' | 'pulled' | 'requested' | 'fill_queued' | 'never_pulled';
+export type RecordsRequestState = 'ineligible' | 'pulled' | 'parked' | 'requested' | 'fill_queued' | 'never_pulled';
 
 interface RequestStateRow {
   city: string | null;
   parcel_id: string | null;
   has_deeper: number;
   pending_reason: QueueReason | null;
+  pending_attempts: number | null;
 }
 
 /**
@@ -52,6 +55,13 @@ interface RequestStateRow {
  *   (`jurisdictionForCity`), not a string compare on 'Boston', so 'boston' and 'Boston, MA'
  *   get the button the pull would honor.
  * - `pulled`: a deeper pull exists; the ledger is the normal one and the button never returns.
+ * - `parked`: the pending row has used all `MAX_ATTEMPTS` of its claims, so the Worker will
+ *   not take it again without a human. Such a row keeps `done_at IS NULL` forever, which
+ *   `requested` would report as "reload in a few minutes" for as long as it sits there — so
+ *   say what is true instead. The button is not offered, and the endpoint treats `parked`
+ *   exactly like `requested`: a press falls through to `enqueue`, which answers
+ *   `already_queued` against a parked button, follower or refresh row and replaces a parked
+ *   `fill` row the way it replaces a live one.
  * - `requested`: a button, follower, or refresh row is pending; say so, offer no button.
  * - `fill_queued`: only the city-wide pass has it; say so, and still offer the button.
  * - `never_pulled`: offer the button.
@@ -62,17 +72,25 @@ interface RequestStateRow {
  * exported for the callers that need one answer without the other.
  */
 export async function recordsRequestState(db: RecordsDb, buildingId: string): Promise<RecordsRequestState> {
+  requireDeeperSourceIds('recordsRequestState', DEEPER_SOURCE_IDS);
+  // Two scalar subqueries over the same pending row rather than one row subquery: SQLite
+  // scalar subqueries return a single column, and 0031's partial unique index means both
+  // read the one pending row through the same index seek. Still one statement.
   const row = await db
     .prepare(
       'SELECT b.city, b.parcel_id, ' +
         `EXISTS (SELECT 1 FROM record_pulls rp WHERE rp.building_id = b.id AND rp.source_id IN (${DEEPER_PLACEHOLDERS})) AS has_deeper, ` +
-        '(SELECT q.reason FROM records_queue q WHERE q.building_id = b.id AND q.done_at IS NULL) AS pending_reason ' +
+        '(SELECT q.reason FROM records_queue q WHERE q.building_id = b.id AND q.done_at IS NULL) AS pending_reason, ' +
+        '(SELECT q.attempts FROM records_queue q WHERE q.building_id = b.id AND q.done_at IS NULL) AS pending_attempts ' +
         'FROM buildings b WHERE b.id = ?',
     )
     .bind(...DEEPER_SOURCE_IDS, buildingId)
     .first<RequestStateRow>();
   if (!row || jurisdictionForCity(row.city) === null || row.parcel_id === null) return 'ineligible';
   if (row.has_deeper) return 'pulled';
+  // Before the two branches below on purpose: a parked row is pending by `done_at`, so both
+  // of them would read it as work still in flight.
+  if (row.pending_reason !== null && (row.pending_attempts ?? 0) >= MAX_ATTEMPTS) return 'parked';
   if (row.pending_reason === 'fill') return 'fill_queued';
   if (row.pending_reason !== null) return 'requested';
   return 'never_pulled';

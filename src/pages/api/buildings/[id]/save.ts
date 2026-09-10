@@ -1,6 +1,7 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
 import { logError } from '../../../../lib/logger';
+import { buildRateLimitHeaders, checkRateLimit } from '../../../../lib/rateLimit';
 import { errorMessage } from '../../../../lib/records/errors';
 import { recordsRequestState } from '../../../../lib/records/coverage';
 import { enqueue } from '../../../../lib/records/queue';
@@ -23,6 +24,23 @@ export async function POST(context: APIContext): Promise<Response> {
 
   try {
     const db = getDB(context);
+
+    // Rate limit: 20 saves per hour per user, the same budget as `building-create`. A save
+    // is not just a bookmark any more — the follower enqueue below is a priority-0 queue
+    // row, and unlike the reader-facing button it asks for no Turnstile and counts against
+    // no daily cap. So the save itself is the only thing that can bound that path, and it
+    // has to. DELETE is left alone: unsaving enqueues nothing.
+    const rateLimit = await checkRateLimit(db, context.locals.user.id, 'building-save', 20, 3600);
+    if (!rateLimit.allowed) {
+      const status = rateLimit.error ? 503 : 429;
+      const message = rateLimit.error
+        ? 'Service temporarily unavailable. Please try again in a few minutes.'
+        : 'Too many requests. Please try again later.';
+      return new Response(JSON.stringify({ error: message }), {
+        status,
+        headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 20) }
+      });
+    }
 
     // Check building exists
     const building = await db.prepare('SELECT id FROM buildings WHERE id = ?')

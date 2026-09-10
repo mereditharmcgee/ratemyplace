@@ -57,9 +57,11 @@ const UNIT_PATTERN = /(?:^|\s+)(?:APT|APARTMENT|UNIT|STE|SUITE|FL|FLOOR|RM|ROOM)
  * Complete means: every USPS city name for a Boston-only ZIP, plus the neighborhood names
  * people type; `CHESTNUT HILL` is excluded because 02467 also covers Newton and Brookline.
  * `src/lib/locality.ts` keeps a separate display-side set that also carries New Haven
- * names, which must never be stripped from a key — hence two sets, not one.
+ * names, which must never be stripped from a key — hence two sets, not one. Both are
+ * exported and `recordsDedupe.test.ts` holds this one against that one's Boston half, so
+ * the two spellings of the same vocabulary cannot drift.
  */
-const TRAILING_LOCALITIES: ReadonlySet<string> = new Set([
+export const TRAILING_LOCALITIES: ReadonlySet<string> = new Set([
   'BOSTON',
   'ALLSTON',
   'BRIGHTON',

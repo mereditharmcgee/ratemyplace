@@ -5,7 +5,7 @@ import { DEEPER_SOURCE_IDS, hasDeeperPull, pendingQueueReason, recordsRequestSta
 import { DEEPER_SOURCE_IDS as SCHEDULER_DEEPER } from '../records/scheduler';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
-import { enqueue } from '../records/queue';
+import { MAX_ATTEMPTS, enqueue, requireDeeperSourceIds } from '../records/queue';
 
 const suite = sqliteAvailable ? describe : describe.skip;
 
@@ -75,6 +75,47 @@ suite('coverage', () => {
     await enqueue(db, { buildingId: id, reason: 'refresh', now: 1_001 });
     expect(await pendingQueueReason(db, id)).toBe('refresh');
     expect(await recordsRequestState(db, id)).toBe('requested');
+  });
+
+  // A row that used its claims keeps `done_at IS NULL`, so without this branch the panel
+  // would tell the reader to reload a page that will not change until a human looks.
+  it('reads a pending row that used all its attempts as parked, and one attempt short as requested', async () => {
+    const db = createRecordsTestDb();
+    const id = await insertBuilding(db, { parcel_id: '2102396000' });
+    await enqueue(db, { buildingId: id, reason: 'button', now: 1_000 });
+
+    await db
+      .prepare('UPDATE records_queue SET attempts = ? WHERE building_id = ? AND done_at IS NULL')
+      .bind(MAX_ATTEMPTS - 1, id)
+      .run();
+    expect(await recordsRequestState(db, id)).toBe('requested');
+
+    await db
+      .prepare('UPDATE records_queue SET attempts = ? WHERE building_id = ? AND done_at IS NULL')
+      .bind(MAX_ATTEMPTS, id)
+      .run();
+    expect(await recordsRequestState(db, id)).toBe('parked');
+  });
+
+  it('parked outranks fill_queued, and a deeper pull still outranks parked', async () => {
+    const db = createRecordsTestDb();
+    const id = await insertBuilding(db, { parcel_id: '2102396000' });
+    await enqueue(db, { buildingId: id, reason: 'fill', now: 1_000 });
+    await db
+      .prepare('UPDATE records_queue SET attempts = ? WHERE building_id = ? AND done_at IS NULL')
+      .bind(MAX_ATTEMPTS, id)
+      .run();
+    expect(await recordsRequestState(db, id)).toBe('parked');
+
+    await insertPull(db, id, PERMITS_RESOURCE_ID);
+    expect(await recordsRequestState(db, id)).toBe('pulled');
+  });
+
+  // The empty-list guard `queue.ts` already applies to both planners: an empty
+  // `DEEPER_SOURCE_IDS` would make every coverage test here go silently false the same way.
+  it('shares the queue module\'s empty-source-list guard', () => {
+    expect(typeof requireDeeperSourceIds).toBe('function');
+    expect(() => requireDeeperSourceIds('test', [])).toThrow(/must not be empty/);
   });
 
   it('recordsRequestState accepts the city spellings the pull path accepts', async () => {

@@ -7,7 +7,7 @@ import { createMemoryDatabase, TestD1Database } from './sqliteD1';
  * reference, plus the two tables the queue planner reads (`reviews.building_id`
  * and `status`, `saved_buildings.building_id`). Column names mirror the real
  * migrations (0001, 0023); the unused columns are left out. Keeps tests honest
- * about the SQL that ships without applying all 31 migrations.
+ * about the SQL that ships without applying all 33 migrations.
  */
 export function createRecordsStubDb(): TestD1Database {
   const db = new TestD1Database(createMemoryDatabase());
@@ -81,6 +81,7 @@ export function createRecordsStubDb(): TestD1Database {
  * 0032 indexes `saved_buildings(building_id)`, a table the real 0023 creates and the stub
  * above stands in for, so the stub has to exist before this runs — `createRecordsTestDb`
  * is the only correct order. The other two indexes are over tables 0029 and 0031 create.
+ * 0033's index is over `records_queue`, which 0031 creates, so it follows for the same reason.
  */
 export function applyRecordsMigrations(db: TestD1Database): void {
   for (const file of [
@@ -88,6 +89,7 @@ export function applyRecordsMigrations(db: TestD1Database): void {
     '0030_audit_records_actions.sql',
     '0031_boston_coverage.sql',
     '0032_records_queue_indexes.sql',
+    '0033_records_queue_reason_requested.sql',
   ]) {
     db.exec(readFileSync(join(process.cwd(), 'migrations', file), 'utf8'));
   }

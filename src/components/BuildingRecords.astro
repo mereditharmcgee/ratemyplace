@@ -24,6 +24,7 @@ import {
   NO_VIOLATIONS_CAVEAT,
   KIND_LABELS,
   REQUESTED_COPY,
+  REQUEST_PARKED_COPY,
   formatDollars,
   formatPullDate,
 } from '../lib/records/display';
@@ -137,6 +138,9 @@ const disclosureClass =
 
     {requestState === 'requested' && (
       <p class="mt-4 text-sm text-gray-600" role="status">{REQUESTED_COPY}</p>
+    )}
+    {requestState === 'parked' && (
+      <p class="mt-4 text-sm text-gray-600" role="status">{REQUEST_PARKED_COPY}</p>
     )}
     {(requestState === 'never_pulled' || requestState === 'fill_queued') && (
       <div class="mt-4 border-t border-gray-200 pt-4">

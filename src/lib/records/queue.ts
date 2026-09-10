@@ -245,8 +245,11 @@ function placeholders(n: number): string {
  * test goes silently false, which reads as every building being both permanently fresh
  * (the refresh does nothing) and never pulled (the fill queues the whole city). Failing
  * loudly here beats discovering either state in production.
+ *
+ * Exported for `coverage.ts`, whose two reads answer the same "has this building been
+ * covered?" question off the same list and would go silently false the same way.
  */
-function requireDeeperSourceIds(fn: string, ids: string[]): void {
+export function requireDeeperSourceIds(fn: string, ids: readonly string[]): void {
   if (ids.length === 0) throw new Error(`${fn}: deeperSourceIds must not be empty`);
 }
 

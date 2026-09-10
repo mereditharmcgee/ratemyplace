@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { APIContext } from 'astro';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
-import { POST } from '../../pages/api/buildings';
+import { GET, POST } from '../../pages/api/buildings';
 
 const suite = sqliteAvailable ? describe : describe.skip;
 
@@ -139,5 +139,56 @@ suite('POST /api/buildings with seeded dedupe', () => {
     const res = await POST(createContext(db, { streetAddress: '9 Pine St.', city: 'Cambridge', state: 'MA', zipCode: null }));
     expect(res.status).toBe(201);
     expect((await res.json()).building.slug).toBe('9-pine-st-cambridge-2');
+  });
+});
+
+/**
+ * The typeahead behind the review form's address field. It is unauthenticated and runs a
+ * double `LIKE '%…%'` over every building, so the two things it needs are a ceiling per IP
+ * and a floor on how little the caller may type.
+ */
+suite('GET /api/buildings guards the typeahead', () => {
+  let db: TestD1Database;
+
+  /** GET reads `context.url`, which Astro supplies and the POST helper above does not need. */
+  function getContext(dbase: TestD1Database, search: string, ip = '203.0.113.20'): APIContext {
+    const url = `https://ratemyplace.org/api/buildings${search}`;
+    const request = new Request(url, { headers: { 'CF-Connecting-IP': ip } });
+    return {
+      request,
+      url: new URL(request.url),
+      locals: { user: null, runtime: { env: { DB: dbase } } },
+    } as unknown as APIContext;
+  }
+
+  beforeEach(async () => {
+    db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'seed-1', address: '23-27 Lanark Rd', slug: '23-27-lanark-rd-boston', source: 'seed' });
+  });
+
+  it('answers a one-character query with no rows rather than ten arbitrary ones', async () => {
+    const res = await GET(getContext(db, '?q=a'));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ buildings: [] });
+  });
+
+  it('a two-character query searches, and finds the seeded row', async () => {
+    const res = await GET(getContext(db, '?q=Lan'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.buildings).toHaveLength(1);
+    expect(body.buildings[0]).toMatchObject({ id: 'seed-1', address: '23-27 Lanark Rd' });
+  });
+
+  it('429s one IP past 120 lookups a minute', async () => {
+    for (let i = 0; i < 120; i += 1) {
+      expect((await GET(getContext(db, '?q=Lan'))).status).toBe(200);
+    }
+    const refused = await GET(getContext(db, '?q=Lan'));
+    expect(refused.status).toBe(429);
+    expect(await refused.json()).toEqual({ error: 'Too many requests. Please try again later.' });
+    expect(refused.headers.get('X-RateLimit-Limit')).toBe('120');
+    // A different caller is unaffected: the budget is per IP.
+    expect((await GET(getContext(db, '?q=Lan', '203.0.113.21'))).status).toBe(200);
   });
 });
