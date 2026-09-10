@@ -7,7 +7,10 @@ const source = readFileSync(join(process.cwd(), 'src/pages/building/[slug].astro
 describe('building page source', () => {
   it('derives its title and description from buildingPageMeta', () => {
     expect(source).toMatch(/buildingPageMeta\(/);
-    expect(source).toMatch(/<BaseLayout title=\{meta\.title\} description=\{meta\.description\}>/);
+    // Two loose matches rather than one on the whole tag: the scan is here to catch a page that
+    // stops using the helper, not to freeze the attribute order or spacing of a layout element.
+    expect(source).toMatch(/title=\{meta\.title\}/);
+    expect(source).toMatch(/description=\{meta\.description\}/);
   });
 
   it('renders the no-reviews card from display.ts copy', () => {

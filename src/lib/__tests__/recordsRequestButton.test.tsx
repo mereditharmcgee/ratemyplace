@@ -212,6 +212,45 @@ describe('RecordsRequestButton', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('leaves a 429 message alone when the widget reports a failure afterwards', async () => {
+    // Turnstile retries a failed challenge by itself, so an error callback can arrive seconds
+    // after the press it belonged to has already been answered. It must not overwrite the
+    // rate-limit text the reader is still reading, or take focus off what they are doing.
+    const stub = stubTurnstile();
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(429, { error: 'Too many requests. Please try again later.' }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RecordsRequestButton buildingId="b1" initialState="never_pulled" />);
+
+    await pressButton();
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Too many requests'));
+
+    await act(async () => {
+      stub.options()['error-callback']?.();
+    });
+
+    expect(screen.getByRole('alert').textContent).toContain('Too many requests');
+    expect(screen.getByRole('alert').textContent).not.toBe(REQUEST_FAILED_COPY);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a widget failure once however many times the widget reports it', async () => {
+    const stub = stubTurnstile('tok', false);
+    vi.stubGlobal('fetch', vi.fn());
+    render(<RecordsRequestButton buildingId="b1" initialState="never_pulled" />);
+
+    await pressButton();
+    await act(async () => {
+      stub.options()['error-callback']?.();
+      stub.options()['error-callback']?.();
+    });
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(screen.getByRole('alert').textContent).toBe(REQUEST_FAILED_COPY);
+    expect((screen.getByRole('button', { name: REQUEST_BUTTON_LABEL }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('hands the button back when the widget times out', async () => {
     const stub = stubTurnstile('tok', false);
     const fetchMock = vi.fn();

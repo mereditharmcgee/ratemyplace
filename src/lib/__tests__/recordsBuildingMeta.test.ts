@@ -26,6 +26,12 @@ describe('buildingPageMeta', () => {
     );
   });
 
+  it('does not name the city twice when the address already carries it', () => {
+    expect(buildingPageMeta({ address: '12 Elm St, Boston', city: 'Boston', neighborhood: null, parcel_id: '1' }, 0).title).toBe(
+      '12 Elm St, Boston',
+    );
+  });
+
   it('reads the city the way the rest of the records code does', () => {
     // Eligibility is jurisdictionForCity, not a strict equality on 'Boston', so a row whose
     // city was written in another case is still a records page.

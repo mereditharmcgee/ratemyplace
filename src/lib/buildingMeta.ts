@@ -28,8 +28,11 @@ export function buildingPageMeta(
   if (jurisdiction !== 'boston') {
     return { title: building.address, description: `Reviews for ${building.address} in ${displayLocality(building)}` };
   }
+  // Some seeded addresses already carry the city, so the suffix is only added when it is
+  // missing — otherwise the title reads "Boston" twice.
+  const suffix = /,\s*boston\b/i.test(building.address) ? '' : ', Boston';
   return {
-    title: `${building.address}, Boston`,
+    title: `${building.address}${suffix}`,
     description: `City of Boston records for ${building.address}: assessment, permits, violations, code enforcement, and 311 requests. No tenant reviews yet.`,
   };
 }

@@ -56,11 +56,13 @@ export default function RecordsRequestButton({ buildingId, initialState }: Props
       });
       const data = (await response.json().catch(() => ({}))) as { error?: string };
       if (response.status === 202) {
+        setError(null);
         setPhase('requested');
         return;
       }
       // Someone else's request already landed the records: the panel below is stale, not wrong.
       if (response.status === 409) {
+        setError(null);
         setPhase('already_pulled');
         return;
       }
@@ -89,6 +91,17 @@ export default function RecordsRequestButton({ buildingId, initialState }: Props
       if (interval) clearInterval(interval);
       interval = null;
     };
+    // Gated on a press for the same reason the token callback is: Turnstile retries a failed
+    // challenge on its own (`retry: 'auto'`, about eight seconds later), so a widget that failed
+    // once goes on reporting failures with no one behind them. Ungated, one of those would
+    // overwrite a 429 message the reader is still reading and pull focus back to the button, or
+    // raise an alert next to the requested line while the POST is in flight.
+    const handleWidgetFailure = () => {
+      if (!awaitingTokenRef.current) return;
+      awaitingTokenRef.current = false;
+      setError(REQUEST_FAILED_COPY);
+      setPhase((current) => (current === 'verifying' ? 'idle' : current));
+    };
     const renderWidget = () => {
       if (!turnstileRef.current || !window.turnstile) return;
       // Rendered once and kept: a second press re-challenges the same widget.
@@ -116,16 +129,8 @@ export default function RecordsRequestButton({ buildingId, initialState }: Props
         // reader cannot get through — never answers with a token at all. Without these two the
         // press would hold the verifying line and the disabled button for as long as the page
         // stays open, so both say so and hand the control back.
-        'error-callback': () => {
-          awaitingTokenRef.current = false;
-          setError(REQUEST_FAILED_COPY);
-          setPhase((current) => (current === 'verifying' ? 'idle' : current));
-        },
-        'timeout-callback': () => {
-          awaitingTokenRef.current = false;
-          setError(REQUEST_FAILED_COPY);
-          setPhase((current) => (current === 'verifying' ? 'idle' : current));
-        },
+        'error-callback': handleWidgetFailure,
+        'timeout-callback': handleWidgetFailure,
       });
     };
     if (window.turnstile) renderWidget();
