@@ -69,6 +69,10 @@ export function createRecordsStubDb(): TestD1Database {
       created_at INTEGER DEFAULT (unixepoch()),
       UNIQUE(user_id, building_id)
     );
+    -- Mirrors migration 0024. The sitemap and the queue planner both count approved reviews
+    -- per building and their comments claim this index; without it here the claim is not
+    -- exercisable against the double.
+    CREATE INDEX idx_reviews_building_status ON reviews(building_id, status);
   `);
   return db;
 }

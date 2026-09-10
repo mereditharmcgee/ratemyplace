@@ -10,7 +10,13 @@ import { SITEMAP_HEADERS, buildingSitemapEntries, renderUrlSet, siteUrlFrom, typ
 const CHUNK_NUMBER = /^[1-9]\d{0,3}$/;
 
 function notFound(): Response {
-  return new Response('Not found\n', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  // Cached for a day. An in-range but empty chunk (`buildings-9999.xml`) still runs the
+  // sitemap query to discover it is empty, so an uncacheable 404 would let one bot repeat
+  // that scan; a day of caching makes the probe cost once per URL instead of once per fetch.
+  return new Response('Not found\n', {
+    status: 404,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=86400' },
+  });
 }
 
 export async function GET(context: APIContext): Promise<Response> {

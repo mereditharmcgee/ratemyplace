@@ -181,7 +181,11 @@ suite('sitemap routes', () => {
     // `updated_at` defaults to now, so the date is whatever today is — assert the shape.
     expect(body).toMatch(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
 
-    expect((await buildingsGet(createContext(db, '/sitemaps/buildings-2.xml', { n: '2' }))).status).toBe(404);
+    const pastEnd = await buildingsGet(createContext(db, '/sitemaps/buildings-2.xml', { n: '2' }));
+    expect(pastEnd.status).toBe(404);
+    // Cacheable: reaching this 404 costs a sitemap query, so a bot must not be able to
+    // repeat an in-range empty chunk as an uncacheable full scan.
+    expect(pastEnd.headers.get('Cache-Control')).toBe('public, max-age=86400');
     expect((await buildingsGet(createContext(db, '/sitemaps/buildings-0.xml', { n: '0' }))).status).toBe(404);
     expect((await buildingsGet(createContext(db, '/sitemaps/buildings-x.xml', { n: 'x' }))).status).toBe(404);
   });
