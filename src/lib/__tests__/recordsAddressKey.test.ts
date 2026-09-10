@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addressKey, splitSuffix, streetKey } from '../records/identity';
+import { addressKey, splitSuffix, streetKey, stripTrailingLocality } from '../records/identity';
 
 describe('splitSuffix', () => {
   it('splits a known suffix and returns its spellings', () => {
@@ -63,5 +63,52 @@ describe('addressKey', () => {
     expect(addressKey('1027 Commonwealth Ave, Boston, MA 02215, USA')!.streetKey).toBe(
       addressKey('1027 Commonwealth Avenue')!.streetKey,
     );
+  });
+});
+
+describe('stripTrailingLocality', () => {
+  it('peels a trailing city, state, and ZIP written without commas', () => {
+    expect(stripTrailingLocality('COMMONWEALTH AVE BOSTON')).toBe('COMMONWEALTH AVE');
+    expect(stripTrailingLocality('COMMONWEALTH AVE BOSTON MA')).toBe('COMMONWEALTH AVE');
+    expect(stripTrailingLocality('COMMONWEALTH AVE BOSTON MA 02215')).toBe('COMMONWEALTH AVE');
+    expect(stripTrailingLocality('COMMONWEALTH AVE 02215')).toBe('COMMONWEALTH AVE');
+    expect(stripTrailingLocality('COMMONWEALTH AVE MA 02215-1234')).toBe('COMMONWEALTH AVE');
+  });
+
+  it('peels a two-word neighborhood', () => {
+    expect(stripTrailingLocality('CENTRE ST JAMAICA PLAIN')).toBe('CENTRE ST');
+    expect(stripTrailingLocality('E BROADWAY SOUTH BOSTON MA')).toBe('E BROADWAY');
+  });
+
+  it('leaves a street whose name or suffix merely resembles a locality token', () => {
+    expect(stripTrailingLocality('BOSTON ST')).toBe('BOSTON ST');
+    expect(stripTrailingLocality('LANARK CT')).toBe('LANARK CT');
+    expect(stripTrailingLocality('BEACON ST')).toBe('BEACON ST');
+    expect(stripTrailingLocality('DORCHESTER AVE')).toBe('DORCHESTER AVE');
+  });
+
+  it('never strips the whole street away', () => {
+    expect(stripTrailingLocality('BOSTON')).toBe('BOSTON');
+    expect(stripTrailingLocality('SOUTH BOSTON')).toBe('SOUTH BOSTON');
+    expect(stripTrailingLocality('02135')).toBe('02135');
+  });
+
+  it('only treats MA as a state when a ZIP or a locality sits beside it', () => {
+    expect(stripTrailingLocality('LANARK RD MA')).toBe('LANARK RD MA');
+    expect(stripTrailingLocality('LANARK RD BOSTON MA')).toBe('LANARK RD');
+  });
+});
+
+describe('addressKey with a trailing locality', () => {
+  it('keys a comma-less manual entry the same as the assessor', () => {
+    expect(addressKey('1027 Commonwealth Ave Boston')).toEqual({ streetKey: 'COMMONWEALTH AV', numLo: 1027, numHi: 1027 });
+    expect(addressKey('1027 Commonwealth Ave Boston MA 02215')).toEqual({ streetKey: 'COMMONWEALTH AV', numLo: 1027, numHi: 1027 });
+    expect(addressKey('10 Centre St Jamaica Plain MA 02130')).toEqual({ streetKey: 'CENTRE ST', numLo: 10, numHi: 10 });
+  });
+
+  it('still keys the comma form and the plain form', () => {
+    expect(addressKey('23-27 Lanark Rd, Boston, MA 02135')).toEqual({ streetKey: 'LANARK RD', numLo: 23, numHi: 27 });
+    expect(addressKey('5 Boston St')).toEqual({ streetKey: 'BOSTON ST', numLo: 5, numHi: 5 });
+    expect(addressKey('12 Lanark Ct')).toEqual({ streetKey: 'LANARK CT', numLo: 12, numHi: 12 });
   });
 });

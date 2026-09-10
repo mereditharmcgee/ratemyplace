@@ -47,6 +47,80 @@ const DIRECTIONALS: Record<string, string> = { NORTH: 'N', SOUTH: 'S', EAST: 'E'
  */
 const UNIT_PATTERN = /(?:^|\s+)(?:APT|APARTMENT|UNIT|STE|SUITE|FL|FLOOR|RM|ROOM)\b.*$|\s*#.*$/i;
 
+/**
+ * Locality words a person types after the street when there is no comma to cut at:
+ * "1027 Commonwealth Ave Boston", "10 Centre St Jamaica Plain MA 02130". Boston's own
+ * neighborhoods are here because Google Places and manual entry both use them as the
+ * city. Uppercase, because it runs after `normalizeStreet`. Multi-word names are matched
+ * as a unit, longest first.
+ */
+const TRAILING_LOCALITIES: ReadonlySet<string> = new Set([
+  'BOSTON',
+  'ALLSTON',
+  'BRIGHTON',
+  'CHARLESTOWN',
+  'CHINATOWN',
+  'DORCHESTER',
+  'DOWNTOWN',
+  'FENWAY',
+  'MATTAPAN',
+  'ROSLINDALE',
+  'ROXBURY',
+  'SEAPORT',
+  'HYDE PARK',
+  'JAMAICA PLAIN',
+  'SOUTH BOSTON',
+  'EAST BOSTON',
+  'WEST ROXBURY',
+  'SOUTH END',
+  'NORTH END',
+  'BACK BAY',
+  'BEACON HILL',
+  'MISSION HILL',
+  'WEST END',
+]);
+
+const ZIP_TOKEN = /^\d{5}(?:-\d{4})?$/;
+
+/**
+ * How many trailing words are a locality name — 2, 1, or 0 (longest first, so "SOUTH
+ * BOSTON" is not read as "BOSTON" after a "SOUTH"). Zero when the words *are* a locality
+ * in full, whether one word ("BOSTON") or two ("SOUTH BOSTON"): there is no street in
+ * front of it for the locality to trail.
+ */
+function trailingLocalityLength(words: readonly string[]): number {
+  if (TRAILING_LOCALITIES.has(words.join(' '))) return 0;
+  for (const n of [2, 1]) {
+    if (words.length > n && TRAILING_LOCALITIES.has(words.slice(-n).join(' '))) return n;
+  }
+  return 0;
+}
+
+/**
+ * Peel a trailing ZIP, then "MA", then a locality from an already-normalized (uppercase,
+ * comma-free) street. Every step keeps at least one word, and a street that is itself a
+ * locality name ("BOSTON", "SOUTH BOSTON") is left whole. "MA" is only a state when a ZIP
+ * was just removed or a locality precedes it — otherwise it is left alone, and "CT" is
+ * never touched at all, because both are also street suffixes ("Lanark Ct"). Called by
+ * `addressKey`, which is what the seed's existing-row matcher and the reviewer dedupe both
+ * key with; not by `streetKey`, whose input is a bare assessor street name.
+ */
+export function stripTrailingLocality(streetUpper: string): string {
+  const words = streetUpper.split(' ').filter((word) => word.length > 0);
+  let sawZip = false;
+  if (words.length > 1 && ZIP_TOKEN.test(words[words.length - 1])) {
+    words.pop();
+    sawZip = true;
+  }
+  if (words.length > 1 && words[words.length - 1] === 'MA') {
+    const before = words.slice(0, -1);
+    if (sawZip || trailingLocalityLength(before) > 0) words.pop();
+  }
+  const localityWords = trailingLocalityLength(words);
+  if (localityWords > 0) words.splice(words.length - localityWords, localityWords);
+  return words.join(' ');
+}
+
 export function toCanonicalParcel(value: string | number | null | undefined): string | null {
   if (!value) return null;
   const trimmed = String(value).trim();
@@ -190,7 +264,7 @@ export function addressKey(address: string): AddressKey | null {
     .map((p) => Number.parseInt(p.replace(/[A-Z]+$/, ''), 10))
     .filter((n) => Number.isFinite(n));
   if (numbers.length === 0) return null;
-  const { base, spellings } = splitSuffix(parsed.street);
+  const { base, spellings } = splitStreet(stripTrailingLocality(normalizeStreet(parsed.street)));
   if (isDegenerateStreet(base, spellings)) return null;
   return {
     streetKey: keyOf(base, spellings),
