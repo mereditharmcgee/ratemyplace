@@ -15,7 +15,7 @@ async function review(db: TestD1Database, buildingId: string, score: number, id 
 
 async function search(db: TestD1Database, query: string): Promise<Array<{ slug: string; review_count: number; has_records: number }>> {
   const where = buildingSearchWhere(query);
-  const sql = `SELECT ${buildingSearchSelect('r', YEAR)}
+  const sql = `SELECT ${buildingSearchSelect(YEAR)}
     FROM buildings b
     LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
     LEFT JOIN landlords l ON b.landlord_id = l.id
@@ -37,7 +37,7 @@ suite('building search SQL', () => {
     expect(slugs).toEqual(['a', 'b']);
   });
 
-  it('puts reviewed buildings first in the old order, then the rest by address', async () => {
+  it('puts reviewed buildings first (by review count, then score), then the rest by address', async () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'z', address: '9 Lanark Rd', parcel_id: '1', source: 'seed' });
     await insertBuilding(db, { id: 'y', address: '5 Lanark Rd', parcel_id: '2', source: 'seed' });
@@ -53,9 +53,22 @@ suite('building search SQL', () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'p', address: '1 Lanark Rd', parcel_id: '1' });
     await insertBuilding(db, { id: 'q', address: '2 Lanark Rd', parcel_id: null });
-    const rows = await search(db, 'lanark');
-    expect(rows.find((r) => r.slug === 'p')?.has_records).toBe(1);
-    expect(rows.find((r) => r.slug === 'q')?.has_records).toBe(0);
+    // The city half of the flag has to agree with `jurisdictionForCity`: case-insensitive,
+    // tolerant of a trailing ", MA", and never NULL for a row whose city is NULL.
+    await insertBuilding(db, { id: 'lower', address: '3 Lanark Rd', parcel_id: '2', city: 'boston' });
+    await insertBuilding(db, { id: 'stated', address: '4 Lanark Rd', parcel_id: '3', city: 'Boston, MA' });
+    await insertBuilding(db, { id: 'other', address: '5 Lanark Rd', parcel_id: '4', city: 'Cambridge' });
+    // `insertBuilding` types `city` as a string, so null it after the fact.
+    await insertBuilding(db, { id: 'nocity', address: '6 Lanark Rd', parcel_id: '5' });
+    await db.prepare("UPDATE buildings SET city = NULL WHERE id = 'nocity'").run();
+
+    const byslug = new Map((await search(db, 'lanark')).map((r) => [r.slug, r.has_records]));
+    expect(byslug.get('p')).toBe(1);
+    expect(byslug.get('q')).toBe(0);
+    expect(byslug.get('lower')).toBe(1);
+    expect(byslug.get('stated')).toBe(1);
+    expect(byslug.get('other')).toBe(0);
+    expect(byslug.get('nocity')).toBe(0);
   });
 
   it('still matches a neighborhood or landlord name with the whole query', async () => {

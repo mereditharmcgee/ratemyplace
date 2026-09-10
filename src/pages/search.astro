@@ -36,21 +36,21 @@ if (query) {
       // come from `lib/searchSql.ts` so this page and /api/search/results cannot disagree
       // about which rows exist or what order they are in.
       const where = buildingSearchWhere(query);
+      // The count needs no reviews join and no GROUP BY: the query-mode buildings query is
+      // no longer reviewed-only, so one row per matching building is exactly COUNT(*).
+      // `landlords.id` is the primary key, so the landlord join — which the WHERE needs for
+      // `l.name` — cannot multiply a building into several rows.
       const countResult = await db.prepare(`
-        SELECT COUNT(*) as total FROM (
-          SELECT b.id
-          FROM buildings b
-          LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
-          LEFT JOIN landlords l ON b.landlord_id = l.id
-          WHERE ${where.sql}
-          GROUP BY b.id
-        )
+        SELECT COUNT(*) as total
+        FROM buildings b
+        LEFT JOIN landlords l ON b.landlord_id = l.id
+        WHERE ${where.sql}
       `).bind(...where.binds).first<{ total: number }>();
       totalBuildings = countResult?.total || 0;
 
       if (totalBuildings > 0) {
         const buildingResults = await db.prepare(`
-          SELECT ${buildingSearchSelect('r', currentYear)}
+          SELECT ${buildingSearchSelect(currentYear)}
           FROM buildings b
           LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
           LEFT JOIN landlords l ON b.landlord_id = l.id

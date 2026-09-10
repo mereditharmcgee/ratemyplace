@@ -25,6 +25,9 @@ function contains(value: string): string {
  * spellings ("comm ave" matches an address stored as "Ave" or "Avenue", and still needs
  * "comm"); failing that, the whole query names a neighborhood or a landlord. Table aliases
  * are fixed: `b` buildings, `l` landlords.
+ *
+ * The whole body is parenthesized so a caller can compose it — `WHERE ${sql} AND ...` —
+ * without the trailing ORs swallowing the added condition.
  */
 export function buildingSearchWhere(query: string): SqlFragment {
   const whole = contains(query.trim());
@@ -39,21 +42,36 @@ export function buildingSearchWhere(query: string): SqlFragment {
     addressClause = clauses.join(' AND ');
   } else {
     // Nothing survived normalization ("...", a lone letter). Fall back to the raw query so
-    // the clause still has a bind and the query is not silently every building.
+    // the clause still has a bind rather than the literal `%%` pattern that matches every
+    // row. Not a load guard — a one-letter query still matches most addresses in the city;
+    // it only keeps the degenerate case from being spelled as "no filter at all".
     addressClause = `b.address ${LIKE}`;
     binds.push(whole);
   }
   binds.push(whole, whole);
-  return { sql: `(${addressClause}) OR b.neighborhood ${LIKE} OR l.name ${LIKE}`, binds };
+  return { sql: `((${addressClause}) OR b.neighborhood ${LIKE} OR l.name ${LIKE})`, binds };
 }
 
-/** Column list for a buildings result row. Explicit — never `b.*` (admin_notes, owner_*). */
-export function buildingSearchSelect(reviewAlias: string, currentYear: number): string {
+/**
+ * Column list for a buildings result row. Explicit — never `b.*` (admin_notes, owner_*).
+ *
+ * `has_records` mirrors `jurisdictionForCity` in SQL: case-insensitive, and tolerant of a
+ * city stored with a trailing ", MA". It is duplicated rather than imported because
+ * `records/jurisdictions.ts` imports the six Boston source modules, and this select feeds
+ * the search island's props — pulling that module in would drag all of it into the client
+ * bundle. `COALESCE(..., 0)` keeps a NULL city from yielding a NULL column, so the value
+ * the client sees is always 0 or 1.
+ *
+ * The review alias is fixed at `r`: both call sites join reviews as `r`, and
+ * `BUILDING_SEARCH_ORDER` hardcodes it, so a parameter here could only ever disagree with
+ * the ORDER BY.
+ */
+export function buildingSearchSelect(currentYear: number): string {
   return `b.slug, b.address, b.neighborhood, b.city, b.state,
-    COUNT(${reviewAlias}.id) AS review_count,
-    ${recencyWeightedOverallSql(reviewAlias, currentYear)} AS avg_overall,
+    COUNT(r.id) AS review_count,
+    ${recencyWeightedOverallSql('r', currentYear)} AS avg_overall,
     l.name AS landlord_name,
-    (b.city = 'Boston' AND b.parcel_id IS NOT NULL) AS has_records`;
+    COALESCE(b.parcel_id IS NOT NULL AND (LOWER(TRIM(b.city)) = 'boston' OR LOWER(TRIM(b.city)) LIKE 'boston, __'), 0) AS has_records`;
 }
 
 /**
@@ -62,9 +80,5 @@ export function buildingSearchSelect(reviewAlias: string, currentYear: number): 
  * The leading term is what `COUNT(r.id) DESC` already gives on its own. It is spelled out
  * anyway so the product rule — a reviewed building never sorts below a seeded one — is
  * stated in the SQL and survives a later change to the tiebreakers behind it.
- *
- * The review alias is fixed at `r` rather than taken as a parameter: both call sites join
- * reviews as `r`, and a mismatch would be a SQL error at the first request, not a silent
- * reorder.
  */
 export const BUILDING_SEARCH_ORDER = 'ORDER BY (COUNT(r.id) > 0) DESC, COUNT(r.id) DESC, avg_overall DESC, b.address ASC, b.id ASC';

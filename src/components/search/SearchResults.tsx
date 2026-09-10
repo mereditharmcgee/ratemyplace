@@ -13,7 +13,7 @@ interface Building {
   landlord_name?: string;
   review_count: number;
   avg_overall: number | null;
-  /** 1 when the building is a Boston parcel, so city records can be pulled for it. SQL boolean. */
+  /** 0 or 1 — 1 when the building is a Boston parcel, so city records can be pulled for it. */
   has_records?: number;
 }
 

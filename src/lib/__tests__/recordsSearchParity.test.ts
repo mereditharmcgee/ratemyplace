@@ -13,25 +13,37 @@ import { describe, expect, it } from 'vitest';
 const page = readFileSync(join(process.cwd(), 'src/pages/search.astro'), 'utf8');
 const endpoint = readFileSync(join(process.cwd(), 'src/pages/api/search/results.ts'), 'utf8');
 
+/**
+ * Whitespace-tolerant, so reformatting the gate does not read as removing it. A global
+ * regex, and `String.prototype.match` with one of those returns every match — the counts
+ * below depend on that.
+ */
+const HAVING_REVIEWED_ONLY = /HAVING\s+COUNT\(\s*r\.id\s*\)\s*>\s*0/g;
+
+const REVIEWED_ONLY_HINT =
+  'browse-mode and landlord queries must stay reviewed-only; if you added an unrelated query, update this count';
+
 describe('search page and results endpoint stay aligned', () => {
   for (const [name, source] of [['search.astro', page], ['results.ts', endpoint]] as const) {
     it(`${name} builds the query-mode buildings query from searchSql`, () => {
       expect(source).toMatch(/buildingSearchWhere\(/);
       expect(source).toMatch(/buildingSearchSelect\(/);
-      expect(source).toMatch(/BUILDING_SEARCH_ORDER/);
+      // Interpolated into the SQL, not merely imported — a bare-name match would be
+      // satisfied by an unused import left behind after someone inlined the ORDER BY.
+      expect(source).toMatch(/\$\{BUILDING_SEARCH_ORDER\}/);
     });
   }
 
   // The page held eight: buildings and landlords, count and rows, in each of search and
   // browse mode. The two query-mode buildings queries lost theirs; the other six keep it.
   it('the page keeps browse mode and landlords reviewed-only', () => {
-    expect((page.match(/HAVING COUNT\(r\.id\) > 0/g) ?? []).length).toBe(6);
+    expect((page.match(HAVING_REVIEWED_ONLY) ?? []).length, REVIEWED_ONLY_HINT).toBe(6);
   });
 
   // Three, not the two the plan predicted: the endpoint's landlords branch is also written
   // as a query / no-query pair, so it carries two `HAVING`s of its own, not one. The
   // buildings branch keeps the one in its no-query variant.
   it('the endpoint keeps browse mode and landlords reviewed-only', () => {
-    expect((endpoint.match(/HAVING COUNT\(r\.id\) > 0/g) ?? []).length).toBe(3);
+    expect((endpoint.match(HAVING_REVIEWED_ONLY) ?? []).length, REVIEWED_ONLY_HINT).toBe(3);
   });
 });

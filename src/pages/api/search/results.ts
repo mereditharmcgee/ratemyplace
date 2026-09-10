@@ -62,8 +62,12 @@ export async function GET(context: APIContext): Promise<Response> {
            LEFT JOIN landlords l ON b.landlord_id = l.id
            WHERE ${where.sql}
            GROUP BY b.id`;
-        countSql = `SELECT COUNT(*) as total FROM (SELECT b.id ${from})`;
-        rowsSql = `SELECT ${buildingSearchSelect('r', currentYear)}
+        // The count needs no reviews join and no GROUP BY: query mode is no longer
+        // reviewed-only, so one row per matching building is exactly COUNT(*).
+        // `landlords.id` is the primary key, so the landlord join — which the WHERE needs
+        // for `l.name` — cannot multiply a building into several rows.
+        countSql = `SELECT COUNT(*) AS total FROM buildings b LEFT JOIN landlords l ON b.landlord_id = l.id WHERE ${where.sql}`;
+        rowsSql = `SELECT ${buildingSearchSelect(currentYear)}
          ${from}
          ${BUILDING_SEARCH_ORDER}
          LIMIT ? OFFSET ?`;
@@ -83,12 +87,18 @@ export async function GET(context: APIContext): Promise<Response> {
         binds = [];
       }
 
-      const countResult = await db.prepare(countSql).bind(...binds).first<{ total: number }>();
+      // `total` is only consumed for the first page: the search island takes its totals
+      // from the SSR props on `search.astro` and every later request is a Load-more
+      // append, whose `total` it discards. On a 38,000-row seeded table that count is the
+      // expensive half of the request, so skip it whenever the caller is paging.
+      const total = offset === 0
+        ? (await db.prepare(countSql).bind(...binds).first<{ total: number }>())?.total || 0
+        : 0;
       const rows = await db.prepare(rowsSql).bind(...binds, limit, offset).all();
 
       return new Response(JSON.stringify({
         results: rows.results || [],
-        total: countResult?.total || 0,
+        total,
       }), { headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) } });
     }
 
