@@ -185,10 +185,20 @@ export async function POST(context: APIContext): Promise<Response> {
     // building never gets two pages. Writes the place id and coordinates the seeded row lacks.
     const seeded = await findBuildingByAddress(db, { address: cleanAddress, city: cleanCity, zip: cleanZip });
     if (seeded) {
-      await db.prepare(
-        'UPDATE buildings SET google_place_id = COALESCE(google_place_id, ?), latitude = COALESCE(latitude, ?), ' +
-        'longitude = COALESCE(longitude, ?), updated_at = unixepoch() WHERE id = ?'
-      ).bind(placeId || null, cleanLatitude, cleanLongitude, seeded.id).run();
+      // Only stamp when there is something to stamp, and only onto a row still missing one of
+      // the three. COALESCE never overwrites: the first place id wins, and a later different
+      // place id lands on this same row through the address tier, so the outcome is
+      // idempotent. The extra WHERE clause is about the clock rather than the columns —
+      // `updated_at` feeds the sitemap's `lastmod`, so an abandoned form (or a repeat visit
+      // to an already-stamped row) must not republish the page as freshly changed.
+      const hasSomethingToStamp = Boolean(placeId) || cleanLatitude !== null || cleanLongitude !== null;
+      if (hasSomethingToStamp) {
+        await db.prepare(
+          'UPDATE buildings SET google_place_id = COALESCE(google_place_id, ?), latitude = COALESCE(latitude, ?), ' +
+          'longitude = COALESCE(longitude, ?), updated_at = unixepoch() WHERE id = ? ' +
+          'AND (google_place_id IS NULL OR latitude IS NULL OR longitude IS NULL)'
+        ).bind(placeId || null, cleanLatitude, cleanLongitude, seeded.id).run();
+      }
 
       return found(seeded);
     }
@@ -215,12 +225,17 @@ export async function POST(context: APIContext): Promise<Response> {
     // are the public URL, and "9-pine-st-cambridge-2" is a readable second building at that
     // address where "9-pine-st-cambridge-mtv0094i" is noise. Bounded by the number of rows
     // already holding the base slug.
-    let slug = baseSlug;
-    let attempt = 1;
-    while (await db.prepare('SELECT 1 FROM buildings WHERE slug = ?').bind(slug).first()) {
-      attempt += 1;
-      slug = `${baseSlug}-${attempt}`;
-    }
+    const nextFreeSlug = async (from: string): Promise<string> => {
+      let candidate = from;
+      // `from` is either the base slug (attempt 1) or a `-N` the race below just lost.
+      let attempt = from === baseSlug ? 1 : Number(from.slice(baseSlug.length + 1)) || 1;
+      while (await db.prepare('SELECT 1 FROM buildings WHERE slug = ?').bind(candidate).first()) {
+        attempt += 1;
+        candidate = `${baseSlug}-${attempt}`;
+      }
+      return candidate;
+    };
+    let slug = await nextFreeSlug(baseSlug);
 
     const buildingId = generateIdFromEntropySize(10);
     // Reviewer dedupe (and the seed's existing-row matching) look up on (city, street_key)
@@ -229,7 +244,7 @@ export async function POST(context: APIContext): Promise<Response> {
     // created, it just cannot be found by key.
     const key = addressKey(safeAddress);
 
-    await db.prepare(`
+    const insertWithSlug = (withSlug: string): Promise<unknown> => db.prepare(`
       INSERT INTO buildings (
         id, address, slug, neighborhood, city, state, zip_code,
         latitude, longitude, google_place_id, street_key, st_num_lo, st_num_hi
@@ -237,7 +252,7 @@ export async function POST(context: APIContext): Promise<Response> {
     `).bind(
       buildingId,
       safeAddress,
-      slug,
+      withSlug,
       cleanNeighborhood,
       cleanCity,
       cleanState,
@@ -249,6 +264,19 @@ export async function POST(context: APIContext): Promise<Response> {
       key?.numLo ?? null,
       key?.numHi ?? null
     ).run();
+
+    try {
+      await insertWithSlug(slug);
+    } catch (error) {
+      // Counting suffixes is a read followed by a write, so two concurrent creates at the
+      // same address can both settle on `-2` and the loser trips the UNIQUE index on
+      // `slug`. Re-count from the slug we just lost and insert once more; a second failure
+      // falls through to the generic 500 rather than spinning under contention.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/UNIQUE/i.test(message)) throw error;
+      slug = await nextFreeSlug(slug);
+      await insertWithSlug(slug);
+    }
 
     return new Response(JSON.stringify({
       building: { id: buildingId, slug },

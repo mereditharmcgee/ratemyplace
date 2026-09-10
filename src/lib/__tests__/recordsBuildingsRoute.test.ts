@@ -20,6 +20,20 @@ async function rows(db: TestD1Database): Promise<BuildingRow[]> {
   return results;
 }
 
+/** `updated_at` is not in `rows()` because most assertions do not care; these three do. */
+async function updatedAt(db: TestD1Database, id: string): Promise<number> {
+  const row = await db.prepare('SELECT updated_at FROM buildings WHERE id = ?').bind(id).first<{ updated_at: number }>();
+  if (!row) throw new Error(`no building ${id}`);
+  return row.updated_at;
+}
+
+async function stampSeed(db: TestD1Database, fields: { placeId: string | null; lat: number | null; lng: number | null; updatedAt: number }): Promise<void> {
+  await db
+    .prepare('UPDATE buildings SET google_place_id = ?, latitude = ?, longitude = ?, updated_at = ? WHERE id = ?')
+    .bind(fields.placeId, fields.lat, fields.lng, fields.updatedAt, 'seed-1')
+    .run();
+}
+
 suite('POST /api/buildings with seeded dedupe', () => {
   let db: TestD1Database;
   beforeEach(async () => {
@@ -69,6 +83,35 @@ suite('POST /api/buildings with seeded dedupe', () => {
     const res = await POST(createContext(db, { streetAddress: '1 elm st', city: 'new haven', state: 'CT', zipCode: null }));
     expect(res.status).toBe(200);
     expect((await rows(db)).length).toBe(2);
+  });
+
+  it('an exact place id wins over the address tier and leaves the seeded row alone', async () => {
+    await insertBuilding(db, { id: 'other', address: '1 Pine St', slug: '1-pine-st-cambridge', city: 'Cambridge', zip_code: '02139', google_place_id: 'gp-x' });
+    const res = await POST(createContext(db, { placeId: 'gp-x', streetAddress: '25 Lanark Rd', city: 'Boston', state: 'MA', zipCode: '02135' }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).building).toEqual({ id: 'other', slug: '1-pine-st-cambridge' });
+    const seed = (await rows(db)).find((r) => r.id === 'seed-1');
+    expect(seed?.google_place_id).toBeNull();
+  });
+
+  it('never overwrites an already-stamped seeded row, and does not touch its updated_at', async () => {
+    await stampSeed(db, { placeId: 'gp-old', lat: 42.1, lng: -71.1, updatedAt: 1_700_000_000 });
+    const before = await updatedAt(db, 'seed-1');
+    const res = await POST(createContext(db, { placeId: 'gp-new', streetAddress: '25 Lanark Rd', city: 'Boston', state: 'MA', zipCode: '02135', latitude: 42.34, longitude: -71.15 }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).building.id).toBe('seed-1');
+    const seed = (await rows(db)).find((r) => r.id === 'seed-1');
+    expect(seed).toMatchObject({ google_place_id: 'gp-old', latitude: 42.1, longitude: -71.1 });
+    expect(await updatedAt(db, 'seed-1')).toBe(before);
+  });
+
+  it('a manual entry with no place id and no coordinates does not bump updated_at', async () => {
+    await stampSeed(db, { placeId: null, lat: null, lng: null, updatedAt: 1_700_000_000 });
+    const before = await updatedAt(db, 'seed-1');
+    const res = await POST(createContext(db, { streetAddress: '25 Lanark Rd', city: 'Boston', state: 'MA', zipCode: '02135' }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).building.id).toBe('seed-1');
+    expect(await updatedAt(db, 'seed-1')).toBe(before);
   });
 
   it('a slug collision gets -2, -3', async () => {

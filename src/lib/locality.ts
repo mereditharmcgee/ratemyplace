@@ -17,14 +17,16 @@ interface LocalityBuilding {
 // `isBostonLocality` tests membership, and `displayLocality` trusts the single-word names
 // that are also common street names, which the street-word heuristic below would otherwise
 // wrongly discard (e.g. "45 Roxbury Street" really is in Roxbury). The multi-word names
-// are inert for that second job — a multi-word name can never equal a single address word,
-// so the street-word test already leaves them alone — and they are listed anyway so the
-// Boston vocabulary lives in one place.
+// mostly do not need that rescue: `normalize()` strips punctuation, so a multi-word name can
+// only equal a single address word when that word is hyphenated ("Hyde-Park Ave" normalizes
+// to 'hydepark'), which is rare but real. They are listed both for that case and so the
+// Boston vocabulary lives in one place. `readville` is single-word, so it is trusted the
+// same way the rest of the single-word names are.
 //
 // `src/lib/records/identity.ts` keeps the uppercase, space-preserving version of the same
 // vocabulary (`TRAILING_LOCALITIES`, plus 'BOSTON' itself) for stripping a trailing
-// locality off a street. Keep the two lists in step; folding them into one shared data
-// module is a recorded follow-up.
+// locality off a street. Keep the two lists in step; worth folding into one data module
+// later.
 const BOSTON_NEIGHBORHOODS = new Set([
   'allston',
   'brighton',
@@ -63,7 +65,11 @@ function normalize(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
-/** "Boston" or one of its neighborhoods, as Google Places and manual entry both spell the city. A trailing ", MA" is tolerated. */
+/**
+ * "Boston" or one of its neighborhoods, as Google Places and manual entry both spell the
+ * city. A comma-delimited state tail is tolerated ("Boston, MA"); a comma-less one
+ * ("Boston MA") is not, and no current writer produces that shape.
+ */
 export function isBostonLocality(city: string | null | undefined): boolean {
   if (!city) return false;
   const key = normalize(city.replace(/,\s*[A-Za-z]{2}\s*$/, ''));

@@ -30,6 +30,23 @@ suite('findBuildingByAddress', () => {
     expect(await findBuildingByAddress(db, { address: '15 Gordon St', city: 'Boston', zip: '02136' })).toBeNull();
   });
 
+  it('rejects a lone candidate whose ZIP disagrees, and accepts it when a ZIP is absent on either side', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'g1', address: '15 Gordon St', slug: 'g1-slug', zip_code: '02134', source: 'seed', street_key: 'GORDON ST', st_num_lo: 15, st_num_hi: 15 });
+    // A different ZIP on a single candidate means a different neighborhood's Gordon St, so
+    // the caller creates its own row rather than merging onto this one.
+    expect(await findBuildingByAddress(db, { address: '15 Gordon St', city: 'Boston', zip: '02135' })).toBeNull();
+    expect(await findBuildingByAddress(db, { address: '15 Gordon St', city: 'Boston', zip: '02134' })).toEqual({ id: 'g1', slug: 'g1-slug' });
+    expect(await findBuildingByAddress(db, { address: '15 Gordon St', city: 'Boston', zip: null })).toEqual({ id: 'g1', slug: 'g1-slug' });
+  });
+
+  it('ignores a candidate whose number span is implausibly wide', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'wide', address: '2-9998 Washington St', slug: 'wide-slug', source: 'user', street_key: 'WASHINGTON ST', st_num_lo: 2, st_num_hi: 9998 });
+    await insertBuilding(db, { id: 'real', address: '100 Washington St', slug: 'real-slug', source: 'seed', street_key: 'WASHINGTON ST', st_num_lo: 100, st_num_hi: 100 });
+    expect(await findBuildingByAddress(db, { address: '100 Washington St', city: 'Boston', zip: null })).toEqual({ id: 'real', slug: 'real-slug' });
+  });
+
   it('prefers a user row over a seeded twin on the same range and ZIP, even without a ZIP in the input', async () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'seed-x', address: '10 Elm St', source: 'seed', street_key: 'ELM ST', st_num_lo: 10, st_num_hi: 10 });
