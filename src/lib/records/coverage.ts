@@ -38,7 +38,7 @@ export async function pendingQueueReason(db: RecordsDb, buildingId: string): Pro
 }
 
 /** Listed in the precedence order `recordsRequestState` applies. */
-export type RecordsRequestState = 'ineligible' | 'pulled' | 'parked' | 'requested' | 'fill_queued' | 'never_pulled';
+export type RecordsRequestState = 'ineligible' | 'pulled' | 'fill_queued' | 'parked' | 'requested' | 'never_pulled';
 
 interface RequestStateRow {
   city: string | null;
@@ -55,15 +55,22 @@ interface RequestStateRow {
  *   (`jurisdictionForCity`), not a string compare on 'Boston', so 'boston' and 'Boston, MA'
  *   get the button the pull would honor.
  * - `pulled`: a deeper pull exists; the ledger is the normal one and the button never returns.
- * - `parked`: the pending row has used all `MAX_ATTEMPTS` of its claims, so the Worker will
- *   not take it again without a human. Such a row keeps `done_at IS NULL` forever, which
- *   `requested` would report as "reload in a few minutes" for as long as it sits there — so
- *   say what is true instead. The button is not offered, and the endpoint treats `parked`
- *   exactly like `requested`: a press falls through to `enqueue`, which answers
- *   `already_queued` against a parked button, follower or refresh row and replaces a parked
- *   `fill` row the way it replaces a live one.
+ * - `fill_queued`: only the city-wide pass has it; say so, and still offer the button. This
+ *   is checked ahead of `parked` on purpose: a fill row that used all `MAX_ATTEMPTS` of its
+ *   claims is still a row the button can do something about, because `enqueue` replaces it
+ *   with a fresh priority-0 row that gets its own attempts. Offering the button there is
+ *   the honest answer — the press really does move the building to the front of the queue.
+ * - `parked`: the pending `button`, `follower` or `refresh` row has used all `MAX_ATTEMPTS`
+ *   of its claims, so the Worker will not take it again without a human. Such a row keeps
+ *   `done_at IS NULL` forever, which `requested` would report as "reload in a few minutes"
+ *   for as long as it sits there — so say what is true instead. No button is offered:
+ *   against a parked `button` or `follower` row a press can only answer `already_queued`,
+ *   priority 0 not beating priority 0, and a parked `refresh` row does not reach this
+ *   branch in practice, because `planRefresh` only queues buildings that already have a
+ *   deeper pull and `pulled` catches those first. The endpoint still treats `parked`
+ *   exactly like `requested` — it is a page state, not a refusal, so a press from a stale
+ *   page falls through to `enqueue` rather than meeting a 404 or a 409.
  * - `requested`: a button, follower, or refresh row is pending; say so, offer no button.
- * - `fill_queued`: only the city-wide pass has it; say so, and still offer the button.
  * - `never_pulled`: offer the button.
  *
  * One statement on purpose: the public endpoint calls this once per request, and both
@@ -88,10 +95,11 @@ export async function recordsRequestState(db: RecordsDb, buildingId: string): Pr
     .first<RequestStateRow>();
   if (!row || jurisdictionForCity(row.city) === null || row.parcel_id === null) return 'ineligible';
   if (row.has_deeper) return 'pulled';
-  // Before the two branches below on purpose: a parked row is pending by `done_at`, so both
-  // of them would read it as work still in flight.
-  if (row.pending_reason !== null && (row.pending_attempts ?? 0) >= MAX_ATTEMPTS) return 'parked';
+  // Ahead of `parked`: an exhausted fill row is the one parked row a press can still fix.
   if (row.pending_reason === 'fill') return 'fill_queued';
+  // Before `requested` for the reasons in the docblock: a parked row is pending by
+  // `done_at`, so `requested` would read it as work still in flight.
+  if (row.pending_reason !== null && (row.pending_attempts ?? 0) >= MAX_ATTEMPTS) return 'parked';
   if (row.pending_reason !== null) return 'requested';
   return 'never_pulled';
 }

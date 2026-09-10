@@ -227,18 +227,21 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   and ANDs across terms, so "comm ave" matches both `Avenue` and `Ave` in stored addresses
   without matching a building that has neither. Consumed by `searchSql.ts`.
 - **`coverage.ts` is the page-state table, read-only.** `recordsRequestState` answers
-  `ineligible` / `pulled` / `parked` / `requested` / `fill_queued` / `never_pulled` in that
+  `ineligible` / `pulled` / `fill_queued` / `parked` / `requested` / `never_pulled` in that
   precedence, in **one** statement (indexed `building_id` seeks as correlated subqueries),
   because the public endpoint calls it once per request; `hasDeeperPull` and
   `pendingQueueReason` stay exported for callers that need one answer without the other.
-  Eligibility is `jurisdictionForCity`, not a string compare on 'Boston'. `DEEPER_SOURCE_IDS`
-  lives here and `scheduler.ts` re-exports it — do not move it back.
+  Eligibility is `jurisdictionForCity`, not a string compare on 'Boston'. A **parked `fill` row
+  still reads `fill_queued`**, so the button stays offered: a press replaces it with a fresh
+  priority-0 row that gets its own attempts. `DEEPER_SOURCE_IDS` lives here and
+  `scheduler.ts` re-exports it — do not move it back.
 - **`parked` exists because a row at `MAX_ATTEMPTS` is still `done_at IS NULL`.** Without it
   the panel reads such a row as `requested` and tells the reader to reload a page that will
-  not change until a human looks, so it is resolved **before** the `fill_queued` and
-  `requested` branches. It is a page state, not a refusal: `POST /api/records/request` lets
-  it fall through to `enqueue` exactly as `requested` does, which answers `already_queued`
-  against a parked button, follower or refresh row and replaces a parked `fill` row.
+  not change until a human looks, so it is resolved **before** the `requested` branch — but
+  **after** `fill_queued`, because a press really does replace an exhausted `fill` row. It is a
+  page state, not a refusal: `POST /api/records/request` lets it fall through to `enqueue`
+  exactly as `requested` does, which answers `already_queued` against a parked button or
+  follower row.
 - **`request.ts` holds the button's limits, not the route.** Three presses an hour per IP
   (`REQUEST_PER_IP`) and 300 button rows a day site-wide (`REQUEST_DAILY_CAP`) over a
   **rolling** 24 hours, counted from `records_queue` because button rows are never purged.

@@ -359,11 +359,13 @@ Endpoint guards, in order: JSON content type; `checkRateLimit(db, ip, 'records_r
 > **A sixth page state, `parked`,** added in review. The state table above has no row for a
 > queue row that used all `MAX_ATTEMPTS` of its claims: such a row keeps `done_at IS NULL`, so
 > `requested` reported it as work in flight and the panel told the reader to reload a page that
-> would not change until a human looked. `parked` is resolved ahead of the `fill_queued` and
-> `requested` branches, renders `REQUEST_PARKED_COPY` ("These records could not be retrieved
+> would not change until a human looked. `parked` is resolved ahead of the `requested`
+> branch, renders `REQUEST_PARKED_COPY` ("These records could not be retrieved
 > yet. The request is queued for another attempt."), and offers no button. The endpoint treats
 > it exactly like `requested` — it is a page state, not a refusal, so a press from a stale page
-> falls through to `enqueue` rather than meeting a 404 or a 409.
+> falls through to `enqueue` rather than meeting a 404 or a 409. **A parked `fill` row is the
+> exception and still reads `fill_queued`, button included** — `enqueue` replaces it with a fresh
+> priority-0 row that gets its own attempts, so the press genuinely helps the reader.
 >
 > **The follower enqueue on save is rate-limited at the save**, 20 an hour per user
 > (`building-save`, the same budget as `building-create`). It is a priority-0 queue row asked

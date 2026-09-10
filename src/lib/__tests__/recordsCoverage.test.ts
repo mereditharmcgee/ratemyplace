@@ -97,7 +97,10 @@ suite('coverage', () => {
     expect(await recordsRequestState(db, id)).toBe('parked');
   });
 
-  it('parked outranks fill_queued, and a deeper pull still outranks parked', async () => {
+  // A parked *fill* row is the one exhausted row a press can still fix: `enqueue` replaces
+  // it with a fresh priority-0 button row, so `fill_queued` outranks `parked` and the button
+  // stays offered. A deeper pull still outranks both.
+  it('a parked fill row still reads fill_queued, and the button replaces it', async () => {
     const db = createRecordsTestDb();
     const id = await insertBuilding(db, { parcel_id: '2102396000' });
     await enqueue(db, { buildingId: id, reason: 'fill', now: 1_000 });
@@ -105,7 +108,16 @@ suite('coverage', () => {
       .prepare('UPDATE records_queue SET attempts = ? WHERE building_id = ? AND done_at IS NULL')
       .bind(MAX_ATTEMPTS, id)
       .run();
-    expect(await recordsRequestState(db, id)).toBe('parked');
+    expect(await recordsRequestState(db, id)).toBe('fill_queued');
+
+    // The replacement is a fresh insert, so the exhausted row's attempts go with it.
+    expect(await enqueue(db, { buildingId: id, reason: 'button', now: 1_001 })).toEqual({ status: 'queued' });
+    const pending = await db
+      .prepare('SELECT reason, attempts FROM records_queue WHERE building_id = ? AND done_at IS NULL')
+      .bind(id)
+      .first<{ reason: string; attempts: number }>();
+    expect(pending).toEqual({ reason: 'button', attempts: 0 });
+    expect(await recordsRequestState(db, id)).toBe('requested');
 
     await insertPull(db, id, PERMITS_RESOURCE_ID);
     expect(await recordsRequestState(db, id)).toBe('pulled');
