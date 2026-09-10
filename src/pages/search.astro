@@ -2,7 +2,7 @@
 import BaseLayout from '../components/layout/BaseLayout.astro';
 import SearchResults from '../components/search/SearchResults';
 import EmptyState from '../components/ui/EmptyState.astro';
-import { escapeLikePattern } from '../lib/validation';
+import { escapeLikePattern, validateSearch } from '../lib/validation';
 import { BUILDING_SEARCH_ORDER, buildingSearchSelect, buildingSearchWhere } from '../lib/searchSql';
 import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../lib/scoring-sql';
 
@@ -21,7 +21,15 @@ let totalBuildings = 0;
 let totalLandlords = 0;
 let hasAnyListings = false;
 
-if (query) {
+// The same length cap `/api/search/results` applies (`validateSearch`, 200 characters on the
+// trimmed query), so the page and the endpoint agree about what is a search. Over that, no
+// query runs at all: `buildings` and `landlords` stay empty and the totals stay 0, so the
+// markup below falls to the "No buildings match that search" empty state. Browse mode must
+// not catch it either — a 5,000-character `q` is a rejected search, not a request to list
+// everything — hence the explicit `!query` on the browse branch rather than a bare `else`.
+const searchRejected = query !== '' && validateSearch(query).length > 0;
+
+if (query && !searchRejected) {
   // Search mode — filtered results with totals.
   // Escape LIKE wildcards (% and _) so they match literally, matching the
   // paginated /api/search/results endpoint (otherwise SSR counts and Load-more
@@ -98,7 +106,7 @@ if (query) {
   } catch (error) {
     console.error('Search error:', error);
   }
-} else {
+} else if (!query) {
   // Browse mode — all reviewed properties with totals
   try {
     const buildingCount = await db.prepare(`

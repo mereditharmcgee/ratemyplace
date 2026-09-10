@@ -4,6 +4,7 @@ import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../../lib
 import { validateSearch, escapeLikePattern } from '../../../lib/validation';
 import { BUILDING_SEARCH_ORDER, buildingSearchSelect, buildingSearchWhere } from '../../../lib/searchSql';
 import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../../../lib/scoring-sql';
+import type { SearchResultsResponse } from '../../../lib/api-types';
 
 export async function GET(context: APIContext): Promise<Response> {
   const db = getDB(context);
@@ -99,7 +100,7 @@ export async function GET(context: APIContext): Promise<Response> {
       return new Response(JSON.stringify({
         results: rows.results || [],
         total,
-      }), { headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) } });
+      } satisfies SearchResultsResponse), { headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) } });
     }
 
     if (resultType === 'landlords') {
@@ -135,10 +136,10 @@ export async function GET(context: APIContext): Promise<Response> {
       return new Response(JSON.stringify({
         results: rows.results || [],
         total: countResult?.total || 0,
-      }), { headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) } });
+      } satisfies SearchResultsResponse), { headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) } });
     }
 
-    return new Response(JSON.stringify({ results: [], total: 0 }), {
+    return new Response(JSON.stringify({ results: [], total: 0 } satisfies SearchResultsResponse), {
       headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) }
     });
   } catch (error) {

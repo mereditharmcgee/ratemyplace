@@ -34,6 +34,15 @@ describe('search page and results endpoint stay aligned', () => {
     });
   }
 
+  // The endpoint 400s a query over 200 characters. The page used to run it anyway, which is
+  // the two surfaces disagreeing about what counts as a search — so it now applies the same
+  // `validateSearch` and renders the no-match empty state without querying.
+  it('the page applies the same length cap as the endpoint', () => {
+    for (const [name, source] of [['search.astro', page], ['results.ts', endpoint]] as const) {
+      expect(source, `${name} must run validateSearch on the query`).toMatch(/validateSearch\(/);
+    }
+  });
+
   // The page held eight: buildings and landlords, count and rows, in each of search and
   // browse mode. The two query-mode buildings queries lost theirs; the other six keep it.
   it('the page keeps browse mode and landlords reviewed-only', () => {
