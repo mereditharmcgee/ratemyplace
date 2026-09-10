@@ -116,6 +116,15 @@ describe('buildIdentity', () => {
     expect(() => buildIdentity({ ...base, address: '23 - 27 Lanark Rd' })).toThrow(/degenerate/i);
   });
 
+  it('strips a comma-less trailing locality, so both forms of one address agree', () => {
+    const typed = buildIdentity({ ...base, address: '1027 Commonwealth Ave Boston', zip_code: '02215' });
+    expect(typed.streetForms).toEqual(['COMMONWEALTH AV', 'COMMONWEALTH AVE', 'COMMONWEALTH AVENUE']);
+    expect(typed.streetBase).toBe('COMMONWEALTH');
+    const comma = buildIdentity({ ...base, address: '1027 Commonwealth Ave, Boston, MA 02215', zip_code: '02215' });
+    expect(comma.streetForms).toEqual(typed.streetForms);
+    expect(comma.streetBase).toBe('COMMONWEALTH');
+  });
+
   it('round-trips the SAM id', () => {
     expect(buildIdentity({ ...base, sam_id: '12345' }).samId).toBe('12345');
     expect(buildIdentity(base).samId).toBeNull();

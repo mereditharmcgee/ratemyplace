@@ -78,6 +78,15 @@ describe('stripTrailingLocality', () => {
   it('peels a two-word neighborhood', () => {
     expect(stripTrailingLocality('CENTRE ST JAMAICA PLAIN')).toBe('CENTRE ST');
     expect(stripTrailingLocality('E BROADWAY SOUTH BOSTON MA')).toBe('E BROADWAY');
+    expect(stripTrailingLocality('SOUTH BOSTON MA 02127')).toBe('SOUTH BOSTON');
+  });
+
+  it('peels a postal city name that is not the bare neighborhood name', () => {
+    expect(stripTrailingLocality('MELVILLE AVE DORCHESTER CENTER MA 02124')).toBe('MELVILLE AVE');
+  });
+
+  it('takes an empty street as it finds it', () => {
+    expect(stripTrailingLocality('')).toBe('');
   });
 
   it('leaves a street whose name or suffix merely resembles a locality token', () => {
@@ -113,5 +122,13 @@ describe('addressKey with a trailing locality', () => {
     expect(addressKey('23-27 Lanark Rd, Boston, MA 02135')).toEqual({ streetKey: 'LANARK RD', numLo: 23, numHi: 27 });
     expect(addressKey('5 Boston St')).toEqual({ streetKey: 'BOSTON ST', numLo: 5, numHi: 5 });
     expect(addressKey('12 Lanark Ct')).toEqual({ streetKey: 'LANARK CT', numLo: 12, numHi: 12 });
+  });
+
+  it('keeps a street that is a locality behind an article whole', () => {
+    expect(addressKey('12 The Fenway Boston MA 02215')).toEqual({ streetKey: 'THE FENWAY', numLo: 12, numHi: 12 });
+  });
+
+  it('leaves a non-Boston city in the key, since the stripper is deliberately Boston-only', () => {
+    expect(addressKey('5 Beacon St Brookline MA 02446')).toEqual({ streetKey: 'BEACON ST BROOKLINE', numLo: 5, numHi: 5 });
   });
 });

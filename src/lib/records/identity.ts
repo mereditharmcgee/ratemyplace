@@ -54,6 +54,9 @@ const UNIT_PATTERN = /(?:^|\s+)(?:APT|APARTMENT|UNIT|STE|SUITE|FL|FLOOR|RM|ROOM)
  * city. Uppercase, because it runs after `normalizeStreet`. Multi-word names are matched
  * as a unit, longest first.
  */
+// Complete means: every postal city name USPS uses for a Boston ZIP, plus the neighborhood
+// names people type; `src/lib/locality.ts` keeps a separate display-side set that also carries
+// New Haven names, which must never be stripped from a key — hence two sets, not one.
 const TRAILING_LOCALITIES: ReadonlySet<string> = new Set([
   'BOSTON',
   'ALLSTON',
@@ -78,22 +81,26 @@ const TRAILING_LOCALITIES: ReadonlySet<string> = new Set([
   'BEACON HILL',
   'MISSION HILL',
   'WEST END',
+  // Postal city names for Boston ZIPs that are not the bare neighborhood name.
+  'DORCHESTER CENTER',
+  'ROXBURY CROSSING',
 ]);
 
 const ZIP_TOKEN = /^\d{5}(?:-\d{4})?$/;
 
+const STREET_ARTICLES: ReadonlySet<string> = new Set(['THE']);
+const MAX_LOCALITY_WORDS = Math.max(...[...TRAILING_LOCALITIES].map((name) => name.split(' ').length));
+
 /**
- * How many trailing words are a locality name — 2, 1, or 0 (longest first, so "SOUTH
- * BOSTON" is not read as "BOSTON" after a "SOUTH"). Zero when the words *are* a locality
- * in full — one word ("BOSTON"), two ("SOUTH BOSTON"), or an article plus one ("THE
- * FENWAY", a real Boston street): there is no street in front of it for the locality to
- * trail, and "THE" alone is not a street name.
+ * How many trailing words are a locality name, longest first ("SOUTH BOSTON" is not read
+ * as a "BOSTON" behind a "SOUTH"). Zero when nothing usable would be left in front of it:
+ * a street that *is* a locality ("BOSTON"), or one that is a locality behind an article
+ * ("THE FENWAY", a real Boston street) — an article alone is not a street name.
  */
-function trailingLocalityLength(words: readonly string[]): number {
-  const bare = words[0] === 'THE' ? words.slice(1) : words;
-  if (TRAILING_LOCALITIES.has(bare.join(' '))) return 0;
-  for (const n of [2, 1]) {
-    if (words.length > n && TRAILING_LOCALITIES.has(words.slice(-n).join(' '))) return n;
+function trailingLocalityWordCount(words: readonly string[]): number {
+  for (let n = MAX_LOCALITY_WORDS; n >= 1; n -= 1) {
+    if (words.length < n || !TRAILING_LOCALITIES.has(words.slice(-n).join(' '))) continue;
+    return words.slice(0, -n).every((word) => STREET_ARTICLES.has(word)) ? 0 : n;
   }
   return 0;
 }
@@ -101,11 +108,13 @@ function trailingLocalityLength(words: readonly string[]): number {
 /**
  * Peel a trailing ZIP, then "MA", then a locality from an already-normalized (uppercase,
  * comma-free) street. Every step keeps at least one word, and a street that is itself a
- * locality name ("BOSTON", "SOUTH BOSTON") is left whole. "MA" is only a state when a ZIP
- * was just removed or a locality precedes it — otherwise it is left alone, and "CT" is
- * never touched at all, because both are also street suffixes ("Lanark Ct"). Called by
- * `addressKey`, which is what the seed's existing-row matcher and the reviewer dedupe both
- * key with; not by `streetKey`, whose input is a bare assessor street name.
+ * locality name ("BOSTON", "SOUTH BOSTON") is left whole. "CT" is a street suffix (Court),
+ * so it is never treated as a state. A lone "MA" after a street is only read as the state
+ * when a ZIP was just removed or a locality precedes it: nothing has verified that no Boston
+ * street name ends in a bare "MA", so the guard errs toward not stripping, at the known cost
+ * that '23 Lanark Rd MA' keys as `LANARK RD MA` while '23 Lanark Rd MA 02135' keys as
+ * `LANARK RD`. Called by `addressKey` and `buildIdentity`, which both consume user-entered
+ * `buildings.address`; not by `streetKey`, whose input is a bare assessor street name.
  */
 export function stripTrailingLocality(streetUpper: string): string {
   const words = streetUpper.split(' ').filter((word) => word.length > 0);
@@ -116,9 +125,9 @@ export function stripTrailingLocality(streetUpper: string): string {
   }
   if (words.length > 1 && words[words.length - 1] === 'MA') {
     const before = words.slice(0, -1);
-    if (sawZip || trailingLocalityLength(before) > 0) words.pop();
+    if (sawZip || trailingLocalityWordCount(before) > 0) words.pop();
   }
-  const localityWords = trailingLocalityLength(words);
+  const localityWords = trailingLocalityWordCount(words);
   if (localityWords > 0) words.splice(words.length - localityWords, localityWords);
   return words.join(' ');
 }
@@ -195,7 +204,7 @@ export function buildIdentity(building: BuildingRowForIdentity): BuildingIdentit
   // A lettered number also matches as its bare number: '12A' -> ['12A','12'].
   const numbers = Array.from(new Set(parts.flatMap((p) => (/[A-Z]$/.test(p) ? [p, p.replace(/[A-Z]+$/, '')] : [p])))).filter(Boolean);
 
-  const { base, spellings } = splitStreet(normalizeStreet(parsed.street));
+  const { base, spellings } = splitStreet(stripTrailingLocality(normalizeStreet(parsed.street)));
   if (isDegenerateStreet(base, spellings)) {
     throw new Error(`Degenerate street name from address: ${building.address}`);
   }
