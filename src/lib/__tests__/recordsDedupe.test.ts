@@ -62,6 +62,16 @@ suite('findBuildingByAddress', () => {
     expect((await findBuildingByAddress(db, { address: '10 Elm Street', city: 'Boston', zip: null }))?.id).toBe('user-x');
   });
 
+  it('prefers the more specific parcel among same-source candidates', async () => {
+    // A wide mixed-parity parcel and a single-number parcel both contain 100 and agree on
+    // the ZIP, so neither the source nor the ZIP separates them. The narrower parcel is the
+    // better page: it is about that address, not about the 198 numbers around it.
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'wide', address: '2-200 Main St', slug: 'wide-slug', zip_code: '02135', source: 'seed', street_key: 'MAIN ST', st_num_lo: 2, st_num_hi: 200 });
+    await insertBuilding(db, { id: 'exact', address: '100 Main St', slug: 'exact-slug', zip_code: '02135', source: 'seed', street_key: 'MAIN ST', st_num_lo: 100, st_num_hi: 100 });
+    expect(await findBuildingByAddress(db, { address: '100 Main St', city: 'Boston', zip: '02135' })).toEqual({ id: 'exact', slug: 'exact-slug' });
+  });
+
   it('keys a comma-less city tail and a neighborhood city', async () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'c', address: '1027 Commonwealth Av', source: 'seed', street_key: 'COMMONWEALTH AV', st_num_lo: 1027, st_num_hi: 1027 });

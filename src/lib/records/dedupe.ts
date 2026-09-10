@@ -76,6 +76,14 @@ export async function findBuildingByAddress(db: RecordsDb, input: DedupeInput): 
   }
   if (contained.length === 0) return null;
 
-  contained.sort((a, b) => (a.source === 'user' ? 0 : 1) - (b.source === 'user' ? 0 : 1) || a.created_at - b.created_at);
+  // User rows first (they already hold the reviews), then the narrower range: when two
+  // parcels both contain the number, the one that covers only it is the page about this
+  // address rather than the block around it. `created_at` is the last resort.
+  contained.sort(
+    (a, b) =>
+      (a.source === 'user' ? 0 : 1) - (b.source === 'user' ? 0 : 1) ||
+      a.st_num_hi - a.st_num_lo - (b.st_num_hi - b.st_num_lo) ||
+      a.created_at - b.created_at,
+  );
   return { id: contained[0].id, slug: contained[0].slug };
 }
