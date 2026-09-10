@@ -262,6 +262,24 @@ export function unavailableCopy(retrievedAt: number): string {
 export const CAPPED_REQUESTS_COPY = `First ${ROW_CAP} requests considered.`;
 export const CAPPED_ROWS_COPY = `First ${ROW_CAP} shown.`;
 
+// Reader-facing request button and page states (design spec Section 4). The button asks the
+// companion Worker to fetch; nothing is fetched in the request. Copy stays here so the
+// banned-words scan covers it.
+export const REQUEST_BUTTON_LABEL = "Get this building's city records";
+export const REQUEST_BUTTON_HELP =
+  'Permits, violations, code enforcement tickets, and 311 requests are fetched from the city when someone asks. It takes a few minutes.';
+export const REQUEST_VERIFYING_COPY = 'Checking that you are a person, then sending the request.';
+export const REQUESTED_COPY = 'Records requested. They usually appear within a few minutes; reload to check.';
+export const FILL_QUEUED_COPY = 'Queued for the city-wide pass.';
+export const REQUEST_ALREADY_PULLED_COPY = 'These records have already been retrieved. Reload to see them.';
+export const REQUEST_FAILED_COPY = 'The request did not go through. Please try again.';
+
+// The building page's no-reviews card and the search result line for a seeded building.
+export const NO_REVIEWS_CARD_TITLE = 'No reviews yet.';
+export const NO_REVIEWS_CARD_BODY = 'Lived here? Rate this place.';
+export const NO_REVIEWS_BREAKDOWN_COPY = 'Rating breakdown appears after the first review.';
+export const SEARCH_SEEDED_COPY = 'No reviews yet · city records';
+
 const COMPACT_UNITS: Array<{ threshold: number; suffix: string }> = [
   { threshold: 1_000_000_000, suffix: 'B' },
   { threshold: 1_000_000, suffix: 'M' },
@@ -370,6 +388,17 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   NEVER_PULLED_COPY,
   CAPPED_REQUESTS_COPY,
   CAPPED_ROWS_COPY,
+  REQUEST_BUTTON_LABEL,
+  REQUEST_BUTTON_HELP,
+  REQUEST_VERIFYING_COPY,
+  REQUESTED_COPY,
+  FILL_QUEUED_COPY,
+  REQUEST_ALREADY_PULLED_COPY,
+  REQUEST_FAILED_COPY,
+  NO_REVIEWS_CARD_TITLE,
+  NO_REVIEWS_CARD_BODY,
+  NO_REVIEWS_BREAKDOWN_COPY,
+  SEARCH_SEEDED_COPY,
   ...Object.fromEntries(
     Object.entries(KIND_LABELS).map(([kind, label]) => [`KIND_LABELS.${kind}`, label]),
   ),
