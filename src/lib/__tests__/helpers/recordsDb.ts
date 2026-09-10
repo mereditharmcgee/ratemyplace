@@ -103,33 +103,58 @@ export function auditActionTypesFrom0028(): string[] {
   return Array.from(block[1].matchAll(/'([a-z_]+)'/g), (m) => m[1]);
 }
 
-export async function insertBuilding(
-  db: TestD1Database,
-  overrides: Partial<{
-    id: string;
-    address: string;
-    slug: string;
-    neighborhood: string | null;
-    city: string;
-    state: string;
-    zip_code: string;
-    parcel_id: string | null;
-    sam_id: string | null;
-    google_place_id: string | null;
-    latitude: number | null;
-    longitude: number | null;
-    source: 'user' | 'seed';
-    street_key: string | null;
-    st_num_lo: number | null;
-    st_num_hi: number | null;
-  }> = {},
-): Promise<string> {
-  const row = {
+type BuildingRow = {
+  id: string;
+  address: string;
+  slug: string;
+  neighborhood: string | null;
+  city: string;
+  state: string;
+  zip_code: string;
+  parcel_id: string | null;
+  sam_id: string | null;
+  google_place_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  source: 'user' | 'seed';
+  street_key: string | null;
+  st_num_lo: number | null;
+  st_num_hi: number | null;
+};
+
+/**
+ * One list drives both the INSERT's column names and its bind order, so the two cannot
+ * drift apart the way three hand-maintained lists could.
+ */
+const BUILDING_COLUMNS = [
+  'id',
+  'address',
+  'slug',
+  'neighborhood',
+  'city',
+  'state',
+  'zip_code',
+  'parcel_id',
+  'sam_id',
+  'google_place_id',
+  'latitude',
+  'longitude',
+  'source',
+  'street_key',
+  'st_num_lo',
+  'st_num_hi',
+] as const;
+
+export async function insertBuilding(db: TestD1Database, overrides: Partial<BuildingRow> = {}): Promise<string> {
+  // An explicitly-undefined key (`{ slug: undefined }`) must not win the spread and bind
+  // undefined into the statement, so drop those keys before the defaults are applied.
+  const given = Object.fromEntries(Object.entries(overrides).filter(([, v]) => v !== undefined)) as Partial<BuildingRow>;
+  const row: BuildingRow = {
     id: 'bldg-lanark',
     address: '23-27 Lanark Rd, Boston, MA 02135',
     // Mirrors the old helper's `overrides.slug ?? id`: an override id becomes the slug too, so
     // a second building in one test does not collide on the UNIQUE column.
-    slug: overrides.id ?? 'bldg-lanark',
+    slug: given.id ?? 'bldg-lanark',
     neighborhood: null,
     city: 'Boston',
     state: 'MA',
@@ -139,34 +164,17 @@ export async function insertBuilding(
     google_place_id: null,
     latitude: null,
     longitude: null,
-    source: 'user' as const,
+    source: 'user',
     street_key: null,
     st_num_lo: null,
     st_num_hi: null,
-    ...overrides,
+    ...given,
   };
   await db
     .prepare(
-      'INSERT INTO buildings (id, address, slug, neighborhood, city, state, zip_code, parcel_id, sam_id, google_place_id, latitude, longitude, source, street_key, st_num_lo, st_num_hi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      `INSERT INTO buildings (${BUILDING_COLUMNS.join(', ')}) VALUES (${BUILDING_COLUMNS.map(() => '?').join(', ')})`,
     )
-    .bind(
-      row.id,
-      row.address,
-      row.slug,
-      row.neighborhood,
-      row.city,
-      row.state,
-      row.zip_code,
-      row.parcel_id,
-      row.sam_id,
-      row.google_place_id,
-      row.latitude,
-      row.longitude,
-      row.source,
-      row.street_key,
-      row.st_num_lo,
-      row.st_num_hi,
-    )
+    .bind(...BUILDING_COLUMNS.map((column) => row[column]))
     .run();
   return row.id;
 }

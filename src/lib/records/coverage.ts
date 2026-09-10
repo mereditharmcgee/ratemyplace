@@ -1,7 +1,7 @@
 // What the site knows about a Boston building's records coverage, for the request paths
 // that must not pull anything themselves: the reader-facing button, the follower enqueue on
 // save, and the panel's page state. Read-only; the queue module owns every write.
-import { sourcesForCity } from './jurisdictions';
+import { jurisdictionForCity, sourcesForCity } from './jurisdictions';
 import type { QueueReason, RecordsDb } from './types';
 
 /**
@@ -19,10 +19,10 @@ const DEEPER_PLACEHOLDERS = DEEPER_SOURCE_IDS.map(() => '?').join(', ');
 export async function hasDeeperPull(db: RecordsDb, buildingId: string): Promise<boolean> {
   const row = await db
     .prepare(
-      `SELECT 1 AS present FROM record_pulls WHERE building_id = ? AND source_id IN (${DEEPER_PLACEHOLDERS}) LIMIT 1`,
+      `SELECT 1 FROM record_pulls WHERE building_id = ? AND source_id IN (${DEEPER_PLACEHOLDERS}) LIMIT 1`,
     )
     .bind(buildingId, ...DEEPER_SOURCE_IDS)
-    .first<{ present: number }>();
+    .first<unknown>();
   return row !== null;
 }
 
@@ -35,25 +35,45 @@ export async function pendingQueueReason(db: RecordsDb, buildingId: string): Pro
   return row?.reason ?? null;
 }
 
+/** Listed in the precedence order `recordsRequestState` applies. */
+export type RecordsRequestState = 'ineligible' | 'pulled' | 'requested' | 'fill_queued' | 'never_pulled';
+
+interface RequestStateRow {
+  city: string | null;
+  parcel_id: string | null;
+  has_deeper: number;
+  pending_reason: QueueReason | null;
+}
+
 /**
  * The page-state table from the design spec, Section 4:
- * - `ineligible`: not a Boston building with a parcel id (or no such building) — nothing to offer.
+ * - `ineligible`: no such building, or no jurisdiction that knows how to pull for its city,
+ *   or no parcel id — nothing to offer. Eligibility is the pull path's own test
+ *   (`jurisdictionForCity`), not a string compare on 'Boston', so 'boston' and 'Boston, MA'
+ *   get the button the pull would honor.
  * - `pulled`: a deeper pull exists; the ledger is the normal one and the button never returns.
  * - `requested`: a button, follower, or refresh row is pending; say so, offer no button.
  * - `fill_queued`: only the city-wide pass has it; say so, and still offer the button.
  * - `never_pulled`: offer the button.
+ *
+ * One statement on purpose: the public endpoint calls this once per request, and both
+ * subqueries are indexed seeks off `building_id`, so composing `hasDeeperPull` and
+ * `pendingQueueReason` would buy two extra D1 round trips and nothing else. Those two stay
+ * exported for the callers that need one answer without the other.
  */
-export type RecordsRequestState = 'ineligible' | 'pulled' | 'requested' | 'fill_queued' | 'never_pulled';
-
 export async function recordsRequestState(db: RecordsDb, buildingId: string): Promise<RecordsRequestState> {
-  const building = await db
-    .prepare('SELECT city, parcel_id FROM buildings WHERE id = ?')
-    .bind(buildingId)
-    .first<{ city: string | null; parcel_id: string | null }>();
-  if (!building || building.city !== 'Boston' || building.parcel_id === null) return 'ineligible';
-  if (await hasDeeperPull(db, buildingId)) return 'pulled';
-  const pending = await pendingQueueReason(db, buildingId);
-  if (pending === 'fill') return 'fill_queued';
-  if (pending !== null) return 'requested';
+  const row = await db
+    .prepare(
+      'SELECT b.city, b.parcel_id, ' +
+        `EXISTS (SELECT 1 FROM record_pulls rp WHERE rp.building_id = b.id AND rp.source_id IN (${DEEPER_PLACEHOLDERS})) AS has_deeper, ` +
+        '(SELECT q.reason FROM records_queue q WHERE q.building_id = b.id AND q.done_at IS NULL) AS pending_reason ' +
+        'FROM buildings b WHERE b.id = ?',
+    )
+    .bind(...DEEPER_SOURCE_IDS, buildingId)
+    .first<RequestStateRow>();
+  if (!row || jurisdictionForCity(row.city) === null || row.parcel_id === null) return 'ineligible';
+  if (row.has_deeper) return 'pulled';
+  if (row.pending_reason === 'fill') return 'fill_queued';
+  if (row.pending_reason !== null) return 'requested';
   return 'never_pulled';
 }

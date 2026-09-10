@@ -241,9 +241,10 @@ function placeholders(n: number): string {
 
 /**
  * An empty deeper-source list is a caller bug that both planners would answer plausibly and
- * wrongly: `IN ()` is a SQLite syntax error, and even if it parsed, "no deeper sources" reads
- * as every building being both permanently fresh (refresh does nothing) and never pulled
- * (the fill queues the whole city). Neither is a state to discover in production.
+ * wrongly. SQLite accepts `IN ()` and returns no rows, so nothing fails: every "covered"
+ * test goes silently false, which reads as every building being both permanently fresh
+ * (the refresh does nothing) and never pulled (the fill queues the whole city). Failing
+ * loudly here beats discovering either state in production.
  */
 function requireDeeperSourceIds(fn: string, ids: string[]): void {
   if (ids.length === 0) throw new Error(`${fn}: deeperSourceIds must not be empty`);

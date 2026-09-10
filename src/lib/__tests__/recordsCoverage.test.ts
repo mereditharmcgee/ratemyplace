@@ -26,7 +26,6 @@ async function insertPull(
 suite('coverage', () => {
   it('lists the five non-assessor sources and scheduler re-exports the same array', () => {
     expect(DEEPER_SOURCE_IDS).toHaveLength(5);
-    expect(DEEPER_SOURCE_IDS).not.toContain(FY2026_RESOURCE_ID);
     expect(SCHEDULER_DEEPER).toBe(DEEPER_SOURCE_IDS);
   });
 
@@ -37,6 +36,17 @@ suite('coverage', () => {
     expect(await hasDeeperPull(db, id)).toBe(false);
     await insertPull(db, id, PERMITS_RESOURCE_ID, 'error');
     expect(await hasDeeperPull(db, id)).toBe(true);
+  });
+
+  it('scopes both reads to the building asked about', async () => {
+    const db = createRecordsTestDb();
+    const first = await insertBuilding(db, { id: 'b1', parcel_id: '2102396000' });
+    const second = await insertBuilding(db, { id: 'b2', parcel_id: '2102396001' });
+    await insertPull(db, first, PERMITS_RESOURCE_ID);
+    expect(await hasDeeperPull(db, first)).toBe(true);
+    expect(await hasDeeperPull(db, second)).toBe(false);
+    expect(await recordsRequestState(db, first)).toBe('pulled');
+    expect(await recordsRequestState(db, second)).toBe('never_pulled');
   });
 
   it('pendingQueueReason reports the pending row and ignores finished ones', async () => {
@@ -63,6 +73,34 @@ suite('coverage', () => {
 
     await insertPull(db, id, PERMITS_RESOURCE_ID);
     expect(await recordsRequestState(db, id)).toBe('pulled');
+  });
+
+  it('reads a pending follower and a pending refresh row as requested', async () => {
+    const db = createRecordsTestDb();
+    const id = await insertBuilding(db, { parcel_id: '2102396000' });
+    await enqueue(db, { buildingId: id, reason: 'follower', now: 1_000 });
+    expect(await pendingQueueReason(db, id)).toBe('follower');
+    expect(await recordsRequestState(db, id)).toBe('requested');
+
+    // Direct insert, not `enqueue`: refresh is a worse priority than the pending follower
+    // row, so `enqueue` would answer `already_queued` and leave the follower in place.
+    await db.prepare('DELETE FROM records_queue WHERE building_id = ?').bind(id).run();
+    await db
+      .prepare("INSERT INTO records_queue (building_id, reason, priority, requested_at) VALUES (?, 'refresh', 1, ?)")
+      .bind(id, 1_001)
+      .run();
+    expect(await pendingQueueReason(db, id)).toBe('refresh');
+    expect(await recordsRequestState(db, id)).toBe('requested');
+  });
+
+  it('recordsRequestState accepts the city spellings the pull path accepts', async () => {
+    const db = createRecordsTestDb();
+    const lower = await insertBuilding(db, { id: 'b1', city: 'boston', parcel_id: '2102396000' });
+    const withState = await insertBuilding(db, { id: 'b2', city: 'Boston, MA', parcel_id: '2102396001' });
+    await insertPull(db, lower, FY2026_RESOURCE_ID);
+    await insertPull(db, withState, FY2026_RESOURCE_ID);
+    expect(await recordsRequestState(db, lower)).toBe('never_pulled');
+    expect(await recordsRequestState(db, withState)).toBe('never_pulled');
   });
 
   it('recordsRequestState is ineligible for a non-Boston, no-parcel, or unknown building', async () => {
