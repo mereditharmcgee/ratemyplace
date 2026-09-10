@@ -1,5 +1,9 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
+import { logError } from '../../../../lib/logger';
+import { errorMessage } from '../../../../lib/records/errors';
+import { recordsRequestState } from '../../../../lib/records/coverage';
+import { enqueue } from '../../../../lib/records/queue';
 
 export async function POST(context: APIContext): Promise<Response> {
   if (!context.locals.user) {
@@ -46,6 +50,17 @@ export async function POST(context: APIContext): Promise<Response> {
         });
       }
       throw err;
+    }
+
+    // A save is a follow: the building's records now matter to someone, so ask the Worker
+    // for them — once, and only when nobody (button, follower, or the city-wide pass) has
+    // asked already. Isolated so a queue hiccup cannot turn a saved row into a 500.
+    try {
+      if ((await recordsRequestState(db, buildingId)) === 'never_pulled') {
+        await enqueue(db, { buildingId, reason: 'follower', now: Math.floor(Date.now() / 1000) });
+      }
+    } catch (err) {
+      logError('records_follower_enqueue_failed', { buildingId, error: errorMessage(err) });
     }
 
     return new Response(JSON.stringify({ saved: true }), {
