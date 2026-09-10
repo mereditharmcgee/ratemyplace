@@ -79,6 +79,7 @@ describe('jurisdictionForCity', () => {
     expect(jurisdictionForCity('Boston, MA')).toBe('boston');
     expect(jurisdictionForCity('boston')).toBe('boston');
     expect(jurisdictionForCity('BOSTON')).toBe('boston');
+    expect(jurisdictionForCity('Boston, MA ')).toBe('boston');
   });
 
   it('returns null for everything else', () => {

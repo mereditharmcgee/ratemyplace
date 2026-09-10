@@ -83,6 +83,7 @@ describe('stripTrailingLocality', () => {
 
   it('peels a postal city name that is not the bare neighborhood name', () => {
     expect(stripTrailingLocality('MELVILLE AVE DORCHESTER CENTER MA 02124')).toBe('MELVILLE AVE');
+    expect(stripTrailingLocality('SPRAGUE ST READVILLE MA 02136')).toBe('SPRAGUE ST');
   });
 
   it('takes an empty street as it finds it', () => {

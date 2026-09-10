@@ -54,9 +54,11 @@ suite('building search SQL', () => {
     await insertBuilding(db, { id: 'p', address: '1 Lanark Rd', parcel_id: '1' });
     await insertBuilding(db, { id: 'q', address: '2 Lanark Rd', parcel_id: null });
     // The city half of the flag has to agree with `jurisdictionForCity`: case-insensitive,
-    // tolerant of a trailing ", MA", and never NULL for a row whose city is NULL.
+    // tolerant of a trailing ", MA" at any spacing, and never NULL for a row whose city is NULL.
     await insertBuilding(db, { id: 'lower', address: '3 Lanark Rd', parcel_id: '2', city: 'boston' });
     await insertBuilding(db, { id: 'stated', address: '4 Lanark Rd', parcel_id: '3', city: 'Boston, MA' });
+    await insertBuilding(db, { id: 'nospace', address: '7 Lanark Rd', parcel_id: '6', city: 'Boston,MA' });
+    await insertBuilding(db, { id: 'twospace', address: '8 Lanark Rd', parcel_id: '7', city: 'Boston,  MA' });
     await insertBuilding(db, { id: 'other', address: '5 Lanark Rd', parcel_id: '4', city: 'Cambridge' });
     // `insertBuilding` types `city` as a string, so null it after the fact.
     await insertBuilding(db, { id: 'nocity', address: '6 Lanark Rd', parcel_id: '5' });
@@ -67,6 +69,8 @@ suite('building search SQL', () => {
     expect(byslug.get('q')).toBe(0);
     expect(byslug.get('lower')).toBe(1);
     expect(byslug.get('stated')).toBe(1);
+    expect(byslug.get('nospace')).toBe(1);
+    expect(byslug.get('twospace')).toBe(1);
     expect(byslug.get('other')).toBe(0);
     expect(byslug.get('nocity')).toBe(0);
   });

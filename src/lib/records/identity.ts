@@ -53,10 +53,12 @@ const UNIT_PATTERN = /(?:^|\s+)(?:APT|APARTMENT|UNIT|STE|SUITE|FL|FLOOR|RM|ROOM)
  * neighborhoods are here because Google Places and manual entry both use them as the
  * city. Uppercase, because it runs after `normalizeStreet`. Multi-word names are matched
  * as a unit, longest first.
+ *
+ * Complete means: every USPS city name for a Boston-only ZIP, plus the neighborhood names
+ * people type; `CHESTNUT HILL` is excluded because 02467 also covers Newton and Brookline.
+ * `src/lib/locality.ts` keeps a separate display-side set that also carries New Haven
+ * names, which must never be stripped from a key — hence two sets, not one.
  */
-// Complete means: every postal city name USPS uses for a Boston ZIP, plus the neighborhood
-// names people type; `src/lib/locality.ts` keeps a separate display-side set that also carries
-// New Haven names, which must never be stripped from a key — hence two sets, not one.
 const TRAILING_LOCALITIES: ReadonlySet<string> = new Set([
   'BOSTON',
   'ALLSTON',
@@ -84,6 +86,7 @@ const TRAILING_LOCALITIES: ReadonlySet<string> = new Set([
   // Postal city names for Boston ZIPs that are not the bare neighborhood name.
   'DORCHESTER CENTER',
   'ROXBURY CROSSING',
+  'READVILLE', // USPS city name for 02136/02137, both Boston-only (Hyde Park).
 ]);
 
 const ZIP_TOKEN = /^\d{5}(?:-\d{4})?$/;
