@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sqliteAvailable } from './helpers/sqliteD1';
-import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
+import { createRecordsTestDb, insertBuilding, insertPull } from './helpers/recordsDb';
 import { DEEPER_SOURCE_IDS, hasDeeperPull, pendingQueueReason, recordsRequestState } from '../records/coverage';
 import { DEEPER_SOURCE_IDS as SCHEDULER_DEEPER } from '../records/scheduler';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
@@ -8,20 +8,6 @@ import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
 import { enqueue } from '../records/queue';
 
 const suite = sqliteAvailable ? describe : describe.skip;
-
-async function insertPull(
-  db: ReturnType<typeof createRecordsTestDb>,
-  buildingId: string,
-  sourceId: string,
-  status = 'ok',
-): Promise<void> {
-  await db
-    .prepare(
-      "INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, row_count, error_message, triggered_by, correction_id, trigger_reason) VALUES (?, ?, 'boston', ?, 'label', 'q', ?, 0, NULL, NULL, NULL, 'admin')",
-    )
-    .bind(`${buildingId}-${sourceId}-${status}`, buildingId, sourceId, status)
-    .run();
-}
 
 suite('coverage', () => {
   it('lists the five non-assessor sources and scheduler re-exports the same array', () => {

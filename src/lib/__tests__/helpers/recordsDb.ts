@@ -178,3 +178,33 @@ export async function insertBuilding(db: TestD1Database, overrides: Partial<Buil
     .run();
   return row.id;
 }
+
+/**
+ * A finished pull row for one source, so the coverage reads can see it. The id folds in
+ * `status` so one building can hold both an `ok` and an `error` row for the same source.
+ * `trigger_reason` is fixed: nothing asserts it, and the column only needs to be non-null.
+ */
+export async function insertPull(
+  db: TestD1Database,
+  buildingId: string,
+  sourceId: string,
+  status = 'ok',
+): Promise<void> {
+  await db
+    .prepare(
+      'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, ' +
+        'row_count, error_message, triggered_by, correction_id, trigger_reason) ' +
+        "VALUES (?, ?, 'boston', ?, 'label', 'q', ?, 0, NULL, NULL, NULL, 'admin')",
+    )
+    .bind(`${buildingId}-${sourceId}-${status}`, buildingId, sourceId, status)
+    .run();
+}
+
+/** The `reason` of every queue row still waiting on the Worker, for the building asked about. */
+export async function pendingReasons(db: TestD1Database, buildingId: string): Promise<string[]> {
+  const { results } = await db
+    .prepare('SELECT reason FROM records_queue WHERE building_id = ? AND done_at IS NULL')
+    .bind(buildingId)
+    .all<{ reason: string }>();
+  return results.map((row) => row.reason);
+}

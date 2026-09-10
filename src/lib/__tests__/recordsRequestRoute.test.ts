@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { APIContext } from 'astro';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
-import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
+import { createRecordsTestDb, insertBuilding, insertPull, pendingReasons } from './helpers/recordsDb';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
 import { enqueue } from '../records/queue';
@@ -39,17 +39,6 @@ function createContext(db: TestD1Database, options: ContextOptions = {}): APICon
   } as unknown as APIContext;
 }
 
-async function insertPull(db: TestD1Database, buildingId: string, sourceId: string): Promise<void> {
-  await db
-    .prepare(
-      'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, ' +
-        "row_count, error_message, triggered_by, correction_id, trigger_reason) " +
-        "VALUES (?, ?, 'boston', ?, 'label', 'q', 'ok', 0, NULL, NULL, NULL, 'seed')",
-    )
-    .bind(`${buildingId}-${sourceId}`, buildingId, sourceId)
-    .run();
-}
-
 /** Enqueue exactly the cap's worth of button rows, timestamped now, on other buildings. */
 async function fillDailyCap(db: TestD1Database): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
@@ -60,14 +49,6 @@ async function fillDailyCap(db: TestD1Database): Promise<void> {
     });
     await enqueue(db, { buildingId: other, reason: 'button', now });
   }
-}
-
-async function pendingRows(db: TestD1Database, buildingId: string): Promise<Array<{ reason: string }>> {
-  const { results } = await db
-    .prepare('SELECT reason FROM records_queue WHERE building_id = ? AND done_at IS NULL')
-    .bind(buildingId)
-    .all<{ reason: string }>();
-  return results;
 }
 
 suite('POST /api/records/request', () => {
@@ -141,7 +122,7 @@ suite('POST /api/records/request', () => {
     expect(await res.json()).toEqual({
       error: 'The daily limit for city-records requests has been reached. Please try again later.',
     });
-    expect(await pendingRows(db, id)).toEqual([]);
+    expect(await pendingReasons(db, id)).toEqual([]);
   });
 
   it('Turnstile is checked before field validation', async () => {
@@ -178,7 +159,7 @@ suite('POST /api/records/request', () => {
     expect(await res.json()).toEqual({
       error: 'City records for this building have already been retrieved.',
     });
-    expect(await pendingRows(db, id)).toEqual([]);
+    expect(await pendingReasons(db, id)).toEqual([]);
   });
 
   it('202 queued, then 202 already_queued on a second press, with one pending row', async () => {
@@ -190,7 +171,7 @@ suite('POST /api/records/request', () => {
     const second = await POST(createContext(db, { body: good(id) }));
     expect(second.status).toBe(202);
     expect(await second.json()).toEqual({ data: { status: 'already_queued' } });
-    expect(await pendingRows(db, id)).toEqual([{ reason: 'button' }]);
+    expect(await pendingReasons(db, id)).toEqual(['button']);
   });
 
   it('replaces a pending fill row with a button row', async () => {
@@ -198,6 +179,6 @@ suite('POST /api/records/request', () => {
     const res = await POST(createContext(db, { body: good(id) }));
     expect(res.status).toBe(202);
     expect(await res.json()).toEqual({ data: { status: 'queued' } });
-    expect(await pendingRows(db, id)).toEqual([{ reason: 'button' }]);
+    expect(await pendingReasons(db, id)).toEqual(['button']);
   });
 });

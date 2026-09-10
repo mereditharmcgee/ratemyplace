@@ -53,8 +53,11 @@ export async function POST(context: APIContext): Promise<Response> {
     }
 
     // A save is a follow: the building's records now matter to someone, so ask the Worker
-    // for them — once, and only when nobody (button, follower, or the city-wide pass) has
-    // asked already. Isolated so a queue hiccup cannot turn a saved row into a 500.
+    // for them — once, and only when the building is eligible, has no deeper records yet,
+    // and nobody (button, follower, or the city-wide pass) has asked already. A pending
+    // fill row is deliberately not promoted: a save bypasses the button's per-IP limit and
+    // daily cap, so promotion would be an uncapped path to priority 0. Isolated so a queue
+    // hiccup cannot turn a saved row into a 500.
     try {
       if ((await recordsRequestState(db, buildingId)) === 'never_pulled') {
         await enqueue(db, { buildingId, reason: 'follower', now: Math.floor(Date.now() / 1000) });
