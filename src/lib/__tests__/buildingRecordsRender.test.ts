@@ -568,6 +568,16 @@ suite('BuildingRecords.astro request button states', () => {
 
     expect(text).toContain(REQUEST_BUTTON_LABEL);
     expect(text).not.toContain(REQUESTED_COPY);
+
+    // Where it sits, not just that it is somewhere: below the facts strip the seed did fill
+    // and above the four rows it is offering to fill. A seeded building has a parcel and an
+    // assessor pull but no assessment rows, so the strip is the empty-record line.
+    const factsIndex = text.indexOf('No assessor record on file.');
+    const labelIndex = text.indexOf(REQUEST_BUTTON_LABEL);
+    const ledgerIndex = text.indexOf('311 housing requests');
+    expect(factsIndex).toBeGreaterThan(-1);
+    expect(labelIndex).toBeGreaterThan(factsIndex);
+    expect(ledgerIndex).toBeGreaterThan(labelIndex);
   });
 
   it('tells a fill-queued building it is queued and still offers the button', async () => {

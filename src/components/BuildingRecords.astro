@@ -54,19 +54,29 @@ const { buildingId } = Astro.props;
 // and the map down with it, so the whole read is isolated and an unreadable panel renders as
 // no panel at all.
 let view: BuildingRecordsView | null = null;
-// Only asked when there is a panel to put the button in, and only inside the same
-// try/catch: a queue or coverage read that fails must cost the page nothing but the button.
+// Only asked when there is a panel to put the button in, and isolated separately from the
+// panel read: a queue or coverage read that fails costs the page nothing but the button,
+// where sharing the panel's try/catch would have cost it the whole panel.
 let requestState: RecordsRequestState = 'ineligible';
 try {
   view = await getBuildingRecords(Astro.locals.runtime.env.DB, buildingId);
-  if (view) requestState = await recordsRequestState(Astro.locals.runtime.env.DB, buildingId);
 } catch (error) {
   logError('building_records_panel_failed', {
     buildingId,
     error: error instanceof Error ? error.message : String(error),
   });
   view = null;
-  requestState = 'ineligible';
+}
+if (view) {
+  try {
+    requestState = await recordsRequestState(Astro.locals.runtime.env.DB, buildingId);
+  } catch (error) {
+    logError('records_request_state_failed', {
+      buildingId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    requestState = 'ineligible';
+  }
 }
 
 const current = view?.assessments[0] ?? null;

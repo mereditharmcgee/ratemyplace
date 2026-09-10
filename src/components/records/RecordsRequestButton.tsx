@@ -20,6 +20,10 @@ import {
 
 const TURNSTILE_SITEKEY = '0x4AAAAAACo4KpkxsacPhM2r';
 
+/** api.js is loaded async by the panel, so the widget may be asked for before it exists. */
+const POLL_MS = 100;
+const POLL_TICKS = 100;
+
 interface Props {
   buildingId: string;
   initialState: 'never_pulled' | 'fill_queued';
@@ -32,7 +36,13 @@ export default function RecordsRequestButton({ buildingId, initialState }: Props
   const [error, setError] = useState<string | null>(null);
   const turnstileRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const statusRef = useRef<HTMLParagraphElement>(null);
   const sendingRef = useRef(false);
+  // A token only ever means "the reader just pressed the button". Turnstile also hands one
+  // over unasked — it renews an expiring token by itself, and it answers a `reset` the same way
+  // for a visitor it never has to challenge — and an unasked token must not become a POST.
+  const awaitingTokenRef = useRef(false);
 
   const submit = async (token: string) => {
     if (sendingRef.current) return;
@@ -54,21 +64,31 @@ export default function RecordsRequestButton({ buildingId, initialState }: Props
         setPhase('already_pulled');
         return;
       }
-      setError(data.error || REQUEST_FAILED_COPY);
+      // The two rate-limit messages are written for the reader and say something a retry
+      // depends on. Every other status is a server fault the reader can do nothing with.
+      setError(response.status === 429 && data.error ? data.error : REQUEST_FAILED_COPY);
       setPhase('idle');
     } catch {
       setError(REQUEST_FAILED_COPY);
       setPhase('idle');
     } finally {
       sendingRef.current = false;
-      // Tokens are single-use: a failed POST needs a fresh challenge before the next press.
-      if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
+      // Nothing resets the widget here on purpose. `reset` re-runs the challenge, and for a
+      // visitor Turnstile never has to question it fires `callback` again with no one watching
+      // — which, with a callback that submits, makes a failed POST ask for a token that asks
+      // for another POST. The press path resets in `renderWidget` instead, where a person is
+      // behind it. Pinned by the "sends exactly once" case in recordsRequestButton.test.tsx.
     }
   };
 
   useEffect(() => {
     if (phase !== 'verifying') return;
     let interval: ReturnType<typeof setInterval> | null = null;
+    let ticks = 0;
+    const stopPolling = () => {
+      if (interval) clearInterval(interval);
+      interval = null;
+    };
     const renderWidget = () => {
       if (!turnstileRef.current || !window.turnstile) return;
       // Rendered once and kept: a second press re-challenges the same widget.
@@ -79,64 +99,119 @@ export default function RecordsRequestButton({ buildingId, initialState }: Props
       widgetIdRef.current = window.turnstile.render(turnstileRef.current, {
         sitekey: TURNSTILE_SITEKEY,
         theme: 'light',
-        callback: (token: string) => void submit(token),
+        // This callback is the first render's closure and keeps it for the life of the widget,
+        // which is only safe because `submit` reads refs, state setters, and the `buildingId`
+        // prop that never changes — never a value off a later render. Keep it that way.
+        callback: (token: string) => {
+          if (!awaitingTokenRef.current) return;
+          awaitingTokenRef.current = false;
+          void submit(token);
+        },
         'expired-callback': () => setPhase((current) => (current === 'verifying' ? 'idle' : current)),
       });
     };
-    // The api.js script is async, so the widget may be asked for before it exists.
     if (window.turnstile) renderWidget();
     else {
       interval = setInterval(() => {
         if (window.turnstile) {
-          if (interval) clearInterval(interval);
-          interval = null;
+          stopPolling();
           renderWidget();
+          return;
         }
-      }, 100);
+        ticks += 1;
+        // Ten seconds and the script is not coming — a blocked CDN, a reader who went offline.
+        // Say so and hand the button back rather than holding a line that never resolves.
+        if (ticks >= POLL_TICKS) {
+          stopPolling();
+          awaitingTokenRef.current = false;
+          setError(REQUEST_FAILED_COPY);
+          setPhase('idle');
+        }
+      }, POLL_MS);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    return stopPolling;
   }, [phase]);
+
+  const terminal = phase === 'requested' || phase === 'already_pulled';
+
+  // The widget's container unmounts with the button in a terminal phase, so the widget goes
+  // with it rather than being left pointing at a node no longer on the page.
+  useEffect(() => {
+    if (!terminal) return;
+    if (widgetIdRef.current) {
+      if (window.turnstile) window.turnstile.remove(widgetIdRef.current);
+      widgetIdRef.current = null;
+    }
+  }, [terminal]);
 
   useEffect(
     () => () => {
-      if (widgetIdRef.current && window.turnstile) {
-        window.turnstile.remove(widgetIdRef.current);
+      if (widgetIdRef.current) {
+        if (window.turnstile) window.turnstile.remove(widgetIdRef.current);
         widgetIdRef.current = null;
       }
     },
     [],
   );
 
-  if (phase === 'requested') return <p role="status" className="text-sm text-gray-600">{REQUESTED_COPY}</p>;
-  if (phase === 'already_pulled')
-    return <p role="status" className="text-sm text-gray-600">{REQUEST_ALREADY_PULLED_COPY}</p>;
+  // Focus follows the outcome, as the correction form's confirmation does: the answer takes
+  // focus when it arrives, and a failure hands focus back to the control that failed.
+  useEffect(() => {
+    if (terminal) {
+      statusRef.current?.focus();
+      return;
+    }
+    if (phase === 'idle' && error) buttonRef.current?.focus();
+  }, [phase, terminal, error]);
 
   const busy = phase === 'verifying' || phase === 'sending';
+  const statusText = terminal
+    ? phase === 'requested'
+      ? REQUESTED_COPY
+      : REQUEST_ALREADY_PULLED_COPY
+    : busy
+      ? REQUEST_VERIFYING_COPY
+      : '';
+
   return (
     <div>
-      {initialState === 'fill_queued' && <p className="text-sm text-gray-600">{FILL_QUEUED_COPY}</p>}
-      <p className={`text-sm text-gray-600 ${initialState === 'fill_queued' ? 'mt-1' : ''}`}>{REQUEST_BUTTON_HELP}</p>
-      {!busy && (
+      {!terminal && initialState === 'fill_queued' && <p className="text-sm text-gray-600">{FILL_QUEUED_COPY}</p>}
+      {!terminal && (
+        <p className={`text-sm text-gray-600 ${initialState === 'fill_queued' ? 'mt-1' : ''}`}>
+          {REQUEST_BUTTON_HELP}
+        </p>
+      )}
+      {/* Disabled rather than unmounted while the request is in flight: unmounting the control
+          the reader just pressed drops focus to the top of the document. */}
+      {!terminal && (
         <button
           type="button"
+          ref={buttonRef}
+          disabled={busy}
           onClick={() => {
             setError(null);
+            awaitingTokenRef.current = true;
             setPhase('verifying');
           }}
-          className="mt-3 inline-flex min-h-[44px] items-center rounded-[4px] border border-teal-700 px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50"
+          className="mt-3 inline-flex min-h-[44px] items-center rounded-[4px] border border-teal-700 px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 disabled:opacity-60"
         >
           {REQUEST_BUTTON_LABEL}
         </button>
       )}
-      {busy && (
-        <p className="mt-3 text-sm text-gray-600" aria-live="polite">
-          {REQUEST_VERIFYING_COPY}
-        </p>
-      )}
+      {/* One live region for the whole island, always mounted: a paragraph that appears at the
+          moment it gets its text is a live region a screen reader may never have been told
+          about, and one that unmounts takes the focus it was given with it. */}
+      <p
+        role="status"
+        aria-live="polite"
+        tabIndex={-1}
+        ref={statusRef}
+        className={statusText ? 'mt-3 text-sm text-gray-600' : undefined}
+      >
+        {statusText}
+      </p>
       {/* Hidden rather than unmounted: the widget it holds has to survive for `reset`. */}
-      <div ref={turnstileRef} className="mt-3" hidden={!busy} />
+      {!terminal && <div ref={turnstileRef} className="mt-3" hidden={!busy} />}
       {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
     </div>
   );

@@ -275,6 +275,8 @@ export const REQUEST_ALREADY_PULLED_COPY = 'These records have already been retr
 export const REQUEST_FAILED_COPY = 'The request did not go through. Please try again.';
 
 // The building page's no-reviews card and the search result line for a seeded building.
+// Registered in PANEL_COPY for the banned-words scan; rendered by the building page and
+// search, not the panel.
 export const NO_REVIEWS_CARD_TITLE = 'No reviews yet.';
 export const NO_REVIEWS_CARD_BODY = 'Lived here? Rate this place.';
 export const NO_REVIEWS_BREAKDOWN_COPY = 'Rating breakdown appears after the first review.';
