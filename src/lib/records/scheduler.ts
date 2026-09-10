@@ -2,7 +2,7 @@
 // day. Everything here is a pure function over injected dependencies — clock, pull, fixture,
 // alert, log — so the whole scheduler is unit-tested against the node:sqlite D1 double and
 // the Worker stays a five-line `scheduled()` handler over `liveDeps`.
-import { sourcesForCity } from './jurisdictions';
+import { DEEPER_SOURCE_IDS } from './coverage';
 import { errorMessage } from './errors';
 import { pullBuildingRecords, type PullOptions } from './pull';
 import {
@@ -54,14 +54,10 @@ export const ERROR_RATE_THRESHOLD = 0.5;
 export const MIN_ATTEMPTS = 20;
 export const ERROR_WINDOW_SECONDS = 86_400;
 
-/**
- * Every Boston source except the assessor years: a building "has records" when one of these
- * has a pull row. The assessor is excluded because the seed already wrote an FY2026 pull row
- * for all 38,208 seeded buildings, so counting it would mark the whole city as done.
- */
-export const DEEPER_SOURCE_IDS: string[] = sourcesForCity('Boston')
-  .filter((source) => !source.kinds.includes('assessment'))
-  .map((source) => source.id);
+// Defined in ./coverage, where the request paths can read it without importing the scheduler.
+// Re-exported here because `plan` passes it to both queue planners and every existing caller
+// (and test) imports it from this module.
+export { DEEPER_SOURCE_IDS } from './coverage';
 
 export interface SchedulerDeps {
   db: RecordsDb;

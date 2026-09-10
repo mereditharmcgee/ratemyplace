@@ -56,8 +56,12 @@ export function createRecordsStubDb(): TestD1Database {
       id TEXT PRIMARY KEY,
       building_id TEXT NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
       status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'flagged')),
+      overall_score REAL,
+      move_out_year_new TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     );
+    CREATE TABLE landlords (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL);
+    CREATE TABLE property_managers (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL);
     CREATE TABLE saved_buildings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -105,26 +109,64 @@ export async function insertBuilding(
     id: string;
     address: string;
     slug: string;
+    neighborhood: string | null;
     city: string;
     state: string;
     zip_code: string;
     parcel_id: string | null;
     sam_id: string | null;
+    google_place_id: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    source: 'user' | 'seed';
+    street_key: string | null;
+    st_num_lo: number | null;
+    st_num_hi: number | null;
   }> = {},
 ): Promise<string> {
-  const id = overrides.id ?? 'bldg-lanark';
+  const row = {
+    id: 'bldg-lanark',
+    address: '23-27 Lanark Rd, Boston, MA 02135',
+    // Mirrors the old helper's `overrides.slug ?? id`: an override id becomes the slug too, so
+    // a second building in one test does not collide on the UNIQUE column.
+    slug: overrides.id ?? 'bldg-lanark',
+    neighborhood: null,
+    city: 'Boston',
+    state: 'MA',
+    zip_code: '02135',
+    parcel_id: null,
+    sam_id: null,
+    google_place_id: null,
+    latitude: null,
+    longitude: null,
+    source: 'user' as const,
+    street_key: null,
+    st_num_lo: null,
+    st_num_hi: null,
+    ...overrides,
+  };
   await db
-    .prepare('INSERT INTO buildings (id, address, slug, city, state, zip_code, parcel_id, sam_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .prepare(
+      'INSERT INTO buildings (id, address, slug, neighborhood, city, state, zip_code, parcel_id, sam_id, google_place_id, latitude, longitude, source, street_key, st_num_lo, st_num_hi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    )
     .bind(
-      id,
-      overrides.address ?? '23-27 Lanark Rd, Boston, MA 02135',
-      overrides.slug ?? id,
-      overrides.city ?? 'Boston',
-      overrides.state ?? 'MA',
-      overrides.zip_code ?? '02135',
-      overrides.parcel_id ?? null,
-      overrides.sam_id ?? null,
+      row.id,
+      row.address,
+      row.slug,
+      row.neighborhood,
+      row.city,
+      row.state,
+      row.zip_code,
+      row.parcel_id,
+      row.sam_id,
+      row.google_place_id,
+      row.latitude,
+      row.longitude,
+      row.source,
+      row.street_key,
+      row.st_num_lo,
+      row.st_num_hi,
     )
     .run();
-  return id;
+  return row.id;
 }
