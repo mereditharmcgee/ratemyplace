@@ -12,13 +12,20 @@ interface LocalityBuilding {
   city?: string | null;
 }
 
-// Single-word neighborhoods that are also common street names, so the
-// street-word heuristic below would otherwise wrongly discard them (e.g.
-// "45 Roxbury Street" really is in Roxbury). These are checked first and
-// always trusted. Multi-word names (Hyde Park, Jamaica Plain) need no entry
-// here — a multi-word neighborhood can never equal a single address word, so
-// the street-word test already leaves them alone.
-const KNOWN_NEIGHBORHOODS = new Set([
+// Every locality name a Boston building's city can be spelled as, in `normalize()` form
+// (lowercase, non-alphanumerics stripped, so "Hyde Park" is 'hydepark'). Two jobs:
+// `isBostonLocality` tests membership, and `displayLocality` trusts the single-word names
+// that are also common street names, which the street-word heuristic below would otherwise
+// wrongly discard (e.g. "45 Roxbury Street" really is in Roxbury). The multi-word names
+// are inert for that second job — a multi-word name can never equal a single address word,
+// so the street-word test already leaves them alone — and they are listed anyway so the
+// Boston vocabulary lives in one place.
+//
+// `src/lib/records/identity.ts` keeps the uppercase, space-preserving version of the same
+// vocabulary (`TRAILING_LOCALITIES`, plus 'BOSTON' itself) for stripping a trailing
+// locality off a street. Keep the two lists in step; folding them into one shared data
+// module is a recorded follow-up.
+const BOSTON_NEIGHBORHOODS = new Set([
   'allston',
   'brighton',
   'charlestown',
@@ -30,15 +37,37 @@ const KNOWN_NEIGHBORHOODS = new Set([
   'roslindale',
   'roxbury',
   'seaport',
-  // New Haven — production has New Haven addresses too.
-  'westville',
-  'newhallville',
-  'dwight',
-  'dixwell',
+  'hydepark',
+  'jamaicaplain',
+  'southboston',
+  'eastboston',
+  'westroxbury',
+  'southend',
+  'northend',
+  'backbay',
+  'beaconhill',
+  'missionhill',
+  'westend',
+  // Postal city names for Boston ZIPs that are not the bare neighborhood name.
+  'dorchestercenter',
+  'roxburycrossing',
+  'readville',
 ]);
+
+// New Haven — production has New Haven addresses too.
+const NEW_HAVEN_NEIGHBORHOODS = new Set(['westville', 'newhallville', 'dwight', 'dixwell']);
+
+const KNOWN_NEIGHBORHOODS = new Set([...BOSTON_NEIGHBORHOODS, ...NEW_HAVEN_NEIGHBORHOODS]);
 
 function normalize(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+/** "Boston" or one of its neighborhoods, as Google Places and manual entry both spell the city. A trailing ", MA" is tolerated. */
+export function isBostonLocality(city: string | null | undefined): boolean {
+  if (!city) return false;
+  const key = normalize(city.replace(/,\s*[A-Za-z]{2}\s*$/, ''));
+  return key === 'boston' || BOSTON_NEIGHBORHOODS.has(key);
 }
 
 function addressWords(address?: string | null): Set<string> {
