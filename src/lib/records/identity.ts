@@ -85,11 +85,13 @@ const ZIP_TOKEN = /^\d{5}(?:-\d{4})?$/;
 /**
  * How many trailing words are a locality name — 2, 1, or 0 (longest first, so "SOUTH
  * BOSTON" is not read as "BOSTON" after a "SOUTH"). Zero when the words *are* a locality
- * in full, whether one word ("BOSTON") or two ("SOUTH BOSTON"): there is no street in
- * front of it for the locality to trail.
+ * in full — one word ("BOSTON"), two ("SOUTH BOSTON"), or an article plus one ("THE
+ * FENWAY", a real Boston street): there is no street in front of it for the locality to
+ * trail, and "THE" alone is not a street name.
  */
 function trailingLocalityLength(words: readonly string[]): number {
-  if (TRAILING_LOCALITIES.has(words.join(' '))) return 0;
+  const bare = words[0] === 'THE' ? words.slice(1) : words;
+  if (TRAILING_LOCALITIES.has(bare.join(' '))) return 0;
   for (const n of [2, 1]) {
     if (words.length > n && TRAILING_LOCALITIES.has(words.slice(-n).join(' '))) return n;
   }

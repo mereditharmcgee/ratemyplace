@@ -90,6 +90,9 @@ describe('stripTrailingLocality', () => {
   it('never strips the whole street away', () => {
     expect(stripTrailingLocality('BOSTON')).toBe('BOSTON');
     expect(stripTrailingLocality('SOUTH BOSTON')).toBe('SOUTH BOSTON');
+    // 'The Fenway' is a street; 'THE' alone would be a garbage key.
+    expect(stripTrailingLocality('THE FENWAY')).toBe('THE FENWAY');
+    expect(addressKey('123 The Fenway')).toEqual({ streetKey: 'THE FENWAY', numLo: 123, numHi: 123 });
     expect(stripTrailingLocality('02135')).toBe('02135');
   });
 
