@@ -7,7 +7,7 @@ import { createMemoryDatabase, TestD1Database } from './sqliteD1';
  * reference, plus the two tables the queue planner reads (`reviews.building_id`
  * and `status`, `saved_buildings.building_id`). Column names mirror the real
  * migrations (0001, 0023); the unused columns are left out. Keeps tests honest
- * about the SQL that ships without applying all 31 migrations.
+ * about the SQL that ships without applying all 33 migrations.
  */
 export function createRecordsStubDb(): TestD1Database {
   const db = new TestD1Database(createMemoryDatabase());
@@ -56,8 +56,12 @@ export function createRecordsStubDb(): TestD1Database {
       id TEXT PRIMARY KEY,
       building_id TEXT NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
       status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'flagged')),
+      overall_score REAL,
+      move_out_year_new TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     );
+    CREATE TABLE landlords (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL);
+    CREATE TABLE property_managers (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL);
     CREATE TABLE saved_buildings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -65,6 +69,10 @@ export function createRecordsStubDb(): TestD1Database {
       created_at INTEGER DEFAULT (unixepoch()),
       UNIQUE(user_id, building_id)
     );
+    -- Mirrors migration 0024. The sitemap and the queue planner both count approved reviews
+    -- per building and their comments claim this index; without it here the claim is not
+    -- exercisable against the double.
+    CREATE INDEX idx_reviews_building_status ON reviews(building_id, status);
   `);
   return db;
 }
@@ -73,6 +81,7 @@ export function createRecordsStubDb(): TestD1Database {
  * 0032 indexes `saved_buildings(building_id)`, a table the real 0023 creates and the stub
  * above stands in for, so the stub has to exist before this runs — `createRecordsTestDb`
  * is the only correct order. The other two indexes are over tables 0029 and 0031 create.
+ * 0033's index is over `records_queue`, which 0031 creates, so it follows for the same reason.
  */
 export function applyRecordsMigrations(db: TestD1Database): void {
   for (const file of [
@@ -80,6 +89,7 @@ export function applyRecordsMigrations(db: TestD1Database): void {
     '0030_audit_records_actions.sql',
     '0031_boston_coverage.sql',
     '0032_records_queue_indexes.sql',
+    '0033_records_queue_reason_requested.sql',
   ]) {
     db.exec(readFileSync(join(process.cwd(), 'migrations', file), 'utf8'));
   }
@@ -99,32 +109,108 @@ export function auditActionTypesFrom0028(): string[] {
   return Array.from(block[1].matchAll(/'([a-z_]+)'/g), (m) => m[1]);
 }
 
-export async function insertBuilding(
-  db: TestD1Database,
-  overrides: Partial<{
-    id: string;
-    address: string;
-    slug: string;
-    city: string;
-    state: string;
-    zip_code: string;
-    parcel_id: string | null;
-    sam_id: string | null;
-  }> = {},
-): Promise<string> {
-  const id = overrides.id ?? 'bldg-lanark';
+type BuildingRow = {
+  id: string;
+  address: string;
+  slug: string;
+  neighborhood: string | null;
+  city: string;
+  state: string;
+  zip_code: string;
+  parcel_id: string | null;
+  sam_id: string | null;
+  google_place_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  source: 'user' | 'seed';
+  street_key: string | null;
+  st_num_lo: number | null;
+  st_num_hi: number | null;
+};
+
+/**
+ * One list drives both the INSERT's column names and its bind order, so the two cannot
+ * drift apart the way three hand-maintained lists could.
+ */
+const BUILDING_COLUMNS = [
+  'id',
+  'address',
+  'slug',
+  'neighborhood',
+  'city',
+  'state',
+  'zip_code',
+  'parcel_id',
+  'sam_id',
+  'google_place_id',
+  'latitude',
+  'longitude',
+  'source',
+  'street_key',
+  'st_num_lo',
+  'st_num_hi',
+] as const;
+
+export async function insertBuilding(db: TestD1Database, overrides: Partial<BuildingRow> = {}): Promise<string> {
+  // An explicitly-undefined key (`{ slug: undefined }`) must not win the spread and bind
+  // undefined into the statement, so drop those keys before the defaults are applied.
+  const given = Object.fromEntries(Object.entries(overrides).filter(([, v]) => v !== undefined)) as Partial<BuildingRow>;
+  const row: BuildingRow = {
+    id: 'bldg-lanark',
+    address: '23-27 Lanark Rd, Boston, MA 02135',
+    // Mirrors the old helper's `overrides.slug ?? id`: an override id becomes the slug too, so
+    // a second building in one test does not collide on the UNIQUE column.
+    slug: given.id ?? 'bldg-lanark',
+    neighborhood: null,
+    city: 'Boston',
+    state: 'MA',
+    zip_code: '02135',
+    parcel_id: null,
+    sam_id: null,
+    google_place_id: null,
+    latitude: null,
+    longitude: null,
+    source: 'user',
+    street_key: null,
+    st_num_lo: null,
+    st_num_hi: null,
+    ...given,
+  };
   await db
-    .prepare('INSERT INTO buildings (id, address, slug, city, state, zip_code, parcel_id, sam_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(
-      id,
-      overrides.address ?? '23-27 Lanark Rd, Boston, MA 02135',
-      overrides.slug ?? id,
-      overrides.city ?? 'Boston',
-      overrides.state ?? 'MA',
-      overrides.zip_code ?? '02135',
-      overrides.parcel_id ?? null,
-      overrides.sam_id ?? null,
+    .prepare(
+      `INSERT INTO buildings (${BUILDING_COLUMNS.join(', ')}) VALUES (${BUILDING_COLUMNS.map(() => '?').join(', ')})`,
     )
+    .bind(...BUILDING_COLUMNS.map((column) => row[column]))
     .run();
-  return id;
+  return row.id;
+}
+
+/**
+ * A finished pull row for one source, so the coverage reads can see it. The id folds in
+ * `status` so one building can hold both an `ok` and an `error` row for the same source.
+ * `trigger_reason` is fixed: nothing asserts it, and any value the union allows will do.
+ */
+export async function insertPull(
+  db: TestD1Database,
+  buildingId: string,
+  sourceId: string,
+  status: 'ok' | 'empty' | 'error' = 'ok',
+): Promise<void> {
+  await db
+    .prepare(
+      'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, ' +
+        'row_count, error_message, triggered_by, correction_id, trigger_reason) ' +
+        "VALUES (?, ?, 'boston', ?, 'label', 'q', ?, 0, NULL, NULL, NULL, 'admin')",
+    )
+    .bind(`${buildingId}-${sourceId}-${status}`, buildingId, sourceId, status)
+    .run();
+}
+
+/** The `reason` of every queue row still waiting on the Worker, for the building asked about. */
+export async function pendingReasons(db: TestD1Database, buildingId: string): Promise<string[]> {
+  const { results } = await db
+    .prepare('SELECT reason FROM records_queue WHERE building_id = ? AND done_at IS NULL')
+    .bind(buildingId)
+    .all<{ reason: string }>();
+  return results.map((row) => row.reason);
 }

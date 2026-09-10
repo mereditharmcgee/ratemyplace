@@ -117,6 +117,22 @@ export interface BuildingSearchResponse {
   building?: BuildingSearchResult;
 }
 
+/**
+ * `GET /api/search/results` — the paginated half of the search page. The row shape differs
+ * per `type` (buildings carry an address and a score, landlords a name and a building
+ * count), and the island reads them positionally, so `results` is deliberately not narrowed
+ * here.
+ *
+ * `total` is computed only for `offset === 0`. Later pages return 0 on purpose: the client
+ * paginates against the total it already has from the SSR props on `search.astro`, and the
+ * count is the expensive half of the request over a 38,000-row table. A caller that treats a
+ * paged `total` as the real one will read it as an empty result set.
+ */
+export interface SearchResultsResponse {
+  results: unknown[];
+  total: number;
+}
+
 export interface MapBuilding {
   id: string;
   slug: string;
@@ -401,6 +417,11 @@ export interface RecordsQueueStats {
   oldestPendingAgeSeconds: number | null;
   completedLast24h: number;
   fillPaused: boolean;
+}
+
+/** POST /api/records/request — 202 body. */
+export interface RecordsRequestResponse {
+  data: { status: 'queued' | 'already_queued' };
 }
 
 /**

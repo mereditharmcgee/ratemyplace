@@ -13,7 +13,9 @@ import { currentReviewYear } from '../../lib/scoring-sql';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 import { humanize } from '../../lib/format';
 import { BUILDING_DETAIL_FIELDS, hasBuildingDetails, type BuildingDetailFields } from '../../lib/buildingDetails';
-import { displayLocality, localityLine } from '../../lib/locality';
+import { localityLine } from '../../lib/locality';
+import { buildingPageMeta } from '../../lib/buildingMeta';
+import { NO_REVIEWS_CARD_TITLE, NO_REVIEWS_CARD_BODY, NO_REVIEWS_BREAKDOWN_COPY } from '../../lib/records/display';
 
 // Label and formatter for each field in BUILDING_DETAIL_FIELDS, in display order —
 // keeps the <dl> rows and the hasBuildingDetails check from drifting.
@@ -188,9 +190,21 @@ const sortedUnits = Array.from(reviewsByUnit.values())
   .sort((a, b) => unitTypeOrder.indexOf(a.unitType) - unitTypeOrder.indexOf(b.unitType));
 
 const showBuildingDetails = hasBuildingDetails(building);
+// A seeded Boston page with no review yet is a city-records page and its metadata says so.
+// The fields are picked out one by one rather than cast: the building row is loosely typed
+// here, and a cast would hide a column this ever stops selecting.
+const meta = buildingPageMeta(
+  {
+    address: building.address,
+    city: building.city,
+    neighborhood: building.neighborhood,
+    parcel_id: building.parcel_id ?? null,
+  },
+  reviews.length,
+);
 ---
 
-<BaseLayout title={building.address} description={`Reviews for ${building.address} in ${displayLocality(building)}`}>
+<BaseLayout title={meta.title} description={meta.description}>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {submitted && (
       <div class="mb-6 bg-teal-50 border border-teal-200 rounded-[6px] p-4" id="submitted-banner">
@@ -293,6 +307,20 @@ const showBuildingDetails = hasBuildingDetails(building);
       <!-- Sidebar -->
       <div class="lg:col-start-3 lg:row-start-1 lg:col-span-1 lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
         {scores && <ScoreCard scores={scores} type="building" />}
+
+        {!scores && (
+          <div class="bg-white rounded-[6px] border border-gray-200 p-6">
+            <h3 class="font-semibold text-gray-900">{NO_REVIEWS_CARD_TITLE}</h3>
+            <p class="mt-1 text-sm text-gray-600">{NO_REVIEWS_CARD_BODY}</p>
+            <a
+              href={`/review/new?building=${building.id}`}
+              class="mt-4 inline-block bg-teal-700 text-white font-semibold px-6 py-2 rounded-[4px] hover:bg-teal-800 transition-colors"
+            >
+              Write a review
+            </a>
+            <p class="mt-4 text-xs text-gray-500">{NO_REVIEWS_BREAKDOWN_COPY}</p>
+          </div>
+        )}
 
         {scores && scores.review_count > 0 && (
           <div class="bg-white rounded-[6px] border border-gray-200 p-6 mt-6">

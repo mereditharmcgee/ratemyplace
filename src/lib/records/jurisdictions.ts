@@ -14,10 +14,11 @@ export type Jurisdiction = 'boston';
 /**
  * Strip a trailing ", XX" state, lowercase. Deliberately looser than
  * enrichment/dispatcher.ts, which requires an uppercase state and treats "Boston, ma" as
- * unrecognized.
+ * unrecognized. Trimmed first as well as last, so the `$`-anchored state pattern still
+ * matches when the stored city carries trailing whitespace ("Boston, MA ").
  */
 function normalizeCity(city: string): string {
-  return city.replace(/,\s*[A-Z]{2}$/i, '').trim().toLowerCase();
+  return city.trim().replace(/,\s*[A-Z]{2}$/i, '').trim().toLowerCase();
 }
 
 export function jurisdictionForCity(city: string | null): Jurisdiction | null {

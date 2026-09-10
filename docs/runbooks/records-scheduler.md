@@ -29,6 +29,13 @@ second earlier — which is what it is for.
 Do these in order. The first minute tick starts pulling the moment the Worker is live, so
 the pause flag has to be on production **before** the Worker is.
 
+> **As of 2026-09-10 the Worker is not yet deployed.** The API token in use lacks the
+> "Workers Scripts: Edit" permission, so `npm run records:worker:deploy` cannot run — grant
+> that permission (or `wrangler login`) first. Owner action. And note that `app_settings` on
+> production is empty today, so step 1 below is required rather than a formality: with no
+> row for `records_fill_paused` the fill reads as running, and the first minute tick after
+> the deploy would start the city-wide pass.
+
 **1. Confirm the fill is paused on production.** This is an upsert, so it is safe whether or
 not the row already exists:
 
@@ -97,7 +104,43 @@ before it. Workers Logs is enabled on this Worker, so both can be read after the
 Workers → `ratemyplace-records-scheduler` → Logs rather than by sitting on a tail at 2am.
 
 Unpausing the city-wide fill is a separate, deliberate step (sub-project C3, after the site
-release), not part of this deploy.
+release), not part of this deploy. See the next section.
+
+## Turning the city-wide fill on for the first time
+
+The Worker ships paused. Once the C3 site release is live (search, the records button, the
+sitemap), turn the fill on once, deliberately.
+
+**Step 0, before anything else: apply migration `0033` by hand.** It indexes
+`records_queue(reason, requested_at)`, which is the records button's rolling daily-cap count
+over a table whose `button` rows are never purged. It is idempotent, and it is the one
+migration on this branch that production does not have yet.
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --file migrations/0033_records_queue_reason_requested.sql
+
+# Verify — this must return the index name, not an empty result
+npx wrangler d1 execute ratemyplace-db --remote --command \
+  "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_records_queue_reason_requested'"
+```
+
+Then open `/admin/records`, confirm the fixture line reads "Fixture: all N checks passed at
+<date>" with today's date, and press **Resume fill**. Within a minute `records_drain` lines
+start showing `pulled: 1` and `fillPaused: false`.
+
+Watch three numbers on the first day:
+
+- **Completed (24 h)** should climb toward about 1,440.
+- **Oldest pending** should stay under an hour.
+- Per-source errors should stay well under half of attempts for every source:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --command \
+  "SELECT source_id, status, COUNT(*) FROM record_pulls WHERE retrieved_at >= unixepoch() - 86400
+   GROUP BY 1, 2"
+```
+
+If the 06:00 planner pauses the fill and emails, read the email before resuming — see below.
 
 ## Reading the admin panel
 
@@ -116,9 +159,10 @@ release), not part of this deploy.
   hours with the fill running means the drain has stopped; check the Worker's Cron Events
   tab for red rows.
 - **Fixture** — the last daily Lanark fixture result, from
-  `app_settings.records_fixture_last`. "All checks passed" plus a timestamp from this
-  morning is the healthy state. A timestamp more than a day old means the planner did not
-  run.
+  `app_settings.records_fixture_last`. The healthy state is a line reading "Fixture: all N
+  checks passed at <date>" — the panel names the number of checks out loud, because "nothing
+  failed" is also true of a run where nothing ran — with a timestamp from this morning. A
+  timestamp more than a day old means the planner did not run.
 
 ## The breaker email, and unpausing
 

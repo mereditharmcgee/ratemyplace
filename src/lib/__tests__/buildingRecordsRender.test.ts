@@ -12,12 +12,17 @@ import { LEGACY_311_RESOURCES, NEW_311_RESOURCE_ID } from '../records/sources/bo
 import {
   CONDOMINIUM_COPY,
   DECLARED_VALUATION_CAVEAT,
+  FILL_QUEUED_COPY,
   NO_VIOLATIONS_CAVEAT,
   OTHER_REQUESTS_COPY,
+  REQUESTED_COPY,
+  REQUEST_BUTTON_LABEL,
+  REQUEST_PARKED_COPY,
 } from '../records/display';
 import { ROW_CAP } from '../records/ckan';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
-import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
+import { createRecordsTestDb, insertBuilding, insertPull } from './helpers/recordsDb';
+import { MAX_ATTEMPTS, enqueue } from '../records/queue';
 import { fixtureFetch, type FixtureRoute } from './helpers/records/fixtureFetch';
 import lanark2026 from './helpers/records/assessor-fy2026-lanark.json';
 import lanark2025 from './helpers/records/assessor-fy2025-lanark.json';
@@ -530,5 +535,101 @@ suite('BuildingRecords.astro ledger', () => {
     expect(html).not.toContain('<polyline');
     // The ledger still renders: the condo rule is about the assessor row, not the whole panel.
     expect(sectionText(html, 'Building permits')).toContain('No permitted work on record since 2006');
+  });
+});
+
+/**
+ * The request button's page states (design spec Section 4). Each case is what a seeded
+ * building looks like in production — a parcel and the assessor pull row the seed wrote, which
+ * is what makes the panel render at all — so the only thing that varies is what the queue and
+ * the deeper sources hold for it. There is no no-panel case to cover: the button lives inside
+ * the panel, and a building with no pulls has neither.
+ */
+suite('BuildingRecords.astro request button states', () => {
+  /** A seeded Boston building: eligible, panel-rendering, and nothing deeper pulled. */
+  async function seededBuilding(id: string): Promise<TestD1Database> {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id, parcel_id: '2102396000' });
+    await insertPull(db, id, FY2026_RESOURCE_ID);
+    return db;
+  }
+
+  /**
+   * Rendered text rather than raw HTML, so the copy constants can be asserted whole: the
+   * button label carries an apostrophe, which the markup escapes to a character reference.
+   * Reading it back through the DOM decodes it again. The island is server-rendered by
+   * `client:load`, so its label is in this text.
+   */
+  function panelText(html: string): string {
+    return parse(html).textContent ?? '';
+  }
+
+  it('offers the button on a building nobody has asked about', async () => {
+    const text = panelText(await renderPanel(await seededBuilding('bldg-state-1'), 'bldg-state-1'));
+
+    expect(text).toContain(REQUEST_BUTTON_LABEL);
+    expect(text).not.toContain(REQUESTED_COPY);
+
+    // Where it sits, not just that it is somewhere: below the facts strip the seed did fill
+    // and above the four rows it is offering to fill. A seeded building has a parcel and an
+    // assessor pull but no assessment rows, so the strip is the empty-record line.
+    const factsIndex = text.indexOf('No assessor record on file.');
+    const labelIndex = text.indexOf(REQUEST_BUTTON_LABEL);
+    const ledgerIndex = text.indexOf('311 housing requests');
+    expect(factsIndex).toBeGreaterThan(-1);
+    expect(labelIndex).toBeGreaterThan(factsIndex);
+    expect(ledgerIndex).toBeGreaterThan(labelIndex);
+  });
+
+  it('tells a fill-queued building it is queued and still offers the button', async () => {
+    const db = await seededBuilding('bldg-state-2');
+    await enqueue(db, { buildingId: 'bldg-state-2', reason: 'fill', now: 1_000 });
+
+    const text = panelText(await renderPanel(db, 'bldg-state-2'));
+
+    // The city-wide pass will reach this building eventually; the button is the shortcut.
+    expect(text).toContain(FILL_QUEUED_COPY);
+    expect(text).toContain(REQUEST_BUTTON_LABEL);
+  });
+
+  it('replaces the button with the requested line once someone has pressed it', async () => {
+    const db = await seededBuilding('bldg-state-3');
+    await enqueue(db, { buildingId: 'bldg-state-3', reason: 'button', now: 1_000 });
+
+    const text = panelText(await renderPanel(db, 'bldg-state-3'));
+
+    expect(text).toContain(REQUESTED_COPY);
+    expect(text).not.toContain(REQUEST_BUTTON_LABEL);
+  });
+
+  it('tells a reader the truth when the queue row has used all its attempts', async () => {
+    const db = await seededBuilding('bldg-state-5');
+    await enqueue(db, { buildingId: 'bldg-state-5', reason: 'button', now: 1_000 });
+    await db
+      .prepare('UPDATE records_queue SET attempts = ? WHERE building_id = ? AND done_at IS NULL')
+      .bind(MAX_ATTEMPTS, 'bldg-state-5')
+      .run();
+
+    const text = panelText(await renderPanel(db, 'bldg-state-5'));
+
+    // Not "reload to check": the row is not going to be claimed again on its own.
+    expect(text).toContain(REQUEST_PARKED_COPY);
+    expect(text).not.toContain(REQUESTED_COPY);
+    expect(text).not.toContain(REQUEST_BUTTON_LABEL);
+  });
+
+  it('offers neither once the deeper records are in', async () => {
+    const db = await seededBuilding('bldg-state-4');
+    await insertPull(db, 'bldg-state-4', PERMITS_RESOURCE_ID);
+
+    const html = await renderPanel(db, 'bldg-state-4');
+    const text = panelText(html);
+
+    // Anchored on the panel itself: three of these four assertions are absences, and an
+    // unrendered panel would satisfy them all.
+    expect(html).toContain('id="public-records"');
+    // The ledger below is the answer now, and the button never comes back.
+    expect(text).not.toContain(REQUEST_BUTTON_LABEL);
+    expect(text).not.toContain(REQUESTED_COPY);
   });
 });

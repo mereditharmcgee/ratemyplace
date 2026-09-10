@@ -23,14 +23,18 @@ import {
   CONDOMINIUM_COPY,
   NO_VIOLATIONS_CAVEAT,
   KIND_LABELS,
+  REQUESTED_COPY,
+  REQUEST_PARKED_COPY,
   formatDollars,
   formatPullDate,
 } from '../lib/records/display';
 import { ledgerModel } from '../lib/records/ledger';
+import { recordsRequestState, type RecordsRequestState } from '../lib/records/coverage';
 import { FY2026_RESOURCE_ID } from '../lib/records/sources/boston/assessor';
 import { PERMIT_COVERAGE_START } from '../lib/records/sources/boston/permits';
 import { HOUSING_REASONS, HOUSING_DEPARTMENT_PREFIX } from '../lib/records/sources/boston/serviceRequests';
 import RecordCorrectionForm from './records/RecordCorrectionForm';
+import RecordsRequestButton from './records/RecordsRequestButton';
 import CorrectionNotes from './records/CorrectionNotes.astro';
 import FactsStrip from './records/FactsStrip.astro';
 import LedgerRow from './records/LedgerRow.astro';
@@ -51,6 +55,10 @@ const { buildingId } = Astro.props;
 // and the map down with it, so the whole read is isolated and an unreadable panel renders as
 // no panel at all.
 let view: BuildingRecordsView | null = null;
+// Only asked when there is a panel to put the button in, and isolated separately from the
+// panel read: a queue or coverage read that fails costs the page nothing but the button,
+// where sharing the panel's try/catch would have cost it the whole panel.
+let requestState: RecordsRequestState = 'ineligible';
 try {
   view = await getBuildingRecords(Astro.locals.runtime.env.DB, buildingId);
 } catch (error) {
@@ -59,6 +67,17 @@ try {
     error: error instanceof Error ? error.message : String(error),
   });
   view = null;
+}
+if (view) {
+  try {
+    requestState = await recordsRequestState(Astro.locals.runtime.env.DB, buildingId);
+  } catch (error) {
+    logError('records_request_state_failed', {
+      buildingId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    requestState = 'ineligible';
+  }
 }
 
 const current = view?.assessments[0] ?? null;
@@ -116,6 +135,18 @@ const disclosureClass =
       </SourceState>
     </div>
     <CorrectionNotes notes={notesFor('assessment')} />
+
+    {requestState === 'requested' && (
+      <p class="mt-4 text-sm text-gray-600" role="status">{REQUESTED_COPY}</p>
+    )}
+    {requestState === 'parked' && (
+      <p class="mt-4 text-sm text-gray-600" role="status">{REQUEST_PARKED_COPY}</p>
+    )}
+    {(requestState === 'never_pulled' || requestState === 'fill_queued') && (
+      <div class="mt-4 border-t border-gray-200 pt-4">
+        <RecordsRequestButton client:load buildingId={buildingId} initialState={requestState} />
+      </div>
+    )}
 
     <div class="mt-6 border-b border-gray-200">
       <LedgerRow
@@ -253,9 +284,10 @@ const disclosureClass =
   </section>
 )}
 
-{/* The correction form is the only Turnstile widget on a building page, and it only exists
-    inside the panel above — so the script loads with the panel rather than on every building
-    page. A building with no pulls renders neither, and pays for neither. */}
+{/* Both Turnstile widgets on a building page live inside the panel above — the correction
+    form renders one on load, the records button renders one on press — so the script loads
+    with the panel rather than on every building page. A building with no pulls renders
+    neither, and pays for neither. */}
 {view && (
   <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 )}

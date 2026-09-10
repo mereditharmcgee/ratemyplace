@@ -1,0 +1,62 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+/**
+ * The search page renders the first page of results server-side and the results endpoint
+ * serves every page after it. They are two hand-written copies of one query, and a change
+ * to either alone shows up as a building that appears on load and vanishes on "Load more".
+ * Both now build the query-mode buildings query out of `searchSql.ts`; these are the guards
+ * that they keep doing so, and that removing the reviewed-only gate there did not remove it
+ * from browse mode or from the landlord queries.
+ */
+const page = readFileSync(join(process.cwd(), 'src/pages/search.astro'), 'utf8');
+const endpoint = readFileSync(join(process.cwd(), 'src/pages/api/search/results.ts'), 'utf8');
+
+/**
+ * Whitespace-tolerant, so reformatting the gate does not read as removing it. A global
+ * regex, and `String.prototype.match` with one of those returns every match — the counts
+ * below depend on that.
+ */
+const HAVING_REVIEWED_ONLY = /HAVING\s+COUNT\(\s*r\.id\s*\)\s*>\s*0/g;
+
+const REVIEWED_ONLY_HINT =
+  'browse-mode and landlord queries must stay reviewed-only; if you added an unrelated query, update this count';
+
+describe('search page and results endpoint stay aligned', () => {
+  for (const [name, source] of [['search.astro', page], ['results.ts', endpoint]] as const) {
+    it(`${name} builds the query-mode buildings query from searchSql`, () => {
+      expect(source).toMatch(/buildingSearchWhere\(/);
+      expect(source).toMatch(/buildingSearchSelect\(/);
+      // Interpolated into the SQL, not merely imported — a bare-name match would be
+      // satisfied by an unused import left behind after someone inlined the ORDER BY.
+      expect(source).toMatch(/\$\{BUILDING_SEARCH_ORDER\}/);
+    });
+  }
+
+  // The endpoint 400s a query over 200 characters. The page used to run it anyway, which is
+  // the two surfaces disagreeing about what counts as a search — so it now applies the same
+  // `validateSearch` and renders the no-match empty state without querying.
+  it('the page applies the same length cap as the endpoint', () => {
+    for (const [name, source] of [['search.astro', page], ['results.ts', endpoint]] as const) {
+      expect(source, `${name} must run validateSearch on the query`).toMatch(/validateSearch\(/);
+    }
+    // A bare identifier match would survive computing the verdict and never reading it. The
+    // two gates that make a rejected query reach neither the search branch nor browse mode:
+    expect(page, 'the search branch must be gated on the length verdict').toMatch(/query\s*&&\s*!searchRejected/);
+    expect(page, 'browse mode must not catch a rejected query').toMatch(/else\s+if\s*\(\s*!query\s*\)/);
+  });
+
+  // The page held eight: buildings and landlords, count and rows, in each of search and
+  // browse mode. The two query-mode buildings queries lost theirs; the other six keep it.
+  it('the page keeps browse mode and landlords reviewed-only', () => {
+    expect((page.match(HAVING_REVIEWED_ONLY) ?? []).length, REVIEWED_ONLY_HINT).toBe(6);
+  });
+
+  // Three, not the two the plan predicted: the endpoint's landlords branch is also written
+  // as a query / no-query pair, so it carries two `HAVING`s of its own, not one. The
+  // buildings branch keeps the one in its no-query variant.
+  it('the endpoint keeps browse mode and landlords reviewed-only', () => {
+    expect((endpoint.match(HAVING_REVIEWED_ONLY) ?? []).length, REVIEWED_ONLY_HINT).toBe(3);
+  });
+});

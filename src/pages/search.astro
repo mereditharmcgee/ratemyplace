@@ -2,7 +2,8 @@
 import BaseLayout from '../components/layout/BaseLayout.astro';
 import SearchResults from '../components/search/SearchResults';
 import EmptyState from '../components/ui/EmptyState.astro';
-import { escapeLikePattern } from '../lib/validation';
+import { escapeLikePattern, validateSearch } from '../lib/validation';
+import { BUILDING_SEARCH_ORDER, buildingSearchSelect, buildingSearchWhere } from '../lib/searchSql';
 import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../lib/scoring-sql';
 
 const query = (Astro.url.searchParams.get('q') || '').trim();
@@ -20,42 +21,52 @@ let totalBuildings = 0;
 let totalLandlords = 0;
 let hasAnyListings = false;
 
-if (query) {
+// The same length cap `/api/search/results` applies (`validateSearch`, 200 characters on the
+// trimmed query), so the page and the endpoint agree about what is a search. Over that, no
+// query runs at all: `buildings` and `landlords` stay empty and the totals stay 0, so the
+// markup below falls to the "No buildings match that search" empty state. Browse mode must
+// not catch it either — a 5,000-character `q` is a rejected search, not a request to list
+// everything — hence the explicit `!query` on the browse branch rather than a bare `else`.
+const searchRejected = query !== '' && validateSearch(query).length > 0;
+
+if (query && !searchRejected) {
   // Search mode — filtered results with totals.
   // Escape LIKE wildcards (% and _) so they match literally, matching the
   // paginated /api/search/results endpoint (otherwise SSR counts and Load-more
-  // results diverge on queries containing % or _).
+  // results diverge on queries containing % or _). The buildings query gets the
+  // same treatment inside `buildingSearchWhere`; this pattern is the landlord
+  // queries' own.
   const likePattern = `%${escapeLikePattern(query)}%`;
   try {
     if (type === 'all' || type === 'buildings') {
+      // Every matching building, reviewed or not — a searched address that exists in the
+      // city's parcel list is a real answer even with no review on it yet. The fragments
+      // come from `lib/searchSql.ts` so this page and /api/search/results cannot disagree
+      // about which rows exist or what order they are in.
+      const where = buildingSearchWhere(query);
+      // The count needs no reviews join and no GROUP BY: the query-mode buildings query is
+      // no longer reviewed-only, so one row per matching building is exactly COUNT(*).
+      // `landlords.id` is the primary key, so the landlord join — which the WHERE needs for
+      // `l.name` — cannot multiply a building into several rows.
       const countResult = await db.prepare(`
-        SELECT COUNT(*) as total FROM (
-          SELECT b.id
-          FROM buildings b
-          LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
-          LEFT JOIN landlords l ON b.landlord_id = l.id
-          WHERE b.address LIKE ? ESCAPE '\\' OR b.neighborhood LIKE ? ESCAPE '\\' OR l.name LIKE ? ESCAPE '\\'
-          GROUP BY b.id
-          HAVING COUNT(r.id) > 0
-        )
-      `).bind(likePattern, likePattern, likePattern).first<{ total: number }>();
+        SELECT COUNT(*) as total
+        FROM buildings b
+        LEFT JOIN landlords l ON b.landlord_id = l.id
+        WHERE ${where.sql}
+      `).bind(...where.binds).first<{ total: number }>();
       totalBuildings = countResult?.total || 0;
 
       if (totalBuildings > 0) {
         const buildingResults = await db.prepare(`
-          SELECT b.slug, b.address, b.neighborhood, b.city, b.state,
-            COUNT(r.id) as review_count,
-            ${recencyWeightedOverallSql('r', currentYear)} as avg_overall,
-            l.name as landlord_name
+          SELECT ${buildingSearchSelect(currentYear)}
           FROM buildings b
           LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
           LEFT JOIN landlords l ON b.landlord_id = l.id
-          WHERE b.address LIKE ? ESCAPE '\\' OR b.neighborhood LIKE ? ESCAPE '\\' OR l.name LIKE ? ESCAPE '\\'
+          WHERE ${where.sql}
           GROUP BY b.id
-          HAVING COUNT(r.id) > 0
-          ORDER BY COUNT(r.id) DESC, avg_overall DESC, b.id ASC
+          ${BUILDING_SEARCH_ORDER}
           LIMIT ?
-        `).bind(likePattern, likePattern, likePattern, PAGE_SIZE).all();
+        `).bind(...where.binds, PAGE_SIZE).all();
         buildings = buildingResults.results || [];
       }
     }
@@ -95,7 +106,7 @@ if (query) {
   } catch (error) {
     console.error('Search error:', error);
   }
-} else {
+} else if (!query) {
   // Browse mode — all reviewed properties with totals
   try {
     const buildingCount = await db.prepare(`

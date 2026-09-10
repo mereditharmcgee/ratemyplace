@@ -43,7 +43,10 @@ function makeDatabase(): SQLiteDatabase {
       state TEXT NOT NULL,
       slug TEXT NOT NULL,
       landlord_id TEXT,
-      property_manager_id TEXT
+      property_manager_id TEXT,
+      -- 0031. Search selects it (a Boston parcel is a building whose city records can be
+      -- pulled), so a fixture without it fails the whole query, not just that column.
+      parcel_id TEXT
     );
     CREATE TABLE reviews (
       id TEXT PRIMARY KEY,
@@ -65,7 +68,7 @@ function makeDatabase(): SQLiteDatabase {
       ('manager-thin', 'Thin Data Manager', 'thin-data-manager', NULL, NULL, NULL, NULL, NULL),
       ('manager-established', 'Established Manager', 'established-manager', NULL, NULL, NULL, NULL, NULL),
       ('manager-unavailable', 'Unavailable Overall Manager', 'unavailable-overall-manager', NULL, NULL, NULL, NULL, NULL);
-    INSERT INTO buildings VALUES
+    INSERT INTO buildings (id, address, neighborhood, city, state, slug, landlord_id, property_manager_id) VALUES
       ('landlord-thin-1', '10 Oak Street', 'Back Bay', 'Boston', 'MA', '10-oak-street', 'landlord-thin', NULL),
       ('landlord-thin-2', '12 Oak Street', 'Back Bay', 'Boston', 'MA', '12-oak-street', 'landlord-thin', NULL),
       ('landlord-established-1', '20 Pine Street', 'South End', 'Boston', 'MA', '20-pine-street', 'landlord-established', NULL),

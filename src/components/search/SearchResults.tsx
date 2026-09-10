@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 import { getNamedPartyScoreState, NAMED_PARTY_MIN_REVIEWS } from '../../lib/scoring';
 import { localityLine } from '../../lib/locality';
+import { SEARCH_SEEDED_COPY } from '../../lib/records/display';
 
 interface Building {
   slug: string;
@@ -12,6 +13,8 @@ interface Building {
   landlord_name?: string;
   review_count: number;
   avg_overall: number | null;
+  /** 0 or 1 — 1 when the building is a Boston parcel, so city records can be pulled for it. */
+  has_records?: number;
 }
 
 interface Landlord {
@@ -56,7 +59,9 @@ function BuildingCard({ building }: { building: Building }) {
               <div className="text-sm text-gray-500">{building.review_count} review{building.review_count !== 1 ? 's' : ''}</div>
             </div>
           ) : (
-            <span className="text-sm text-gray-400">No reviews yet</span>
+            <span className="text-sm text-gray-400">
+              {building.review_count === 0 && building.has_records ? SEARCH_SEEDED_COPY : 'No reviews yet'}
+            </span>
           )}
         </div>
       </div>

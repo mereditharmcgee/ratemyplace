@@ -41,7 +41,10 @@ function makeDatabase(): SQLiteDatabase {
       city TEXT NOT NULL,
       state TEXT NOT NULL,
       slug TEXT NOT NULL,
-      landlord_id TEXT
+      landlord_id TEXT,
+      -- 0031. The query-mode buildings select reads it for has_records, so a fixture
+      -- without it fails the whole query, not just that column.
+      parcel_id TEXT
     );
     CREATE TABLE reviews (
       id TEXT PRIMARY KEY,
@@ -55,12 +58,14 @@ function makeDatabase(): SQLiteDatabase {
     INSERT INTO landlords VALUES
       ('landlord-thin', 'Thin Data Landlord', 'thin-data-landlord'),
       ('landlord-established', 'Established Landlord', 'established-landlord');
-    INSERT INTO buildings VALUES
-      ('building-thin', '10 Oak Street', 'Back Bay', 'Boston', 'MA', '10-oak-street', 'landlord-thin'),
-      ('building-thin-2', '12 Oak Street', 'Back Bay', 'Boston', 'MA', '12-oak-street', 'landlord-thin'),
-      ('building-established', '20 Pine Street', 'South End', 'Boston', 'MA', '20-pine-street', 'landlord-established'),
-      ('building-established-2', '22 Pine Street', 'South End', 'Boston', 'MA', '22-pine-street', 'landlord-established'),
-      ('building-one-review', '30 Main Street', 'Roxbury', 'Boston', 'MA', '30-main-street', NULL);
+    -- Explicit column list: the table gained parcel_id, and a bare VALUES list would bind
+    -- the landlord id into it.
+    INSERT INTO buildings (id, address, neighborhood, city, state, slug, landlord_id, parcel_id) VALUES
+      ('building-thin', '10 Oak Street', 'Back Bay', 'Boston', 'MA', '10-oak-street', 'landlord-thin', NULL),
+      ('building-thin-2', '12 Oak Street', 'Back Bay', 'Boston', 'MA', '12-oak-street', 'landlord-thin', NULL),
+      ('building-established', '20 Pine Street', 'South End', 'Boston', 'MA', '20-pine-street', 'landlord-established', 'parcel-20'),
+      ('building-established-2', '22 Pine Street', 'South End', 'Boston', 'MA', '22-pine-street', 'landlord-established', NULL),
+      ('building-one-review', '30 Main Street', 'Roxbury', 'Boston', 'MA', '30-main-street', NULL, NULL);
     INSERT INTO reviews VALUES
       ('thin-1', 'building-thin', 'approved', 4.8, '2026', 1),
       ('thin-2', 'building-thin-2', 'approved', 4.8, '2026', 1),
@@ -114,6 +119,57 @@ suite('public named-party aggregate routes', () => {
         review_count: 1,
         avg_overall: 4.6,
       });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('answers a buildings query with a total, the matching rows, and has_records', async () => {
+    const sqlite = makeDatabase();
+    try {
+      const response = await getSearchResults(makeContext(
+        'https://ratemyplace.org/api/search/results?type=buildings&q=Pine',
+        new TestD1Database(sqlite),
+      ));
+      const body = await response.json() as {
+        total: number;
+        results: Array<{ slug: string; review_count: number; has_records: number }>;
+      };
+
+      // Both Pine Street buildings, and only those two.
+      expect(body.total).toBe(2);
+      expect(body.results.map((result) => result.slug)).toEqual(['20-pine-street', '22-pine-street']);
+      // 20 Pine has a parcel and a Boston city, 22 Pine has no parcel — never null either way.
+      expect(body.results.find((result) => result.slug === '20-pine-street')).toMatchObject({
+        review_count: 2,
+        has_records: 1,
+      });
+      expect(body.results.find((result) => result.slug === '22-pine-street')).toMatchObject({
+        review_count: 1,
+        has_records: 0,
+      });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('pages a buildings query past the first row and skips the discarded total', async () => {
+    const sqlite = makeDatabase();
+    try {
+      const response = await getSearchResults(makeContext(
+        'https://ratemyplace.org/api/search/results?type=buildings&q=Pine&offset=1',
+        new TestD1Database(sqlite),
+      ));
+      const body = await response.json() as {
+        total: number;
+        results: Array<{ slug: string }>;
+      };
+
+      // `limit` and `offset` bind after the WHERE patterns, so a rows query that still
+      // returns the second match proves that bind order. `total` is deliberately 0: only
+      // the first page's count is consumed, and this is a Load-more append.
+      expect(body.results.map((result) => result.slug)).toEqual(['22-pine-street']);
+      expect(body.total).toBe(0);
     } finally {
       sqlite.close();
     }

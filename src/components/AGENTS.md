@@ -27,14 +27,15 @@ data, use Astro instead.
 | `reviews/` | `ReviewForm`, `ReviewEditForm`, `ReviewCard`, `form-steps/` |
 | `admin/` | 9 tables and queues + `AdminLayout.astro` |
 | `profile/` | Tenant dashboard, settings, notifications, verification |
-| `records/` | Public-records panel pieces: `FactsStrip`, `LedgerRow`, `SourceState`, `RecordList`, `YearBars`, `CategoryBars`, `StatusToken`, `CorrectionNotes` (all `.astro`) + `RecordCorrectionForm.tsx` |
+| `records/` | Public-records panel pieces: `FactsStrip`, `LedgerRow`, `SourceState`, `RecordList`, `YearBars`, `CategoryBars`, `StatusToken`, `CorrectionNotes` (all `.astro`) + the React islands `RecordCorrectionForm.tsx` and `RecordsRequestButton.tsx` |
 | `search/`, `ratings/`, `ui/`, `contact/`, `disputes/` | As named |
 
-`BuildingRecords.astro` and every `.astro` file in `records/` are read as source text by
-`src/lib/__tests__/recordsPanelCopy.test.ts`, which fails on any word in `BANNED_WORDS`
-(`src/lib/records/display.ts`) — the panel reports what the city recorded and never
-characterizes it. Copy added there is scanned automatically; a new section file is picked
-up with no test change.
+`BuildingRecords.astro` plus every `.astro` **and** `.tsx` file in `records/` are read as
+source text by `src/lib/__tests__/recordsPanelCopy.test.ts`, which fails on any word in
+`BANNED_WORDS` (`src/lib/records/display.ts`) — the panel reports what the city recorded and
+never characterizes it. Copy added there is scanned automatically; a new section file or
+island is picked up with no test change. The scan reads raw source, so a banned word in a
+comment fails too.
 
 `BuildingRecords.astro` is markup: the four ledger rows' counts, spans, breakdowns, and row
 lists are built by `ledgerModel()` in [`src/lib/records/ledger.ts`](../lib/records/ledger.ts)

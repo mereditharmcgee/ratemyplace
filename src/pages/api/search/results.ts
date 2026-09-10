@@ -2,7 +2,9 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { validateSearch, escapeLikePattern } from '../../../lib/validation';
+import { BUILDING_SEARCH_ORDER, buildingSearchSelect, buildingSearchWhere } from '../../../lib/searchSql';
 import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../../../lib/scoring-sql';
+import type { SearchResultsResponse } from '../../../lib/api-types';
 
 export async function GET(context: APIContext): Promise<Response> {
   const db = getDB(context);
@@ -42,42 +44,63 @@ export async function GET(context: APIContext): Promise<Response> {
 
   try {
     if (resultType === 'buildings') {
-      const baseQuery = query
-        ? `FROM buildings b
+      // Two different queries, not one template with a flag. A search names an address, so
+      // it answers with every matching building — the fragments in `lib/searchSql.ts`, the
+      // same ones search.astro renders its first page from. Browse mode has no address to
+      // match and stays reviewed-only: it is a landing list, not an answer.
+      //
+      // Explicit column lists in both — never `b.*`. A wildcard leaks internal columns
+      // (admin_notes, owner_*) into this public JSON response and into the search
+      // island's serialized props (visible in view-source).
+      let countSql: string;
+      let rowsSql: string;
+      let binds: Array<string | number>;
+
+      if (query) {
+        const where = buildingSearchWhere(query);
+        const from = `FROM buildings b
            LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
            LEFT JOIN landlords l ON b.landlord_id = l.id
-           WHERE b.address LIKE ? ESCAPE '\\' OR b.neighborhood LIKE ? ESCAPE '\\' OR l.name LIKE ? ESCAPE '\\'
-           GROUP BY b.id
-           HAVING COUNT(r.id) > 0`
-        : `FROM buildings b
+           WHERE ${where.sql}
+           GROUP BY b.id`;
+        // The count needs no reviews join and no GROUP BY: query mode is no longer
+        // reviewed-only, so one row per matching building is exactly COUNT(*).
+        // `landlords.id` is the primary key, so the landlord join — which the WHERE needs
+        // for `l.name` — cannot multiply a building into several rows.
+        countSql = `SELECT COUNT(*) AS total FROM buildings b LEFT JOIN landlords l ON b.landlord_id = l.id WHERE ${where.sql}`;
+        rowsSql = `SELECT ${buildingSearchSelect(currentYear)}
+         ${from}
+         ${BUILDING_SEARCH_ORDER}
+         LIMIT ? OFFSET ?`;
+        binds = where.binds;
+      } else {
+        const from = `FROM buildings b
            LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
            LEFT JOIN landlords l ON b.landlord_id = l.id
            GROUP BY b.id
            HAVING COUNT(r.id) > 0`;
-
-      const escaped = query ? escapeLikePattern(query) : '';
-      const pattern = `%${escaped}%`;
-      const binds = query ? [pattern, pattern, pattern] : [];
-
-      const countResult = await db.prepare(
-        `SELECT COUNT(*) as total FROM (SELECT b.id ${baseQuery})`
-      ).bind(...binds).first<{ total: number }>();
-
-      // Explicit column list — never `b.*`. A wildcard leaks internal columns
-      // (admin_notes, owner_*) into this public JSON response and into the search
-      // island's serialized props (visible in view-source).
-      const rows = await db.prepare(
-        `SELECT b.slug, b.address, b.neighborhood, b.city, b.state,
+        countSql = `SELECT COUNT(*) as total FROM (SELECT b.id ${from})`;
+        rowsSql = `SELECT b.slug, b.address, b.neighborhood, b.city, b.state,
                 COUNT(r.id) as review_count, ${recencyWeightedOverallSql('r', currentYear)} as avg_overall, l.name as landlord_name
-         ${baseQuery}
+         ${from}
          ORDER BY COUNT(r.id) DESC, avg_overall DESC, b.id ASC
-         LIMIT ? OFFSET ?`
-      ).bind(...binds, limit, offset).all();
+         LIMIT ? OFFSET ?`;
+        binds = [];
+      }
+
+      // `total` is only consumed for the first page: the search island takes its totals
+      // from the SSR props on `search.astro` and every later request is a Load-more
+      // append, whose `total` it discards. On a 38,000-row seeded table that count is the
+      // expensive half of the request, so skip it whenever the caller is paging.
+      const total = offset === 0
+        ? (await db.prepare(countSql).bind(...binds).first<{ total: number }>())?.total || 0
+        : 0;
+      const rows = await db.prepare(rowsSql).bind(...binds, limit, offset).all();
 
       return new Response(JSON.stringify({
         results: rows.results || [],
-        total: countResult?.total || 0,
-      }), { headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) } });
+        total,
+      } satisfies SearchResultsResponse), { headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) } });
     }
 
     if (resultType === 'landlords') {
@@ -113,10 +136,10 @@ export async function GET(context: APIContext): Promise<Response> {
       return new Response(JSON.stringify({
         results: rows.results || [],
         total: countResult?.total || 0,
-      }), { headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) } });
+      } satisfies SearchResultsResponse), { headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) } });
     }
 
-    return new Response(JSON.stringify({ results: [], total: 0 }), {
+    return new Response(JSON.stringify({ results: [], total: 0 } satisfies SearchResultsResponse), {
       headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) }
     });
   } catch (error) {

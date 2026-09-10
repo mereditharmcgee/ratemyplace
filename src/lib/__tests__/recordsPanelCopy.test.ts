@@ -4,12 +4,14 @@ import { join } from 'node:path';
 import { BANNED_WORDS } from '../records/display';
 
 // The panel is spread across the entry component and the section pieces it composes, so the
-// scan reads all of them. Anything added to src/components/records as an .astro file is
-// covered automatically — a new section extracted tomorrow cannot slip out from under this.
+// scan reads all of them. Anything added to src/components/records is covered automatically —
+// a new section extracted tomorrow cannot slip out from under this. The islands are scanned
+// with them: the request button and the correction form both write on the reader-facing
+// surface, so their copy answers to the same rule.
 const PANEL_FILES = [
   join(process.cwd(), 'src/components/BuildingRecords.astro'),
   ...readdirSync(join(process.cwd(), 'src/components/records'))
-    .filter((name) => name.endsWith('.astro'))
+    .filter((name) => name.endsWith('.astro') || name.endsWith('.tsx'))
     .map((name) => join(process.cwd(), 'src/components/records', name)),
 ];
 
@@ -32,6 +34,8 @@ describe('BuildingRecords.astro display rules', () => {
       'StatusToken.astro',
       'SourceState.astro',
       'RecordList.astro',
+      'RecordsRequestButton.tsx',
+      'RecordCorrectionForm.tsx',
     ]) {
       expect(PANEL_FILES.some((path) => path.endsWith(name))).toBe(true);
     }

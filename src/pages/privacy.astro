@@ -46,6 +46,7 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
           <li><strong>Owner of record:</strong> shown as the city publishes it.</li>
           <li><strong>Mailing addresses:</strong> When the owner of record is an individual we do not show the mailing address. When an entity's mailing address names a person, including a care-of line, we omit that name and show only the street and city.</li>
           <li><strong>Reporting a record error:</strong> Reporting a record error stores your description and, only if you give one, an email address. The rate limiter that protects the form keeps your IP address for one hour, as it does for every public form on the site, and nothing else about you is kept.</li>
+          <li><strong>Requesting a building's records:</strong> Pressing "Get this building's city records" stores the building and the time of the request, not who pressed it. The rate limiter that protects the button keeps your IP address for one hour, as it does for every public form on the site.</li>
         </ul>
       </section>
 
