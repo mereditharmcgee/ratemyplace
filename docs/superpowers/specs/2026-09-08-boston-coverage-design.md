@@ -306,6 +306,56 @@ Endpoint guards, in order: JSON content type; `checkRateLimit(db, ip, 'records_r
 
 **Copy** for the card, button, and status lines lives in `display.ts` and joins `PANEL_COPY`, so the banned-words scan covers it.
 
+> **Amended 2026-09-10, as built (C3):**
+>
+> **Status codes** follow the sibling public route `corrections.ts`, not the sketch above:
+> content-type failure is **415** and Turnstile failure is **400** (not 400/403). The rest of
+> the guard order stands.
+>
+> **The daily cap is a rolling 24 hours**, counted from `records_queue` (`button` rows are
+> never purged), not a calendar day. Its message is "The daily limit for city-records
+> requests has been reached. Please try again later." with a `Retry-After` computed from the
+> oldest counted row, so the number is the real wait. The cap check runs **before** Turnstile:
+> it is a local D1 read, and there is no reason to spend an outbound subrequest on a request
+> that is already refused. Concurrency can overshoot the cap by a few rows — accepted.
+>
+> **Response** is the records envelope `{ data: { status } }`, 202 for both `queued` and
+> `already_queued`. Pressing against a pending `refresh` row **replaces** it (priority 0 beats
+> 1) and answers `queued`, so a reader's press is never silently absorbed by a scheduled row.
+>
+> **Follower enqueue fires only in the `never_pulled` state.** A pending `fill` row is
+> deliberately *not* promoted on save: promoting it would let a save bypass the button's
+> per-IP limit and the daily cap, since saving costs nothing.
+>
+> **Eligibility everywhere is `jurisdictionForCity`**, not `city === 'Boston'` — in
+> `coverage.ts` and `buildingMeta.ts` — so 'boston' and 'Boston, MA' get the button the pull
+> would honor.
+>
+> **`RecordsRequestState`** (`src/lib/records/coverage.ts`) is the built form of the table
+> above, resolved in that precedence in one statement:
+>
+> | State | Meaning | Shown |
+> |---|---|---|
+> | `ineligible` | no such building, no jurisdiction for its city, or no parcel id | nothing |
+> | `pulled` | any deeper `record_pulls` row exists | normal ledger, no button ever again |
+> | `requested` | a pending `button`, `follower` or `refresh` row | "Records requested…", no button |
+> | `fill_queued` | only the city-wide pass has it | the line plus the button |
+> | `never_pulled` | nothing queued, nothing pulled | the button |
+>
+> **The island** (`RecordsRequestButton.tsx`) renders Turnstile on press into a kept-mounted
+> container and **never resets in `finally`**: a reset re-runs the challenge, which re-fires
+> the callback, which posts again — an unbounded POST loop, found in review. The submitting
+> callback is gated on a press flag, the error and timeout callbacks are handled and gated
+> the same way, the status poll is bounded at 10 s, one always-mounted status region carries
+> focus management, and server error text is surfaced only for a 429.
+>
+> **Copy** for the no-reviews card and the search line lives in `display.ts` and is registered
+> in `PANEL_COPY` even though both render outside the panel, so the banned-words scan still
+> covers them; that scan now also reads `.tsx` under `src/components/records/`.
+>
+> **The coverage read is isolated from the panel read** in `BuildingRecords.astro`: a coverage
+> failure costs the button, not the ledger.
+
 ## Section 5: Search and reviewer flow
 
 **Search.** Remove `HAVING COUNT(r.id) > 0` from the search page and `/api/search/results`; the parity test keeps them aligned. Order: buildings with approved reviews first in today's order, then the rest by address. Seeded results show "No reviews yet · city records" in the score position. Before matching, the query is normalized by a new `normalizeSearchQuery` in `src/lib/`: punctuation stripped and common suffix abbreviations expanded from the identity suffix table, so "1027 comm ave" matches "1027 Commonwealth Avenue". A leading-wildcard `LIKE` over 38,000 rows is milliseconds in SQLite; no new index for search.
@@ -335,6 +385,41 @@ On a match: set `google_place_id`, and `latitude`/`longitude` if null, and retur
 > repeat across neighborhoods, so `(city, street_key)` plus range containment can return two
 > genuinely different buildings.
 
+> **Amended 2026-09-10, as built (C3):**
+>
+> **`HAVING COUNT(r.id) > 0` came out of the query-mode buildings queries only.** Browse mode
+> (no query) and the landlord queries stay reviewed-only — listing 38,000 unreviewed pages
+> under "Reviewed buildings" is noise, and the spec's intent was the search box — and the map
+> is untouched. The shared fragments live in `src/lib/searchSql.ts`
+> (`buildingSearchWhere`, `buildingSearchSelect`, `BUILDING_SEARCH_ORDER`) and
+> `recordsSearchParity.test.ts` pins both the shared use and the remaining guard counts
+> (page 6, endpoint 3).
+>
+> **The seeded result line reads `No reviews yet · city records`**, shown for any zero-review
+> row that is Boston with a parcel. The SQL restates `jurisdictionForCity` rather than
+> importing it: case-insensitive, a trailing ", MA" tolerated, NULL-safe.
+>
+> **The dedupe candidate query keeps `city = 'Boston'`** — the spelling the seed writes and the
+> way the `(city, street_key)` index is keyed. A row stored with a neighborhood as its city
+> (which is what `POST /api/buildings` saves when Google hands one over) is therefore not a
+> candidate; accepted, because the cost is a duplicate page and the fix is a city-normalization
+> pass over `buildings`, not a `LOWER()` that would drop the index.
+>
+> **Dedupe precedence, as built** (`src/lib/records/dedupe.ts`): parity via `rangeContains`;
+> then the ZIP tiebreak. It **refuses rather than guesses** — several candidates spanning
+> different ZIPs with no input ZIP, or a lone candidate whose ZIP disagrees with the input,
+> both return null and create a page. Among survivors: a user row before its seeded twin, then
+> the narrower span, then the oldest. The 100-number span bound applies to **user-entered rows
+> only**; seeded rows are never bounded, because six real parcels exceed it (up to 628 at
+> `10-638 Georgetowne Dr`) and the assessor's range *is* the parcel.
+>
+> **On a match, `POST /api/buildings` stamps the place id and coordinates only when it has
+> something to stamp and the row lacks it** — first place id wins — so a re-submission does not
+> bump `updated_at`, which feeds sitemap `lastmod`.
+>
+> **Slug collisions loop `-2`, `-3`, …** like `seedSlug` rather than appending a timestamp, and
+> the INSERT is retried once on a UNIQUE error that names `slug`.
+
 ## Section 6: Sitemap, metadata, docs
 
 **Sitemap.** `/sitemap.xml` is an index pointing at `/sitemaps/static.xml` and `/sitemaps/buildings-<n>.xml` in chunks of 10,000, generated from D1 and served with `Cache-Control: public, max-age=3600`. Included: allowlisted static pages; every building with `city = 'Boston'` and `parcel_id` not null; any other building or landlord page with at least one approved review. Excluded: auth, profile, admin, review forms. `lastmod` is the latest of the building's `updated_at`, its most recent `record_pulls.retrieved_at`, and its most recent approved review. `/robots.txt` allows crawling and names the index. Structured data remains a v1.6 item.
@@ -349,6 +434,50 @@ On a match: set `google_place_id`, and `latitude`/`longitude` if null, and retur
 - `MASTER.md`; root `AGENTS.md` traps (second deployable, fill pause flag, never re-pull on demand); `migrations/AGENTS.md` (0031 by hand); `src/lib/AGENTS.md` (queue module).
 
 **Rollout order.** Migration 0031 → Worker deployed with `records_fill_paused = '1'` → seed script (dry run, then real) → site release (search, button, sitemap, page states, dedupe, docs) → clear the pause flag → watch the first day's error rate and queue depth in admin.
+
+> **Amended 2026-09-10, as built (C3):**
+>
+> **The static sitemap omits property-manager pages.** `STATIC_SITEMAP_PATHS` in
+> `src/lib/sitemap.ts` is the allowlist of public pages; `/property-manager/[slug]` is
+> deliberately not in it, and only landlord pages with an approved review join the static file
+> (unchunked, which is fine below about 50,000 landlords). Static entries carry no `lastmod` —
+> there is nothing truthful to put there.
+>
+> **`buildingChunkCount` has no floor of 1.** An empty table advertises no chunk at all, so the
+> index never names a URL it cannot serve. The index carries no per-child `<lastmod>`. Route
+> catches call `logError`. A chunk number past the end 404s, and that 404 is cached for a day:
+> an in-range but empty chunk (`buildings-9999.xml`) still runs the query to discover it is
+> empty, so an uncacheable 404 would let one bot repeat that scan.
+>
+> **`lastmod` is a `MAX()` of three timestamps, and `updated_at` is effectively a floor** — never
+> the decisive one in production, since a Boston-parcel row always has the seed's assessor pull
+> and a reviewed row always has a review. A re-seed re-stamps both `updated_at` and the
+> assessor pull's `retrieved_at`, so all 38k pages move together; that is truthful rather than
+> a bug, because the "as of" date is visible page content.
+>
+> **Three spellings of "is a Boston building" coexist, on purpose.** The sitemap and the dedupe
+> candidate query use `b.city = 'Boston'` (index-friendly, and how the seed writes it); search's
+> `has_records` and `jurisdictionForCity` are case-insensitive and tolerate ", MA". So a
+> user-created row stored as 'boston' with a parcel and no reviews would be missing from the
+> sitemap — near-zero impact today, and the fix is the city-normalization pass named in
+> Section 5.
+>
+> **Metadata is narrower than the sketch:** the records-flavored title and description apply
+> only when a building has zero approved reviews **and** a Boston jurisdiction **and** a parcel
+> id, and the title avoids a doubled ", Boston" when the address already carries it.
+>
+> **Two operational residues** for the runbook and follow-ups, not defects here: `robots.txt`
+> on a preview host (`*.pages.dev`) advertises the production sitemap, which is harmless only if
+> Cloudflare sends `X-Robots-Tag: noindex` on preview deployments; and Pages Functions responses
+> are not edge-cached by `Cache-Control` alone, so without a Cache Rule for `/sitemap*` every
+> crawler fetch is a live D1 query.
+>
+> **The docs list above shipped as written**, plus root `AGENTS.md` traps for the search
+> fragments, the D1-backed sitemap routes, the Turnstile reset loop, and the `updated_at`
+> no-op rule; `src/lib/AGENTS.md` bullets for `coverage.ts`, `request.ts`, `dedupe.ts`,
+> `stripTrailingLocality`, `searchSql.ts`, `buildingMeta.ts`, `sitemap.ts` and
+> `isBostonLocality`; and a runbook section on turning the city-wide fill on for the first
+> time. The strategy entry is dated **2026-09-10**.
 
 ## Section 7: Testing, failure modes, split
 

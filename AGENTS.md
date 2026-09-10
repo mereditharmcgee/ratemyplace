@@ -235,8 +235,9 @@ non-form content-type endpoint.
 ### Turnstile and email
 
 `verifyTurnstile(token, getEnv(context).TURNSTILE_SECRET_KEY, clientIP)` — required on
-signup, forgot-password, contact, disputes, bug reports. It cannot be tested on preview or
-locally; verify on production.
+signup, signin, forgot-password, contact, disputes, bug reports, reviews, record
+corrections, and the public records request (`/api/records/request`). It cannot be tested on
+preview or locally; verify on production.
 
 Email templates live in `lib/email.ts`, never in route handlers, and every interpolated
 user value goes through that module's local `escapeHtml`. Send with
@@ -307,9 +308,30 @@ Things that have already cost time. Read before debugging.
   and both are rate-limited and audited. Every `records_queue` row is pulled by the companion
   Cron Worker on a later minute tick instead, never by a request; the admin retry endpoint
   un-parks a row rather than pulling it (it refuses a row whose lease is still live with a
-  409); and the reader-facing button, which enqueues rather than pulls, arrives in C3. So
+  409); and the reader-facing button (`src/pages/api/records/request.ts`) enqueues a `button`
+  row rather than pulling. So
   "I clicked it and nothing happened" is expected for up to a minute on anything queued — but
   not on those two admin buttons, which either return a summary or fail in front of you.
+- **Search is not reviewed-only any more, but browse and the map are.**
+  `buildingSearchWhere` / `buildingSearchSelect` / `BUILDING_SEARCH_ORDER` in
+  `src/lib/searchSql.ts` are the only spelling of the query-mode buildings query, shared by
+  `src/pages/search.astro` and `src/pages/api/search/results.ts` so a seeded Boston page
+  cannot appear on one and not the other. Browse mode (no query), the landlord queries and
+  `src/pages/api/buildings/map.ts` keep their `HAVING COUNT(r.id) > 0`.
+  `recordsSearchParity.test.ts` fails if either call site stops using the fragments or if
+  the browse-mode and landlord counts change.
+- **`/sitemap.xml`, `/sitemaps/*.xml`, and `/robots.txt` are D1-backed routes** in
+  `src/pages/`, not files in `public/`. The static-page allowlist is `STATIC_SITEMAP_PATHS`
+  in `src/lib/sitemap.ts`; a new public page is not in the sitemap until it is added there.
+- **Never call `turnstile.reset()` from a callback that submits.** A reset re-runs the
+  challenge, which re-fires the callback, which submits again — an unbounded POST loop
+  against your own endpoint. Reset only after a failed POST (tokens are single-use), and
+  gate any submitting callback on a press flag so an auto-solve cannot post on its own. See
+  `src/components/records/RecordsRequestButton.tsx`.
+- **`buildings.updated_at` feeds sitemap `lastmod`.** Do not bump it on a no-op write; a
+  write-through that stamps nothing new would move a page's date for every crawler with no
+  content change behind it. `POST /api/buildings` only stamps a matched row when it has
+  something to add and the row lacks it.
 - **An `_`-prefixed file under `src/pages/` is not a route.** Astro excludes it from
   file-based routing, which is how `src/pages/api/admin/records/queue/_json.ts` can be a
   shared helper next to the endpoints that import it. The rule cuts the other way for

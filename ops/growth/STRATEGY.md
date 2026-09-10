@@ -109,3 +109,17 @@ Until C ships, the rule above still holds. Depth beats breadth, and targeted rev
 recruitment comes first.
 
 See `docs/superpowers/specs/2026-09-06-building-records-design.md`.
+
+### 2026-09-10: the reader-first deferral is lifted for Boston
+
+The condition set on 2026-09-06 is met. Sub-project C is live: a page for each of the
+38,208 whole-building rental parcels in Boston, each carrying the assessor's facts, each in
+search and in the sitemap, each able to ask the city for its deeper records at a reader's
+request. A reader arriving with a Boston address now finds something there.
+
+What changes: reader acquisition for Boston addresses is in scope. Address-intent search and
+the sitemap are the first channels, because they cost nothing per visit. What does not
+change: no content farms, no neighborhood pages written for crawlers, and the map stays
+reviewed-only. Outside Boston the rule above still holds.
+
+See `docs/superpowers/specs/2026-09-08-boston-coverage-design.md`.

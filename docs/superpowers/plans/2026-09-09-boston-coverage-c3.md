@@ -41,6 +41,10 @@
 4. Reviewer dedupe treats a submitted city of "Boston" **or any Boston neighborhood name** as Boston, because Google Places often returns the neighborhood as the locality.
 5. Slug collisions in `POST /api/buildings` now loop with `-2`, `-3`, … like `seedSlug`, instead of one timestamp suffix.
 
+This list is partial — it is what the plan knew before the work. The complete as-built record
+is in the spec's three `Amended 2026-09-10, as built (C3)` blocks under Sections 4, 5 and 6
+(`docs/superpowers/specs/2026-09-08-boston-coverage-design.md`); read those, not this list.
+
 ---
 
 ## File map
@@ -2109,6 +2113,7 @@ const BUILDING_FROM = `
 
 export async function buildingChunkCount(db: RecordsDb): Promise<number> {
   const row = await db.prepare(`SELECT COUNT(*) AS n ${BUILDING_FROM}`).first<{ n: number }>();
+  // (as built: no floor of 1 — an empty table advertises no chunk, so the index never names a URL it cannot serve)
   return Math.max(1, Math.ceil((row?.n ?? 0) / SITEMAP_CHUNK));
 }
 

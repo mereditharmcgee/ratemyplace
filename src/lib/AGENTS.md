@@ -225,13 +225,62 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
 - **`searchQuery.ts` returns alternatives per term, not one string per term.**
   `normalizeSearchQuery` gives back `string[][]`: the search ORs the spellings inside a term
   and ANDs across terms, so "comm ave" matches both `Avenue` and `Ave` in stored addresses
-  without matching a building that has neither.
+  without matching a building that has neither. Consumed by `searchSql.ts`.
+- **`coverage.ts` is the page-state table, read-only.** `recordsRequestState` answers
+  `ineligible` / `pulled` / `requested` / `fill_queued` / `never_pulled` in that precedence,
+  in **one** statement (two indexed `building_id` seeks as correlated subqueries), because
+  the public endpoint calls it once per request; `hasDeeperPull` and `pendingQueueReason`
+  stay exported for callers that need one answer without the other. Eligibility is
+  `jurisdictionForCity`, not a string compare on 'Boston'. `DEEPER_SOURCE_IDS` lives here
+  and `scheduler.ts` re-exports it — do not move it back.
+- **`request.ts` holds the button's limits, not the route.** Three presses an hour per IP
+  (`REQUEST_PER_IP`) and 300 button rows a day site-wide (`REQUEST_DAILY_CAP`) over a
+  **rolling** 24 hours, counted from `records_queue` because button rows are never purged.
+  `Retry-After` on the cap branch is computed from the oldest counted row, so the number it
+  gives is the real wait rather than a fixed guess. The numbers live here so the route, its
+  tests, and the privacy-page copy cannot fork.
+- **`dedupe.ts` refuses rather than guesses.** `findBuildingByAddress` runs place id →
+  Boston address key plus range containment under the parity rule → ZIP tiebreak → exact
+  address/city, and returns null (create a page) whenever the answer is not forced: several
+  candidates spanning different ZIPs with no input ZIP, or a lone candidate whose ZIP
+  disagrees with the input. Among survivors: a user row before its seeded twin, then the
+  narrower span, then the oldest. The candidate span bound (100 numbers) applies to
+  user-entered rows **only** — six real seeded parcels are wider, up to 628 at
+  `10-638 Georgetowne Dr`, and the assessor's range *is* the parcel.
+- **`stripTrailingLocality` is called by `addressKey` and `buildIdentity`, not
+  `streetKey`.** It removes a comma-less trailing "Boston" / neighborhood / "MA" / ZIP tail
+  that `normalizeStreet`'s comma rule cannot see. `streetKey` takes a street it has already
+  been handed, so adding the stripper there would change seed keys.
 - **`display.ts` holds a privacy gate.** `showMailingAddress` publishes a tax mailing
   address only for an owner that reads as an entity, and `mailingAddressLine` holds the
   addressee to the same test — an entity can list a person as its `C/O ATT`. It errs
   toward hiding: a hidden business address costs a reader one lookup, a published home
   address cannot be taken back. `BANNED_WORDS` in the same file is scanned against the
   panel's templates by `__tests__/recordsPanelCopy.test.ts`.
+
+### Search, page metadata, and the sitemap
+
+- **`searchSql.ts` is the only spelling of the query-mode buildings query.**
+  `buildingSearchWhere`, `buildingSearchSelect` and `BUILDING_SEARCH_ORDER` are shared by
+  `src/pages/search.astro` and `src/pages/api/search/results.ts`, so the page and the
+  endpoint cannot disagree about which buildings match or in what order. Query mode returns
+  every Boston building, reviewed ones first; browse mode, the landlord queries and the map
+  keep their `HAVING COUNT(r.id) > 0`. `__tests__/recordsSearchParity.test.ts` fails if
+  either call site stops using the fragments.
+- **`buildingMeta.ts` decides the records-page title.** `buildingPageMeta` swaps in the
+  records-flavored title and description only when a building has zero approved reviews, a
+  Boston jurisdiction (`jurisdictionForCity`) and a parcel id, and avoids a doubled
+  ", Boston" when the address already carries it. Reviewed pages keep the review metadata.
+- **`sitemap.ts` owns the allowlist and the chunking.** `STATIC_SITEMAP_PATHS` is the
+  hand-kept list of public pages (property-manager pages are deliberately absent);
+  `SITEMAP_CHUNK` is 10,000 URLs per chunk; `buildingChunkCount` has no floor of 1, so an
+  empty table advertises no chunk at all. `lastmod` is the newest of the building's
+  `updated_at`, its newest approved review, and its newest pull.
+- **`locality.ts` exports `isBostonLocality`** — 'Boston' or any Boston neighborhood name,
+  case-insensitively — because Google Places routinely hands back the neighborhood as the
+  locality. Note that `records/identity.ts` keeps an uppercase twin of the same vocabulary
+  for its trailing-locality stripper; a new neighborhood name has to be added in both until
+  someone merges them.
 
 ### `enrichment/` — municipal property data
 

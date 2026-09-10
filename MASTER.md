@@ -264,14 +264,14 @@ We collect precise data for analysis and moderation but display fuzzy data to pr
 - Every rendered value is a field from a primary record or a count of records. No ratio, no comparison, no grade, no color coding, no inference.
 - **Records are not part of any score.** Reviews are the judgment layer; the records panel has no opinion.
 - Each section shows the date its records were retrieved and links to the dataset it came from. Provenance is stored per pull in `record_pulls`.
-- Pulls are admin-triggered. Nothing is fetched from a city API on a public page view.
+- Pulls are admin-triggered, reader-requested (a button that enqueues one pull for the scheduled Worker), or scheduled. Nothing is fetched from a city API on a public page view.
 - The owner of record is shown. The tax mailing address is shown only when the owner is an entity, decided by a word-boundary token rule; an individual named as a trustee is treated as an individual, and the addressee line is shown only when the addressee is itself an entity. A condominium building shows no owner.
 - A section that has never been queried says "Not retrieved yet" rather than reading as an empty result.
 - Anyone can file **Report a record error** from the panel. The form stores the claim and an optional email address, and nothing else about the filer. The only resolution is a re-pull from the source; when the city's own data is wrong, a dated public note is added under that section. Every resolution writes an audit log entry.
+- Every whole-building rental parcel in Boston (38,208 pages) is seeded from the assessor; search returns them after reviewed buildings; a sitemap lists them; a companion Cron Worker fills in the deeper sources city-wide and refreshes the buildings people follow, review, or ask about.
 
 **Planned:**
 
-- **Sub-project C, Boston coverage:** assessor-seeded pages for every whole-building residential parcel, with a scheduled refresh Worker.
 - **Sub-project B, entity record:** CorpWeb entity records, carrying a manual-verification flag.
 - **Sub-project D, neighborhood indicator:** a saved-query peer group and one published indicator built on it.
 
