@@ -75,12 +75,15 @@ export const POST: APIRoute = async (context: APIContext) => {
     // knowingly-accepted costs. The count has no covering index today (0031/0032 index other
     // columns) and button rows are never purged, so a `records_queue(reason, requested_at)`
     // index is a planned follow-up migration. And concurrent presses can overshoot the cap by
-    // the concurrency, which is fine for a soft daily budget.
+    // the concurrency, which is fine for a soft daily budget — when the cap has overshot that
+    // way, the `Retry-After` below is early by that many rows, which is accepted for an
+    // advisory header.
     const buttons = await buttonRequestsSince(db, now - REQUEST_CAP_WINDOW_SECONDS);
     if (buttons.count >= REQUEST_DAILY_CAP) {
-      // Only Retry-After: `limitHeaders` came from an allowed per-IP check and would claim
-      // remaining presses on a refusal. A slot frees when the oldest counted row leaves the
-      // window.
+      // Only Retry-After: `limitHeaders` came from an ALLOWED per-IP check, so it carries no
+      // Retry-After of its own, and its `X-RateLimit-Limit: 3` would describe a different
+      // limit than the one actually refusing this request. A slot frees when the oldest
+      // counted row leaves the window.
       const retryAfter = Math.max(1, (buttons.oldest ?? now) + REQUEST_CAP_WINDOW_SECONDS - now);
       return json(
         429,
