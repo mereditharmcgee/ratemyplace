@@ -403,6 +403,11 @@ export interface RecordsQueueStats {
   fillPaused: boolean;
 }
 
+/** POST /api/records/request — 202 body. */
+export interface RecordsRequestResponse {
+  data: { status: 'queued' | 'already_queued' };
+}
+
 /**
  * One parked `records_queue` row joined to its building: a pull that failed its
  * way out of the queue and is waiting for an admin to press Retry.
