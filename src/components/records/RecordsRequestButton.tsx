@@ -107,7 +107,25 @@ export default function RecordsRequestButton({ buildingId, initialState }: Props
           awaitingTokenRef.current = false;
           void submit(token);
         },
-        'expired-callback': () => setPhase((current) => (current === 'verifying' ? 'idle' : current)),
+        // A press that is still waiting is no longer waiting once the widget gives up on it.
+        'expired-callback': () => {
+          awaitingTokenRef.current = false;
+          setPhase((current) => (current === 'verifying' ? 'idle' : current));
+        },
+        // A widget that renders and then fails — an unreachable Cloudflare, a challenge the
+        // reader cannot get through — never answers with a token at all. Without these two the
+        // press would hold the verifying line and the disabled button for as long as the page
+        // stays open, so both say so and hand the control back.
+        'error-callback': () => {
+          awaitingTokenRef.current = false;
+          setError(REQUEST_FAILED_COPY);
+          setPhase((current) => (current === 'verifying' ? 'idle' : current));
+        },
+        'timeout-callback': () => {
+          awaitingTokenRef.current = false;
+          setError(REQUEST_FAILED_COPY);
+          setPhase((current) => (current === 'verifying' ? 'idle' : current));
+        },
       });
     };
     if (window.turnstile) renderWidget();

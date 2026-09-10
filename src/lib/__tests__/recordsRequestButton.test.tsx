@@ -22,9 +22,13 @@ afterEach(() => {
   delete (window as { turnstile?: unknown }).turnstile;
 });
 
+type RenderOptions = Parameters<NonNullable<Window['turnstile']>['render']>[1];
+
 interface TurnstileStub {
   /** Hand the island a token nobody asked for, the way an expiring widget renews itself. */
   fire: (token?: string) => void;
+  /** The options the island rendered with, so a test can fire the widget's own failure paths. */
+  options: () => RenderOptions;
   reset: ReturnType<typeof vi.fn>;
   remove: ReturnType<typeof vi.fn>;
 }
@@ -34,20 +38,30 @@ interface TurnstileStub {
  * answers the same way, because that is what the real widget does for a visitor it never has
  * to challenge: the challenge re-runs unattended and fires `callback` again.
  */
-function stubTurnstile(token = 'test-token'): TurnstileStub {
+function stubTurnstile(token = 'test-token', answerOnRender = true): TurnstileStub {
   let callback: ((value: string) => void) | undefined;
+  let rendered: RenderOptions | undefined;
   const reset = vi.fn(() => callback?.('token-after-reset'));
   const remove = vi.fn();
   window.turnstile = {
     render: (_container, options) => {
       callback = options.callback;
-      options.callback?.(token);
+      rendered = options;
+      if (answerOnRender) options.callback?.(token);
       return 'widget-1';
     },
     reset,
     remove,
   };
-  return { fire: (value = token) => callback?.(value), reset, remove };
+  return {
+    fire: (value = token) => callback?.(value),
+    options: () => {
+      if (!rendered) throw new Error('stubTurnstile: render was never called');
+      return rendered;
+    },
+    reset,
+    remove,
+  };
 }
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -175,6 +189,65 @@ describe('RecordsRequestButton', () => {
     await pressButton();
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(REQUEST_FAILED_COPY));
+  });
+
+  it('hands the button back when the widget itself reports an error', async () => {
+    // A widget that renders and then fails — a challenge the reader cannot pass, an api.js
+    // that loaded but cannot reach Cloudflare — never answers with a token, so without an
+    // error path the press would sit in the verifying phase for good.
+    const stub = stubTurnstile('tok', false);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RecordsRequestButton buildingId="b1" initialState="never_pulled" />);
+
+    await pressButton();
+    await act(async () => {
+      stub.options()['error-callback']?.();
+    });
+
+    expect(screen.getByRole('alert').textContent).toBe(REQUEST_FAILED_COPY);
+    expect(screen.getByRole('status').textContent).toBe('');
+    const button = screen.getByRole('button', { name: REQUEST_BUTTON_LABEL });
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('hands the button back when the widget times out', async () => {
+    const stub = stubTurnstile('tok', false);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RecordsRequestButton buildingId="b1" initialState="never_pulled" />);
+
+    await pressButton();
+    await act(async () => {
+      stub.options()['timeout-callback']?.();
+    });
+
+    expect(screen.getByRole('alert').textContent).toBe(REQUEST_FAILED_COPY);
+    expect((screen.getByRole('button', { name: REQUEST_BUTTON_LABEL }) as HTMLButtonElement).disabled).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a second press after a failure resets the widget and posts again', async () => {
+    const stub = stubTurnstile();
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(429, { error: 'Too many requests. Please try again later.' }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RecordsRequestButton buildingId="b1" initialState="never_pulled" />);
+
+    await pressButton();
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Too many requests'));
+    await pressButton();
+
+    // The widget is rendered once and kept, so the second press re-challenges it — and the
+    // token that re-challenge answers with is one the reader did ask for.
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(stub.reset).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String((fetchMock.mock.calls[1] as unknown as [string, RequestInit])[1].body))).toEqual({
+      buildingId: 'b1',
+      turnstileToken: 'token-after-reset',
+    });
   });
 
   it('gives up on the script after ten seconds and hands the button back', async () => {

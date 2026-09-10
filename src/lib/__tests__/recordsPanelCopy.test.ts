@@ -35,6 +35,7 @@ describe('BuildingRecords.astro display rules', () => {
       'SourceState.astro',
       'RecordList.astro',
       'RecordsRequestButton.tsx',
+      'RecordCorrectionForm.tsx',
     ]) {
       expect(PANEL_FILES.some((path) => path.endsWith(name))).toBe(true);
     }
