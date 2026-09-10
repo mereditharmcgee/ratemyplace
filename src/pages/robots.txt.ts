@@ -7,12 +7,16 @@ export function GET(context: APIContext): Response {
   const body = [
     'User-agent: *',
     'Allow: /',
-    'Disallow: /admin/',
-    'Disallow: /api/',
-    'Disallow: /auth/',
+    // Prefixes, not directories: no trailing slash, so each line also covers the bare path
+    // (`/admin` as well as `/admin/users`) instead of only what sits beneath it.
+    'Disallow: /admin',
+    'Disallow: /api',
+    'Disallow: /auth',
     'Disallow: /profile',
-    'Disallow: /review/',
+    'Disallow: /review',
     'Disallow: /dispute',
+    'Disallow: /email-verified',
+    'Disallow: /bug-report',
     '',
     `Sitemap: ${site}/sitemap.xml`,
     '',

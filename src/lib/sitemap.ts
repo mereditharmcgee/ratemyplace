@@ -13,15 +13,18 @@ export interface BuildingSitemapEntry {
   lastmod: number;
 }
 
-// The two LEFT JOINs are pre-grouped subqueries rather than a GROUP BY over the join, so
-// every building appears exactly once and the outer query needs no aggregate of its own.
-// `idx_record_pulls_building (building_id, source_id, retrieved_at)` serves the pull
-// subquery; `idx_reviews_building_status (building_id, status)` serves the review one.
+// Membership is a WHERE with an EXISTS, and the timestamps are correlated subqueries in the
+// select list. The earlier shape pre-grouped `record_pulls` and `reviews` into derived tables
+// and LEFT JOINed them, which scanned both tables in full on every chunk request and built a
+// transient automatic index over each; the correlated form runs the two MAX seeks only for the
+// rows actually emitted, because SQLite does not evaluate result-column subqueries for rows
+// skipped by OFFSET. `idx_record_pulls_building (building_id, source_id, retrieved_at)` serves
+// the pull seek; `idx_reviews_building_status (building_id, status)` serves both the EXISTS and
+// the review seek.
 const BUILDING_FROM = `
   FROM buildings b
-  LEFT JOIN (SELECT building_id, MAX(retrieved_at) AS last_pull FROM record_pulls GROUP BY building_id) rp ON rp.building_id = b.id
-  LEFT JOIN (SELECT building_id, MAX(created_at) AS last_review FROM reviews WHERE status = 'approved' GROUP BY building_id) rv ON rv.building_id = b.id
-  WHERE (b.city = 'Boston' AND b.parcel_id IS NOT NULL) OR rv.last_review IS NOT NULL`;
+  WHERE (b.city = 'Boston' AND b.parcel_id IS NOT NULL)
+     OR EXISTS (SELECT 1 FROM reviews r WHERE r.building_id = b.id AND r.status = 'approved')`;
 
 /**
  * How many `buildings-<n>.xml` chunks exist. Zero when nothing qualifies — the index lists
@@ -35,11 +38,20 @@ export async function buildingChunkCount(db: RecordsDb): Promise<number> {
 
 /** Chunk `n` (1-based) of the building URLs, ordered by id so chunk membership is stable between requests. */
 export async function buildingSitemapEntries(db: RecordsDb, n: number): Promise<BuildingSitemapEntry[]> {
-  // Scalar three-argument MAX(), not the aggregate: the largest of the three timestamps.
-  // It returns NULL if any argument is NULL, hence the COALESCEs over the outer-joined
-  // sides; `buildings.updated_at` is NOT NULL and needs none.
+  // Scalar three-argument MAX(), not the aggregate: the largest of the three timestamps. It
+  // returns NULL if any argument is NULL, hence the COALESCEs around the subqueries, which are
+  // NULL for a building with no pull or no approved review; `buildings.updated_at` is NOT NULL
+  // and needs none. The pull seek is deliberately not filtered to the deeper sources: the
+  // assessor pull's `retrieved_at` is the "as of" date the records panel shows, so it is
+  // exactly the date a crawler should read as this page's last modification.
   const { results } = await db
-    .prepare(`SELECT b.slug, MAX(b.updated_at, COALESCE(rp.last_pull, 0), COALESCE(rv.last_review, 0)) AS lastmod ${BUILDING_FROM} ORDER BY b.id LIMIT ? OFFSET ?`)
+    .prepare(
+      `SELECT b.slug,
+              MAX(b.updated_at,
+                  COALESCE((SELECT MAX(retrieved_at) FROM record_pulls p WHERE p.building_id = b.id), 0),
+                  COALESCE((SELECT MAX(created_at) FROM reviews r WHERE r.building_id = b.id AND r.status = 'approved'), 0)) AS lastmod
+       ${BUILDING_FROM} ORDER BY b.id LIMIT ? OFFSET ?`,
+    )
     .bind(SITEMAP_CHUNK, (n - 1) * SITEMAP_CHUNK)
     .all<BuildingSitemapEntry>();
   return results;
@@ -83,6 +95,10 @@ export function renderSitemapIndex(siteUrl: string, files: readonly string[]): s
 }
 
 export const SITEMAP_HEADERS = { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' };
+
+// A degraded answer is still a 200, so without a shorter TTL a five-second D1 blip would pin a
+// truncated index (or a landlord-less static file) in caches for the full hour.
+export const SITEMAP_DEGRADED_HEADERS = { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=60' };
 
 export function siteUrlFrom(env: { SITE_URL?: string } | undefined): string {
   return (env?.SITE_URL || 'https://ratemyplace.org').replace(/\/+$/, '');

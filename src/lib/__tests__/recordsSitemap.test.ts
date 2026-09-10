@@ -64,6 +64,18 @@ suite('sitemap', () => {
     expect(entry.lastmod).toBe(1_700_000_000);
   });
 
+  it('lastmod is the last pull when the pull is the newest of the three', async () => {
+    // The mirror of the case above: whichever of the three is newest has to win, so the pull
+    // subquery is not just along for the ride when a review happens to be later.
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'a', slug: 'a', parcel_id: '1' });
+    await db.prepare("UPDATE buildings SET updated_at = 1600000000 WHERE id = 'a'").run();
+    await review(db, 'a', 1_650_000_000);
+    await pull(db, 'a', 1_700_000_000);
+    const [entry] = await buildingSitemapEntries(db, 1);
+    expect(entry.lastmod).toBe(1_700_000_000);
+  });
+
   it('falls back to updated_at when a building has no pull and no approved review', async () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'a', slug: 'a', parcel_id: '1' });
@@ -93,8 +105,9 @@ suite('sitemap', () => {
     await db.prepare("INSERT INTO landlords (id, name, slug) VALUES ('l1', 'A', 'a'), ('l2', 'B', 'b')").run();
     await insertBuilding(db, { id: 'x', slug: 'x' });
     await db.prepare("UPDATE buildings SET landlord_id = 'l1' WHERE id = 'x'").run();
+    await review(db, 'x', 1_650_000_000);
     await review(db, 'x', 1_700_000_000);
-    expect((await landlordSitemapEntries(db)).map((e) => e.slug)).toEqual(['a']);
+    expect(await landlordSitemapEntries(db)).toEqual([{ slug: 'a', lastmod: 1_700_000_000 }]);
   });
 
   it('renders valid XML with escaped locations and ISO dates', () => {
@@ -150,6 +163,8 @@ suite('sitemap routes', () => {
   it('serves the static file with the allowlisted pages and reviewed landlords', async () => {
     const res = await staticGet(createContext(await seeded(), '/sitemaps/static.xml'));
     expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('application/xml; charset=utf-8');
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=3600');
     const body = await res.text();
     expect(body).toContain(`<loc>${SITE}/about</loc>`);
     expect(body).toContain(`<loc>${SITE}/</loc>`);
@@ -171,13 +186,26 @@ suite('sitemap routes', () => {
     expect((await buildingsGet(createContext(db, '/sitemaps/buildings-x.xml', { n: 'x' }))).status).toBe(404);
   });
 
+  it('404s a chunk number past the bound without touching D1', async () => {
+    // A plain 404, not a 503: an out-of-range n must not reach the query at all. The huge
+    // value used to overflow the OFFSET bind and surface as a 503 with a log line.
+    const db = await seeded();
+    expect((await buildingsGet(createContext(db, '/sitemaps/buildings-10000.xml', { n: '10000' }))).status).toBe(404);
+    const huge = await buildingsGet(createContext(db, '/sitemaps/buildings-99999999999999999999.xml', { n: '99999999999999999999' }));
+    expect(huge.status).toBe(404);
+  });
+
   it('serves robots.txt naming the index and disallowing the private trees', async () => {
     const res = robotsGet(createContext(null, '/robots.txt'));
     expect(res.status).toBe(200);
     expect(res.headers.get('Content-Type')).toBe('text/plain; charset=utf-8');
     const text = await res.text();
     expect(text).toContain(`Sitemap: ${SITE}/sitemap.xml`);
-    expect(text).toContain('Disallow: /admin/');
+    // Prefixes without a trailing slash, so each line covers the bare path as well as the
+    // tree beneath it. Matching whole lines, not substrings, is what proves the slash is gone.
+    for (const prefix of ['/admin', '/api', '/auth', '/profile', '/review', '/dispute', '/email-verified', '/bug-report']) {
+      expect(text.split('\n')).toContain(`Disallow: ${prefix}`);
+    }
     expect(text).toContain('Allow: /');
   });
 
@@ -191,14 +219,18 @@ suite('sitemap routes', () => {
     };
     const index = await indexGet(createContext(broken, '/sitemap.xml'));
     expect(index.status).toBe(200);
+    // A minute, not an hour: a brief blip must not pin the truncated index in caches.
+    expect(index.headers.get('Cache-Control')).toBe('public, max-age=60');
     expect(await index.text()).toContain('static.xml');
 
     const statics = await staticGet(createContext(null, '/sitemaps/static.xml'));
     expect(statics.status).toBe(200);
+    expect(statics.headers.get('Cache-Control')).toBe('public, max-age=60');
     expect(await statics.text()).toContain(`<loc>${SITE}/about</loc>`);
 
     const chunk = await buildingsGet(createContext(null, '/sitemaps/buildings-1.xml', { n: '1' }));
     expect(chunk.status).toBe(503);
     expect(chunk.headers.get('Retry-After')).toBe('300');
+    expect(chunk.headers.get('Cache-Control')).toBe(null);
   });
 });

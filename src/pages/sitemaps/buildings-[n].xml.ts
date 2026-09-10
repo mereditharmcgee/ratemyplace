@@ -4,7 +4,10 @@ import { logError } from '../../lib/logger';
 import { getEnv } from '../../lib/runtime';
 import { SITEMAP_HEADERS, buildingSitemapEntries, renderUrlSet, siteUrlFrom, type BuildingSitemapEntry } from '../../lib/sitemap';
 
-const CHUNK_NUMBER = /^[1-9]\d*$/;
+// Bounded at four digits (9999 chunks, ~100M URLs) rather than open-ended. An unbounded `n`
+// let any bot URL run the full sitemap query for an uncacheable 404, and values above 2^53
+// failed the OFFSET bind, surfacing as a 503 plus a log line instead of a plain 404.
+const CHUNK_NUMBER = /^[1-9]\d{0,3}$/;
 
 function notFound(): Response {
   return new Response('Not found\n', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
