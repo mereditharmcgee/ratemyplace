@@ -109,9 +109,24 @@ release), not part of this deploy. See the next section.
 ## Turning the city-wide fill on for the first time
 
 The Worker ships paused. Once the C3 site release is live (search, the records button, the
-sitemap), turn the fill on once, deliberately: open `/admin/records`, confirm the fixture
-line reads "All checks passed" with today's date, then press **Resume fill**. Within a
-minute `records_drain` lines start showing `pulled: 1` and `fillPaused: false`.
+sitemap), turn the fill on once, deliberately.
+
+**Step 0, before anything else: apply migration `0033` by hand.** It indexes
+`records_queue(reason, requested_at)`, which is the records button's rolling daily-cap count
+over a table whose `button` rows are never purged. It is idempotent, and it is the one
+migration on this branch that production does not have yet.
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --file migrations/0033_records_queue_reason_requested.sql
+
+# Verify — this must return the index name, not an empty result
+npx wrangler d1 execute ratemyplace-db --remote --command \
+  "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_records_queue_reason_requested'"
+```
+
+Then open `/admin/records`, confirm the fixture line reads "Fixture: all N checks passed at
+<date>" with today's date, and press **Resume fill**. Within a minute `records_drain` lines
+start showing `pulled: 1` and `fillPaused: false`.
 
 Watch three numbers on the first day:
 
@@ -144,9 +159,10 @@ If the 06:00 planner pauses the fill and emails, read the email before resuming 
   hours with the fill running means the drain has stopped; check the Worker's Cron Events
   tab for red rows.
 - **Fixture** — the last daily Lanark fixture result, from
-  `app_settings.records_fixture_last`. "All checks passed" plus a timestamp from this
-  morning is the healthy state. A timestamp more than a day old means the planner did not
-  run.
+  `app_settings.records_fixture_last`. The healthy state is a line reading "Fixture: all N
+  checks passed at <date>" — the panel names the number of checks out loud, because "nothing
+  failed" is also true of a run where nothing ran — with a timestamp from this morning. A
+  timestamp more than a day old means the planner did not run.
 
 ## The breaker email, and unpausing
 

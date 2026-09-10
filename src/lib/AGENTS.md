@@ -227,25 +227,34 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   and ANDs across terms, so "comm ave" matches both `Avenue` and `Ave` in stored addresses
   without matching a building that has neither. Consumed by `searchSql.ts`.
 - **`coverage.ts` is the page-state table, read-only.** `recordsRequestState` answers
-  `ineligible` / `pulled` / `requested` / `fill_queued` / `never_pulled` in that precedence,
-  in **one** statement (two indexed `building_id` seeks as correlated subqueries), because
-  the public endpoint calls it once per request; `hasDeeperPull` and `pendingQueueReason`
-  stay exported for callers that need one answer without the other. Eligibility is
-  `jurisdictionForCity`, not a string compare on 'Boston'. `DEEPER_SOURCE_IDS` lives here
-  and `scheduler.ts` re-exports it — do not move it back.
+  `ineligible` / `pulled` / `parked` / `requested` / `fill_queued` / `never_pulled` in that
+  precedence, in **one** statement (indexed `building_id` seeks as correlated subqueries),
+  because the public endpoint calls it once per request; `hasDeeperPull` and
+  `pendingQueueReason` stay exported for callers that need one answer without the other.
+  Eligibility is `jurisdictionForCity`, not a string compare on 'Boston'. `DEEPER_SOURCE_IDS`
+  lives here and `scheduler.ts` re-exports it — do not move it back.
+- **`parked` exists because a row at `MAX_ATTEMPTS` is still `done_at IS NULL`.** Without it
+  the panel reads such a row as `requested` and tells the reader to reload a page that will
+  not change until a human looks, so it is resolved **before** the `fill_queued` and
+  `requested` branches. It is a page state, not a refusal: `POST /api/records/request` lets
+  it fall through to `enqueue` exactly as `requested` does, which answers `already_queued`
+  against a parked button, follower or refresh row and replaces a parked `fill` row.
 - **`request.ts` holds the button's limits, not the route.** Three presses an hour per IP
   (`REQUEST_PER_IP`) and 300 button rows a day site-wide (`REQUEST_DAILY_CAP`) over a
   **rolling** 24 hours, counted from `records_queue` because button rows are never purged.
   `Retry-After` on the cap branch is computed from the oldest counted row, so the number it
   gives is the real wait rather than a fixed guess. The numbers live here so the route, its
   tests, and the privacy-page copy cannot fork.
-- **`dedupe.ts` refuses rather than guesses.** `findBuildingByAddress` runs place id →
-  Boston address key plus range containment under the parity rule → ZIP tiebreak → exact
-  address/city, and returns null (create a page) whenever the answer is not forced: several
-  candidates spanning different ZIPs with no input ZIP, or a lone candidate whose ZIP
-  disagrees with the input. Among survivors: a user row before its seeded twin, then the
-  narrower span, then the oldest. The candidate span bound (100 numbers) applies to
-  user-entered rows **only** — six real seeded parcels are wider, up to 628 at
+- **`dedupe.ts` refuses rather than guesses — and the tier order is the route's, not the
+  module's.** `POST /api/buildings` runs three tiers: an exact Google **place id**, then
+  `findBuildingByAddress`, then an exact case-insensitive **(address, city)** for a manual
+  entry with no place id. Only the middle tier is in `dedupe.ts`, and inside it the order is
+  Boston address key plus range containment under the parity rule → ZIP tiebreak → survivor
+  ranking: a user row before its seeded twin, then the narrower span, then the oldest.
+  `findBuildingByAddress` itself returns **null** (the route creates a page) whenever it
+  cannot decide: no candidate, several candidates spanning different ZIPs with no input ZIP,
+  or a lone candidate whose ZIP disagrees with the input. The candidate span bound (100
+  numbers) applies to user-entered rows **only** — six real seeded parcels are wider, up to 628 at
   `10-638 Georgetowne Dr`, and the assessor's range *is* the parcel.
 - **`stripTrailingLocality` is called by `addressKey` and `buildIdentity`, not
   `streetKey`.** It removes a comma-less trailing "Boston" / neighborhood / "MA" / ZIP tail

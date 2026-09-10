@@ -325,9 +325,12 @@ Things that have already cost time. Read before debugging.
   in `src/lib/sitemap.ts`; a new public page is not in the sitemap until it is added there.
 - **Never call `turnstile.reset()` from a callback that submits.** A reset re-runs the
   challenge, which re-fires the callback, which submits again — an unbounded POST loop
-  against your own endpoint. Reset only after a failed POST (tokens are single-use), and
-  gate any submitting callback on a press flag so an auto-solve cannot post on its own. See
-  `src/components/records/RecordsRequestButton.tsx`.
+  against your own endpoint. Tokens are single-use, so a stale one has to go somehow: reset
+  on the next press instead (`renderWidget` in
+  `src/components/records/RecordsRequestButton.tsx`, whose success callback posts), or after
+  a failed POST only where the callback merely stores the token —
+  `src/components/records/RecordCorrectionForm.tsx` is that shape. Either way, gate a
+  submitting callback on a press flag so an auto-solve cannot post on its own.
 - **`buildings.updated_at` feeds sitemap `lastmod`.** Do not bump it on a no-op write; a
   write-through that stamps nothing new would move a page's date for every crawler with no
   content change behind it. `POST /api/buildings` only stamps a matched row when it has

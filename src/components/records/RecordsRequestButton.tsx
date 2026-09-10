@@ -14,9 +14,11 @@ import {
 // a widget. It posts the token to /api/records/request, which enqueues one pull for the
 // companion Worker. Every string comes from display.ts so the banned-words scan sees it.
 //
-// Window.turnstile is declared globally by DisputeForm.tsx / ContactForm.tsx and TypeScript
-// merges that augmentation across the project, so — as in RecordCorrectionForm.tsx — this
-// file uses it without redeclaring it.
+// Window.turnstile is declared globally by three components — ContactForm.tsx,
+// DisputeForm.tsx and ConfirmStep.tsx, each carrying an identical copy — and TypeScript
+// merges those augmentations across the project, so this file uses it without redeclaring
+// it, as RecordCorrectionForm.tsx does. One ambient declaration in src/env.d.ts is an open
+// follow-up; a fourth copy here would be one more thing to move when that lands.
 
 const TURNSTILE_SITEKEY = '0x4AAAAAACo4KpkxsacPhM2r';
 

@@ -355,6 +355,26 @@ Endpoint guards, in order: JSON content type; `checkRateLimit(db, ip, 'records_r
 >
 > **The coverage read is isolated from the panel read** in `BuildingRecords.astro`: a coverage
 > failure costs the button, not the ledger.
+>
+> **A sixth page state, `parked`,** added in review. The state table above has no row for a
+> queue row that used all `MAX_ATTEMPTS` of its claims: such a row keeps `done_at IS NULL`, so
+> `requested` reported it as work in flight and the panel told the reader to reload a page that
+> would not change until a human looked. `parked` is resolved ahead of the `fill_queued` and
+> `requested` branches, renders `REQUEST_PARKED_COPY` ("These records could not be retrieved
+> yet. The request is queued for another attempt."), and offers no button. The endpoint treats
+> it exactly like `requested` — it is a page state, not a refusal, so a press from a stale page
+> falls through to `enqueue` rather than meeting a 404 or a 409.
+>
+> **The follower enqueue on save is rate-limited at the save**, 20 an hour per user
+> (`building-save`, the same budget as `building-create`). It is a priority-0 queue row asked
+> for with no Turnstile and no daily cap, so nothing else could bound it; `DELETE` is untouched.
+>
+> **The daily cap needed an index.** Its count is
+> `WHERE reason = 'button' AND requested_at >= ?` over a table whose `button` rows are never
+> purged, and neither 0031 nor 0032 covers those two columns, so every unauthenticated press
+> scanned a growing table. Migration **0033** adds `idx_records_queue_reason_requested`; it is
+> idempotent, is **not yet applied to production**, and must be applied by hand before the
+> city-wide fill is unpaused.
 
 ## Section 5: Search and reviewer flow
 
@@ -429,7 +449,7 @@ On a match: set `google_place_id`, and `latitude`/`longitude` if null, and retur
 **Docs and policy text in the same release:**
 - `ops/growth/STRATEGY.md`: dated decision-log entry lifting the reader-first deferral for Boston.
 - `.planning/milestones/v1.6.0-ROADMAP.md`: retire the "neighborhood content farms" deferral with a pointer here.
-- `/methodology`, under "Public records are not scored": the refresh rule. Buildings with a review, a follower, or a reader request refresh monthly; every other Boston building is pulled once in the city-wide pass and refreshed yearly; every value shows its own "as of" date.
+- `/methodology`, under "Public records are not scored": the refresh rule. Buildings with a review, a follower, or a reader request refresh monthly; every other Boston building is pulled once in the city-wide pass and is refreshed after that only if it gains a review or a follower (see the C3 amendment below — the "refreshed yearly" this line originally promised does not exist); every value shows its own "as of" date.
 - `/privacy`: pressing the records button stores the building and the time, not who pressed it; the IP rate limit is the existing one.
 - `MASTER.md`; root `AGENTS.md` traps (second deployable, fill pause flag, never re-pull on demand); `migrations/AGENTS.md` (0031 by hand); `src/lib/AGENTS.md` (queue module).
 
@@ -478,6 +498,14 @@ On a match: set `google_place_id`, and `latitude`/`longitude` if null, and retur
 > `stripTrailingLocality`, `searchSql.ts`, `buildingMeta.ts`, `sitemap.ts` and
 > `isBostonLocality`; and a runbook section on turning the city-wide fill on for the first
 > time. The strategy entry is dated **2026-09-10**.
+>
+> **There is no yearly refresh, and `/methodology` now says so.** The docs line above promised
+> one; nothing built implements it. `planRefresh` only ever considers the interest set (an
+> approved review, a saved follower, or a finished `button` pull) at 30 days, and `topUpFill`
+> skips any building whose deeper pull came back `ok` or `empty` — so a building the city-wide
+> pass has answered is never re-entered by either planner. The methodology text is the true
+> rule: pulled once in the city-wide pass, and refreshed after that only if the building gains
+> a review or a saved follower, which puts it on the monthly cycle.
 
 ## Section 7: Testing, failure modes, split
 
