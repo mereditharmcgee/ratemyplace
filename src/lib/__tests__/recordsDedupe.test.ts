@@ -40,11 +40,19 @@ suite('findBuildingByAddress', () => {
     expect(await findBuildingByAddress(db, { address: '15 Gordon St', city: 'Boston', zip: null })).toEqual({ id: 'g1', slug: 'g1-slug' });
   });
 
-  it('ignores a candidate whose number span is implausibly wide', async () => {
+  it('ignores a user-entered candidate whose number span is implausibly wide', async () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'wide', address: '2-9998 Washington St', slug: 'wide-slug', source: 'user', street_key: 'WASHINGTON ST', st_num_lo: 2, st_num_hi: 9998 });
     await insertBuilding(db, { id: 'real', address: '100 Washington St', slug: 'real-slug', source: 'seed', street_key: 'WASHINGTON ST', st_num_lo: 100, st_num_hi: 100 });
     expect(await findBuildingByAddress(db, { address: '100 Washington St', city: 'Boston', zip: null })).toEqual({ id: 'real', slug: 'real-slug' });
+  });
+
+  it('keeps a seeded parcel whose span is wider than the user-row bound', async () => {
+    // The widest real parcel in the seed: 628 numbers of subsidized housing on one parcel.
+    // Bounding it would strand every reviewer who lives there on a duplicate page.
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'georgetowne', address: '10-638 Georgetowne Dr', slug: '10-638-georgetowne-dr-boston', source: 'seed', street_key: 'GEORGETOWNE DR', st_num_lo: 10, st_num_hi: 638 });
+    expect(await findBuildingByAddress(db, { address: '300 Georgetowne Dr', city: 'Boston', zip: null })).toEqual({ id: 'georgetowne', slug: '10-638-georgetowne-dr-boston' });
   });
 
   it('prefers a user row over a seeded twin on the same range and ZIP, even without a ZIP in the input', async () => {

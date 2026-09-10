@@ -33,15 +33,19 @@ export async function findBuildingByAddress(db: RecordsDb, input: DedupeInput): 
   // the fix belongs in a city-normalization pass over `buildings`, not in a LOWER() here
   // that would drop the index.
   //
-  // `st_num_hi - st_num_lo <= 100` bounds how wide a candidate's number span may be. No
-  // real assessor parcel range comes anywhere near 100 numbers, so a span that wide is a
-  // data entry mistake, not a building. Without the bound, one wide user row
-  // ("2-9998 Washington St") would contain every number on the street and attract every
-  // reviewer on it. `seed/match.ts` reaches the same conclusion from the other side: it
-  // treats that shape as undecidable rather than a match.
+  // The span bound applies to user-entered rows only. The assessor's own ranges do go very
+  // wide: `10-638 Georgetowne Drive` (a subsidized-housing development) spans 628 numbers,
+  // and six seeded parcels exceed 100 — that one plus `408-826 Border St` (418),
+  // `543-707 Georgetowne Dr` (164), `260-400 Mt Vernon St` (140), `124-226 Sherman Rd` and
+  // `223-325 Columbia Rd` (102 each). Bounding those would strand every reviewer who lives
+  // inside them, so seeded rows are never bounded: the assessor's range *is* the parcel. A
+  // user-entered row carries no such authority — a span wider than any real parcel
+  // ("2-9998 Washington St") is data entry, and unbounded it would contain every number on
+  // the street and attract every reviewer on it. `seed/match.ts` reaches the same conclusion
+  // from the other side: it treats that shape as undecidable rather than a match.
   const { results } = await db
     .prepare(
-      "SELECT id, slug, source, st_num_lo, st_num_hi, zip_code, created_at FROM buildings WHERE city = 'Boston' AND street_key = ? AND st_num_lo IS NOT NULL AND st_num_hi IS NOT NULL AND st_num_hi - st_num_lo <= 100",
+      "SELECT id, slug, source, st_num_lo, st_num_hi, zip_code, created_at FROM buildings WHERE city = 'Boston' AND street_key = ? AND st_num_lo IS NOT NULL AND st_num_hi IS NOT NULL AND (source = 'seed' OR st_num_hi - st_num_lo <= 100)",
     )
     .bind(key.streetKey)
     .all<CandidateRow>();
@@ -61,6 +65,9 @@ export async function findBuildingByAddress(db: RecordsDb, input: DedupeInput): 
     // repeats street names across neighborhoods: two "15 Gordon St" parcels) and only the
     // ZIP can separate them, or they are twins on one ZIP (a user row and its seeded
     // double) and the user-first sort below picks the page that already has the reviews.
+    // With an input ZIP and several candidates that all lack one, the filter empties and the
+    // function refuses — deliberately stricter than the lone-candidate rule above, because
+    // several rows on one street and number is exactly the case where guessing is wrong.
     if (zip) contained = contained.filter((row) => zip5(row.zip_code) === zip);
     else {
       const zipsSeen = new Set(contained.map((row) => zip5(row.zip_code)));

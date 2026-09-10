@@ -105,6 +105,19 @@ suite('POST /api/buildings with seeded dedupe', () => {
     expect(await updatedAt(db, 'seed-1')).toBe(before);
   });
 
+  it('stamps only the columns the seeded row is missing, keeping the place id it already has', async () => {
+    // COALESCE is per column, so a row holding a place id but no coordinates gains the
+    // coordinates and keeps its own place id — the later place id lands on this same row
+    // through the address tier anyway, so the outcome stays idempotent.
+    await stampSeed(db, { placeId: 'gp-old', lat: null, lng: null, updatedAt: 1_700_000_000 });
+    const res = await POST(createContext(db, { placeId: 'gp-new', streetAddress: '25 Lanark Rd', city: 'Boston', state: 'MA', zipCode: '02135', latitude: 42.34, longitude: -71.15 }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).building.id).toBe('seed-1');
+    const seed = (await rows(db)).find((r) => r.id === 'seed-1');
+    expect(seed).toMatchObject({ google_place_id: 'gp-old', latitude: 42.34, longitude: -71.15 });
+    expect(await updatedAt(db, 'seed-1')).toBeGreaterThan(1_700_000_000);
+  });
+
   it('a manual entry with no place id and no coordinates does not bump updated_at', async () => {
     await stampSeed(db, { placeId: null, lat: null, lng: null, updatedAt: 1_700_000_000 });
     const before = await updatedAt(db, 'seed-1');
@@ -114,6 +127,13 @@ suite('POST /api/buildings with seeded dedupe', () => {
     expect(await updatedAt(db, 'seed-1')).toBe(before);
   });
 
+  // Two paths through the insert have no test here, both for want of a way to reach them:
+  //  - the UNIQUE retry itself needs a row to appear between `nextFreeSlug`'s read and the
+  //    insert, and nothing can interleave a write into that synchronous stretch.
+  //  - a non-slug UNIQUE error (the partial unique index 0002 puts over `google_place_id`)
+  //    cannot be provoked through POST: a duplicate place id is caught by the place-id tier
+  //    at the top and returned as a match long before any insert. The stub schema does not
+  //    carry that index either.
   it('a slug collision gets -2, -3', async () => {
     await insertBuilding(db, { id: 'taken', address: '9 Pine St', slug: '9-pine-st-cambridge', city: 'Cambridge' });
     const res = await POST(createContext(db, { streetAddress: '9 Pine St.', city: 'Cambridge', state: 'MA', zipCode: null }));

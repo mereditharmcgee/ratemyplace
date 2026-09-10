@@ -272,8 +272,13 @@ export async function POST(context: APIContext): Promise<Response> {
       // same address can both settle on `-2` and the loser trips the UNIQUE index on
       // `slug`. Re-count from the slug we just lost and insert once more; a second failure
       // falls through to the generic 500 rather than spinning under contention.
+      //
+      // Only a slug collision is retryable, hence the check on the constraint name as well
+      // as on UNIQUE. `slug` is not the only unique column: 0002 adds a partial unique index
+      // over `google_place_id`, and re-counting the slug would do nothing for a place-id
+      // collision — the same insert would fail the same way, so it falls straight to the 500.
       const message = error instanceof Error ? error.message : String(error);
-      if (!/UNIQUE/i.test(message)) throw error;
+      if (!/UNIQUE/i.test(message) || !/slug/i.test(message)) throw error;
       slug = await nextFreeSlug(slug);
       await insertWithSlug(slug);
     }
