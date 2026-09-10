@@ -115,6 +115,10 @@ export default function RecordsRequestButton({ buildingId, initialState }: Props
         // This callback is the first render's closure and keeps it for the life of the widget,
         // which is only safe because `submit` reads refs, state setters, and the `buildingId`
         // prop that never changes — never a value off a later render. Keep it that way.
+        //
+        // `handleWidgetFailure` below is under the same rule, and for the same reason: only
+        // the first effect run's instance is ever registered with the widget, so it too must
+        // read nothing but refs and state setters.
         callback: (token: string) => {
           if (!awaitingTokenRef.current) return;
           awaitingTokenRef.current = false;
