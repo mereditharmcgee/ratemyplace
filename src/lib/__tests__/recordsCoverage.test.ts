@@ -26,6 +26,7 @@ async function insertPull(
 suite('coverage', () => {
   it('lists the five non-assessor sources and scheduler re-exports the same array', () => {
     expect(DEEPER_SOURCE_IDS).toHaveLength(5);
+    expect(DEEPER_SOURCE_IDS).not.toContain(FY2026_RESOURCE_ID);
     expect(SCHEDULER_DEEPER).toBe(DEEPER_SOURCE_IDS);
   });
 
@@ -82,13 +83,10 @@ suite('coverage', () => {
     expect(await pendingQueueReason(db, id)).toBe('follower');
     expect(await recordsRequestState(db, id)).toBe('requested');
 
-    // Direct insert, not `enqueue`: refresh is a worse priority than the pending follower
-    // row, so `enqueue` would answer `already_queued` and leave the follower in place.
+    // The follower row goes first: refresh is a worse priority, so against a pending
+    // follower `enqueue` would answer `already_queued` and leave the follower in place.
     await db.prepare('DELETE FROM records_queue WHERE building_id = ?').bind(id).run();
-    await db
-      .prepare("INSERT INTO records_queue (building_id, reason, priority, requested_at) VALUES (?, 'refresh', 1, ?)")
-      .bind(id, 1_001)
-      .run();
+    await enqueue(db, { buildingId: id, reason: 'refresh', now: 1_001 });
     expect(await pendingQueueReason(db, id)).toBe('refresh');
     expect(await recordsRequestState(db, id)).toBe('requested');
   });
