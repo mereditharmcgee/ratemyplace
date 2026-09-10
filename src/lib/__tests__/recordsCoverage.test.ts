@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { sqliteAvailable } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding, insertPull } from './helpers/recordsDb';
@@ -125,9 +127,12 @@ suite('coverage', () => {
 
   // The empty-list guard `queue.ts` already applies to both planners: an empty
   // `DEEPER_SOURCE_IDS` would make every coverage test here go silently false the same way.
-  it('shares the queue module\'s empty-source-list guard', () => {
-    expect(typeof requireDeeperSourceIds).toBe('function');
+  it('shares the queue module\'s empty-source-list guard at both read sites', () => {
     expect(() => requireDeeperSourceIds('test', [])).toThrow(/must not be empty/);
+    // The guard only protects coverage if coverage calls it. A source scan is what pins
+    // that: the queue helper's own tests already prove what the guard does.
+    const source = readFileSync(join(process.cwd(), 'src/lib/records/coverage.ts'), 'utf8');
+    expect((source.match(/requireDeeperSourceIds\(/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 
   it('recordsRequestState accepts the city spellings the pull path accepts', async () => {

@@ -41,6 +41,10 @@ describe('search page and results endpoint stay aligned', () => {
     for (const [name, source] of [['search.astro', page], ['results.ts', endpoint]] as const) {
       expect(source, `${name} must run validateSearch on the query`).toMatch(/validateSearch\(/);
     }
+    // A bare identifier match would survive computing the verdict and never reading it. The
+    // two gates that make a rejected query reach neither the search branch nor browse mode:
+    expect(page, 'the search branch must be gated on the length verdict').toMatch(/query\s*&&\s*!searchRejected/);
+    expect(page, 'browse mode must not catch a rejected query').toMatch(/else\s+if\s*\(\s*!query\s*\)/);
   });
 
   // The page held eight: buildings and landlords, count and rows, in each of search and

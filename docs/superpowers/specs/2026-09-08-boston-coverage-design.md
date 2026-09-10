@@ -361,7 +361,7 @@ Endpoint guards, in order: JSON content type; `checkRateLimit(db, ip, 'records_r
 > `requested` reported it as work in flight and the panel told the reader to reload a page that
 > would not change until a human looked. `parked` is resolved ahead of the `requested`
 > branch, renders `REQUEST_PARKED_COPY` ("These records could not be retrieved
-> yet. The request is queued for another attempt."), and offers no button. The endpoint treats
+> yet. The request has been set aside for a closer look."), and offers no button. The endpoint treats
 > it exactly like `requested` — it is a page state, not a refusal, so a press from a stale page
 > falls through to `enqueue` rather than meeting a 404 or a 409. **A parked `fill` row is the
 > exception and still reads `fill_queued`, button included** — `enqueue` replaces it with a fresh

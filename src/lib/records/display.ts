@@ -273,11 +273,12 @@ export const REQUESTED_COPY = 'Records requested. They usually appear within a f
 export const FILL_QUEUED_COPY = 'Queued for the city-wide pass.';
 /**
  * The queue row for this building used up its claims, so nothing will happen to it until a
- * human looks. `REQUESTED_COPY` would keep telling the reader to reload a page that is not
- * going to change, so this says what is true and stops asking.
+ * human retries it from the admin panel, where parked rows are listed. `REQUESTED_COPY`
+ * would keep telling the reader to reload a page that is not going to change, so this says
+ * what is true — the request stands, set aside for a person — and stops asking.
  */
 export const REQUEST_PARKED_COPY =
-  'These records could not be retrieved yet. The request is queued for another attempt.';
+  'These records could not be retrieved yet. The request has been set aside for a closer look.';
 export const REQUEST_ALREADY_PULLED_COPY = 'These records have already been retrieved. Reload to see them.';
 export const REQUEST_FAILED_COPY = 'The request did not go through. Please try again.';
 
