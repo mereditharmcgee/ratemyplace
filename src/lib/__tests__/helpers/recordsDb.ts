@@ -5,9 +5,11 @@ import { createMemoryDatabase, TestD1Database } from './sqliteD1';
 /**
  * Minimal schema for records tests: the parent tables the 0029/0030 migrations
  * reference, plus the two tables the queue planner reads (`reviews.building_id`
- * and `status`, `saved_buildings.building_id`). Column names mirror the real
- * migrations (0001, 0023); the unused columns are left out. Keeps tests honest
- * about the SQL that ships without applying all 33 migrations.
+ * and `status`, `saved_buildings.building_id`), plus what the review-moderation
+ * route touches on its way to the approval enqueue (`reviews.user_id`,
+ * `moderation_notes`, `updated_at`, and `notifications`). Column names mirror the
+ * real migrations (0001, 0021, 0023); the unused columns are left out. Keeps tests
+ * honest about the SQL that ships without applying all 33 migrations.
  */
 export function createRecordsStubDb(): TestD1Database {
   const db = new TestD1Database(createMemoryDatabase());
@@ -54,10 +56,29 @@ export function createRecordsStubDb(): TestD1Database {
     );
     CREATE TABLE reviews (
       id TEXT PRIMARY KEY,
+      -- Nullable where 0001 has it NOT NULL: the planner and sitemap tests insert reviews by
+      -- name without an author, and only the moderation route needs the join to users.
+      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
       building_id TEXT NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
       status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'flagged')),
+      moderation_notes TEXT,
       overall_score REAL,
       move_out_year_new TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+    -- Mirrors migration 0021. The moderation route notifies the review's author on approve
+    -- and reject, and createNotification swallows its own errors — without the table the
+    -- approval still succeeds but logs, which would mask the records log a test asserts on.
+    CREATE TABLE notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL CHECK (event_type IN (
+        'review_approved', 'review_rejected', 'review_disputed', 'dispute_resolved'
+      )),
+      review_id TEXT REFERENCES reviews(id) ON DELETE CASCADE,
+      message TEXT NOT NULL,
+      read_at INTEGER,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     );
     CREATE TABLE landlords (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL);

@@ -378,6 +378,20 @@ Endpoint guards, in order: JSON content type; `checkRateLimit(db, ip, 'records_r
 > idempotent, is **not yet applied to production**, and must be applied by hand before the
 > city-wide fill is unpaused.
 
+> **Addendum 2026-09-12 — approval is the third enqueue caller:** the table above left a hole
+> the follow-ups list carried open. A review approved before the city-wide pass reaches its
+> seeded building had no first-pull trigger — `planRefresh` treats an approved review as
+> interesting but only re-pulls buildings that already have a deeper pull, so the page showed a
+> live review beside four "Not retrieved yet" rows until the fill arrived. `PATCH
+> /api/admin/reviews/[id]` now enqueues a `follower` row when `recordsRequestState` reads
+> `never_pulled`, on exactly the terms the save uses: `follower` is reused rather than a new
+> `QueueReason` (a new one needs a migration for `records_queue`'s CHECK constraint and would
+> sit at the same priority 0), a pending `fill` row is **not** promoted, and the block is
+> isolated in its own try/catch logging `records_review_approval_enqueue_failed`, so a queue
+> failure never turns a completed approval into an error. Only the approval fires it —
+> submission starts a review `pending`, the reviewer's own edit sends it back to `pending`, and
+> rejection, flagging and verification approval enqueue nothing.
+
 ## Section 5: Search and reviewer flow
 
 **Search.** Remove `HAVING COUNT(r.id) > 0` from the search page and `/api/search/results`; the parity test keeps them aligned. Order: buildings with approved reviews first in today's order, then the rest by address. Seeded results show "No reviews yet · city records" in the score position. Before matching, the query is normalized by a new `normalizeSearchQuery` in `src/lib/`: punctuation stripped and common suffix abbreviations expanded from the identity suffix table, so "1027 comm ave" matches "1027 Commonwealth Avenue". A leading-wildcard `LIKE` over 38,000 rows is milliseconds in SQLite; no new index for search.

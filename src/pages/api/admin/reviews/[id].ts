@@ -5,6 +5,10 @@ import { createAuditLog } from '../../../../lib/audit';
 import { getClientIP } from '../../../../lib/rateLimit';
 import { createNotification } from '../../../../lib/notifications';
 import { sendReviewRejectedEmail } from '../../../../lib/email';
+import { logError } from '../../../../lib/logger';
+import { errorMessage } from '../../../../lib/records/errors';
+import { recordsRequestState } from '../../../../lib/records/coverage';
+import { enqueue } from '../../../../lib/records/queue';
 
 export async function PATCH(context: APIContext): Promise<Response> {
   // Require authentication
@@ -45,8 +49,12 @@ export async function PATCH(context: APIContext): Promise<Response> {
 
     const db = getDB(context);
 
-    // Check if review exists and get current status (for audit log)
-    const review = await db.prepare('SELECT id, status FROM reviews WHERE id = ?').bind(reviewId).first();
+    // Check if review exists and get current status (for audit log). `building_id` comes
+    // along for the records enqueue at the bottom of the approval branch.
+    const review = await db
+      .prepare('SELECT id, status, building_id FROM reviews WHERE id = ?')
+      .bind(reviewId)
+      .first<{ id: string; status: string; building_id: string }>();
     if (!review) {
       return new Response(JSON.stringify({ error: 'Review not found' }), {
         status: 404,
@@ -133,6 +141,36 @@ export async function PATCH(context: APIContext): Promise<Response> {
               console.warn('RESEND_API_KEY not configured - skipping review rejected email');
             }
           }
+        }
+      }
+
+      // An approval is the third "someone cares about this building" signal, alongside the
+      // reader-facing button and a save: the review goes live next to four "Not retrieved
+      // yet" rows unless the Worker is asked for the deeper records now, and `planRefresh`
+      // will not ask — it only re-pulls buildings that already have a deeper pull, so a
+      // seeded building approved before the city-wide pass reaches it waits weeks. Enqueue
+      // once, and only when the building is eligible, has no deeper records yet, and nobody
+      // (button, follower, or the city-wide pass) has asked already. A pending fill row is
+      // deliberately not promoted, for the same reason as `save.ts`: this path carries no
+      // Turnstile and no daily cap, so promotion would be an uncapped route to priority 0.
+      // `follower` is reused rather than a new reason — a new one needs a migration for
+      // `records_queue`'s CHECK constraint, and the priority is the same. Isolated so a
+      // queue hiccup cannot turn a completed approval into a 500.
+      if (status === 'approved') {
+        try {
+          if ((await recordsRequestState(db, review.building_id)) === 'never_pulled') {
+            await enqueue(db, {
+              buildingId: review.building_id,
+              reason: 'follower',
+              now: Math.floor(Date.now() / 1000),
+            });
+          }
+        } catch (err) {
+          logError('records_review_approval_enqueue_failed', {
+            buildingId: review.building_id,
+            reviewId,
+            error: errorMessage(err),
+          });
         }
       }
     }
