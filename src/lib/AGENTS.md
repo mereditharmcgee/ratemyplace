@@ -169,7 +169,10 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   `enqueue` refuses to replace one for the same reason: a leased row is being pulled right
   now, and that pull writes exactly the records the higher-priority request is asking for, so
   the answer is `already_queued`. Replacing it would delete the row out from under the run
-  holding it.
+  holding it. The **three site callers of `enqueue`** are the reader button, the follower
+  enqueue on save, and review approval; the last two both pass `reason: 'follower'`, because a
+  fourth `QueueReason` would need a migration for `records_queue`'s CHECK constraint and would
+  sit at the same priority anyway.
 - **`scheduler.ts` is pure functions over injected dependencies.** `SchedulerDeps` carries
   the db, clock, pull, fixture, alert, and log, so `drain` and `plan` are unit-tested against
   the `node:sqlite` D1 double and `workers/records-scheduler/` stays a wiring file. `drain`
@@ -231,6 +234,9 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   precedence, in **one** statement (indexed `building_id` seeks as correlated subqueries),
   because the public endpoint calls it once per request; `hasDeeperPull` and
   `pendingQueueReason` stay exported for callers that need one answer without the other.
+  **Three callers enqueue off this state**, all of them from `never_pulled` only: the reader
+  button (`request.ts`), the follower enqueue on save, and review approval
+  (`PATCH /api/admin/reviews/[id]`, a `follower` row).
   Eligibility is `jurisdictionForCity`, not a string compare on 'Boston'. A **parked `fill` row
   still reads `fill_queued`**, so the button stays offered: a press replaces it with a fresh
   priority-0 row that gets its own attempts. `DEEPER_SOURCE_IDS` lives here and

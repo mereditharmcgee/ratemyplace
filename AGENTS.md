@@ -311,7 +311,9 @@ Things that have already cost time. Read before debugging.
   Cron Worker on a later minute tick instead, never by a request; the admin retry endpoint
   un-parks a row rather than pulling it (it refuses a row whose lease is still live with a
   409); and the reader-facing button (`src/pages/api/records/request.ts`) enqueues a `button`
-  row rather than pulling. So
+  row rather than pulling. Approving a review (`PATCH /api/admin/reviews/[id]`) also only
+  **enqueues** — a `follower` row, exactly like a save, and only from `never_pulled`; it never
+  pulls, so the building's records appear a minute or so after the approval, not with it. So
   "I clicked it and nothing happened" is expected for up to a minute on anything queued — but
   not on those two admin buttons, which either return a summary or fail in front of you.
 - **Search is not reviewed-only any more, but browse and the map are.**
