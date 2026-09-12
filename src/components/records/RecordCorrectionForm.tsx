@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CLAIM_MIN, CLAIM_MAX } from '../../lib/records/corrections';
+import { TURNSTILE_FAILED_COPY } from '../../lib/records/display';
 import { isValidEmail } from '../../lib/validation';
 
 interface Props {
@@ -60,6 +61,17 @@ export default function RecordCorrectionForm({ buildingId }: Props) {
         theme: 'light',
         callback: (token: string) => setTurnstileToken(token),
         'expired-callback': () => setTurnstileToken(null),
+        // The widget could not reach Cloudflare, or the challenge ran out before it was
+        // solved. Neither callback submits, so there is nothing to undo beyond dropping the
+        // token and saying so; the reader presses again and the widget re-challenges.
+        'error-callback': () => {
+          setTurnstileToken(null);
+          setError(TURNSTILE_FAILED_COPY);
+        },
+        'timeout-callback': () => {
+          setTurnstileToken(null);
+          setError(TURNSTILE_FAILED_COPY);
+        },
       });
     };
 

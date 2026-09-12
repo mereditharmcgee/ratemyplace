@@ -33,6 +33,17 @@ export default function DisputeForm({ siteUrl }: Props) {
         theme: 'light',
         callback: (token: string) => setTurnstileToken(token),
         'expired-callback': () => setTurnstileToken(null),
+        // The widget could not reach Cloudflare, or the challenge ran out before it was
+        // solved. Neither callback submits, so there is nothing to undo beyond dropping the
+        // token and saying so; the reader presses again and the widget re-challenges.
+        'error-callback': () => {
+          setTurnstileToken(null);
+          setError('Bot verification failed. Please try again.');
+        },
+        'timeout-callback': () => {
+          setTurnstileToken(null);
+          setError('Bot verification failed. Please try again.');
+        },
       });
     };
 

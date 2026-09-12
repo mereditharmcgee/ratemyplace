@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { unitItems, buildingItems, landlordItems, supplementaryItems } from '../../../lib/surveyItems';
 import { bedroomOptions, bathroomOptions } from '../../../lib/formOptions';
 import type { Building, UnitDetails, Tenancy, ReviewData } from './types';
@@ -36,6 +36,9 @@ export default function ConfirmStep({
 }: Props) {
   const turnstileRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
+  // The submit error belongs to the parent form; a widget failure is this step's own, so it
+  // gets its own state and shares the one error banner below.
+  const [turnstileError, setTurnstileError] = useState<string | null>(null);
 
   useEffect(() => {
     const renderWidget = () => {
@@ -43,8 +46,22 @@ export default function ConfirmStep({
       widgetIdRef.current = window.turnstile.render(turnstileRef.current, {
         sitekey: '0x4AAAAAACo4KpkxsacPhM2r',
         theme: 'light',
-        callback: (token: string) => onTurnstileToken(token),
+        callback: (token: string) => {
+          setTurnstileError(null);
+          onTurnstileToken(token);
+        },
         'expired-callback': () => onTurnstileToken(null),
+        // The widget could not reach Cloudflare, or the challenge ran out before it was
+        // solved. Neither callback submits, so there is nothing to undo beyond dropping the
+        // token and saying so; the reader presses again and the widget re-challenges.
+        'error-callback': () => {
+          onTurnstileToken(null);
+          setTurnstileError('Bot verification failed. Please try again.');
+        },
+        'timeout-callback': () => {
+          onTurnstileToken(null);
+          setTurnstileError('Bot verification failed. Please try again.');
+        },
       });
     };
 
@@ -117,7 +134,11 @@ export default function ConfirmStep({
         </div>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">{error}</div>}
+      {(error || turnstileError) && (
+        <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
+          {error || turnstileError}
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-[6px] p-6">
         <h3 className="font-semibold text-gray-900 mb-4">Review Summary</h3>

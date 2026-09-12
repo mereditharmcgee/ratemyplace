@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, cleanup, screen, waitFor } from '@testing-library/react';
+import { render, cleanup, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import RecordCorrectionForm from '../../components/records/RecordCorrectionForm';
+import { TURNSTILE_FAILED_COPY } from '../records/display';
 
-// Window.turnstile is already declared globally (see DisputeForm.tsx / ContactForm.tsx);
-// TypeScript merges that augmentation across the project, so it is not redeclared here.
+// Window.turnstile is declared once, ambiently, in src/env.d.ts, so it is not redeclared here.
+
+type RenderOptions = Parameters<NonNullable<Window['turnstile']>['render']>[1];
 
 afterEach(() => {
   cleanup();
@@ -163,6 +165,79 @@ describe('RecordCorrectionForm', () => {
 
     expect(await screen.findByText(/report received/i)).toBeTruthy();
     expect(screen.queryByText(/reference/i)).toBeNull();
+  });
+
+  it("surfaces the failure copy on Turnstile's error-callback and still refuses to submit", async () => {
+    // This stub never solves the challenge, so the form holds no token — the shape of a
+    // widget that could not reach Cloudflare.
+    let captured: RenderOptions | null = null;
+    window.turnstile = {
+      render: (_container, options) => {
+        captured = options;
+        return 'widget-1';
+      },
+      reset: vi.fn(),
+      remove: vi.fn(),
+    };
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const user = userEvent.setup();
+    render(<RecordCorrectionForm buildingId="building-1" />);
+
+    await waitFor(() => expect(captured).not.toBeNull());
+
+    act(() => {
+      (captured as RenderOptions)['error-callback']?.();
+    });
+
+    expect(await screen.findByText(TURNSTILE_FAILED_COPY)).toBeTruthy();
+
+    // An otherwise valid report still goes nowhere: there is no token to send.
+    await user.selectOptions(screen.getByLabelText(/which record is wrong/i), 'assessment');
+    await user.type(
+      screen.getByLabelText(/what's wrong with it/i),
+      'This assessment record has an incorrect owner name listed.'
+    );
+    await user.click(screen.getByRole('button', { name: /send report/i }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await screen.findByText(/complete the bot verification/i)).toBeTruthy();
+  });
+
+  it("clears the token on Turnstile's timeout-callback", async () => {
+    let captured: RenderOptions | null = null;
+    window.turnstile = {
+      render: (_container, options) => {
+        captured = options;
+        options.callback?.('good-token');
+        return 'widget-1';
+      },
+      reset: vi.fn(),
+      remove: vi.fn(),
+    };
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const user = userEvent.setup();
+    render(<RecordCorrectionForm buildingId="building-1" />);
+
+    await waitFor(() => expect(captured).not.toBeNull());
+
+    act(() => {
+      (captured as RenderOptions)['timeout-callback']?.();
+    });
+
+    expect(await screen.findByText(TURNSTILE_FAILED_COPY)).toBeTruthy();
+
+    await user.selectOptions(screen.getByLabelText(/which record is wrong/i), 'assessment');
+    await user.type(
+      screen.getByLabelText(/what's wrong with it/i),
+      'This assessment record has an incorrect owner name listed.'
+    );
+    await user.click(screen.getByRole('button', { name: /send report/i }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('renders the Turnstile widget once it loads late and removes it on unmount', async () => {

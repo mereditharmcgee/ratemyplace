@@ -281,6 +281,14 @@ export const REQUEST_PARKED_COPY =
   'These records could not be retrieved yet. The request has been set aside for a closer look.';
 export const REQUEST_ALREADY_PULLED_COPY = 'These records have already been retrieved. Reload to see them.';
 export const REQUEST_FAILED_COPY = 'The request did not go through. Please try again.';
+/**
+ * Turnstile's own `error-callback` / `timeout-callback` — the widget could not reach
+ * Cloudflare, or the challenge expired before it was solved. Shown by the correction form,
+ * which stores the token rather than submitting on it, so there is nothing to undo beyond
+ * clearing the token and telling the reader to press again. Same sentence the corrections
+ * endpoint returns on a rejected token, so a reader sees one wording either way.
+ */
+export const TURNSTILE_FAILED_COPY = 'Bot verification failed. Please try again.';
 
 // The building page's no-reviews card and the search result line for a seeded building.
 // Registered in PANEL_COPY for the banned-words scan; rendered by the building page and
@@ -406,6 +414,7 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   REQUEST_PARKED_COPY,
   REQUEST_ALREADY_PULLED_COPY,
   REQUEST_FAILED_COPY,
+  TURNSTILE_FAILED_COPY,
   NO_REVIEWS_CARD_TITLE,
   NO_REVIEWS_CARD_BODY,
   NO_REVIEWS_BREAKDOWN_COPY,
