@@ -240,6 +240,56 @@ describe('RecordCorrectionForm', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('clears the failure copy once the challenge is solved, and submits on the new token', async () => {
+    // Turnstile retries a failed challenge by itself, so the widget can fail and then answer
+    // with a token without the reader touching anything. The stale failure line has to go
+    // with it, or the form claims verification failed while holding a good token.
+    let captured: RenderOptions | null = null;
+    window.turnstile = {
+      render: (_container, options) => {
+        captured = options;
+        return 'widget-1';
+      },
+      reset: vi.fn(),
+      remove: vi.fn(),
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({ data: { id: 'abcdef1234567890' } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const user = userEvent.setup();
+    render(<RecordCorrectionForm buildingId="building-7" />);
+
+    await waitFor(() => expect(captured).not.toBeNull());
+
+    act(() => {
+      (captured as RenderOptions)['error-callback']?.();
+    });
+    expect(await screen.findByText(TURNSTILE_FAILED_COPY)).toBeTruthy();
+
+    act(() => {
+      (captured as RenderOptions).callback?.('recovered-token');
+    });
+
+    await waitFor(() => expect(screen.queryByText(TURNSTILE_FAILED_COPY)).toBeNull());
+    const submit = screen.getByRole('button', { name: /send report/i });
+    expect((submit as HTMLButtonElement).disabled).toBe(false);
+
+    await user.selectOptions(screen.getByLabelText(/which record is wrong/i), 'assessment');
+    await user.type(
+      screen.getByLabelText(/what's wrong with it/i),
+      'This assessment record has an incorrect owner name listed.'
+    );
+    await user.click(submit);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body as string).turnstileToken).toBe('recovered-token');
+  });
+
   it('renders the Turnstile widget once it loads late and removes it on unmount', async () => {
     const renderFn = vi.fn((_container, options) => {
       options.callback?.('late-token');

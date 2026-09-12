@@ -7,6 +7,7 @@ import {
   REQUEST_BUTTON_LABEL,
   REQUEST_FAILED_COPY,
   REQUEST_VERIFYING_COPY,
+  TURNSTILE_FAILED_COPY,
 } from '../../lib/records/display';
 
 // The reader-facing records button. Pressing it renders Turnstile on demand the way the
@@ -96,10 +97,16 @@ export default function RecordsRequestButton({ buildingId, initialState }: Props
     // once goes on reporting failures with no one behind them. Ungated, one of those would
     // overwrite a 429 message the reader is still reading and pull focus back to the button, or
     // raise an alert next to the requested line while the POST is in flight.
+    //
+    // The widget's own failure gets the widget's own sentence — the same one the correction
+    // form writes — because nothing was ever sent: the reader is being told verification did
+    // not go through, not that their request was refused. `REQUEST_FAILED_COPY` stays for the
+    // POST failures and for the script that never arrives below, where there is no widget to
+    // blame.
     const handleWidgetFailure = () => {
       if (!awaitingTokenRef.current) return;
       awaitingTokenRef.current = false;
-      setError(REQUEST_FAILED_COPY);
+      setError(TURNSTILE_FAILED_COPY);
       setPhase((current) => (current === 'verifying' ? 'idle' : current));
     };
     const renderWidget = () => {

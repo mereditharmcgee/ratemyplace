@@ -441,6 +441,18 @@ On a match: set `google_place_id`, and `latitude`/`longitude` if null, and retur
 > candidate; accepted, because the cost is a duplicate page and the fix is a city-normalization
 > pass over `buildings`, not a `LOWER()` that would drop the index.
 >
+> > **Superseded 2026-09-12 (C3 hardening).** The candidate query no longer names one city.
+> > It binds `CITY_CANDIDATES` from `src/lib/records/dedupe.ts` — the display-form Boston
+> > locality names in `src/lib/bostonLocalities.ts` plus `boston` and `BOSTON`, 28 values —
+> > and asks `city IN (…)`. An `IN` on the leading column of `idx_buildings_street` is still
+> > one index seek per value, so the index survives where the `LOWER()` ruled out above
+> > would not, and a row stored under a neighborhood is a candidate rather than a duplicate
+> > page. Four of those names (Downtown, West End, North End, South End) belong to other
+> > cities too, so the query also carries
+> > `AND (zip_code IS NULL OR zip_code LIKE '021%' OR zip_code LIKE '022%')` as a residual
+> > filter after the seek. Casings beyond the three spellings of the city name itself still
+> > wait on the city-normalization pass.
+>
 > **Dedupe precedence, as built** (`src/lib/records/dedupe.ts`): parity via `rangeContains`;
 > then the ZIP tiebreak. It **refuses rather than guesses** — several candidates spanning
 > different ZIPs with no input ZIP, or a lone candidate whose ZIP disagrees with the input,
@@ -497,6 +509,13 @@ On a match: set `google_place_id`, and `latitude`/`longitude` if null, and retur
 > user-created row stored as 'boston' with a parcel and no reviews would be missing from the
 > sitemap — near-zero impact today, and the fix is the city-normalization pass named in
 > Section 5.
+>
+> > **Amended 2026-09-12 (C3 hardening).** Two spellings now, not three: the dedupe
+> > candidate query left this group. It binds `CITY_CANDIDATES` — the display-form Boston
+> > locality names from `src/lib/bostonLocalities.ts` plus `boston`/`BOSTON`, 28 values —
+> > as `city IN (…)`, guarded to 021xx/022xx ZIPs, and still
+> > seeks `idx_buildings_street`. Only the sitemap and `searchSql.ts` keep the narrow
+> > `city = 'Boston'` form, so the missing-from-the-sitemap case above stands as written.
 >
 > **Metadata is narrower than the sketch:** the records-flavored title and description apply
 > only when a building has zero approved reviews **and** a Boston jurisdiction **and** a parcel

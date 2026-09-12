@@ -53,6 +53,22 @@ export async function findBuildingByAddress(db: RecordsDb, input: DedupeInput): 
   // Casings beyond the three listed ('DORCHESTER', say) remain out of reach; that is what a
   // city-normalization pass over `buildings` is for.
   //
+  // Widening the city predicate widened the blast radius with it: four locality names are
+  // not Boston's alone. Downtown, West End, North End and South End are all real city
+  // fields elsewhere — New Haven has a Downtown too — so a non-Boston row saved under one
+  // of them could become a merge target for a reviewer whose street name and house number
+  // happen to line up. The ZIP guard below keeps the candidate set inside Boston: every
+  // Boston ZIP is 021xx or 022xx. A NULL ZIP is kept rather than dropped, because a row
+  // that never recorded one is not evidence of anywhere, and the precedence rules below
+  // already decline to merge onto a candidate whose ZIP disagrees with the input.
+  // `LIKE '021%'` on a prefix is a residual filter on rows the index seek already found,
+  // not a second seek, so the plan is unchanged.
+  //
+  // Two gaps remain after it. A Massachusetts row outside Boston that shares a 021xx/022xx
+  // ZIP (a Cambridge or Brookline row stored under one of those four names) is still
+  // reachable in principle, and so is any casing outside the three above. Both close with
+  // the same city-normalization pass.
+  //
   // The span bound applies to user-entered rows only. The assessor's own ranges do go very
   // wide: `10-638 Georgetowne Drive` (a subsidized-housing development) spans 628 numbers,
   // and six seeded parcels exceed 100 — that one plus `408-826 Border St` (418),
@@ -65,7 +81,7 @@ export async function findBuildingByAddress(db: RecordsDb, input: DedupeInput): 
   // from the other side: it treats that shape as undecidable rather than a match.
   const { results } = await db
     .prepare(
-      `SELECT id, slug, source, st_num_lo, st_num_hi, zip_code, created_at FROM buildings WHERE city IN (${CITY_PLACEHOLDERS}) AND street_key = ? AND st_num_lo IS NOT NULL AND st_num_hi IS NOT NULL AND (source = 'seed' OR st_num_hi - st_num_lo <= 100)`,
+      `SELECT id, slug, source, st_num_lo, st_num_hi, zip_code, created_at FROM buildings WHERE city IN (${CITY_PLACEHOLDERS}) AND street_key = ? AND (zip_code IS NULL OR zip_code LIKE '021%' OR zip_code LIKE '022%') AND st_num_lo IS NOT NULL AND st_num_hi IS NOT NULL AND (source = 'seed' OR st_num_hi - st_num_lo <= 100)`,
     )
     .bind(...CITY_CANDIDATES, key.streetKey)
     .all<CandidateRow>();

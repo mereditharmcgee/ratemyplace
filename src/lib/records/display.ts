@@ -287,6 +287,10 @@ export const REQUEST_FAILED_COPY = 'The request did not go through. Please try a
  * which stores the token rather than submitting on it, so there is nothing to undo beyond
  * clearing the token and telling the reader to press again. Same sentence the corrections
  * endpoint returns on a rejected token, so a reader sees one wording either way.
+ *
+ * The request button says this too when its widget reports a failure: nothing was sent, so
+ * `REQUEST_FAILED_COPY` would name the wrong thing. That one stays for a POST that came
+ * back wrong and for an api.js that never loads at all.
  */
 export const TURNSTILE_FAILED_COPY = 'Bot verification failed. Please try again.';
 

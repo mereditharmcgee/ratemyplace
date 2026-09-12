@@ -99,6 +99,21 @@ suite('findBuildingByAddress', () => {
     expect((await findBuildingByAddress(db, { address: '5 Elm St', city: 'Boston', zip: null }))?.id).toBe('lower');
   });
 
+  it('keeps a row under a locality name that is not only Boston out of the candidate set', async () => {
+    // Downtown, West End, North End and South End are real city fields outside Boston too,
+    // so widening the city predicate to the whole locality vocabulary put a New Haven row on
+    // a shared street name within reach of a merge. The ZIP guard is what rules it out:
+    // every Boston ZIP is 021xx or 022xx, and 06510 is neither.
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'nh', address: '5 Chapel St', slug: 'nh', source: 'user', city: 'Downtown', zip_code: '06510', street_key: 'CHAPEL ST', st_num_lo: 5, st_num_hi: 5 });
+    expect(await findBuildingByAddress(db, { address: '5 Chapel St', city: 'Boston', zip: null })).toBeNull();
+
+    // The same row on a Boston ZIP is the case the widened predicate was for.
+    const bos = createRecordsTestDb();
+    await insertBuilding(bos, { id: 'bos', address: '5 Chapel St', slug: 'bos', source: 'user', city: 'Downtown', zip_code: '02110', street_key: 'CHAPEL ST', st_num_lo: 5, st_num_hi: 5 });
+    expect(await findBuildingByAddress(bos, { address: '5 Chapel St', city: 'Boston', zip: null })).toEqual({ id: 'bos', slug: 'bos' });
+  });
+
   /**
    * The city predicate is an `IN` over 28 spellings rather than a `LOWER(city)` precisely so
    * it stays index-seekable: `idx_buildings_street` is `(city, street_key)`, and an `IN` on

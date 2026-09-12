@@ -31,7 +31,14 @@ export default function DisputeForm({ siteUrl }: Props) {
       widgetIdRef.current = window.turnstile.render(turnstileRef.current, {
         sitekey: '0x4AAAAAACo4KpkxsacPhM2r',
         theme: 'light',
-        callback: (token: string) => setTurnstileToken(token),
+        callback: (token: string) => {
+          setTurnstileToken(token);
+          // A solved challenge clears the widget's own failure line — and only that line.
+          // Turnstile also hands a token over unasked when it renews an expiring one, and a
+          // silent renewal must not wipe a server error the reader still has to read, so the
+          // clear is narrowed to the exact sentence the failure callbacks below write.
+          setError((prev) => (prev === 'Bot verification failed. Please try again.' ? null : prev));
+        },
         'expired-callback': () => setTurnstileToken(null),
         // The widget could not reach Cloudflare, or the challenge ran out before it was
         // solved. Neither callback submits, so there is nothing to undo beyond dropping the

@@ -12,7 +12,21 @@ export function GET(context: APIContext): Response {
   // competing with the canonical domain. Compared against SITE_URL's host rather than a
   // hardcoded suffix, so any host that is not the canonical one — a custom domain still
   // being set up, a Pages branch alias — is covered by the same rule.
-  if (context.url.host !== new URL(site).host) {
+  //
+  // `siteUrlFrom` hands SITE_URL back as it was configured, only stripped of trailing
+  // slashes, so a value entered without a scheme ('ratemyplace.org') makes `new URL` throw.
+  // That would 500 the one route a crawler reads before anything else — the most expensive
+  // place on the site to be strict about a typo — so the host is read defensively: the parse
+  // first, then the scheme-less spelling, and a value that yields no host at all serves the
+  // permissive body rather than fencing every crawler out of production.
+  const canonicalHost = ((): string => {
+    try {
+      return new URL(site).host;
+    } catch {
+      return site.replace(/^https?:\/\//, '').split('/')[0];
+    }
+  })();
+  if (canonicalHost && context.url.host !== canonicalHost) {
     return new Response('User-agent: *\nDisallow: /\n', { headers: HEADERS });
   }
 
