@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sqliteAvailable } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
-import { findBuildingByAddress } from '../records/dedupe';
+import { CITY_CANDIDATES, findBuildingByAddress } from '../records/dedupe';
 import { BOSTON_NEIGHBORHOODS, isBostonLocality } from '../locality';
 import { BOSTON_LOCALITY_NAMES } from '../bostonLocalities';
 import { TRAILING_LOCALITIES } from '../records/identity';
@@ -78,6 +78,68 @@ suite('findBuildingByAddress', () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'c', address: '1027 Commonwealth Av', source: 'seed', street_key: 'COMMONWEALTH AV', st_num_lo: 1027, st_num_hi: 1027 });
     expect((await findBuildingByAddress(db, { address: '1027 Commonwealth Ave Boston', city: 'Allston', zip: null }))?.id).toBe('c');
+  });
+
+  it('sees a building stored under a Boston neighborhood as its city', async () => {
+    // The seed writes city 'Boston'; `POST /api/buildings` stores what Google Places hands
+    // back, which for this street is 'Dorchester'. The old `city = 'Boston'` predicate made
+    // the user row invisible and the route created a duplicate page for it.
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'seed-oak', address: '1 Oak St', slug: 'seed-oak', source: 'seed', city: 'Boston', street_key: 'OAK ST', st_num_lo: 1, st_num_hi: 1 });
+    await insertBuilding(db, { id: 'user-oak', address: '5 Oak St', slug: 'user-oak', source: 'user', city: 'Dorchester', street_key: 'OAK ST', st_num_lo: 5, st_num_hi: 5 });
+    expect(await findBuildingByAddress(db, { address: '5 Oak St', city: 'Boston', zip: null })).toEqual({
+      id: 'user-oak',
+      slug: 'user-oak',
+    });
+  });
+
+  it('finds a row stored under a lowercase city too', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'lower', address: '5 Elm St', slug: 'lower', source: 'user', city: 'boston', street_key: 'ELM ST', st_num_lo: 5, st_num_hi: 5 });
+    expect((await findBuildingByAddress(db, { address: '5 Elm St', city: 'Boston', zip: null }))?.id).toBe('lower');
+  });
+
+  /**
+   * The city predicate is an `IN` over 28 spellings rather than a `LOWER(city)` precisely so
+   * it stays index-seekable: `idx_buildings_street` is `(city, street_key)`, and an `IN` on
+   * the leading column is a series of seeks where a function call on it would scan all 38k
+   * seeded rows. Asserted against the statement the module actually prepares.
+   */
+  it('seeks idx_buildings_street rather than scanning buildings', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'plan', address: '5 Oak St', slug: 'plan', source: 'seed', street_key: 'OAK ST', st_num_lo: 5, st_num_hi: 5 });
+
+    const calls: Array<{ sql: string; values: unknown[] }> = [];
+    const capturing = {
+      prepare(sql: string) {
+        const inner = db.prepare(sql);
+        const self = {
+          bind(...values: unknown[]) {
+            calls.push({ sql, values });
+            inner.bind(...(values as never[]));
+            return self;
+          },
+          first: <T>() => inner.first<T>(),
+          all: <T>() => inner.all<T>(),
+          run: () => inner.run(),
+        };
+        return self;
+      },
+    } as unknown as Parameters<typeof findBuildingByAddress>[0];
+
+    await findBuildingByAddress(capturing, { address: '5 Oak St', city: 'Boston', zip: null });
+    const call = calls.find((c) => c.sql.includes('FROM buildings'));
+    expect(call).toBeDefined();
+    // The whole locality vocabulary is bound, not interpolated.
+    expect(call?.values.slice(0, CITY_CANDIDATES.length)).toEqual([...CITY_CANDIDATES]);
+
+    const rows = await db
+      .prepare(`EXPLAIN QUERY PLAN ${call?.sql}`)
+      .bind(...((call?.values ?? []) as never[]))
+      .all<{ detail: string }>();
+    const plan = rows.results.map((row) => row.detail).join('\n');
+    expect(plan).toContain('idx_buildings_street');
+    expect(plan).not.toContain('SCAN buildings');
   });
 
   it('returns null outside Boston, for an unparseable address, or with no candidate', async () => {
