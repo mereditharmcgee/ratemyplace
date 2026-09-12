@@ -327,6 +327,12 @@ Things that have already cost time. Read before debugging.
 - **`/sitemap.xml`, `/sitemaps/*.xml`, and `/robots.txt` are D1-backed routes** in
   `src/pages/`, not files in `public/`. The static-page allowlist is `STATIC_SITEMAP_PATHS`
   in `src/lib/sitemap.ts`; a new public page is not in the sitemap until it is added there.
+  `/robots.txt` serves `Disallow: /` on any host that is not `SITE_URL`'s, so a preview
+  deploy is not asking a crawler to index a second copy of every page — a permissive
+  robots.txt on preview is the bug, not the empty one.
+- **`Window.turnstile` is declared once in `src/env.d.ts`; never add a per-component
+  `declare global` for it.** TypeScript merges augmentations project-wide, so three
+  components each carrying an identical copy compiled fine and drifted quietly instead.
 - **Never call `turnstile.reset()` from a callback that submits.** A reset re-runs the
   challenge, which re-fires the callback, which submits again — an unbounded POST loop
   against your own endpoint. Tokens are single-use, so a stale one has to go somehow: reset
