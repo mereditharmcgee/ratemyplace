@@ -238,7 +238,8 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   from every state but `ineligible` and `pulled`, and the follower enqueue on save and on
   review approval (`PATCH /api/admin/reviews/[id]`, a `follower` row), both only from
   `never_pulled`.
-  Eligibility is `jurisdictionForCity`, not a string compare on 'Boston'. A **parked `fill` row
+  Eligibility is `jurisdictionForCity` from the leaf `records/jurisdiction.ts`, not a string
+  compare on 'Boston'. A **parked `fill` row
   still reads `fill_queued`**, so the button stays offered: a press replaces it with a fresh
   priority-0 row that gets its own attempts. `DEEPER_SOURCE_IDS` lives here and
   `scheduler.ts` re-exports it — do not move it back.
@@ -295,11 +296,15 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   `SITEMAP_CHUNK` is 10,000 URLs per chunk; `buildingChunkCount` has no floor of 1, so an
   empty table advertises no chunk at all. `lastmod` is the newest of the building's
   `updated_at`, its newest approved review, and its newest pull.
-- **`locality.ts` exports `isBostonLocality`** — 'Boston' or any Boston neighborhood name,
-  case-insensitively — because Google Places routinely hands back the neighborhood as the
-  locality. Note that `records/identity.ts` keeps an uppercase twin of the same vocabulary
-  for its trailing-locality stripper; a new neighborhood name has to be added in both until
-  someone merges them.
+- **`bostonLocalities.ts` is the one Boston locality vocabulary.** `BOSTON_LOCALITY_NAMES`
+  holds the 26 names in display form — every USPS city name for a Boston-only ZIP plus the
+  neighborhood names people type, minus `CHESTNUT HILL`, whose 02467 also covers Newton and
+  Brookline. Three consumers derive from it and none restates it: `locality.ts`
+  (`BOSTON_NEIGHBORHOODS`, normalized and minus 'boston', behind the `isBostonLocality`
+  predicate — Google Places routinely hands back the neighborhood as the locality),
+  `records/identity.ts` (`TRAILING_LOCALITIES`, uppercased, for the trailing-locality
+  stripper), and `records/dedupe.ts` (`CITY_CANDIDATES`, the bind list for its `city IN (…)`
+  candidate predicate). Add a name here and nowhere else.
 
 ### `enrichment/` — municipal property data
 

@@ -1,6 +1,13 @@
-// Maps a building's city to the jurisdiction that knows how to pull records for it, and
-// to that jurisdiction's list of sources. New Haven has no source implementation yet, so
-// it (and anything else unrecognized) resolves to no jurisdiction and an empty source list.
+// Maps a jurisdiction to its list of sources. New Haven has no source implementation yet,
+// so it (and anything else unrecognized) resolves to no jurisdiction and an empty source
+// list.
+//
+// City resolution itself lives in `./jurisdiction` (singular), which imports nothing: this
+// file pulls in all six Boston source modules, so anything that only needs to ask "is this
+// a Boston building?" — a React island above all — imports the leaf instead of this.
+// `Jurisdiction`, `normalizeCity` and `jurisdictionForCity` are re-exported here so the
+// server call sites that already import them from this module keep working.
+import { jurisdictionForCity, normalizeCity, type Jurisdiction } from './jurisdiction';
 import { assessorSource, ASSESSOR_YEARS } from './sources/boston/assessor';
 import { enforcementSource } from './sources/boston/enforcement';
 import { permitsSource } from './sources/boston/permits';
@@ -9,22 +16,8 @@ import { serviceRequestsSource } from './sources/boston/serviceRequests';
 import { violationsSource } from './sources/boston/violations';
 import type { RecordSource } from './types';
 
-export type Jurisdiction = 'boston';
-
-/**
- * Strip a trailing ", XX" state, lowercase. Deliberately looser than
- * enrichment/dispatcher.ts, which requires an uppercase state and treats "Boston, ma" as
- * unrecognized. Trimmed first as well as last, so the `$`-anchored state pattern still
- * matches when the stored city carries trailing whitespace ("Boston, MA ").
- */
-function normalizeCity(city: string): string {
-  return city.trim().replace(/,\s*[A-Z]{2}$/i, '').trim().toLowerCase();
-}
-
-export function jurisdictionForCity(city: string | null): Jurisdiction | null {
-  if (!city) return null;
-  return normalizeCity(city) === 'boston' ? 'boston' : null;
-}
+export { jurisdictionForCity, normalizeCity };
+export type { Jurisdiction };
 
 export function sourcesForCity(city: string | null): RecordSource[] {
   const jurisdiction = jurisdictionForCity(city);

@@ -1,7 +1,8 @@
 // What the site knows about a Boston building's records coverage, for the request paths
 // that must not pull anything themselves: the reader-facing button, the follower enqueue on
 // save, and the panel's page state. Read-only; the queue module owns every write.
-import { jurisdictionForCity, sourcesForCity } from './jurisdictions';
+import { jurisdictionForCity } from './jurisdiction';
+import { sourcesForCity } from './jurisdictions';
 import { MAX_ATTEMPTS, requireDeeperSourceIds } from './queue';
 import type { QueueReason, RecordsDb } from './types';
 

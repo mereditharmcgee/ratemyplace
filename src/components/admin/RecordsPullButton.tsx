@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ROW_CAP } from '../../lib/records/ckan';
+import { jurisdictionForCity } from '../../lib/records/jurisdiction';
 
 interface RecordsPullButtonProps {
   buildingId: string;
@@ -20,12 +21,6 @@ interface PullSummary {
   parcelId: string | null;
   condominium: boolean;
   sources: PullSourceSummary[];
-}
-
-/** Strip a trailing ", XX" state and lowercase, matching lib/records/jurisdictions.ts's normalizeCity. */
-function isBoston(city: string | null): boolean {
-  if (!city) return false;
-  return city.replace(/,\s*[A-Z]{2}$/i, '').trim().toLowerCase() === 'boston';
 }
 
 function parcelLabel(summary: PullSummary): string {
@@ -60,7 +55,10 @@ export default function RecordsPullButton({ buildingId, city }: RecordsPullButto
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<PullSummary | null>(null);
 
-  if (!isBoston(city)) {
+  // `records/jurisdiction.ts` is a leaf module — importing it here costs the client bundle
+  // nothing but this one function, where `records/jurisdictions.ts` would drag in all six
+  // Boston CKAN adapters. This button used to hand-copy the regex instead.
+  if (jurisdictionForCity(city) === null) {
     return <p className="text-xs text-gray-500">Public records are available for Boston buildings only.</p>;
   }
 

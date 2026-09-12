@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { sqliteAvailable } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
-import { findBuildingByAddress } from '../records/dedupe';
+import { CITY_CANDIDATES, findBuildingByAddress } from '../records/dedupe';
 import { BOSTON_NEIGHBORHOODS, isBostonLocality } from '../locality';
+import { BOSTON_LOCALITY_NAMES } from '../bostonLocalities';
 import { TRAILING_LOCALITIES } from '../records/identity';
 
 const suite = sqliteAvailable ? describe : describe.skip;
@@ -79,6 +80,83 @@ suite('findBuildingByAddress', () => {
     expect((await findBuildingByAddress(db, { address: '1027 Commonwealth Ave Boston', city: 'Allston', zip: null }))?.id).toBe('c');
   });
 
+  it('sees a building stored under a Boston neighborhood as its city', async () => {
+    // The seed writes city 'Boston'; `POST /api/buildings` stores what Google Places hands
+    // back, which for this street is 'Dorchester'. The old `city = 'Boston'` predicate made
+    // the user row invisible and the route created a duplicate page for it.
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'seed-oak', address: '1 Oak St', slug: 'seed-oak', source: 'seed', city: 'Boston', street_key: 'OAK ST', st_num_lo: 1, st_num_hi: 1 });
+    await insertBuilding(db, { id: 'user-oak', address: '5 Oak St', slug: 'user-oak', source: 'user', city: 'Dorchester', street_key: 'OAK ST', st_num_lo: 5, st_num_hi: 5 });
+    expect(await findBuildingByAddress(db, { address: '5 Oak St', city: 'Boston', zip: null })).toEqual({
+      id: 'user-oak',
+      slug: 'user-oak',
+    });
+  });
+
+  it('finds a row stored under a lowercase city too', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'lower', address: '5 Elm St', slug: 'lower', source: 'user', city: 'boston', street_key: 'ELM ST', st_num_lo: 5, st_num_hi: 5 });
+    expect((await findBuildingByAddress(db, { address: '5 Elm St', city: 'Boston', zip: null }))?.id).toBe('lower');
+  });
+
+  it('keeps a row under a locality name that is not only Boston out of the candidate set', async () => {
+    // Downtown, West End, North End and South End are real city fields outside Boston too,
+    // so widening the city predicate to the whole locality vocabulary put a New Haven row on
+    // a shared street name within reach of a merge. The ZIP guard is what rules it out:
+    // every Boston ZIP is 021xx or 022xx, and 06510 is neither.
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'nh', address: '5 Chapel St', slug: 'nh', source: 'user', city: 'Downtown', zip_code: '06510', street_key: 'CHAPEL ST', st_num_lo: 5, st_num_hi: 5 });
+    expect(await findBuildingByAddress(db, { address: '5 Chapel St', city: 'Boston', zip: null })).toBeNull();
+
+    // The same row on a Boston ZIP is the case the widened predicate was for.
+    const bos = createRecordsTestDb();
+    await insertBuilding(bos, { id: 'bos', address: '5 Chapel St', slug: 'bos', source: 'user', city: 'Downtown', zip_code: '02110', street_key: 'CHAPEL ST', st_num_lo: 5, st_num_hi: 5 });
+    expect(await findBuildingByAddress(bos, { address: '5 Chapel St', city: 'Boston', zip: null })).toEqual({ id: 'bos', slug: 'bos' });
+  });
+
+  /**
+   * The city predicate is an `IN` over 28 spellings rather than a `LOWER(city)` precisely so
+   * it stays index-seekable: `idx_buildings_street` is `(city, street_key)`, and an `IN` on
+   * the leading column is a series of seeks where a function call on it would scan all 38k
+   * seeded rows. Asserted against the statement the module actually prepares.
+   */
+  it('seeks idx_buildings_street rather than scanning buildings', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'plan', address: '5 Oak St', slug: 'plan', source: 'seed', street_key: 'OAK ST', st_num_lo: 5, st_num_hi: 5 });
+
+    const calls: Array<{ sql: string; values: unknown[] }> = [];
+    const capturing = {
+      prepare(sql: string) {
+        const inner = db.prepare(sql);
+        const self = {
+          bind(...values: unknown[]) {
+            calls.push({ sql, values });
+            inner.bind(...(values as never[]));
+            return self;
+          },
+          first: <T>() => inner.first<T>(),
+          all: <T>() => inner.all<T>(),
+          run: () => inner.run(),
+        };
+        return self;
+      },
+    } as unknown as Parameters<typeof findBuildingByAddress>[0];
+
+    await findBuildingByAddress(capturing, { address: '5 Oak St', city: 'Boston', zip: null });
+    const call = calls.find((c) => c.sql.includes('FROM buildings'));
+    expect(call).toBeDefined();
+    // The whole locality vocabulary is bound, not interpolated.
+    expect(call?.values.slice(0, CITY_CANDIDATES.length)).toEqual([...CITY_CANDIDATES]);
+
+    const rows = await db
+      .prepare(`EXPLAIN QUERY PLAN ${call?.sql}`)
+      .bind(...((call?.values ?? []) as never[]))
+      .all<{ detail: string }>();
+    const plan = rows.results.map((row) => row.detail).join('\n');
+    expect(plan).toContain('idx_buildings_street');
+    expect(plan).not.toContain('SCAN buildings');
+  });
+
   it('returns null outside Boston, for an unparseable address, or with no candidate', async () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'c', address: '1 Lanark Rd', source: 'seed', street_key: 'LANARK RD', st_num_lo: 1, st_num_hi: 1 });
@@ -97,14 +175,20 @@ describe('isBostonLocality', () => {
   /**
    * One Boston vocabulary in two spellings: `identity.ts` keeps it uppercase and
    * space-preserving to strip a trailing locality off a street, `locality.ts` keeps it
-   * lowercase and squashed to recognise a city field. A name added to one and not the other
-   * is a silent hole — an address whose tail is stripped but whose city is not read as
-   * Boston, or the reverse — so the two are held together here rather than by a comment.
-   * 'boston' is in the identity set and not the neighborhood one, because a neighborhood
-   * list that contained the city would be a different thing.
+   * lowercase and squashed to recognise a city field. Both are now derived from
+   * `bostonLocalities.ts`, so this can no longer fail by drift — it stands as the guard that
+   * the derivations stay derivations, and pins the sizes so a name deleted from the source
+   * list is not silently lost. 'boston' is in the identity set and not the neighborhood one,
+   * because a neighborhood list that contained the city would be a different thing.
    */
-  it('keeps the identity and locality Boston vocabularies identical', () => {
+  it('derives both Boston lookup sets from the one vocabulary', () => {
     const squashed = new Set([...TRAILING_LOCALITIES].map((name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '')));
     expect(squashed).toEqual(new Set([...BOSTON_NEIGHBORHOODS, 'boston']));
+    expect(BOSTON_LOCALITY_NAMES).toHaveLength(26);
+    expect(TRAILING_LOCALITIES.size).toBe(26);
+    expect(BOSTON_NEIGHBORHOODS.size).toBe(25);
+    expect(TRAILING_LOCALITIES.has('HYDE PARK')).toBe(true);
+    expect(BOSTON_NEIGHBORHOODS.has('hydepark')).toBe(true);
+    expect(BOSTON_NEIGHBORHOODS.has('boston')).toBe(false);
   });
 });

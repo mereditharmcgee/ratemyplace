@@ -9,6 +9,7 @@ import {
   REQUEST_BUTTON_LABEL,
   REQUEST_FAILED_COPY,
   REQUEST_VERIFYING_COPY,
+  TURNSTILE_FAILED_COPY,
 } from '../records/display';
 
 // Window.turnstile is already declared globally (see DisputeForm.tsx / ContactForm.tsx);
@@ -205,7 +206,9 @@ describe('RecordsRequestButton', () => {
       stub.options()['error-callback']?.();
     });
 
-    expect(screen.getByRole('alert').textContent).toBe(REQUEST_FAILED_COPY);
+    // The widget's sentence, not the request's: nothing was sent, so there is no request to
+    // report on. `REQUEST_FAILED_COPY` belongs to a POST that came back wrong.
+    expect(screen.getByRole('alert').textContent).toBe(TURNSTILE_FAILED_COPY);
     expect(screen.getByRole('status').textContent).toBe('');
     const button = screen.getByRole('button', { name: REQUEST_BUTTON_LABEL });
     expect((button as HTMLButtonElement).disabled).toBe(false);
@@ -231,7 +234,7 @@ describe('RecordsRequestButton', () => {
     });
 
     expect(screen.getByRole('alert').textContent).toContain('Too many requests');
-    expect(screen.getByRole('alert').textContent).not.toBe(REQUEST_FAILED_COPY);
+    expect(screen.getByRole('alert').textContent).not.toBe(TURNSTILE_FAILED_COPY);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -247,7 +250,7 @@ describe('RecordsRequestButton', () => {
     });
 
     expect(screen.getAllByRole('alert')).toHaveLength(1);
-    expect(screen.getByRole('alert').textContent).toBe(REQUEST_FAILED_COPY);
+    expect(screen.getByRole('alert').textContent).toBe(TURNSTILE_FAILED_COPY);
     expect((screen.getByRole('button', { name: REQUEST_BUTTON_LABEL }) as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -262,7 +265,7 @@ describe('RecordsRequestButton', () => {
       stub.options()['timeout-callback']?.();
     });
 
-    expect(screen.getByRole('alert').textContent).toBe(REQUEST_FAILED_COPY);
+    expect(screen.getByRole('alert').textContent).toBe(TURNSTILE_FAILED_COPY);
     expect((screen.getByRole('button', { name: REQUEST_BUTTON_LABEL }) as HTMLButtonElement).disabled).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -303,6 +306,8 @@ describe('RecordsRequestButton', () => {
       vi.advanceTimersByTime(10_000);
     });
 
+    // No widget ever rendered here, so this one keeps the request copy: there is nothing to
+    // tell the reader about a bot check that never ran.
     expect(screen.getByRole('alert').textContent).toBe(REQUEST_FAILED_COPY);
     expect(screen.getByRole('status').textContent).toBe('');
     expect((screen.getByRole('button', { name: REQUEST_BUTTON_LABEL }) as HTMLButtonElement).disabled).toBe(false);

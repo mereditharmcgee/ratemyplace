@@ -213,6 +213,47 @@ suite('sitemap routes', () => {
     expect(text).toContain('Allow: /');
   });
 
+  it('serves a disallow-all robots.txt on a non-canonical host', async () => {
+    // Preview deploys answer on *.ratemyplace-64y.pages.dev with the same content as
+    // production. A permissive robots.txt there invites a crawler to index the preview copy
+    // of every page, which is duplicate content competing with the real domain.
+    const preview = 'https://abc123.ratemyplace-64y.pages.dev';
+    const res = robotsGet({
+      request: new Request(`${preview}/robots.txt`),
+      params: {},
+      url: new URL(`${preview}/robots.txt`),
+      locals: { user: null, runtime: { env: { DB: null, SITE_URL: SITE } } },
+    } as unknown as APIContext);
+
+    expect(res.status).toBe(200);
+    // Same headers as the canonical answer — only the body changes.
+    expect(res.headers.get('Content-Type')).toBe('text/plain; charset=utf-8');
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=86400');
+    const text = await res.text();
+    expect(text).toBe('User-agent: *\nDisallow: /\n');
+    expect(text).not.toContain('Sitemap:');
+    expect(text).not.toContain('Allow: /');
+  });
+
+  it('still serves the canonical body when SITE_URL carries no scheme', async () => {
+    // `siteUrlFrom` returns SITE_URL as configured, so a value saved without a scheme used
+    // to make `new URL(site)` throw — a 500 on the first file a crawler asks for. The host
+    // comparison falls back to the scheme-less spelling instead, and this host is the
+    // canonical one, so the permissive file with the sitemap line is what gets served.
+    const bare = 'ratemyplace.org';
+    const res = robotsGet({
+      request: new Request(`https://${bare}/robots.txt`),
+      params: {},
+      url: new URL(`https://${bare}/robots.txt`),
+      locals: { user: null, runtime: { env: { DB: null, SITE_URL: bare } } },
+    } as unknown as APIContext);
+
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain('Allow: /');
+    expect(text).toContain(`Sitemap: ${bare}/sitemap.xml`);
+  });
+
   it('degrades to the static file rather than a 500 when D1 is unavailable', async () => {
     // A binding that throws on use, not a missing one: the same shape as D1 refusing a
     // query mid-request, which is the failure the index has to survive.

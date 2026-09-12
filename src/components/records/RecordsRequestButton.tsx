@@ -7,6 +7,7 @@ import {
   REQUEST_BUTTON_LABEL,
   REQUEST_FAILED_COPY,
   REQUEST_VERIFYING_COPY,
+  TURNSTILE_FAILED_COPY,
 } from '../../lib/records/display';
 
 // The reader-facing records button. Pressing it renders Turnstile on demand the way the
@@ -14,11 +15,9 @@ import {
 // a widget. It posts the token to /api/records/request, which enqueues one pull for the
 // companion Worker. Every string comes from display.ts so the banned-words scan sees it.
 //
-// Window.turnstile is declared globally by three components — ContactForm.tsx,
-// DisputeForm.tsx and ConfirmStep.tsx, each carrying an identical copy — and TypeScript
-// merges those augmentations across the project, so this file uses it without redeclaring
-// it, as RecordCorrectionForm.tsx does. One ambient declaration in src/env.d.ts is an open
-// follow-up; a fourth copy here would be one more thing to move when that lands.
+// Window.turnstile is declared once, ambiently, in src/env.d.ts, so this file uses it
+// without redeclaring it — as every other form that renders a widget explicitly does.
+// Never add a per-component `declare global` for it.
 
 const TURNSTILE_SITEKEY = '0x4AAAAAACo4KpkxsacPhM2r';
 
@@ -98,10 +97,16 @@ export default function RecordsRequestButton({ buildingId, initialState }: Props
     // once goes on reporting failures with no one behind them. Ungated, one of those would
     // overwrite a 429 message the reader is still reading and pull focus back to the button, or
     // raise an alert next to the requested line while the POST is in flight.
+    //
+    // The widget's own failure gets the widget's own sentence — the same one the correction
+    // form writes — because nothing was ever sent: the reader is being told verification did
+    // not go through, not that their request was refused. `REQUEST_FAILED_COPY` stays for the
+    // POST failures and for the script that never arrives below, where there is no widget to
+    // blame.
     const handleWidgetFailure = () => {
       if (!awaitingTokenRef.current) return;
       awaitingTokenRef.current = false;
-      setError(REQUEST_FAILED_COPY);
+      setError(TURNSTILE_FAILED_COPY);
       setPhase((current) => (current === 'verifying' ? 'idle' : current));
     };
     const renderWidget = () => {

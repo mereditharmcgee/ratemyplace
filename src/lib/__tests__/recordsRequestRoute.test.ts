@@ -95,6 +95,23 @@ suite('POST /api/records/request', () => {
     });
   });
 
+  it('400 on a body that is not JSON at all, with no log line', async () => {
+    // `{` with a JSON content type used to throw SyntaxError into the generic catch: a 500
+    // and a logError line per attempt, for what is a client error and nothing of ours.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const res = await POST(createContext(db, { body: '{' }));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: 'Validation failed',
+        details: [{ field: 'body', message: 'Request body must be JSON.' }],
+      });
+      expect(consoleError).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it('a malformed body still consumes a per-IP slot', async () => {
     for (let i = 0; i < REQUEST_PER_IP; i += 1) {
       const rejected = await POST(createContext(db, { body: 'null' }));

@@ -1,3 +1,4 @@
+import { BOSTON_LOCALITY_NAMES } from '../bostonLocalities';
 import { parseStreetAddress } from '../enrichment/helpers';
 import type { BuildingIdentity } from './types';
 
@@ -54,42 +55,14 @@ const UNIT_PATTERN = /(?:^|\s+)(?:APT|APARTMENT|UNIT|STE|SUITE|FL|FLOOR|RM|ROOM)
  * city. Uppercase, because it runs after `normalizeStreet`. Multi-word names are matched
  * as a unit, longest first.
  *
- * Complete means: every USPS city name for a Boston-only ZIP, plus the neighborhood names
- * people type; `CHESTNUT HILL` is excluded because 02467 also covers Newton and Brookline.
- * `src/lib/locality.ts` keeps a separate display-side set that also carries New Haven
- * names, which must never be stripped from a key — hence two sets, not one. Both are
- * exported and `recordsDedupe.test.ts` holds this one against that one's Boston half, so
- * the two spellings of the same vocabulary cannot drift.
+ * Derived from `src/lib/bostonLocalities.ts`, which carries the vocabulary in display form
+ * and the note on what "complete" means. `src/lib/locality.ts` derives the lowercase,
+ * squashed twin from the same list; its own display-side set additionally carries New Haven
+ * names, which must never be stripped from a key — hence two derived sets, one source list.
  */
-export const TRAILING_LOCALITIES: ReadonlySet<string> = new Set([
-  'BOSTON',
-  'ALLSTON',
-  'BRIGHTON',
-  'CHARLESTOWN',
-  'CHINATOWN',
-  'DORCHESTER',
-  'DOWNTOWN',
-  'FENWAY',
-  'MATTAPAN',
-  'ROSLINDALE',
-  'ROXBURY',
-  'SEAPORT',
-  'HYDE PARK',
-  'JAMAICA PLAIN',
-  'SOUTH BOSTON',
-  'EAST BOSTON',
-  'WEST ROXBURY',
-  'SOUTH END',
-  'NORTH END',
-  'BACK BAY',
-  'BEACON HILL',
-  'MISSION HILL',
-  'WEST END',
-  // Postal city names for Boston ZIPs that are not the bare neighborhood name.
-  'DORCHESTER CENTER',
-  'ROXBURY CROSSING',
-  'READVILLE', // USPS city name for 02136/02137, both Boston-only (Hyde Park).
-]);
+export const TRAILING_LOCALITIES: ReadonlySet<string> = new Set(
+  BOSTON_LOCALITY_NAMES.map((name) => name.toUpperCase())
+);
 
 const ZIP_TOKEN = /^\d{5}(?:-\d{4})?$/;
 

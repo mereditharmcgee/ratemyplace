@@ -6,6 +6,23 @@ type R2Bucket = import('@cloudflare/workers-types').R2Bucket;
 
 declare const __RMP_BUILD_RELEASE_ID__: string;
 
+// Cloudflare Turnstile's api.js attaches itself to `window`. Declared once here for every
+// component that renders a widget explicitly — never re-declare it in a component.
+interface Window {
+  turnstile?: {
+    render: (container: HTMLElement, options: {
+      sitekey: string;
+      theme?: string;
+      callback?: (token: string) => void;
+      'expired-callback'?: () => void;
+      'error-callback'?: () => void;
+      'timeout-callback'?: () => void;
+    }) => string;
+    reset: (widgetId: string) => void;
+    remove: (widgetId: string) => void;
+  };
+}
+
 declare namespace App {
   interface Platform {
     env: {

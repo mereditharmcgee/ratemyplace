@@ -21,7 +21,7 @@ import {
  * The reader-facing "Get this building's city records" button. It enqueues one pull for the
  * companion Worker; it never pulls anything itself (AGENTS.md: no fetch from a city API in a
  * request). Unauthenticated JSON POST, so the guard order is the corrections route's:
- * content type -> per-IP rate limit -> body shape -> site-wide daily cap -> Turnstile ->
+ * content type -> per-IP rate limit -> JSON parse -> body shape -> site-wide daily cap -> Turnstile ->
  * validation -> coverage (one statement answers building, eligibility, and pull state) ->
  * enqueue. Nothing about the presser is stored: the queue row carries the building and the
  * time, and the rate limiter keeps the IP for an hour as it does for every public form.
@@ -58,7 +58,19 @@ export const POST: APIRoute = async (context: APIContext) => {
     }
     const limitHeaders = buildRateLimitHeaders(rateLimit, REQUEST_PER_IP);
 
-    const body: unknown = await context.request.json();
+    // A body that is not JSON at all ('{') throws SyntaxError. Caught here rather than by
+    // the generic handler below: it is a 400, not a 500, and it writes no log line — a
+    // malformed request is the client's mistake, and logging one per attempt hands a prober
+    // a way to fill the log.
+    let body: unknown;
+    try {
+      body = await context.request.json();
+    } catch {
+      return json(400, {
+        error: 'Validation failed',
+        details: [{ field: 'body', message: 'Request body must be JSON.' }],
+      });
+    }
     // A JSON body of `null`, an array, or a primitive parses fine but is not a record we can
     // read `buildingId` off — reject it before the property access below.
     if (typeof body !== 'object' || body === null || Array.isArray(body)) {

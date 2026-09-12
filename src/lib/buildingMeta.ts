@@ -1,5 +1,5 @@
 import { displayLocality } from './locality';
-import { jurisdictionForCity } from './records/jurisdictions';
+import { jurisdictionForCity } from './records/jurisdiction';
 
 export interface BuildingMetaInput {
   address: string;

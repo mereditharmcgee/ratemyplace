@@ -59,11 +59,13 @@ export function buildingSearchWhere(query: string): SqlFragment {
  * case-insensitive, and tolerant of a trailing ", MA" at any spacing. A restatement, not a
  * proof of character-for-character agreement — it decides whether a search row shows a
  * records badge, and the building page re-asks `jurisdictionForCity` before pulling
- * anything. It is restated rather than imported because
- * `records/jurisdictions.ts` imports the six Boston source modules, and this select feeds
- * the search island's props — pulling that module in would drag all of it into the client
- * bundle. `COALESCE(..., 0)` keeps a NULL city from yielding a NULL column, so the value
- * the client sees is always 0 or 1.
+ * anything. It is restated rather than imported for the plain reason that SQL cannot call
+ * TypeScript: the test has to run inside D1 so the query can filter and sort on it in one
+ * pass, instead of reading every row back and deciding in JS. (The bundle argument that
+ * used to sit here — that `records/jurisdictions.ts` drags in six CKAN adapters — no longer
+ * applies: `jurisdictionForCity` now lives in the leaf `records/jurisdiction.ts`. It still
+ * cannot run in SQLite.) `COALESCE(..., 0)` keeps a NULL city from yielding a NULL column,
+ * so the value the client sees is always 0 or 1.
  *
  * The review alias is fixed at `r`: both call sites join reviews as `r`, and
  * `BUILDING_SEARCH_ORDER` hardcodes it, so a parameter here could only ever disagree with

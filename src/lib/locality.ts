@@ -6,6 +6,8 @@
 // agrees: if the stored neighborhood is blank, or is itself one of the words
 // in the street address, fall back to the city instead.
 
+import { BOSTON_LOCALITY_NAMES } from './bostonLocalities';
+
 interface LocalityBuilding {
   address?: string | null;
   neighborhood?: string | null;
@@ -22,44 +24,16 @@ interface LocalityBuilding {
 // to 'hydepark'), which is rare but real. They are listed both for that case and so the
 // Boston vocabulary lives in one place. `readville` is single-word, so it is trusted the
 // same way the rest of the single-word names are.
-//
-// `src/lib/records/identity.ts` keeps the uppercase, space-preserving version of the same
-// vocabulary (`TRAILING_LOCALITIES`, plus 'BOSTON' itself) for stripping a trailing
-// locality off a street. Keep the two lists in step; worth folding into one data module
-// later.
 /**
- * Exported so one test can hold it against `identity.ts`'s `TRAILING_LOCALITIES`: the same
- * vocabulary in two spellings cannot be kept in step by a comment alone. Read-only to
- * callers — `isBostonLocality` is the predicate to use.
+ * Derived from `bostonLocalities.ts`, which is the one place a Boston locality name is
+ * written down — `records/identity.ts` derives its uppercase, space-preserving twin from the
+ * same list. 'boston' is dropped here: this is the *neighborhood* set, and `isBostonLocality`
+ * tests the city name separately. Read-only to callers — `isBostonLocality` is the predicate
+ * to use.
  */
-export const BOSTON_NEIGHBORHOODS: ReadonlySet<string> = new Set([
-  'allston',
-  'brighton',
-  'charlestown',
-  'chinatown',
-  'dorchester',
-  'downtown',
-  'fenway',
-  'mattapan',
-  'roslindale',
-  'roxbury',
-  'seaport',
-  'hydepark',
-  'jamaicaplain',
-  'southboston',
-  'eastboston',
-  'westroxbury',
-  'southend',
-  'northend',
-  'backbay',
-  'beaconhill',
-  'missionhill',
-  'westend',
-  // Postal city names for Boston ZIPs that are not the bare neighborhood name.
-  'dorchestercenter',
-  'roxburycrossing',
-  'readville',
-]);
+export const BOSTON_NEIGHBORHOODS: ReadonlySet<string> = new Set(
+  BOSTON_LOCALITY_NAMES.map(normalize).filter((name) => name !== 'boston')
+);
 
 // New Haven — production has New Haven addresses too.
 const NEW_HAVEN_NEIGHBORHOODS = new Set(['westville', 'newhallville', 'dwight', 'dixwell']);

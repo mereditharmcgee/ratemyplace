@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { buildIdentity } from '../records/identity';
 import { jurisdictionForCity, sourcesForCity } from '../records/jurisdictions';
+import { jurisdictionForCity as leafJurisdictionForCity, normalizeCity } from '../records/jurisdiction';
 import { rentsmartSource, RENTSMART_RESOURCE_ID } from '../records/sources/boston/rentsmart';
 import type { RentSmartPayload } from '../records/types';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
@@ -121,5 +124,32 @@ describe('sourcesForCity', () => {
     expect(sourcesForCity('New Haven, CT')).toEqual([]);
     expect(sourcesForCity(null)).toEqual([]);
     expect(sourcesForCity('Cambridge')).toEqual([]);
+  });
+});
+
+// `records/jurisdiction.ts` (singular) exists so a client island can ask "is this a Boston
+// building?" without the six CKAN adapters riding along. That only holds while the file
+// stays a leaf, so the guard is a source scan, not a behaviour assertion.
+describe('records/jurisdiction.ts is a leaf module', () => {
+  const leaf = readFileSync(join(process.cwd(), 'src/lib/records/jurisdiction.ts'), 'utf8');
+
+  it('imports nothing at all', () => {
+    expect(leaf).not.toMatch(/^\s*import\s/m);
+    expect(leaf).not.toContain('./sources/');
+  });
+
+  it('is the same city test the plural module re-exports', () => {
+    expect(jurisdictionForCity).toBe(leafJurisdictionForCity);
+    expect(normalizeCity('Boston, MA ')).toBe('boston');
+  });
+});
+
+describe('RecordsPullButton', () => {
+  const button = readFileSync(join(process.cwd(), 'src/components/admin/RecordsPullButton.tsx'), 'utf8');
+
+  it('asks the leaf module instead of restating the city regex', () => {
+    expect(button).toContain("from '../../lib/records/jurisdiction'");
+    expect(button).not.toContain('[A-Z]{2}');
+    expect(button).not.toMatch(/function isBoston/);
   });
 });

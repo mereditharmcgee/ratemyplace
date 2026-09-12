@@ -2,6 +2,7 @@
 // The same precedence as the seed's matcher: key the address, find every row on that street
 // whose range contains it under the parity rule, break a tie with the ZIP, and refuse to
 // guess — a null here means "create a row", never "merge onto the nearest".
+import { BOSTON_LOCALITY_NAMES } from '../bostonLocalities';
 import { isBostonLocality } from '../locality';
 import { addressKey } from './identity';
 import { rangeContains } from './seed/match';
@@ -10,6 +11,19 @@ import type { RecordsDb } from './types';
 
 export interface DedupeInput { address: string; city: string | null; zip: string | null }
 export interface DedupeHit { id: string; slug: string }
+
+/**
+ * Every spelling of a Boston building's `city` column worth seeking on: the locality
+ * vocabulary as it is displayed (the seed writes 'Boston'; `POST /api/buildings` writes
+ * whatever Google Places or the reviewer typed, often a neighborhood), plus the two other
+ * casings of the city name itself. Exported so one test can assert the query plan against
+ * the real bind list. Deduped, because 'Boston' is already the first locality name.
+ */
+export const CITY_CANDIDATES: readonly string[] = [
+  ...new Set([...BOSTON_LOCALITY_NAMES, 'Boston', 'boston', 'BOSTON']),
+];
+
+const CITY_PLACEHOLDERS = CITY_CANDIDATES.map(() => '?').join(',');
 
 interface CandidateRow {
   id: string;
@@ -26,12 +40,34 @@ export async function findBuildingByAddress(db: RecordsDb, input: DedupeInput): 
   const key = addressKey(input.address);
   if (!key) return null;
 
-  // `city = 'Boston'` is how the seed writes it, and the (city, street_key) index this
-  // rides on is keyed the same way. A row stored with any other spelling of the city —
-  // 'boston', or a neighborhood name, which is what this endpoint saves when Google hands
-  // one over — is simply not a candidate. Accepted: it can only cost a duplicate page, and
-  // the fix belongs in a city-normalization pass over `buildings`, not in a LOWER() here
-  // that would drop the index.
+  // `city = 'Boston'` is how the seed writes it, but `POST /api/buildings` stores the city
+  // as typed — and Google Places routinely hands back a neighborhood as the locality, so a
+  // real user row on this street can be sitting under 'Dorchester'. Matching only 'Boston'
+  // made every such row invisible to dedupe and cost a duplicate page.
+  //
+  // The predicate is therefore an `IN` over `CITY_CANDIDATES`: the whole Boston locality
+  // vocabulary in display form, plus the two other casings of the city name itself. An `IN`
+  // on the leading column of `idx_buildings_street (city, street_key)` is still a series of
+  // index seeks — one per value — where the `LOWER(city)` that would catch every casing
+  // would drop the index and scan 38k rows. `recordsDedupe.test.ts` asserts the plan.
+  // Casings beyond the three listed ('DORCHESTER', say) remain out of reach; that is what a
+  // city-normalization pass over `buildings` is for.
+  //
+  // Widening the city predicate widened the blast radius with it: four locality names are
+  // not Boston's alone. Downtown, West End, North End and South End are all real city
+  // fields elsewhere — New Haven has a Downtown too — so a non-Boston row saved under one
+  // of them could become a merge target for a reviewer whose street name and house number
+  // happen to line up. The ZIP guard below keeps the candidate set inside Boston: every
+  // Boston ZIP is 021xx or 022xx. A NULL ZIP is kept rather than dropped, because a row
+  // that never recorded one is not evidence of anywhere, and the precedence rules below
+  // already decline to merge onto a candidate whose ZIP disagrees with the input.
+  // `LIKE '021%'` on a prefix is a residual filter on rows the index seek already found,
+  // not a second seek, so the plan is unchanged.
+  //
+  // Two gaps remain after it. A Massachusetts row outside Boston that shares a 021xx/022xx
+  // ZIP (a Cambridge or Brookline row stored under one of those four names) is still
+  // reachable in principle, and so is any casing outside the three above. Both close with
+  // the same city-normalization pass.
   //
   // The span bound applies to user-entered rows only. The assessor's own ranges do go very
   // wide: `10-638 Georgetowne Drive` (a subsidized-housing development) spans 628 numbers,
@@ -45,9 +81,9 @@ export async function findBuildingByAddress(db: RecordsDb, input: DedupeInput): 
   // from the other side: it treats that shape as undecidable rather than a match.
   const { results } = await db
     .prepare(
-      "SELECT id, slug, source, st_num_lo, st_num_hi, zip_code, created_at FROM buildings WHERE city = 'Boston' AND street_key = ? AND st_num_lo IS NOT NULL AND st_num_hi IS NOT NULL AND (source = 'seed' OR st_num_hi - st_num_lo <= 100)",
+      `SELECT id, slug, source, st_num_lo, st_num_hi, zip_code, created_at FROM buildings WHERE city IN (${CITY_PLACEHOLDERS}) AND street_key = ? AND (zip_code IS NULL OR zip_code LIKE '021%' OR zip_code LIKE '022%') AND st_num_lo IS NOT NULL AND st_num_hi IS NOT NULL AND (source = 'seed' OR st_num_hi - st_num_lo <= 100)`,
     )
-    .bind(key.streetKey)
+    .bind(...CITY_CANDIDATES, key.streetKey)
     .all<CandidateRow>();
 
   let contained = results.filter((row) => rangeContains({ numLo: row.st_num_lo, numHi: row.st_num_hi }, key));
