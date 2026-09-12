@@ -98,19 +98,21 @@ use), `idx_saved_buildings_building` on `saved_buildings(building_id)` (`0023` i
 migration tracking does not know it ran; unlike every other file above, re-running it is
 harmless.
 
-**`0033` (records queue reason/requested index) is idempotent too, and is NOT YET APPLIED TO
-PRODUCTION.** One `CREATE INDEX IF NOT EXISTS` over `records_queue(reason, requested_at)`,
-which is the daily-cap count behind the public records button:
+**`0033` (records queue reason/requested index) is idempotent too, and was APPLIED TO
+PRODUCTION 2026-09-10** by hand, ahead of the Worker deploy. One
+`CREATE INDEX IF NOT EXISTS` over `records_queue(reason, requested_at)`, which is the
+daily-cap count behind the public records button:
 `SELECT COUNT(*), MIN(requested_at) … WHERE reason = 'button' AND requested_at >= ?`. Neither
 `0031` nor `0032` covers those two columns, and `button` rows are never purged, so that count
-scanned a growing table on every unauthenticated press. **Apply it by hand before the
-city-wide fill is unpaused** — see the runbook's first-unpause checklist:
+scanned a growing table on every unauthenticated press. Wrangler's migration tracking does
+not know it ran; like `0032`, re-running it is harmless. The by-hand command, kept for
+reference:
 
 ```bash
 npx wrangler d1 execute ratemyplace-db --remote --file migrations/0033_records_queue_reason_requested.sql
 ```
 
-Then confirm it landed:
+And the check that confirmed it landed — it returned the index name on 2026-09-10:
 
 ```bash
 npx wrangler d1 execute ratemyplace-db --remote --command \
