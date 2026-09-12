@@ -3,23 +3,6 @@ import { unitItems, buildingItems, landlordItems, supplementaryItems } from '../
 import { bedroomOptions, bathroomOptions } from '../../../lib/formOptions';
 import type { Building, UnitDetails, Tenancy, ReviewData } from './types';
 
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (container: HTMLElement, options: {
-        sitekey: string;
-        theme?: string;
-        callback?: (token: string) => void;
-        'expired-callback'?: () => void;
-        'error-callback'?: () => void;
-        'timeout-callback'?: () => void;
-      }) => string;
-      reset: (widgetId: string) => void;
-      remove: (widgetId: string) => void;
-    };
-  }
-}
-
 interface Props {
   building: Building | null;
   unitDetails: UnitDetails;

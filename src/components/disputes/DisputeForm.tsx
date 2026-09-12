@@ -1,23 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { DISPUTE_REASONS } from '../../lib/disputes';
 
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (container: HTMLElement, options: {
-        sitekey: string;
-        theme?: string;
-        callback?: (token: string) => void;
-        'expired-callback'?: () => void;
-        'error-callback'?: () => void;
-        'timeout-callback'?: () => void;
-      }) => string;
-      reset: (widgetId: string) => void;
-      remove: (widgetId: string) => void;
-    };
-  }
-}
-
 interface Props {
   siteUrl: string;
 }
