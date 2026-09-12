@@ -234,9 +234,10 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   precedence, in **one** statement (indexed `building_id` seeks as correlated subqueries),
   because the public endpoint calls it once per request; `hasDeeperPull` and
   `pendingQueueReason` stay exported for callers that need one answer without the other.
-  **Three callers enqueue off this state**, all of them from `never_pulled` only: the reader
-  button (`request.ts`), the follower enqueue on save, and review approval
-  (`PATCH /api/admin/reviews/[id]`, a `follower` row).
+  **Three callers enqueue off this state:** the reader button (`request.ts`), which enqueues
+  from every state but `ineligible` and `pulled`, and the follower enqueue on save and on
+  review approval (`PATCH /api/admin/reviews/[id]`, a `follower` row), both only from
+  `never_pulled`.
   Eligibility is `jurisdictionForCity`, not a string compare on 'Boston'. A **parked `fill` row
   still reads `fill_queued`**, so the button stays offered: a press replaces it with a fresh
   priority-0 row that gets its own attempts. `DEEPER_SOURCE_IDS` lives here and

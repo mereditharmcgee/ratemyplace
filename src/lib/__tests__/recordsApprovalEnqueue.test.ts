@@ -87,6 +87,14 @@ suite('PATCH /api/admin/reviews/[id] enqueues a first records pull on approval',
     expect(await pendingReasons(db, plain)).toEqual([]);
   });
 
+  it('does not enqueue for a building outside Boston', async () => {
+    const elsewhere = await insertBuilding(db, { id: 'nh', city: 'New Haven', state: 'CT', zip_code: '06511', parcel_id: '123456789' });
+    const review = await insertPendingReview(db, 'rev-nh', elsewhere);
+    const res = await PATCH(createContext(db, review, 'approved'));
+    expect(res.status).toBe(200);
+    expect(await pendingReasons(db, elsewhere)).toEqual([]);
+  });
+
   it('enqueues nothing when the review is rejected', async () => {
     const res = await PATCH(createContext(db, reviewId, 'rejected'));
     expect(res.status).toBe(200);
@@ -101,8 +109,9 @@ suite('PATCH /api/admin/reviews/[id] enqueues a first records pull on approval',
     expect(await pendingReasons(db, buildingId)).toEqual([]);
   });
 
-  // A moderator re-approving an already-approved review must not stack a second row; the
-  // `never_pulled` guard is what stops it, since the first row reads `requested`.
+  // A moderator re-approving an already-approved review must not stack a second row. The
+  // `never_pulled` guard stops it first (the first row reads `requested`), and `enqueue`
+  // would refuse an equal-priority row anyway, so this pins the behaviour, not the guard.
   it('a second approval still leaves one pending row', async () => {
     await PATCH(createContext(db, reviewId, 'approved'));
     const res = await PATCH(createContext(db, reviewId, 'approved'));
