@@ -29,12 +29,15 @@ second earlier — which is what it is for.
 Do these in order. The first minute tick starts pulling the moment the Worker is live, so
 the pause flag has to be on production **before** the Worker is.
 
-> **As of 2026-09-10 the Worker is not yet deployed.** The API token in use lacks the
-> "Workers Scripts: Edit" permission, so `npm run records:worker:deploy` cannot run — grant
-> that permission (or `wrangler login`) first. Owner action. And note that `app_settings` on
-> production is empty today, so step 1 below is required rather than a formality: with no
-> row for `records_fill_paused` the fill reads as running, and the first minute tick after
-> the deploy would start the city-wide pass.
+> **Done once, 2026-09-10.** The first deploy went out that day (version `1ed225ae`), with
+> `records_fill_paused` set to `'1'` on production beforehand; the city-wide fill was turned
+> on 2026-09-12. The steps below stand as the procedure for a rebuild or a fresh environment.
+>
+> One trap from that first deploy: the crons did not fire for most of two days and nothing
+> was wrong with the Worker — Cloudflare incident `sjs8s0q2x4hw` ("Workers Cron Triggers
+> degraded", 2026-09-09 to 2026-09-11) was eating them. **Zero invocations after a deploy:
+> check [cloudflarestatus.com](https://www.cloudflarestatus.com) for a Cron Triggers
+> incident before you debug anything.**
 
 **1. Confirm the fill is paused on production.** This is an upsert, so it is safe whether or
 not the row already exists:
@@ -111,10 +114,10 @@ release), not part of this deploy. See the next section.
 The Worker ships paused. Once the C3 site release is live (search, the records button, the
 sitemap), turn the fill on once, deliberately.
 
-**Step 0, before anything else: apply migration `0033` by hand.** It indexes
-`records_queue(reason, requested_at)`, which is the records button's rolling daily-cap count
-over a table whose `button` rows are never purged. It is idempotent, and it is the one
-migration on this branch that production does not have yet.
+**Step 0, before anything else: apply migration `0033` by hand — done 2026-09-10.** It
+indexes `records_queue(reason, requested_at)`, which is the records button's rolling
+daily-cap count over a table whose `button` rows are never purged. It is idempotent, so
+re-running the command below costs nothing.
 
 ```bash
 npx wrangler d1 execute ratemyplace-db --remote --file migrations/0033_records_queue_reason_requested.sql

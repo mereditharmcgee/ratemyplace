@@ -257,7 +257,9 @@ Things that have already cost time. Read before debugging.
   else, so a change to `src/lib/records/scheduler.ts` or `queue.ts` is live in the admin
   routes but not in the cron until someone runs `npm run records:worker:deploy`. Its secrets
   (`RESEND_API_KEY`, `RECORDS_ALERT_EMAIL`) are Worker secrets, separate from the site's.
-  See [`docs/runbooks/records-scheduler.md`](docs/runbooks/records-scheduler.md).
+  After a deploy, zero cron invocations for more than fifteen minutes has so far meant a
+  Cloudflare Cron Triggers incident rather than a broken Worker — check the status page
+  first. See [`docs/runbooks/records-scheduler.md`](docs/runbooks/records-scheduler.md).
 - **`app_settings.records_fill_paused` is the brake on the city-wide fill.** `'1'` stops the
   fill; button, follower and refresh pulls keep running. The circuit breaker sets it and
   never clears it — a human unpauses from `/admin/records`. Deploy the Worker with it set,
