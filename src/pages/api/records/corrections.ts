@@ -20,7 +20,9 @@ import {
  * no name. Follows the disputes.ts guard order exactly (content-type guard →
  * rate limit → request.json() → Turnstile → validation → logic) because this
  * is an unauthenticated JSON POST and Astro's checkOrigin does not cover
- * application/json bodies.
+ * application/json bodies. The parse itself is guarded: a body that is not
+ * JSON is a 400 from that guard, not a 500 from the catch, and writes no log
+ * line.
  *
  * Reports are only accepted for buildings that have a records panel — a building
  * with no `record_pulls` row 404s like an unknown one.
@@ -55,7 +57,22 @@ export const POST: APIRoute = async (context: APIContext) => {
       });
     }
 
-    const body = await request.json();
+    // A body that is not JSON at all ('{') throws SyntaxError. Caught here rather than by
+    // the generic handler below: it is a 400, not a 500, and it writes no log line — a
+    // malformed request is the client's mistake, and logging one per attempt hands a prober
+    // a way to fill the log.
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return new Response(
+        JSON.stringify({
+          error: 'Validation failed',
+          details: [{ field: 'body', message: 'Request body must be JSON.' }],
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
 
     // A JSON body of `null`, an array, or a primitive parses fine but isn't a
     // record we can validate field-by-field — reject it before it reaches
@@ -70,11 +87,12 @@ export const POST: APIRoute = async (context: APIContext) => {
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
+    const record = body as Record<string, unknown>;
 
     // Turnstile bot verification — this endpoint is unauthenticated and accepts
     // JSON (so Astro checkOrigin does not cover it).
     const turnstileResult = await verifyTurnstile(
-      typeof body.turnstileToken === 'string' ? body.turnstileToken : '',
+      typeof record.turnstileToken === 'string' ? record.turnstileToken : '',
       getEnv(context).TURNSTILE_SECRET_KEY,
       clientIP
     );
@@ -85,7 +103,7 @@ export const POST: APIRoute = async (context: APIContext) => {
       );
     }
 
-    const errors = validateCorrectionBody(body);
+    const errors = validateCorrectionBody(record);
     if (errors.length > 0) {
       return new Response(JSON.stringify({ error: 'Validation failed', details: errors }), {
         status: 400,

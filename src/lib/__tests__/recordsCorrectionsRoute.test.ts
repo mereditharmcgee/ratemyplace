@@ -120,6 +120,27 @@ suite('POST /api/records/corrections', () => {
     });
   });
 
+  it('400s on a body that is not JSON at all, with no log line', async () => {
+    // `{` with a JSON content type used to throw SyntaxError into the generic catch: a 500
+    // and a logError line per attempt, for what is a client error and nothing of ours.
+    const db = createRecordsTestDb();
+    const context = createContext(db, { ip: '198.51.100.22', body: '{' });
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      const response = await POST(context);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: 'Validation failed',
+        details: [{ field: 'body', message: 'Request body must be JSON.' }],
+      });
+      expect(consoleError).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it('rate limits after 3 submissions per hour per IP', async () => {
     const db = createRecordsTestDb();
     await insertPulledBuilding(db);
