@@ -1,5 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { getScoreTextColor } from '../../lib/scoring-colors';
+import type { AdminBuilding, AdminBuildingsResponse, AdminBuildingsStats } from '../../lib/api-types';
+import { adminBuildingsUrl, type AdminBuildingsFilter } from '../../lib/admin/buildingsFilter';
+import { applyBuildingPatch, buildingEditForm, buildingEditPatch, type BuildingEditForm } from '../../lib/admin/buildingEdit';
+import BuildingsFilterBar from './BuildingsFilterBar';
 import RecordsPullButton from './RecordsPullButton';
 
 interface LandlordOption {
@@ -7,53 +11,29 @@ interface LandlordOption {
   name: string;
 }
 
-interface Building {
-  id: string;
-  address: string;
-  slug: string;
-  neighborhood: string | null;
-  city: string | null;
-  state: string | null;
-  zip_code: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  year_built: number | null;
-  unit_count: number | null;
-  building_type: string | null;
-  landlord_id: string | null;
-  landlord_name: string | null;
-  property_manager_id: string | null;
-  property_manager_name: string | null;
-  review_count: number;
-  avg_score: number | null;
-  created_at: number;
-  // Admin-editable info
-  admin_notes: string | null;
-  owner_name: string | null;
-  owner_entity: string | null;
-  owner_website: string | null;
-}
-
-interface BuildingsStats {
-  total_buildings: number;
-  with_reviews: number;
-  with_landlords: number;
-  total_reviews: number;
-}
+type Building = AdminBuilding;
 
 const PAGE_SIZE = 100;
+const SEARCH_DEBOUNCE_MS = 300;
 
 export default function BuildingsTable() {
   const [buildings, setBuildings] = useState<Building[]>([]);
-  const [stats, setStats] = useState<BuildingsStats>({ total_buildings: 0, with_reviews: 0, with_landlords: 0, total_reviews: 0 });
+  const [stats, setStats] = useState<AdminBuildingsStats>({ total_buildings: 0, with_reviews: 0, with_landlords: 0, total_reviews: 0 });
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Filters run on the server. `ready` holds the first fetch until `?landlord=` is read.
+  const [ready, setReady] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+  const [landlordId, setLandlordId] = useState<string | null>(null);
+  const [landlordName, setLandlordName] = useState<string | null>(null);
+  const [orphansOnly, setOrphansOnly] = useState(false);
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(null);
   const [editingBuilding, setEditingBuilding] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<Building>>({});
+  const [editForm, setEditForm] = useState<BuildingEditForm>({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [cleaning, setCleaning] = useState(false);
@@ -61,37 +41,72 @@ export default function BuildingsTable() {
   const [managers, setManagers] = useState<LandlordOption[]>([]);
   const [enriching, setEnriching] = useState<string | null>(null);
   const [enrichResult, setEnrichResult] = useState<any>(null);
+  // Only the newest list request may write state, so a slow response for an old filter
+  // cannot overwrite the rows for the current one.
+  const requestSeq = useRef(0);
+
+  const filter = useMemo<AdminBuildingsFilter>(
+    () => ({ landlord: landlordId, q: search || null, orphans: orphansOnly }),
+    [landlordId, search, orphansOnly],
+  );
 
   useEffect(() => {
-    fetchBuildings(0, true);
+    setLandlordId(new URLSearchParams(window.location.search).get('landlord')?.trim() || null);
+    setReady(true);
     fetchLandlords();
     fetchManagers();
   }, []);
 
-  // replace=true on initial load; replace=false appends the next page.
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Any filter change replaces the list from the first page.
+  useEffect(() => {
+    if (ready) fetchBuildings(0, true);
+  }, [ready, filter]);
+
+  // replace=true starts the list over; replace=false appends the next page.
   const fetchBuildings = async (offset: number, replace: boolean) => {
+    const seq = ++requestSeq.current;
+    if (replace) setRefreshing(true);
+    else setLoadingMore(true);
     try {
-      if (replace) setLoading(true);
-      else setLoadingMore(true);
-      const response = await fetch(`/api/admin/buildings?limit=${PAGE_SIZE}&offset=${offset}`);
+      const response = await fetch(adminBuildingsUrl({ limit: PAGE_SIZE, offset }, filter));
       const data = await response.json();
+      if (seq !== requestSeq.current) return;
 
       if (response.ok) {
-        setBuildings((prev) => (replace ? data.buildings : [...prev, ...data.buildings]));
-        setStats(data.stats);
-        setTotal(data.total);
+        const body = data as AdminBuildingsResponse;
+        setBuildings((prev) => (replace ? body.buildings : [...prev, ...body.buildings]));
+        setStats(body.stats);
+        setTotal(body.total);
+        setLandlordName(body.filter?.landlord?.name ?? null);
+        setError(null);
       } else {
         setError(data.error || 'Failed to load buildings');
       }
     } catch (err) {
-      setError('Failed to load buildings');
+      if (seq === requestSeq.current) setError('Failed to load buildings');
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (seq === requestSeq.current) {
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
+      }
     }
   };
 
   const loadMore = () => fetchBuildings(buildings.length, false);
+
+  const clearLandlord = () => {
+    setLandlordId(null);
+    setLandlordName(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('landlord');
+    window.history.replaceState(null, '', url.toString());
+  };
 
   const fetchLandlords = async () => {
     try {
@@ -113,22 +128,7 @@ export default function BuildingsTable() {
 
   const startEditing = (building: Building) => {
     setEditingBuilding(building.id);
-    setEditForm({
-      address: building.address,
-      neighborhood: building.neighborhood || '',
-      city: building.city || '',
-      state: building.state || '',
-      zip_code: building.zip_code || '',
-      year_built: building.year_built,
-      unit_count: building.unit_count,
-      building_type: building.building_type || '',
-      landlord_id: building.landlord_id || '',
-      property_manager_id: building.property_manager_id || '',
-      admin_notes: building.admin_notes || '',
-      owner_name: building.owner_name || '',
-      owner_entity: building.owner_entity || '',
-      owner_website: building.owner_website || '',
-    });
+    setEditForm(buildingEditForm(building));
   };
 
   const cancelEditing = () => {
@@ -137,28 +137,28 @@ export default function BuildingsTable() {
   };
 
   const saveBuilding = async (buildingId: string) => {
+    const original = buildings.find((b) => b.id === buildingId);
+    if (!original) return;
+    // Send only what changed, so a field the form did not start from is never overwritten.
+    const patch = buildingEditPatch(original, editForm);
+    if (Object.keys(patch).length === 0) {
+      cancelEditing();
+      return;
+    }
     setSaving(true);
     try {
       const response = await fetch(`/api/admin/buildings/${buildingId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(patch),
       });
 
       if (response.ok) {
+        const updated = applyBuildingPatch(original, patch);
         // Resolve landlord/PM names for the updated local state
-        const landlordMatch = landlords.find((l) => l.id === editForm.landlord_id);
-        const managerMatch = managers.find((m) => m.id === editForm.property_manager_id);
-        setBuildings((prev) =>
-          prev.map((b) =>
-            b.id === buildingId ? {
-              ...b,
-              ...editForm,
-              landlord_name: landlordMatch?.name || null,
-              property_manager_name: managerMatch?.name || null,
-            } : b
-          )
-        );
+        updated.landlord_name = landlords.find((l) => l.id === updated.landlord_id)?.name ?? null;
+        updated.property_manager_name = managers.find((m) => m.id === updated.property_manager_id)?.name ?? null;
+        setBuildings((prev) => prev.map((b) => (b.id === buildingId ? updated : b)));
         setEditingBuilding(null);
         setEditForm({});
       } else {
@@ -187,6 +187,7 @@ export default function BuildingsTable() {
 
       if (response.ok) {
         setBuildings((prev) => prev.filter((b) => b.id !== buildingId));
+        setTotal((prev) => Math.max(0, prev - 1));
         setExpandedBuilding(null);
         alert(`Successfully deleted "${data.deleted}". ${data.reviewsDeleted} review(s) were also deleted.`);
       } else {
@@ -280,14 +281,7 @@ export default function BuildingsTable() {
     return getScoreTextColor(score);
   };
 
-  const filteredBuildings = buildings.filter((building) => {
-    return (
-      building.address.toLowerCase().includes(search.toLowerCase()) ||
-      building.city?.toLowerCase().includes(search.toLowerCase()) ||
-      building.neighborhood?.toLowerCase().includes(search.toLowerCase()) ||
-      building.landlord_name?.toLowerCase().includes(search.toLowerCase())
-    );
-  });
+  const filtersActive = Boolean(filter.landlord || filter.q || filter.orphans);
 
   if (loading) {
     return (
@@ -297,25 +291,20 @@ export default function BuildingsTable() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
-        {error}
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       {/* Search and Actions */}
       <div className="flex flex-wrap gap-4">
         <div className="flex-1 min-w-[200px]">
-          <input
-            type="text"
-            placeholder="Search by address, city, neighborhood, or landlord..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          <BuildingsFilterBar
+            searchInput={searchInput}
+            onSearchInput={setSearchInput}
+            landlordId={landlordId}
+            landlordName={landlordName}
+            onClearLandlord={clearLandlord}
+            orphansOnly={orphansOnly}
+            onOrphansOnly={setOrphansOnly}
+            refreshing={refreshing}
           />
         </div>
         <button
@@ -333,8 +322,13 @@ export default function BuildingsTable() {
         </button>
       </div>
 
-      {/* Stats */}
-      {/* Stats — values come from the API so they reflect ALL buildings, not the loaded slice */}
+      {error && (
+        <div role="alert" className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* Stats — values come from the API so they reflect ALL buildings, not the loaded slice or the filters */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-[6px] border border-gray-200">
           <div className="text-2xl font-bold text-gray-900">{stats.total_buildings}</div>
@@ -356,7 +350,7 @@ export default function BuildingsTable() {
 
       {/* Buildings List */}
       <div className="space-y-3">
-        {filteredBuildings.map((building) => (
+        {buildings.map((building) => (
           <div
             key={building.id}
             className="bg-white rounded-[6px] border border-gray-200 overflow-hidden hover:shadow-sm transition-shadow"
@@ -848,17 +842,17 @@ export default function BuildingsTable() {
         ))}
       </div>
 
-      {filteredBuildings.length === 0 && (
+      {buildings.length === 0 && !refreshing && (
         <div className="text-center py-12 text-gray-500 bg-white rounded-[6px] border border-gray-200">
           No buildings found matching your criteria.
         </div>
       )}
 
-      {/* Pagination footer — search filters are client-side and only see the loaded slice */}
-      <div className="flex items-center justify-between text-sm text-gray-500">
+      {/* Pagination footer — search and filters run on the server, so `total` counts every match */}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-500">
         <span>
-          Showing {filteredBuildings.length}
-          {search ? ` of ${buildings.length} loaded` : ''} ({total} total)
+          Showing {buildings.length} of {total}{filtersActive ? ' matching' : ''} buildings
+          {filter.q ? ' (search covers address, city, and ZIP across all buildings)' : ''}
         </span>
         {buildings.length < total && (
           <button
