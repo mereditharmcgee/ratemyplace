@@ -528,17 +528,49 @@ suite('admin records queue routes', () => {
       expect(await pendingReasons(db, 'never')).toEqual(['follower']);
     });
 
-    it('reports a reviewed Boston building with no parcel as ineligible rather than queueing it', async () => {
+    it('queues a reviewed Boston building with no parcel, since the pull resolves the parcel itself', async () => {
       const db = createRecordsTestDb();
+      // The common reviewed building: a Google Places row with no parcel yet.
       await insertBuilding(db, { id: 'no-parcel', parcel_id: null });
       await reviewed(db, 'no-parcel');
 
       const response = await BACKFILL(createContext(db, { body: {} }));
-      expect(await data<RecordsQueueBackfillResult>(response)).toMatchObject({
+      expect(response.status).toBe(202);
+      expect(await data<RecordsQueueBackfillResult>(response)).toEqual({
+        enqueued: 1,
+        skipped: 0,
+        examined: 1,
+        skippedByState: {},
+      });
+      expect(await pendingReasons(db, 'no-parcel')).toEqual(['follower']);
+
+      // A second press finds the pending row and reads it as `requested`, as it would for a
+      // building with a parcel, even though `recordsRequestState` still says `ineligible`.
+      const again = await BACKFILL(createContext(db, { body: {} }));
+      expect(await data<RecordsQueueBackfillResult>(again)).toEqual({
         enqueued: 0,
         skipped: 1,
+        examined: 1,
+        skippedByState: { requested: 1 },
+      });
+      expect(await pendingReasons(db, 'no-parcel')).toEqual(['follower']);
+    });
+
+    it('skips a parcel-less building that already has a deeper pull (a condo with no whole-building parcel)', async () => {
+      const db = createRecordsTestDb();
+      // Resolution found no whole-building parcel, so `parcel_id` stays NULL after a full pull.
+      await insertBuilding(db, { id: 'condo', parcel_id: null });
+      await reviewed(db, 'condo');
+      await insertPull(db, 'condo', DEEPER_SOURCE_IDS[0], 'error');
+
+      const response = await BACKFILL(createContext(db, { body: {} }));
+      expect(await data<RecordsQueueBackfillResult>(response)).toEqual({
+        enqueued: 0,
+        skipped: 1,
+        examined: 1,
         skippedByState: { ineligible: 1 },
       });
+      expect(await pendingReasons(db, 'condo')).toEqual([]);
     });
   });
 });

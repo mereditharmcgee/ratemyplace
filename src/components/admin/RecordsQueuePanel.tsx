@@ -61,7 +61,7 @@ const BACKFILL_SKIP_LABELS: Array<[RecordsQueueBackfillSkip, string]> = [
   ['fill_queued', 'in the fill queue'],
   ['parked', 'parked'],
   ['already_queued', 'queued meanwhile'],
-  ['ineligible', 'no parcel id'],
+  ['ineligible', 'pulled, no parcel found'],
   ['outside_boston', 'outside Boston'],
 ];
 

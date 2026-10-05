@@ -421,7 +421,9 @@ export interface RecordsQueueStats {
 
 /**
  * Why `POST /api/admin/records/queue/backfill-reviewed` passed over a building: a
- * `RecordsRequestState` other than `never_pulled`, or `outside_boston` for a reviewed
+ * `RecordsRequestState` other than `never_pulled` (`ineligible` only for a parcel-less
+ * building that already has a pull: one with none is queued so the pull can resolve its
+ * parcel), or `outside_boston` for a reviewed
  * building in a city with no records jurisdiction, or `already_queued` when a row landed
  * between the state read and the insert. Mirrors the route; the state names are
  * `coverage.ts`'s, copied here so the panel does not import the queue's SQL.

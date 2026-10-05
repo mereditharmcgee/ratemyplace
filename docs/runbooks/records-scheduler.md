@@ -251,15 +251,22 @@ reviewed buildings** (or `POST /api/admin/records/queue/backfill-reviewed` with 
 
 It looks at every building with an approved review, keeps the Boston ones, and enqueues a
 `follower` row for each one whose records state is `never_pulled` — the same rule approval
-uses. The 202 answer is the receipt: `enqueued`, `skipped`, `examined`, and `skippedByState`,
+uses — and for each one with no `parcel_id` that has never been pulled. The 202 answer is the receipt: `enqueued`, `skipped`, `examined`, and `skippedByState`,
 which says why each skipped building was passed over (`pulled`, `requested`, `fill_queued`,
 `parked`, `ineligible`, `outside_boston`, `already_queued`). The rows drain ahead of the fill,
 three a minute, so a few dozen take a quarter of an hour or so.
 
+Most reviewed buildings came in from Google Places with no `parcel_id`. The backfill queues
+them anyway, because the pull resolves the parcel itself and writes `parcel_id` when the
+address matches one. When it matches none, or several, the pull writes an error row on every
+source with the resolution failure as the message; the queue row still completes in that one
+attempt, so there is no retry and nothing parks. Look for those error rows on the building's
+page, and fix the address (or use the correction workflow) before pulling it again by hand.
+
 Pressing it again is harmless: a building whose row is still pending reads `requested` and is
-skipped. Watch for `ineligible` in the receipt — that is a reviewed Boston building with no
-`parcel_id`, which the queue does not take; such a building needs the admin pull button on its
-page, which resolves the parcel itself.
+skipped, with or without a parcel. `ineligible` in the receipt is a reviewed Boston building
+that has no `parcel_id` but has been pulled already — a condo whose resolution found no
+whole-building parcel, or an address that matched none — so it is not queued a second time.
 
 ## Retrying a parked row
 
