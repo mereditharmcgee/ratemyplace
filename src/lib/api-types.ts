@@ -419,6 +419,34 @@ export interface RecordsQueueStats {
   fillPaused: boolean;
 }
 
+/**
+ * Why `POST /api/admin/records/queue/backfill-reviewed` passed over a building: a
+ * `RecordsRequestState` other than `never_pulled`, or `outside_boston` for a reviewed
+ * building in a city with no records jurisdiction, or `already_queued` when a row landed
+ * between the state read and the insert. Mirrors the route; the state names are
+ * `coverage.ts`'s, copied here so the panel does not import the queue's SQL.
+ */
+export type RecordsQueueBackfillSkip =
+  | 'outside_boston'
+  | 'ineligible'
+  | 'pulled'
+  | 'fill_queued'
+  | 'parked'
+  | 'requested'
+  | 'already_queued';
+
+/** POST /api/admin/records/queue/backfill-reviewed — the `data` of its 202 body. */
+export interface RecordsQueueBackfillResult {
+  /** Follower rows that landed. */
+  enqueued: number;
+  /** Examined buildings that got no row; `skippedByState` says why. */
+  skipped: number;
+  /** Distinct buildings with at least one approved review. */
+  examined: number;
+  /** Only the reasons that occurred, so an empty object means nothing was skipped. */
+  skippedByState: Partial<Record<RecordsQueueBackfillSkip, number>>;
+}
+
 /** POST /api/records/request — 202 body. */
 export interface RecordsRequestResponse {
   data: { status: 'queued' | 'already_queued' };

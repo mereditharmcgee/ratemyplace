@@ -3,11 +3,18 @@ import { describe, expect, it } from 'vitest';
 import { GET } from '../../pages/api/admin/records/queue/index';
 import { POST as PAUSE } from '../../pages/api/admin/records/queue/pause';
 import { POST as RETRY } from '../../pages/api/admin/records/queue/retry';
+import { POST as BACKFILL } from '../../pages/api/admin/records/queue/backfill-reviewed';
+import { DEEPER_SOURCE_IDS } from '../records/coverage';
 import { LOCK_TTL_SECONDS, MAX_ATTEMPTS } from '../records/queue';
 import { SETTING_KEYS } from '../records/settings';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
-import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
-import type { RecordsQueueFixtureResult, RecordsQueueParkedRow, RecordsQueueStats } from '../api-types';
+import { createRecordsTestDb, insertBuilding, insertPull, pendingReasons } from './helpers/recordsDb';
+import type {
+  RecordsQueueBackfillResult,
+  RecordsQueueFixtureResult,
+  RecordsQueueParkedRow,
+  RecordsQueueStats,
+} from '../api-types';
 
 const suite = sqliteAvailable ? describe : describe.skip;
 
@@ -447,6 +454,91 @@ suite('admin records queue routes', () => {
       expect(response.status).toBe(404);
       expect(await response.json()).toEqual({ error: 'Queue row not found' });
       expect(await readRow(db, id)).toMatchObject({ attempts: MAX_ATTEMPTS, done_at: NOW - 5 });
+    });
+  });
+
+  describe('POST /api/admin/records/queue/backfill-reviewed', () => {
+    async function reviewed(db: TestD1Database, id: string, status = 'approved', n = 1): Promise<void> {
+      await db.prepare('INSERT INTO reviews (id, building_id, status) VALUES (?, ?, ?)').bind(`r-${id}-${status}-${n}`, id, status).run();
+    }
+
+    it('403s a non-admin and 415s a body that is not application/json', async () => {
+      const db = createRecordsTestDb();
+      const forbidden = await BACKFILL(createContext(db, { user: { id: 'user-1', isAdmin: false }, body: {} }));
+      expect(forbidden.status).toBe(403);
+      expect(await forbidden.json()).toEqual({ error: 'Admin access required' });
+
+      const wrongType = await BACKFILL(createContext(db, { contentType: 'text/plain', body: '{}' }));
+      expect(wrongType.status).toBe(415);
+      expect(await wrongType.json()).toEqual({ error: 'Unsupported Media Type' });
+    });
+
+    it('queues a follower pull for each reviewed Boston building never pulled, and skips the rest', async () => {
+      const db = createRecordsTestDb();
+      // Reviewed, Boston, has a parcel, never pulled: the one this endpoint exists for.
+      await insertBuilding(db, { id: 'never', parcel_id: '2102098000' });
+      await reviewed(db, 'never');
+      // Reviewed but already has a deeper pull.
+      await insertBuilding(db, { id: 'pulled', parcel_id: '2102098001' });
+      await reviewed(db, 'pulled');
+      await insertPull(db, 'pulled', DEEPER_SOURCE_IDS[0]);
+      // Reviewed but not Boston.
+      await insertBuilding(db, {
+        id: 'new-haven',
+        address: '333 Humphrey St, New Haven, CT 06511',
+        city: 'New Haven',
+        state: 'CT',
+        zip_code: '06511',
+      });
+      await reviewed(db, 'new-haven');
+      // Boston and never pulled, but no approved review: not this endpoint's business.
+      await insertBuilding(db, { id: 'pending-only', parcel_id: '2102098002' });
+      await reviewed(db, 'pending-only', 'pending');
+      // Two approved reviews on one building still examine it once.
+      await reviewed(db, 'never', 'approved', 2);
+
+      const response = await BACKFILL(createContext(db, { body: {} }));
+      expect(response.status).toBe(202);
+      expect(await data<RecordsQueueBackfillResult>(response)).toEqual({
+        enqueued: 1,
+        skipped: 2,
+        examined: 3,
+        skippedByState: { outside_boston: 1, pulled: 1 },
+      });
+
+      expect(await pendingReasons(db, 'never')).toEqual(['follower']);
+      expect(await pendingReasons(db, 'pulled')).toEqual([]);
+      expect(await pendingReasons(db, 'new-haven')).toEqual([]);
+      expect(await pendingReasons(db, 'pending-only')).toEqual([]);
+    });
+
+    it('is safe to press twice: the second press finds the row already queued', async () => {
+      const db = createRecordsTestDb();
+      await insertBuilding(db, { id: 'never', parcel_id: '2102098000' });
+      await reviewed(db, 'never');
+
+      await BACKFILL(createContext(db, { body: {} }));
+      const again = await BACKFILL(createContext(db, { body: {} }));
+      expect(await data<RecordsQueueBackfillResult>(again)).toEqual({
+        enqueued: 0,
+        skipped: 1,
+        examined: 1,
+        skippedByState: { requested: 1 },
+      });
+      expect(await pendingReasons(db, 'never')).toEqual(['follower']);
+    });
+
+    it('reports a reviewed Boston building with no parcel as ineligible rather than queueing it', async () => {
+      const db = createRecordsTestDb();
+      await insertBuilding(db, { id: 'no-parcel', parcel_id: null });
+      await reviewed(db, 'no-parcel');
+
+      const response = await BACKFILL(createContext(db, { body: {} }));
+      expect(await data<RecordsQueueBackfillResult>(response)).toMatchObject({
+        enqueued: 0,
+        skipped: 1,
+        skippedByState: { ineligible: 1 },
+      });
     });
   });
 });

@@ -242,6 +242,25 @@ npx wrangler d1 execute ratemyplace-db --remote --command \
 The fill resumes on the next minute tick. If the cause has not actually cleared, the next
 06:00 planner pauses it again and emails again.
 
+## Backfilling reviewed buildings
+
+Approving a review queues a `follower` pull, but only since sub-project C; reviews approved
+before that never queued one, so some reviewed Boston buildings have no records on their page.
+**Run this once after the October 2026 deploy:** on `/admin/records`, press **Queue pulls for
+reviewed buildings** (or `POST /api/admin/records/queue/backfill-reviewed` with `{}`).
+
+It looks at every building with an approved review, keeps the Boston ones, and enqueues a
+`follower` row for each one whose records state is `never_pulled` — the same rule approval
+uses. The 202 answer is the receipt: `enqueued`, `skipped`, `examined`, and `skippedByState`,
+which says why each skipped building was passed over (`pulled`, `requested`, `fill_queued`,
+`parked`, `ineligible`, `outside_boston`, `already_queued`). The rows drain ahead of the fill,
+three a minute, so a few dozen take a quarter of an hour or so.
+
+Pressing it again is harmless: a building whose row is still pending reads `requested` and is
+skipped. Watch for `ineligible` in the receipt — that is a reviewed Boston building with no
+`parcel_id`, which the queue does not take; such a building needs the admin pull button on its
+page, which resolves the parcel itself.
+
 ## Retrying a parked row
 
 A row parks after three **claims**. Retry — in the parked list on `/admin/records`, or
