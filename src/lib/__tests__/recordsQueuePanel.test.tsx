@@ -247,11 +247,18 @@ describe('RecordsQueuePanel', () => {
     await waitFor(() => expect(container.textContent).toContain('Could not queue pulls for reviewed buildings'));
   });
 
-  it('says out loud that the fill is meant to stay paused until the C3 site release', async () => {
+  it('says which pauses clear themselves and which wait for someone to press Resume', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(queuePayload())));
     const { container } = render(<RecordsQueuePanel />);
     await waitFor(() => expect(container.textContent).toContain('Fill paused'));
-    expect(container.textContent).toContain('meant to stay paused until the C3 site release');
+    const text = container.textContent ?? '';
+    expect(text).toContain(
+      'The circuit breaker pauses the fill when the morning fixture fails or a source keeps failing.',
+    );
+    expect(text).toContain(
+      'A fixture pause clears itself the next morning the fixture passes; a pause made by hand or by the error-rate breaker stays until someone presses Resume.',
+    );
+    expect(text).not.toContain('C3 site release');
   });
 
   it('renders parked rows with a truncated error and retries one by id, then re-fetches', async () => {

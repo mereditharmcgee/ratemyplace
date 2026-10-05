@@ -21,6 +21,10 @@ interface Window {
     reset: (widgetId: string) => void;
     remove: (widgetId: string) => void;
   };
+  // Named in the Maps script URL (`callback=__rmpMapsReady`) by BuildingMap.tsx; the API
+  // calls it once loaded with `loading=async`. Set once by the module-level loader there and
+  // left in place; calling it again after the load has resolved does nothing.
+  __rmpMapsReady?: () => void;
 }
 
 declare namespace App {
