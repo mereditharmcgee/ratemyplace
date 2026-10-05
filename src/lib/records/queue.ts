@@ -233,6 +233,12 @@ export const REFRESH_AFTER_SECONDS = 30 * 86_400;
 export const FINISHED_RETENTION_SECONDS = 90 * 86_400;
 /** Ceiling on pending fill rows, so the queue table stays a working set, not a copy of the city. */
 export const FILL_TARGET = 2000;
+/**
+ * ZIPs the fill covers first: Allston (02134) and Brighton (02135), the owner's call on
+ * 2026-10-05. A sort preference, not a filter — the rest of the city follows in the usual
+ * neighborhood order once these run out.
+ */
+export const FILL_PRIORITY_ZIPS = ['02134', '02135'] as const;
 
 export interface PlannerOptions {
   now: number;
@@ -368,6 +374,10 @@ async function insertFillRows(db: RecordsDb, rows: { id: string }[], now: number
  * having no permits for a building is exactly what the panel wants to show — so an `empty`
  * pull ends the building's time in the fill.
  *
+ * FILL_PRIORITY_ZIPS comes second: among buildings at the same `has_any_pull`, Allston–
+ * Brighton goes first. A building with no ZIP compares as NULL, which DESC sorts last, so it
+ * never jumps the priority ZIPs.
+ *
  * `neighborhood IS NULL` sits next because SQLite sorts NULLs first by default and an
  * unplaced building should not jump ahead of a named neighborhood.
  */
@@ -389,9 +399,10 @@ export async function topUpFill(db: RecordsDb, options: PlannerOptions & { targe
         'AND NOT EXISTS (SELECT 1 FROM records_queue q WHERE q.building_id = b.id AND q.done_at IS NULL) ' +
         'AND NOT EXISTS (SELECT 1 FROM record_pulls rp WHERE rp.building_id = b.id ' +
         `AND rp.source_id IN (${inList}) AND rp.status IN ('ok','empty')) ` +
-        'ORDER BY has_any_pull, b.neighborhood IS NULL, b.neighborhood, b.street_key, b.st_num_lo, b.id LIMIT ?',
+        `ORDER BY has_any_pull, (b.zip_code IN (${placeholders(FILL_PRIORITY_ZIPS.length)})) DESC, ` +
+        'b.neighborhood IS NULL, b.neighborhood, b.street_key, b.st_num_lo, b.id LIMIT ?',
     )
-    .bind(...ids, ...ids, room)
+    .bind(...ids, ...ids, ...FILL_PRIORITY_ZIPS, room)
     .all<{ id: string }>();
   return insertFillRows(db, rows.results, options.now);
 }
