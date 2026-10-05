@@ -262,8 +262,28 @@ Things that have already cost time. Read before debugging.
   first. See [`docs/runbooks/records-scheduler.md`](docs/runbooks/records-scheduler.md).
 - **`app_settings.records_fill_paused` is the brake on the city-wide fill.** `'1'` stops the
   fill; button, follower and refresh pulls keep running. The circuit breaker sets it and
-  never clears it — a human unpauses from `/admin/records`. Deploy the Worker with it set,
-  and never assume a quiet queue means the Worker is broken until you have checked the flag.
+  records why in `records_breaker_pause_cause` (`fixture` or `errors`). A `fixture`
+  pause clears itself: the next 06:00 plan whose fixture passes with no source over the
+  error threshold flips the flag back and emails "fill resumed". An `errors` pause, a
+  hand pause from `/admin/records`, and any pause made before October 2026 (no cause
+  recorded) stay until a human resumes them. The fill sat paused for eighteen days in
+  September 2026 on one transient fixture failure, which is why. Deploy the Worker with
+  the flag set, and never assume a quiet queue means the Worker is broken until you have
+  checked it. Resuming by hand means clearing the cause row too (see the runbook).
+- **"Delete orphan buildings" in `/admin/buildings` deletes exactly what the "Outside
+  Boston / New Haven, no reviews" toggle shows.** Both use `orphanBuildingsWhere()` in
+  `src/lib/admin/orphanBuildings.ts`: `source = 'user'`, no review of any status, not
+  saved by anyone, a non-blank city that is not Boston, a Boston locality, or New Haven.
+  The `DELETE` carries the predicate itself plus a hard-coded `source = 'user' AND NOT
+  EXISTS (reviews)` clause, and the route refuses with 409 if the predicate ever matches a
+  seeded or reviewed row. Before October 2026 the button targeted every zero-review
+  building, which after the seed meant all 38,208 parcels — it was never pressed.
+- **`GET /api/admin/buildings` filters server-side.** `landlord=<id>`, `q=` (address,
+  city, ZIP; LIKE-escaped) and `filter=orphans` narrow the query and `total`; the table
+  used to filter only the 100 rows it had loaded, so "View buildings (N)" on a landlord
+  showed an unfiltered list. The list SELECT must keep returning `admin_notes` and the
+  `owner_*` columns, and the edit form sends only changed fields (`buildingEditPatch`):
+  the old full-row PUT nulled whatever the list had not loaded.
 - **Preview deploys cannot exercise Turnstile or the map.** The Turnstile sitekey is not
   allowlisted for `pages.dev`, and preview has no Maps key. Verify those widgets on
   production only — a failure in preview is expected, not a bug.

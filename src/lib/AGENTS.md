@@ -172,7 +172,13 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   holding it. The **three site callers of `enqueue`** are the reader button, the follower
   enqueue on save, and review approval; the last two both pass `reason: 'follower'`, because a
   fourth `QueueReason` would need a migration for `records_queue`'s CHECK constraint and would
-  sit at the same priority anyway.
+  sit at the same priority anyway. A fourth caller, `POST
+  /api/admin/records/queue/backfill-reviewed`, is an admin one-shot that enqueues a
+  `follower` row for every reviewed Boston building with no deeper pull — including
+  parcel-less user rows, because the pull resolves the parcel itself and an unresolvable
+  address completes in one attempt with an error row per source. `topUpFill` orders
+  `has_any_pull` first and then `FILL_PRIORITY_ZIPS` (02134, 02135 — Allston–Brighton)
+  before everything else, so the fill reaches the owner's neighbourhood first.
 - **`scheduler.ts` is pure functions over injected dependencies.** `SchedulerDeps` carries
   the db, clock, pull, fixture, alert, and log, so `drain` and `plan` are unit-tested against
   the `node:sqlite` D1 double and `workers/records-scheduler/` stays a wiring file. `drain`
@@ -185,10 +191,17 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   circuit breaker lives at the end of `plan`, not in the Worker: it
   trips on any fixture failure or on a source with at least 20 attempts and over 50% errors
   in 24 hours (the assessor years are counted on purpose — parcel resolution runs through
-  the assessor, so its outage fails every other source), pauses the fill, and emails once.
-  It never unpauses.
-- **`settings.ts` owns three `app_settings` keys** — `records_fill_paused`,
-  `records_breaker_last_alert`, `records_fixture_last` — and is a leaf module that imports
+  the assessor, so its outage fails every other source), pauses the fill, records the cause
+  in `records_breaker_pause_cause`, and emails once. A `fixture`-caused pause resumes
+  itself at the end of a later `plan` whose fixture passed (at least one check run, none
+  failed) with no source over the error threshold — flag cleared, cause deleted, one "fill
+  resumed" email, `PlanResult.resumed`. An `errors` pause and a hand pause (no cause)
+  never auto-resume: a quiet day is not evidence that a 50%-error source has recovered.
+  `setFillPaused(db, paused, now, cause?)` is the only writer and batches flag and cause
+  in one transaction; a write without a cause deletes the cause.
+- **`settings.ts` owns four `app_settings` keys** — `records_fill_paused`,
+  `records_breaker_pause_cause`, `records_breaker_last_alert`, `records_fixture_last` —
+  and is a leaf module that imports
   only `./types`, so an admin route can read a flag without dragging the whole pull stack
   into the request path. Import `SETTING_KEYS`; do not retype a key string.
 - **`errors.ts` is the one place a failure becomes a stored string.** `record_pulls.error_message`
@@ -304,7 +317,28 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   predicate — Google Places routinely hands back the neighborhood as the locality),
   `records/identity.ts` (`TRAILING_LOCALITIES`, uppercased, for the trailing-locality
   stripper), and `records/dedupe.ts` (`CITY_CANDIDATES`, the bind list for its `city IN (…)`
-  candidate predicate). Add a name here and nowhere else.
+  candidate predicate). Add a name here and nowhere else. `BOSTON_SUB_AREAS` in the same
+  file maps sub-area names Google hands back as the locality (Aberdeen, Oak Square, Cleveland
+  Circle, Savin Hill, …) to the neighborhood they sit in; `displayLocality` and
+  `resolveBostonSubArea` in `locality.ts`, `titleCaseNeighborhood` in
+  `records/seed/format.ts` and `api/places/details.ts` apply it, gated on
+  `isBostonLocality(city)` so a non-Boston "Aberdeen" is left alone. Do not add sub-areas
+  to `BOSTON_LOCALITY_NAMES`; that list is the dedupe and search vocabulary.
+- **`bostonBox.ts` and `mapView.ts` are the map's only geography.** `BOSTON_BOX` /
+  `inBostonBox` (shared with `records/seed/sam.ts`) say what counts as inside Boston;
+  `initialMapView` fits the first non-empty marker load to the Boston markers only (a New
+  Haven pin does not drag the viewport out to sea), clamps zoom to 15, centres a lone marker,
+  and `shouldPanToUser` pans to the reader only when they are inside the fitted box.
+  `BuildingMap.tsx` fits once (`didFitRef`) and never again on refetch.
+- **`admin/landlordMatch.ts` decides whether a tenant-typed landlord name is "the same
+  landlord".** `classifyLandlordCandidates` preselects an existing landlord only when exactly
+  one same-name landlord shares the building's state and city (Boston localities count as
+  Boston; a trailing ", ST" is ignored); otherwise the link panel opens in create mode and
+  names the same-name landlords elsewhere, and `keptSeparateNote` writes the decision into
+  `landlords.admin_notes`. Name alone is never enough — "AA Management" in Boston and in
+  New Haven are two companies.
+- **`admin/orphanBuildings.ts` is the one definition of a deletable building.** See the
+  cleanup trap in the root `AGENTS.md`; the list toggle and the delete share it.
 
 ### `enrichment/` — municipal property data
 
