@@ -234,12 +234,20 @@ export default function BuildingMap({
         url += `?${params.toString()}`;
       }
       const response = await fetch(url);
+      // An error body has no `buildings`; read as an empty list it would wipe every pin.
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data: { buildings?: Building[] } = await response.json();
       if (seq !== requestSeqRef.current) return; // superseded by a newer request
       setBuildings(data.buildings || []);
     } catch (err) {
-      console.error('Failed to fetch buildings:', err);
-      setError('Failed to load building data');
+      if (bounds) {
+        // A failed viewport refetch keeps the map and its current pins; the next pan retries.
+        console.error('Failed to refresh buildings for the viewport:', err);
+      } else {
+        // Only the initial load replaces the map with the error box: there is nothing to show.
+        console.error('Failed to fetch buildings:', err);
+        setError('Failed to load building data');
+      }
     } finally {
       // Not gated on `seq`: viewport refetches start only after the unbounded load has
       // finished, so this never flips `loading` early, and the refetch gate must always open.
