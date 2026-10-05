@@ -23,6 +23,13 @@ describe('averageScore', () => {
     expect(averageScore([])).toBeNull();
   });
 
+  it('rounds to one decimal, the rule /api/buildings/map applies per building', () => {
+    // Unrounded, these come out as 3.9999999999999996 and 1.9999999999999998.
+    expect(averageScore([4.6, 3.8, 3.6])).toBe(4);
+    expect(averageScore([1.4, 3.3, 1.3])).toBe(2);
+    expect(averageScore([4, 3, 3])).toBe(3.3);
+  });
+
   it('ignores a non-finite score instead of poisoning the average', () => {
     expect(averageScore([4, Number.NaN, 2])).toBe(3);
     expect(averageScore([Number.POSITIVE_INFINITY])).toBeNull();
@@ -43,6 +50,17 @@ describe('clusterAppearance', () => {
     expect(clusterAppearance([3, 3]).label).toBe('Mixed');
     expect(clusterAppearance([2.5]).label).toBe('Concerning');
     expect(clusterAppearance([1, 1.5]).hex).toBe(SCORE_HEX.poor);
+  });
+
+  it('lands a float-error average on the band its exact mean belongs to', () => {
+    expect(clusterAppearance([4.6, 3.8, 3.6]).label).toBe('Good');
+    expect(clusterAppearance([4.6, 3.8, 3.6]).hex).toBe(SCORE_HEX.good);
+    expect(clusterAppearance([1.4, 3.3, 1.3]).label).toBe('Concerning');
+  });
+
+  it('keeps a just-below-the-edge average in the lower band, and an exact edge in the upper', () => {
+    expect(clusterAppearance([3.9]).label).toBe('Mixed');
+    expect(clusterAppearance([4.0]).label).toBe('Good');
   });
 
   it('uses the no-score colour when nothing in the cluster is scored', () => {

@@ -12,7 +12,13 @@
 
 import { getScoreColor, getScoreHex } from './scoring-colors';
 
-/** Mean of the finite scores, or null when there are none. */
+/**
+ * Mean of the finite scores rounded to one decimal, or null when there are none.
+ *
+ * Rounded with the same rule `/api/buildings/map` applies to each building's score, so a
+ * mean that sits exactly on a band edge lands in that band: unrounded, [4.6, 3.8, 3.6] is
+ * 3.9999999999999996 (Mixed) and [1.4, 3.3, 1.3] is 1.9999999999999998 (Poor).
+ */
 export function averageScore(scores: readonly (number | null)[]): number | null {
   let sum = 0;
   let count = 0;
@@ -21,11 +27,11 @@ export function averageScore(scores: readonly (number | null)[]): number | null 
     sum += score;
     count += 1;
   }
-  return count === 0 ? null : sum / count;
+  return count === 0 ? null : Math.round((sum / count) * 10) / 10;
 }
 
 export interface ClusterAppearance {
-  /** Plain mean of the scored buildings, or null when none is scored. */
+  /** Plain mean of the scored buildings to one decimal, or null when none is scored. */
   average: number | null;
   /** Badge fill, from `getScoreHex`. */
   hex: string;
