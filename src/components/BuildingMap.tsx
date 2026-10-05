@@ -42,6 +42,43 @@ function mapsApiReady(): boolean {
   return Boolean(window.google?.maps?.Map && window.google.maps.marker?.AdvancedMarkerElement);
 }
 
+// One Maps script load per page, shared by every mount. Per-mount loading appended a second
+// script on a remount and could tear down the callback a still-loading script was about to
+// call; a module-level promise loads once and every caller waits on the same result.
+let mapsLoad: Promise<void> | null = null;
+
+/**
+ * Load the Google Maps script with `loading=async`, once. Resolves when the API calls
+ * MAPS_READY_CALLBACK; rejects on a script error and forgets the attempt, so a later mount
+ * can try again. The script element is never removed: a script already fetching still runs.
+ */
+function loadMapsApi(apiKey: string): Promise<void> {
+  if (mapsApiReady()) return Promise.resolve();
+  if (mapsLoad) return mapsLoad;
+
+  mapsLoad = new Promise<void>((resolve, reject) => {
+    // Assigned before the script is appended, so it exists whenever the API looks for it.
+    window[MAPS_READY_CALLBACK] = () => resolve();
+
+    const params = new URLSearchParams({
+      key: apiKey,
+      libraries: 'marker',
+      v: 'weekly',
+      loading: 'async',
+      callback: MAPS_READY_CALLBACK,
+    });
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?${params.toString()}`;
+    script.async = true;
+    script.onerror = () => {
+      mapsLoad = null;
+      reject(new Error('Failed to load Google Maps'));
+    };
+    document.head.appendChild(script);
+  });
+  return mapsLoad;
+}
+
 // Marker hex + label come from the canonical brand system in src/lib/scoring-colors.ts.
 // Local getMarkerHex / getMarkerLabel exist only because Google Maps takes hex strings, not Tailwind classes.
 function getMarkerHex(score: number | null): string {
@@ -164,44 +201,19 @@ export default function BuildingMap({
     }
   }, [locationRequested]);
 
-  // Load the Google Maps script with `loading=async`; the API calls MAPS_READY_CALLBACK when
-  // it is ready to construct a map.
+  // Wait for the shared Maps script load (see loadMapsApi).
   useEffect(() => {
-    if (mapsApiReady()) {
-      setMapLoaded(true);
-      return;
-    }
-
     let active = true;
-    const onReady = () => {
-      // One-shot: remove the global once it has fired (unless a later mount replaced it).
-      if (window[MAPS_READY_CALLBACK] === onReady) delete window[MAPS_READY_CALLBACK];
-      if (active) setMapLoaded(true);
-    };
-    // Assigned before the script is appended, so it exists whenever the API looks for it.
-    window[MAPS_READY_CALLBACK] = onReady;
-
-    const params = new URLSearchParams({
-      key: apiKey,
-      libraries: 'marker',
-      v: 'weekly',
-      loading: 'async',
-      callback: MAPS_READY_CALLBACK,
-    });
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?${params.toString()}`;
-    script.async = true;
-    script.onerror = () => {
-      if (window[MAPS_READY_CALLBACK] === onReady) delete window[MAPS_READY_CALLBACK];
-      if (active) setError('Failed to load Google Maps');
-    };
-    document.head.appendChild(script);
-
+    loadMapsApi(apiKey).then(
+      () => {
+        if (active) setMapLoaded(true);
+      },
+      () => {
+        if (active) setError('Failed to load Google Maps');
+      },
+    );
     return () => {
-      // A script already fetching still runs and still calls the callback, so the global
-      // stays in place (inert once `active` is false) and deletes itself when it fires.
       active = false;
-      if (!mapsApiReady()) script.remove();
     };
   }, [apiKey]);
 
