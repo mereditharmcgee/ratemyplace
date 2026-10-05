@@ -488,6 +488,30 @@ describe('plan', () => {
     expect(d.alerts).toHaveLength(2);
   });
 
+  it('trips again when a flapping fixture fails after an auto-resume, with a fresh cause and a third email', async () => {
+    const db = createRecordsTestDb();
+    let today = failingFixture();
+    const d = deps(db, { fixture: async () => today });
+
+    expect(await plan(d)).toMatchObject({ paused: true, alerted: true, resumed: false });
+    today = passingFixture();
+    expect(await plan(d)).toMatchObject({ paused: false, alerted: false, resumed: true });
+    expect(await settingOf(db, SETTING_KEYS.breakerPauseCause)).toBeNull();
+
+    // The resume cleared the cause and the paused flag, so the next failure is a new trip, not
+    // a repeat of the old one: it pauses, records the cause again, and mails again.
+    today = failingFixture();
+    expect(await plan(d)).toMatchObject({ paused: true, alerted: true, resumed: false });
+    expect(await getFillPaused(db)).toBe(true);
+    expect(await settingOf(db, SETTING_KEYS.breakerPauseCause)).toBe('fixture');
+    expect(d.alerts).toHaveLength(3);
+    expect(d.alerts.map((alert) => alert.split('\n')[0])).toEqual([
+      RECORDS_PAUSED_SUBJECT,
+      RECORDS_RESUMED_SUBJECT,
+      RECORDS_PAUSED_SUBJECT,
+    ]);
+  });
+
   it('records the cause as errors when only the error rate tripped, and never resumes it by itself', async () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'b1' });
