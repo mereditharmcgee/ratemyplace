@@ -4,6 +4,7 @@ import type { AdminBuilding, AdminBuildingsResponse, AdminBuildingsStats } from 
 import { adminBuildingsUrl, type AdminBuildingsFilter } from '../../lib/admin/buildingsFilter';
 import { applyBuildingPatch, buildingEditForm, buildingEditPatch, type BuildingEditForm } from '../../lib/admin/buildingEdit';
 import BuildingsFilterBar from './BuildingsFilterBar';
+import OrphanCleanupButton from './OrphanCleanupButton';
 import RecordsPullButton from './RecordsPullButton';
 
 interface LandlordOption {
@@ -36,7 +37,6 @@ export default function BuildingsTable() {
   const [editForm, setEditForm] = useState<BuildingEditForm>({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [cleaning, setCleaning] = useState(false);
   const [landlords, setLandlords] = useState<LandlordOption[]>([]);
   const [managers, setManagers] = useState<LandlordOption[]>([]);
   const [enriching, setEnriching] = useState<string | null>(null);
@@ -200,43 +200,6 @@ export default function BuildingsTable() {
     }
   };
 
-  const cleanupEmptyBuildings = async () => {
-    // First, preview what would be deleted
-    try {
-      const previewRes = await fetch('/api/admin/cleanup');
-      const previewData = await previewRes.json();
-
-      if (previewData.count === 0) {
-        alert('No buildings without reviews found.');
-        return;
-      }
-
-      const confirmMsg = `This will delete ${previewData.count} building(s) with no reviews:\n\n${previewData.emptyBuildings.slice(0, 5).map((b: any) => `- ${b.address}`).join('\n')}${previewData.count > 5 ? `\n...and ${previewData.count - 5} more` : ''}\n\nThis action cannot be undone. Continue?`;
-
-      if (!confirm(confirmMsg)) {
-        return;
-      }
-
-      setCleaning(true);
-      const response = await fetch('/api/admin/cleanup', {
-        method: 'POST',
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        alert(data.message);
-        fetchBuildings(0, true);
-      } else {
-        alert(data.error || 'Cleanup failed');
-      }
-    } catch (err) {
-      alert('Cleanup failed');
-    } finally {
-      setCleaning(false);
-    }
-  };
-
   const enrichBuilding = async (buildingId: string) => {
     setEnriching(buildingId);
     setEnrichResult(null);
@@ -313,13 +276,7 @@ export default function BuildingsTable() {
         >
           Refresh
         </button>
-        <button
-          onClick={cleanupEmptyBuildings}
-          disabled={cleaning}
-          className="px-4 py-2 bg-orange-100 text-orange-700 rounded-[6px] hover:bg-orange-200 disabled:opacity-50"
-        >
-          {cleaning ? 'Cleaning...' : 'Cleanup Empty Buildings'}
-        </button>
+        <OrphanCleanupButton onDeleted={() => fetchBuildings(0, true)} />
       </div>
 
       {error && (
