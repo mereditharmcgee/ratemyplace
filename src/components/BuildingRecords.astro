@@ -271,23 +271,59 @@ const disclosureClass =
       <CorrectionNotes notes={notesFor('violation')} />
     </div>
 
-    <div id="report-record" class="border-t border-gray-200 pt-4 mt-6">
-      <h3 class="text-base font-semibold text-gray-900">Report a record error</h3>
+    {/* Folded by default: most readers never report an error, and an open form (with its
+        Turnstile) made the panel's last screen a form. The header link, a #report-record URL,
+        and a hash change all unfold it (script below). `client:visible` means the island
+        hydrates, and renders its Turnstile, only once the unfolded form is on screen. */}
+    <details id="report-record" class="group border-t border-gray-200 pt-4 mt-6">
+      <summary
+        class="flex items-center justify-between gap-3 min-h-[44px] cursor-pointer list-none [&::-webkit-details-marker]:hidden rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
+        <h3 class="text-base font-semibold text-gray-900">Report a record error</h3>
+        <svg
+          class="h-4 w-4 shrink-0 text-gray-400 transition-transform group-open:rotate-180 motion-reduce:transition-none"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          aria-hidden="true">
+          <path d="M5 7.5 10 12.5 15 7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+      </summary>
       <p class="text-sm text-gray-600 mt-1">
         If a record above does not match the city's own data, tell us which one. We re-pull it from the primary
         source. We never edit a value by hand.
       </p>
       <div class="mt-2">
-        <RecordCorrectionForm client:load buildingId={buildingId} />
+        <RecordCorrectionForm client:visible buildingId={buildingId} />
       </div>
-    </div>
+    </details>
   </section>
 )}
 
 {/* Both Turnstile widgets on a building page live inside the panel above — the correction
-    form renders one on load, the records button renders one on press — so the script loads
-    with the panel rather than on every building page. A building with no pulls renders
-    neither, and pays for neither. */}
+    form renders one when a reader unfolds it, the records button renders one on press — so
+    the script loads with the panel rather than on every building page. A building with no
+    pulls renders neither, and pays for neither. */}
 {view && (
   <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 )}
+
+<script>
+  // Unfold the record-error form when a reader asks for it: the header link, a shared
+  // #report-record URL, or a hash change. Opening it on the link's click (not only on
+  // hashchange) covers a second click when the hash is already #report-record.
+  const REPORT_HASH = '#report-record';
+
+  function unfoldReportForm(): void {
+    const report = document.getElementById('report-record');
+    if (report instanceof HTMLDetailsElement) report.open = true;
+  }
+
+  if (location.hash === REPORT_HASH) unfoldReportForm();
+  window.addEventListener('hashchange', () => {
+    if (location.hash === REPORT_HASH) unfoldReportForm();
+  });
+  document.querySelectorAll(`a[href="${REPORT_HASH}"]`).forEach((link) => {
+    link.addEventListener('click', unfoldReportForm);
+  });
+</script>

@@ -13,9 +13,10 @@ describe('buildingPageMeta', () => {
   });
 
   it('switches to review metadata once a review exists', () => {
+    // The stored "Aberdeen" is a Google sub-area; the description names the neighborhood.
     expect(buildingPageMeta(seeded, 1)).toEqual({
       title: '23-27 Lanark Road',
-      description: 'Reviews for 23-27 Lanark Road in Aberdeen',
+      description: 'Reviews for 23-27 Lanark Road in Brighton',
     });
   });
 

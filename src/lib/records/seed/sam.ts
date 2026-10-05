@@ -1,3 +1,4 @@
+import { inBostonBox } from '../../bostonBox';
 import { textOrNull } from '../ckan';
 import { toCanonicalParcel } from '../identity';
 import type { SamPoint, SamRow } from './types';
@@ -7,28 +8,11 @@ export const SAM_RESOURCE_ID = '6d6cfc99-6f26-4974-bbb3-17b5dbad49a9';
 export const SAM_PAGE_URL = 'https://data.boston.gov/dataset/live-street-address-management-sam-addresses';
 export const SAM_FIELDS = ['SAM_ADDRESS_ID', 'RELATIONSHIP_TYPE', 'PARCEL_ID', 'MAILING_NEIGHBORHOOD', 'ZIP_CODE', 'POINT_X', 'POINT_Y', 'UNIT'] as const;
 
-/**
- * Boston's bounding box, wide enough for Hyde Park to Charlestown and the harbor islands.
- * SAM rows that were never geocoded carry 0,0, and a handful carry a coordinate from the
- * wrong side of the state; both land outside this box and are dropped rather than pinning
- * a building to null island. Verified against the city boundary 2026-09-09.
- */
-const BOSTON_BOUNDS = { minLat: 42.2, maxLat: 42.45, minLon: -71.2, maxLon: -70.9 } as const;
-
 function num(value: unknown): number | null {
   const text = textOrNull(value);
   if (text === null) return null;
   const n = Number.parseFloat(text);
   return Number.isFinite(n) ? n : null;
-}
-
-function inBoston(latitude: number, longitude: number): boolean {
-  return (
-    latitude > BOSTON_BOUNDS.minLat
-    && latitude < BOSTON_BOUNDS.maxLat
-    && longitude > BOSTON_BOUNDS.minLon
-    && longitude < BOSTON_BOUNDS.maxLon
-  );
 }
 
 /**
@@ -60,7 +44,9 @@ export function indexSamByParcel(rows: Iterable<SamRow>): Map<string, SamPoint> 
     const longitude = num(row.POINT_X);
     const latitude = num(row.POINT_Y);
     if (!parcel || !samId || longitude === null || latitude === null) continue;
-    if (!inBoston(latitude, longitude)) continue;
+    // Never-geocoded SAM rows carry 0,0 and a handful sit on the wrong side of the state;
+    // both fall outside the Boston box and are dropped rather than pinned to null island.
+    if (!inBostonBox(latitude, longitude)) continue;
     const primary = textOrNull(row.RELATIONSHIP_TYPE) === '1';
     // A SAM id that is not a number sorts last rather than winning on arrival order.
     const parsed = Number.parseInt(samId, 10);
