@@ -10,7 +10,7 @@
 - ✅ **v1.4.0 Open Doors** — Phases 10-15 (shipped 2026-03-22)
 - ✅ **v1.5.0 Closed Loops** — Phases 16-21 (shipped 2026-04-29)
 - 📝 **v1.6.0 Trust + Density** — Phases 22-30 (design approved; implementation planning)
-- 📝 **v1.7.0 Public Record** (Phases 31-34): A records foundation, C Boston coverage, B entity record, D neighborhood indicator; spec approved 2026-09-06; A implemented 2026-09-07 pending merge
+- 📝 **v1.7.0 Public Record** (Phases 31-34): A records foundation, C Boston coverage, B entity record, D neighborhood indicator; spec approved 2026-09-06; A merged 2026-09-07 (PR #20); C shipped 2026-09-12 (PRs #25, #28, #29, follow-ups #30–#32); live-review fix batch 2026-10-05 (PRs #33–#35: neighborhood aliases, map fit, collapsed error form, breaker auto-resume, Allston–Brighton fill priority, reviewed-building backfill, server-side admin filters, scoped cleanup, geographic landlord matching); B and D next
 
 ## Phases
 
