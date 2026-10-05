@@ -329,7 +329,12 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   `initialMapView` fits the first non-empty marker load to the Boston markers only (a New
   Haven pin does not drag the viewport out to sea), clamps zoom to 15, centres a lone marker,
   and `shouldPanToUser` pans to the reader only when they are inside the fitted box.
-  `BuildingMap.tsx` fits once (`didFitRef`) and never again on refetch.
+  `BuildingMap.tsx` fits once (`didFitRef`) and never again on refetch, and skips viewport
+  refetches until the first unbounded load lands so that one fit sees every building.
+- **`mapCluster.ts` decides how a marker cluster looks.** The badge is filled with
+  `getScoreHex` of the plain mean of the clustered buildings' scores (unscored ones left
+  out; none scored → the no-score grey). It is a map colour only — never shown as a number,
+  not weighted, not recency-decayed — so it is not a fourth scoring path.
 - **`admin/landlordMatch.ts` decides whether a tenant-typed landlord name is "the same
   landlord".** `classifyLandlordCandidates` preselects an existing landlord only when exactly
   one same-name landlord shares the building's state and city (Boston localities count as
