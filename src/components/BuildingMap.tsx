@@ -454,7 +454,8 @@ export default function BuildingMap({
       />
 
       {/* Loading overlay — z-20 to stay above Google Maps canvas. Down as soon as the map is
-          interactive; the buildings fetch shows up as the "in view" badge instead. */}
+          interactive, which can be before the first buildings fetch lands; until it does, the
+          "Loading buildings…" chip sits where the "in view" count goes. */}
       {!mapReady && (
         <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center z-20">
           <div className="text-center">
@@ -483,8 +484,13 @@ export default function BuildingMap({
         </div>
       </div>
 
-      {/* Building count */}
-      {!loading && (
+      {/* Building count, or a loading chip in the same place until the first fetch lands, so
+          an interactive map with no pins yet is not mistaken for an empty one. */}
+      {loading ? (
+        <div role="status" className="absolute top-4 right-4 bg-white rounded-lg shadow-lg px-3 py-2 text-sm text-gray-600">
+          Loading buildings…
+        </div>
+      ) : (
         <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg px-3 py-2 text-sm">
           <span className="font-medium">{buildings.length}</span> in view
         </div>
