@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { MarkerClusterer, SuperClusterAlgorithm, type Marker, type Renderer } from '@googlemaps/markerclusterer';
 import { getScoreColor, getScoreHex } from '../lib/scoring-colors';
 import { displayLocality } from '../lib/locality';
-import { initialMapView, shouldPanToUser, type LatLngBox, type LatLngPoint } from '../lib/mapView';
+import { initialMapView, shouldPanToUser, type InitialMapView, type LatLngBox, type LatLngPoint } from '../lib/mapView';
 import { clusterAppearance, clusterBadgeSize, clusterTitle } from '../lib/mapCluster';
 
 interface Building {
@@ -154,6 +154,11 @@ export default function BuildingMap({
   // that follow must never re-fit, or every pan would snap back.
   const didFitRef = useRef(false);
   const fittedBoxRef = useRef<LatLngBox | null>(null);
+  // A first fit scheduled while the tab is hidden: Google Maps has no laid-out size then, and
+  // fitBounds lands on a continental view. The view waits here (computed from the data that
+  // triggered it) until the document is visible; the listener is kept so unmount can remove it.
+  const pendingViewRef = useRef<InitialMapView | null>(null);
+  const visibilityListenerRef = useRef<(() => void) | null>(null);
   const userLocationRef = useRef<LatLngPoint | null>(null);
   // Viewport refetches wait for the first (unbounded) load, so the one-time fit sees every
   // building rather than only those inside the default view the map opened on.
@@ -337,11 +342,13 @@ export default function BuildingMap({
     // Refetch buildings for the current viewport whenever the map settles (debounced), so
     // only in-view buildings are loaded as the user pans/zooms. This listener never fits or
     // moves the map, so a refetch → marker rebuild cannot raise another idle and loop.
+    // Not while a first fit is pending (hidden tab): that viewport is the unfitted one, and
+    // its pins would replace the full set until the fit's own idle refetches anyway.
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
     map.addListener('idle', () => {
       if (idleTimer) clearTimeout(idleTimer);
       idleTimer = setTimeout(() => {
-        if (!initialLoadDoneRef.current) return;
+        if (!initialLoadDoneRef.current || pendingViewRef.current) return;
         const b = map.getBounds();
         if (b) loadBuildings(b);
       }, IDLE_REFETCH_DEBOUNCE_MS);
@@ -349,6 +356,41 @@ export default function BuildingMap({
 
     setMapCreated(true);
   }, [mapLoaded, initialCenter, initialZoom, loadBuildings]);
+
+  // Apply the one-time first view to the map, then (once it settles) clamp a too-close fit
+  // and move to the reader if they stand inside the fitted area. Shared by the immediate and
+  // the deferred (hidden-tab) paths. Reads only refs, so it is stable across renders.
+  const applyInitialView = useCallback((map: google.maps.Map, view: InitialMapView) => {
+    fittedBoxRef.current = view.box;
+    if (view.kind === 'center') {
+      map.setCenter(view.center);
+      map.setZoom(view.zoom);
+    } else {
+      map.fitBounds(view.box, view.padding);
+    }
+    google.maps.event.addListenerOnce(map, 'idle', () => {
+      // fitBounds zooms as close as it can; a tight cluster should not open at roof level.
+      const zoom = map.getZoom();
+      if (view.kind === 'fit' && zoom !== undefined && zoom > view.maxZoom) {
+        map.setZoom(view.maxZoom);
+      }
+      const user = userLocationRef.current;
+      if (user && shouldPanToUser(user, view.box)) {
+        map.panTo(user);
+        map.setZoom(USER_LOCATION_ZOOM);
+      }
+    });
+  }, []);
+
+  // A deferred fit's visibility listener outlives marker rebuilds (a rebuild must not cancel
+  // it); it is removed when it fires, or on unmount.
+  useEffect(() => () => {
+    if (visibilityListenerRef.current) {
+      document.removeEventListener('visibilitychange', visibilityListenerRef.current);
+      visibilityListenerRef.current = null;
+    }
+    pendingViewRef.current = null;
+  }, []);
 
   // Build markers whenever the buildings change, once the map exists. Runs on an empty list
   // too, so a pan into an empty viewport clears stale markers instead of leaving them behind.
@@ -439,32 +481,34 @@ export default function BuildingMap({
 
     // First non-empty build: fit the view to the markers, once. The map may have existed
     // (and gone idle) well before this; the fit still happens here, on the first data.
+    // `didFitRef` is set when the fit is scheduled, so a later load cannot schedule another.
     if (!didFitRef.current && buildings.length > 0) {
       const view = initialMapView(buildings.map((b) => ({ lat: b.latitude, lng: b.longitude })));
       if (view) {
         didFitRef.current = true;
-        fittedBoxRef.current = view.box;
-        if (view.kind === 'center') {
-          map.setCenter(view.center);
-          map.setZoom(view.zoom);
+        if (document.visibilityState === 'visible') {
+          applyInitialView(map, view);
         } else {
-          map.fitBounds(view.box, view.padding);
+          // Hidden tab (opened in the background, or a preview pane off screen): the map has
+          // no laid-out size to fit into. Hold this view, from the data that triggered it, not
+          // whatever is current when the tab is shown, and apply it on the first visible.
+          pendingViewRef.current = view;
+          const onVisible = () => {
+            if (document.visibilityState !== 'visible') return;
+            document.removeEventListener('visibilitychange', onVisible);
+            visibilityListenerRef.current = null;
+            const pending = pendingViewRef.current;
+            pendingViewRef.current = null;
+            if (!pending) return;
+            google.maps.event.trigger(map, 'resize');
+            applyInitialView(map, pending);
+          };
+          visibilityListenerRef.current = onVisible;
+          document.addEventListener('visibilitychange', onVisible);
         }
-        google.maps.event.addListenerOnce(map, 'idle', () => {
-          // fitBounds zooms as close as it can; a tight cluster should not open at roof level.
-          const zoom = map.getZoom();
-          if (view.kind === 'fit' && zoom !== undefined && zoom > view.maxZoom) {
-            map.setZoom(view.maxZoom);
-          }
-          const user = userLocationRef.current;
-          if (user && shouldPanToUser(user, view.box)) {
-            map.panTo(user);
-            map.setZoom(USER_LOCATION_ZOOM);
-          }
-        });
       }
     }
-  }, [mapCreated, buildings, createMarkerElement]);
+  }, [mapCreated, buildings, createMarkerElement, applyInitialView]);
 
   if (error) {
     return (
