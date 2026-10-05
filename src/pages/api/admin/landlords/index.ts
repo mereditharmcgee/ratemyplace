@@ -5,6 +5,7 @@ import { NAMED_PARTY_MIN_REVIEWS } from '../../../../lib/scoring';
 import { generateIdFromEntropySize } from 'lucia';
 import { createAuditLog } from '../../../../lib/audit';
 import { getClientIP } from '../../../../lib/rateLimit';
+import { parseAdminNotes, stringListFromJson } from '../../../../lib/admin/adminNotes';
 
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
@@ -72,20 +73,33 @@ export async function GET(context: APIContext): Promise<Response> {
         l.website,
         l.phone,
         l.email,
+        l.admin_notes,
         l.created_at,
         COUNT(DISTINCT b.id) as building_count,
         COUNT(DISTINCT r.id) as review_count,
-        ${recencyWeightedOverallSql('r', currentYear)} as avg_score
+        ${recencyWeightedOverallSql('r', currentYear)} as avg_score,
+        -- Where the landlord's buildings are, so the review linker can tell same-named
+        -- companies in different cities apart. JSON arrays rather than GROUP_CONCAT: a
+        -- city such as "Boston, MA" contains the comma GROUP_CONCAT would split on, and a
+        -- DISTINCT GROUP_CONCAT cannot take another separator.
+        json_group_array(DISTINCT b.city) as cities_json,
+        json_group_array(DISTINCT UPPER(TRIM(COALESCE(b.state, '')))) as states_json
       FROM landlords l
       LEFT JOIN buildings b ON l.id = b.landlord_id
       LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
       GROUP BY l.id
       ORDER BY l.name ASC
       LIMIT ? OFFSET ?
-    `).bind(limit, offset).all();
+    `).bind(limit, offset).all<Record<string, unknown> & { cities_json: unknown; states_json: unknown }>();
+
+    const rows = (landlords.results ?? []).map(({ cities_json, states_json, ...landlord }) => ({
+      ...landlord,
+      cities: stringListFromJson(cities_json),
+      states: stringListFromJson(states_json),
+    }));
 
     return new Response(JSON.stringify({
-      landlords: landlords.results,
+      landlords: rows,
       total: statsRow?.total_landlords ?? 0,
       offset,
       limit,
@@ -133,6 +147,14 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
+    const notes = parseAdminNotes(body.admin_notes);
+    if (!notes.ok) {
+      return new Response(JSON.stringify({ error: notes.error }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     const db = getDB(context);
     const id = generateIdFromEntropySize(10);
 
@@ -143,14 +165,15 @@ export async function POST(context: APIContext): Promise<Response> {
     }
 
     await db.prepare(`
-      INSERT INTO landlords (id, name, slug, description, website, phone, email)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO landlords (id, name, slug, description, website, phone, email, admin_notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id, name, slug,
       body.description || null,
       body.website || null,
       body.phone || null,
-      body.email || null
+      body.email || null,
+      notes.value ?? null
     ).run();
 
     await createAuditLog(db, {
@@ -159,7 +182,7 @@ export async function POST(context: APIContext): Promise<Response> {
       actionType: 'landlord_created',
       entityType: 'landlord',
       entityId: id,
-      newValue: { name, slug },
+      newValue: { name, slug, ...(notes.value ? { admin_notes: notes.value } : {}) },
     });
 
     return new Response(JSON.stringify({

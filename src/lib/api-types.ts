@@ -215,9 +215,16 @@ export interface AdminLandlord {
   website: string | null;
   phone: string | null;
   email: string | null;
+  /** Internal only; never selected by a public route. */
+  admin_notes: string | null;
   building_count: number;
   review_count: number;
+  avg_score: number | null;
   created_at: number;
+  /** Distinct cities of the landlord's buildings, as stored. Empty when it has none. */
+  cities: string[];
+  /** Distinct upper-cased states of the landlord's buildings. Empty when it has none. */
+  states: string[];
 }
 
 export interface AdminLandlordsResponse {

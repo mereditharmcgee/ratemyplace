@@ -51,6 +51,7 @@ export async function GET(context: APIContext): Promise<Response> {
         b.address as building_address,
         b.slug as building_slug,
         b.city as building_city,
+        b.state as building_state,
         b.landlord_id as building_landlord_id,
         l.name as building_landlord_name,
         r.landlord_name,

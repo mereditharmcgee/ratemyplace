@@ -88,6 +88,14 @@ function makeDatabase(): SQLiteDatabase {
       ('me-3', 'building-manager-established-2', 'approved', 4.2, '2026', 1);
   `);
 
+  // Columns the admin landlords list also reads (notes, and where each landlord's buildings
+  // are), added after the positional INSERTs above so those stay short.
+  database.exec(`
+    ALTER TABLE landlords ADD COLUMN admin_notes TEXT;
+    ALTER TABLE buildings ADD COLUMN city TEXT;
+    ALTER TABLE buildings ADD COLUMN state TEXT;
+  `);
+
   return database;
 }
 

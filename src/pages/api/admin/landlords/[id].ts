@@ -2,6 +2,7 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
 import { createAuditLog } from '../../../../lib/audit';
 import { getClientIP } from '../../../../lib/rateLimit';
+import { parseAdminNotes } from '../../../../lib/admin/adminNotes';
 import { recencyWeightedOverallSql, currentReviewYear } from '../../../../lib/scoring-sql';
 
 export async function PATCH(context: APIContext): Promise<Response> {
@@ -32,6 +33,13 @@ export async function PATCH(context: APIContext): Promise<Response> {
   try {
     const body = await context.request.json();
     const { name, description, website, phone, email } = body;
+    const notes = parseAdminNotes(body.admin_notes);
+    if (!notes.ok) {
+      return new Response(JSON.stringify({ error: notes.error }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     const db = getDB(context);
 
@@ -67,6 +75,10 @@ export async function PATCH(context: APIContext): Promise<Response> {
     if (email !== undefined) {
       updates.push('email = ?');
       values.push(email || null);
+    }
+    if (notes.value !== undefined) {
+      updates.push('admin_notes = ?');
+      values.push(notes.value);
     }
 
     if (updates.length === 0) {
