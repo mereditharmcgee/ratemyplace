@@ -381,7 +381,9 @@ export default function RecordsQueuePanel() {
               Button, follower, and refresh pulls run either way. Only the city-wide fill pauses.
             </p>
             <p className="text-sm text-gray-600 mt-1">
-              The fill is meant to stay paused until the C3 site release.
+              The circuit breaker pauses the fill when the morning fixture fails or a source keeps failing.
+              A fixture pause clears itself the next morning the fixture passes; a pause made by hand or by
+              the error-rate breaker stays until someone presses Resume.
             </p>
           </div>
           <button
