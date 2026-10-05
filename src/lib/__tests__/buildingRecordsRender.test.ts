@@ -43,7 +43,7 @@ const LEGACY_2024_RESOURCE_ID = LEGACY_311_RESOURCES.find((resource) => resource
  * render can tell the two apart.
  *
  * The whole component renders here, island and all: `BuildingRecords.astro` mounts
- * `RecordCorrectionForm` with `client:load`, so the container needs the React renderer
+ * `RecordCorrectionForm` with `client:visible`, so the container needs the React renderer
  * registered the way `namedPartySsrVisibility.test.ts` does it.
  */
 
@@ -259,6 +259,24 @@ suite('BuildingRecords.astro ledger', () => {
 
     expect(html).toContain('City of Boston · pulled');
     // The correction link is the panel's one call to action and has to be tappable.
+    expect(html).toMatch(/href="#report-record"[^>]*min-h-\[44px\]/);
+  });
+
+  it('keeps the record-error form folded until a reader asks for it', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const html = await renderPanel(db);
+    const report = parse(html).querySelector('#report-record');
+
+    // A closed <details>: the heading is the summary, the form waits inside it.
+    expect(report?.tagName).toBe('DETAILS');
+    expect(report?.hasAttribute('open')).toBe(false);
+    expect(report?.querySelector('summary h3')?.textContent?.trim()).toBe('Report a record error');
+    expect(report?.querySelector('summary')?.className).toContain('min-h-[44px]');
+    // The island hydrates when it scrolls into view, so its Turnstile renders only then.
+    expect(report?.querySelector('astro-island')?.getAttribute('client')).toBe('visible');
+    // The header link is still the way in, and still a 44px target.
     expect(html).toMatch(/href="#report-record"[^>]*min-h-\[44px\]/);
   });
 

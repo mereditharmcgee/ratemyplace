@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { RecordsQueueFixtureResult, RecordsQueueParkedRow, RecordsQueueStats } from '../../lib/api-types';
+import type {
+  RecordsQueueBackfillResult,
+  RecordsQueueBackfillSkip,
+  RecordsQueueFixtureResult,
+  RecordsQueueParkedRow,
+  RecordsQueueStats,
+} from '../../lib/api-types';
 
 /** The queue moves on a one-minute Worker tick, so a one-minute poll is as fresh as the data gets. */
 const POLL_INTERVAL_MS = 60_000;
@@ -37,6 +43,36 @@ const LOAD_ERROR = 'Could not load the queue';
  */
 const RESUME_CONFIRM =
   'Resume the city-wide fill? It pulls one building a minute until every seeded building has records.';
+
+/**
+ * The backfill adds people-facing rows, which run ahead of the fill at three a minute, so it
+ * gets the same one-click guard as Resume. Pressing it twice is harmless; pressing it by
+ * accident is still a few dozen requests to the city.
+ */
+const BACKFILL_CONFIRM =
+  'Queue a records pull for every reviewed Boston building that has never been pulled? They run ahead of the fill, three a minute.';
+
+const BACKFILL_ERROR = 'Could not queue pulls for reviewed buildings';
+
+/** Why the backfill passed over a building, in the order the receipt lists them. */
+const BACKFILL_SKIP_LABELS: Array<[RecordsQueueBackfillSkip, string]> = [
+  ['pulled', 'already pulled'],
+  ['requested', 'already requested'],
+  ['fill_queued', 'in the fill queue'],
+  ['parked', 'parked'],
+  ['already_queued', 'queued meanwhile'],
+  ['ineligible', 'pulled, no parcel found'],
+  ['outside_boston', 'outside Boston'],
+];
+
+function backfillReceipt(result: RecordsQueueBackfillResult): string {
+  const queued = `Queued ${result.enqueued} ${result.enqueued === 1 ? 'pull' : 'pulls'}.`;
+  if (result.skipped === 0) return queued;
+  const reasons = BACKFILL_SKIP_LABELS.filter(([state]) => (result.skippedByState[state] ?? 0) > 0).map(
+    ([state, label]) => `${result.skippedByState[state]} ${label}`,
+  );
+  return `${queued} Skipped ${result.skipped} of ${result.examined} reviewed buildings${reasons.length ? `: ${reasons.join(', ')}` : ''}.`;
+}
 
 /** Shown over numbers that are still on screen because a later poll failed, not because they are fresh. */
 const REFRESH_ERROR = "Couldn't refresh the queue; showing the last good numbers";
@@ -128,8 +164,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 /**
  * The pull queue at a glance, for `/admin/records`: what is waiting, what has parked
  * itself after too many failures, whether the city-wide fill is running, and how the
- * last circuit-breaker fixture run went. Read-only except for two switches — pause the
- * fill, and retry one parked row.
+ * last circuit-breaker fixture run went. Read-only except for three actions — pause the
+ * fill, retry one parked row, and queue follower pulls for reviewed buildings never pulled.
  */
 export default function RecordsQueuePanel() {
   const [stats, setStats] = useState<RecordsQueueStats | null>(null);
@@ -141,6 +177,8 @@ export default function RecordsQueuePanel() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [pauseBusy, setPauseBusy] = useState(false);
   const [retryingId, setRetryingId] = useState<number | null>(null);
+  const [backfillBusy, setBackfillBusy] = useState(false);
+  const [backfillReceiptText, setBackfillReceiptText] = useState<string | null>(null);
 
   /**
    * Whether a load has ever succeeded. A ref, not state: `load` is built once and reads this
@@ -218,6 +256,33 @@ export default function RecordsQueuePanel() {
       setActionError(paused ? 'Could not pause the fill' : 'Could not resume the fill');
     } finally {
       setPauseBusy(false);
+    }
+  };
+
+  const backfillReviewed = async () => {
+    if (!window.confirm(BACKFILL_CONFIRM)) return;
+    setBackfillBusy(true);
+    setActionError(null);
+    setBackfillReceiptText(null);
+    try {
+      const response = await fetch('/api/admin/records/queue/backfill-reviewed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const payload = await response.json();
+      const result = payload?.data as RecordsQueueBackfillResult | undefined;
+      if (!response.ok || !result) {
+        setActionError(BACKFILL_ERROR);
+        return;
+      }
+      setBackfillReceiptText(backfillReceipt(result));
+      // The Follower count is the visible proof, and only the GET carries it.
+      await load();
+    } catch {
+      setActionError(BACKFILL_ERROR);
+    } finally {
+      setBackfillBusy(false);
     }
   };
 
@@ -357,7 +422,26 @@ export default function RecordsQueuePanel() {
           )}
         </div>
 
-        <div aria-live="polite">{actionError && <p className="text-sm text-red-700">{actionError}</p>}</div>
+        <div className="border-t border-gray-200 pt-4 flex flex-wrap items-center justify-between gap-4">
+          <p className="text-sm text-gray-600">
+            Reviewed Boston buildings that were never pulled get a follower pull, ahead of the fill.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              void backfillReviewed();
+            }}
+            disabled={backfillBusy}
+            className="h-11 px-4 rounded-[4px] bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          >
+            {backfillBusy ? 'Queueing…' : 'Queue pulls for reviewed buildings'}
+          </button>
+        </div>
+
+        <div aria-live="polite">
+          {actionError && <p className="text-sm text-red-700">{actionError}</p>}
+          {backfillReceiptText && <p className="text-sm text-gray-700">{backfillReceiptText}</p>}
+        </div>
       </div>
 
       <div className="rounded-[6px] border border-gray-200 bg-white p-6">

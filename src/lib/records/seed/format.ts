@@ -1,6 +1,7 @@
 import { textOrNull } from '../ckan';
 import { isDegenerateStreet, splitSuffix } from '../identity';
 import { normalizeLandUse } from './filters';
+import { resolveBostonSubArea } from '../../locality';
 
 /**
  * Title-case one word, splitting on an apostrophe or hyphen so both halves of a joined
@@ -130,10 +131,14 @@ export function buildingTypeFor(landUse: unknown): string {
   return type;
 }
 
-/** 'EAST BOSTON' -> 'East Boston'; plain Boston carries no neighborhood. */
+/**
+ * 'EAST BOSTON' -> 'East Boston'; plain Boston carries no neighborhood; a sub-area is stored
+ * as the neighborhood it sits in ('ABERDEEN' -> 'Brighton', see `BOSTON_SUB_AREAS`). Every
+ * seeded row is in Boston, so the alias needs no city check here.
+ */
 export function titleCaseNeighborhood(value: string | null | undefined): string | null {
   const text = value?.trim();
   if (!text) return null;
-  const titled = text.split(/\s+/).map(titleWord).join(' ');
+  const titled = resolveBostonSubArea(text.split(/\s+/).map(titleWord).join(' '));
   return titled === 'Boston' ? null : titled;
 }

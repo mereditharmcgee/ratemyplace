@@ -97,6 +97,11 @@ describe('titleCaseNeighborhood', () => {
     expect(titleCaseNeighborhood('BOSTON')).toBeNull();
     expect(titleCaseNeighborhood(null)).toBeNull();
   });
+  it('stores the Boston neighborhood for a sub-area name', () => {
+    expect(titleCaseNeighborhood('ABERDEEN')).toBe('Brighton');
+    expect(titleCaseNeighborhood('FORT POINT')).toBe('Seaport');
+    expect(titleCaseNeighborhood('BRIGHTON')).toBe('Brighton');
+  });
   it('title-cases around an apostrophe or hyphen too', () => {
     expect(titleCaseNeighborhood("O'BRIEN SQUARE")).toBe("O'Brien Square");
     expect(titleCaseNeighborhood('ROSLINDALE-WEST')).toBe('Roslindale-West');

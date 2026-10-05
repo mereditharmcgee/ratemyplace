@@ -15,7 +15,7 @@ package against the `node:sqlite` D1 double.
 | Cron | Runs | What it does |
 |---|---|---|
 | `* * * * *` | every minute | `drain` — claims up to 3 people-facing rows plus 1 city-wide fill row, pulls each building's records for real, logs `records_drain`. Skips the fill row entirely while the fill is paused. |
-| `0 6 * * *` | 06:00 UTC daily | `plan` — in this order: purges finished rows, enqueues refreshes, tops the fill queue back up, runs the Lanark fixture and the source error-rate check, then trips the circuit breaker (pausing the fill and emailing once) if either fails. The order is the point: the breaker is judged on the day's pulls and stops the fill before the next drain. Logs `records_plan`. |
+| `0 6 * * *` | 06:00 UTC daily | `plan` — in this order: purges finished rows, enqueues refreshes, tops the fill queue back up, runs the Lanark fixture and the source error-rate check, then trips the circuit breaker (pausing the fill and emailing once) if either fails — or, when the pause it set earlier was caused by the fixture, lifts it on the first morning the fixture passes again and emails that too. The order is the point: the breaker is judged on the day's pulls and stops the fill before the next drain. Logs `records_plan`. |
 
 A seeded building's pull is about 27 requests to `data.boston.gov` — 17 of them 311 (sixteen
 yearly files plus the new-system resource), one per assessor year, one each for permits,
@@ -40,8 +40,8 @@ a second earlier — which is the intended behaviour anyway.
 ## Where the logs are
 
 Both handlers write one structured JSON line per run (`records_drain` / `records_plan`),
-plus `records_scheduler_error` if the run throws, `records_breaker_email_failed` if the
-alert email does not send, `records_breaker_email_skipped` if `RECORDS_ALERT_EMAIL` was
+plus `records_scheduler_error` if the run throws, `records_breaker_email_failed` if a
+pause or resume email does not send, `records_breaker_email_skipped` if `RECORDS_ALERT_EMAIL` was
 never set, and `records_scheduler_unknown_cron` if a cron fires that `src/index.ts` does not
 recognise. Those four go to `console.error`, so they surface as errors in the dashboard
 rather than as one more line to scroll past.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   enqueue, errorRateBySource, getFillPaused, planRefresh, purgeFinished, queueStats, setFillPaused, topUpFill,
-  REFRESH_AFTER_SECONDS, FINISHED_RETENTION_SECONDS, FILL_TARGET, FILL_INSERT_BATCH,
+  REFRESH_AFTER_SECONDS, FINISHED_RETENTION_SECONDS, FILL_TARGET, FILL_INSERT_BATCH, FILL_PRIORITY_ZIPS,
 } from '../records/queue';
 import type { RecordsDb, RecordsPreparedStatement } from '../records/types';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
@@ -18,8 +18,9 @@ async function pull(db: ReturnType<typeof createRecordsTestDb>, buildingId: stri
     .run();
 }
 
-async function seeded(db: ReturnType<typeof createRecordsTestDb>, id: string, neighborhood: string | null, street: string, num: number) {
-  await insertBuilding(db, { id, slug: id, city: 'Boston' });
+/** `zip` defaults to insertBuilding's 02135, which is inside FILL_PRIORITY_ZIPS. */
+async function seeded(db: ReturnType<typeof createRecordsTestDb>, id: string, neighborhood: string | null, street: string, num: number, zip?: string) {
+  await insertBuilding(db, { id, slug: id, city: 'Boston', zip_code: zip });
   await db.prepare("UPDATE buildings SET source = 'seed', neighborhood = ?, street_key = ?, st_num_lo = ?, st_num_hi = ? WHERE id = ?").bind(neighborhood, street, num, num, id).run();
 }
 
@@ -254,6 +255,39 @@ describe('topUpFill', () => {
     const rows = await db.prepare("SELECT building_id FROM records_queue WHERE reason = 'fill' ORDER BY id").all<{ building_id: string }>();
     // 'never' sorts after 'errored' by neighborhood, but has_any_pull leads the ORDER BY.
     expect(rows.results.map((r) => r.building_id)).toEqual(['never', 'errored']);
+  });
+
+  it('puts Allston–Brighton (FILL_PRIORITY_ZIPS) ahead of the rest of the city among never-pulled buildings', async () => {
+    expect(FILL_PRIORITY_ZIPS).toEqual(['02134', '02135']);
+    const db = createRecordsTestDb();
+    // Dorchester sorts before Brighton by neighborhood name; the ZIP term has to beat that.
+    await seeded(db, 'dorchester', 'Dorchester', 'A ST', 1, '02125');
+    await seeded(db, 'brighton', 'Brighton', 'Z ST', 99, '02135');
+    await seeded(db, 'allston', 'Allston', 'Z ST', 99, '02134');
+    expect(await topUpFill(db, { now: NOW, deeperSourceIds: DEEPER, target: 10 })).toBe(3);
+    const rows = await db.prepare("SELECT building_id FROM records_queue WHERE reason = 'fill' ORDER BY id").all<{ building_id: string }>();
+    expect(rows.results.map((r) => r.building_id)).toEqual(['allston', 'brighton', 'dorchester']);
+  });
+
+  it('keeps an error-only Brighton building behind a never-pulled building elsewhere', async () => {
+    const db = createRecordsTestDb();
+    await seeded(db, 'brighton-errored', 'Brighton', 'A ST', 1, '02135');
+    await seeded(db, 'dorchester-never', 'Dorchester', 'Z ST', 9, '02125');
+    for (const source of DEEPER) await pull(db, 'brighton-errored', source, 'error', NOW - 100);
+    expect(await topUpFill(db, { now: NOW, deeperSourceIds: DEEPER, target: 10 })).toBe(2);
+    const rows = await db.prepare("SELECT building_id FROM records_queue WHERE reason = 'fill' ORDER BY id").all<{ building_id: string }>();
+    // has_any_pull still leads: first coverage anywhere beats a retry in the priority ZIPs.
+    expect(rows.results.map((r) => r.building_id)).toEqual(['dorchester-never', 'brighton-errored']);
+  });
+
+  it('treats a building with no ZIP as outside the priority ZIPs, not ahead of them', async () => {
+    const db = createRecordsTestDb();
+    await seeded(db, 'nozip', 'Allston', 'A ST', 1, '');
+    await db.prepare("UPDATE buildings SET zip_code = NULL WHERE id = 'nozip'").run();
+    await seeded(db, 'brighton', 'Brighton', 'Z ST', 99, '02135');
+    expect(await topUpFill(db, { now: NOW, deeperSourceIds: DEEPER, target: 10 })).toBe(2);
+    const rows = await db.prepare("SELECT building_id FROM records_queue WHERE reason = 'fill' ORDER BY id").all<{ building_id: string }>();
+    expect(rows.results.map((r) => r.building_id)).toEqual(['brighton', 'nozip']);
   });
 
   it('sorts a seeded building with no neighborhood last', async () => {

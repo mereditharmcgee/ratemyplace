@@ -6,6 +6,8 @@ import {
   FILL_PER_RUN,
   MIN_ATTEMPTS,
   PRIORITY_PER_RUN,
+  RECORDS_PAUSED_SUBJECT,
+  RECORDS_RESUMED_SUBJECT,
   SCHEDULER_SETTING_KEYS,
   drain,
   liveDeps,
@@ -14,6 +16,7 @@ import {
 } from '../records/scheduler';
 import { enqueue, getFillPaused, setFillPaused } from '../records/queue';
 import { sourcesForCity } from '../records/jurisdictions';
+import { SETTING_KEYS } from '../records/settings';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import type { FixtureResult } from '../records/fixture';
 import type { PullSummary, RecordsDb, RecordsPreparedStatement } from '../records/types';
@@ -33,6 +36,24 @@ function fixtureResult(overrides: Partial<FixtureResult> = {}): FixtureResult {
     condominium: false,
     ...overrides,
   };
+}
+
+/** A day the Lanark fixture passed: one check ran and came back ok, and no source threw. */
+function passingFixture(): FixtureResult {
+  return fixtureResult({
+    checks: [{ label: 'parcel resolves to 2102098000', ok: true, detail: '2102098000' }],
+    rowsBySource: { RentSmart: 4 },
+  });
+}
+
+/** A day the city portal 502'd mid-fixture, like 2026-09-17. */
+function failingFixture(): FixtureResult {
+  return fixtureResult({
+    checks: [{ label: 'parcel resolves to 2102098000', ok: false, detail: 'got null' }],
+    checksFailed: 1,
+    failures: 2,
+    sourceErrors: [{ label: 'RentSmart', message: 'HTTP 502' }],
+  });
 }
 
 interface LoggedEvent {
@@ -429,14 +450,163 @@ describe('plan', () => {
     expect(await plan(deps(db))).toMatchObject({ paused: false, alerted: false });
   });
 
-  it('does not unpause by itself once the fixture is healthy again', async () => {
+  it('does not unpause a pause with no recorded cause, even once the fixture is healthy', async () => {
+    // A human pressed Pause, or the pause predates the cause key: either way nobody told the
+    // planner it was safe to undo, so it leaves the flag alone.
     const db = createRecordsTestDb();
     await setFillPaused(db, true, NOW);
-    expect(await plan(deps(db))).toMatchObject({ paused: true, alerted: false });
+    const d = deps(db, { fixture: async () => passingFixture() });
+    expect(await plan(d)).toMatchObject({ paused: true, alerted: false, resumed: false });
+    expect(d.alerts).toEqual([]);
     expect(await getFillPaused(db)).toBe(true);
     // The fixture ran and its result is stored even though the pause predates it: the panel
     // needs today's fixture to tell "still broken" from "fixed, waiting for a human".
     expect(JSON.parse((await settingOf(db, SCHEDULER_SETTING_KEYS.lastFixture))!)).toMatchObject({ at: NOW, failures: 0 });
+  });
+
+  it('resumes a fixture-caused pause once the fixture passes again, clears the cause, and emails once', async () => {
+    const db = createRecordsTestDb();
+    let today = failingFixture();
+    const d = deps(db, { fixture: async () => today });
+
+    expect(await plan(d)).toMatchObject({ paused: true, alerted: true, resumed: false });
+    expect(await settingOf(db, SETTING_KEYS.breakerPauseCause)).toBe('fixture');
+
+    today = passingFixture();
+    expect(await plan(d)).toMatchObject({ paused: false, alerted: false, resumed: true, fixtureFailures: 0 });
+    expect(await getFillPaused(db)).toBe(false);
+    expect(await settingOf(db, SETTING_KEYS.breakerPauseCause)).toBeNull();
+    expect(d.alerts).toHaveLength(2);
+    expect(d.alerts[0].startsWith(`${RECORDS_PAUSED_SUBJECT}\n`)).toBe(true);
+    expect(d.alerts[1].startsWith(`${RECORDS_RESUMED_SUBJECT}\n`)).toBe(true);
+    expect(d.alerts[1]).toContain('Lanark fixture: 0 checks failed, 0 sources threw');
+    const resumed = d.logged.find((entry) => entry.event === 'records_fill_resumed');
+    expect(resumed?.context).toMatchObject({ checksTotal: 1, checksFailed: 0, sourceErrors: 0 });
+
+    // A resumed fill is an ordinary running fill: the next healthy day neither resumes nor mails.
+    expect(await plan(d)).toMatchObject({ paused: false, alerted: false, resumed: false });
+    expect(d.alerts).toHaveLength(2);
+  });
+
+  it('trips again when a flapping fixture fails after an auto-resume, with a fresh cause and a third email', async () => {
+    const db = createRecordsTestDb();
+    let today = failingFixture();
+    const d = deps(db, { fixture: async () => today });
+
+    expect(await plan(d)).toMatchObject({ paused: true, alerted: true, resumed: false });
+    today = passingFixture();
+    expect(await plan(d)).toMatchObject({ paused: false, alerted: false, resumed: true });
+    expect(await settingOf(db, SETTING_KEYS.breakerPauseCause)).toBeNull();
+
+    // The resume cleared the cause and the paused flag, so the next failure is a new trip, not
+    // a repeat of the old one: it pauses, records the cause again, and mails again.
+    today = failingFixture();
+    expect(await plan(d)).toMatchObject({ paused: true, alerted: true, resumed: false });
+    expect(await getFillPaused(db)).toBe(true);
+    expect(await settingOf(db, SETTING_KEYS.breakerPauseCause)).toBe('fixture');
+    expect(d.alerts).toHaveLength(3);
+    expect(d.alerts.map((alert) => alert.split('\n')[0])).toEqual([
+      RECORDS_PAUSED_SUBJECT,
+      RECORDS_RESUMED_SUBJECT,
+      RECORDS_PAUSED_SUBJECT,
+    ]);
+  });
+
+  it('records the cause as errors when only the error rate tripped, and never resumes it by itself', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'b1' });
+    for (let i = 0; i < MIN_ATTEMPTS + 5; i += 1) await pullRow(db, `p${i}`, 'permits', 'error', NOW - i);
+    const d = deps(db, { fixture: async () => passingFixture() });
+    expect(await plan(d)).toMatchObject({ paused: true, alerted: true, resumed: false });
+    expect(await settingOf(db, SETTING_KEYS.breakerPauseCause)).toBe('errors');
+
+    // The source recovers: no errors in the window, and the fixture still passes.
+    await db.prepare('DELETE FROM record_pulls').run();
+    expect(await plan(d)).toMatchObject({ paused: true, alerted: false, resumed: false });
+    expect(await getFillPaused(db)).toBe(true);
+    expect(await settingOf(db, SETTING_KEYS.breakerPauseCause)).toBe('errors');
+    expect(d.alerts).toHaveLength(1);
+  });
+
+  it('records the cause as fixture when the fixture and the error rate both tripped', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'b1' });
+    for (let i = 0; i < MIN_ATTEMPTS + 5; i += 1) await pullRow(db, `p${i}`, 'permits', 'error', NOW - i);
+    expect(await plan(deps(db, { fixture: async () => failingFixture() }))).toMatchObject({ paused: true, alerted: true });
+    expect(await settingOf(db, SETTING_KEYS.breakerPauseCause)).toBe('fixture');
+  });
+
+  it('keeps a fixture-caused pause while the fixture is still failing, without a second breaker email', async () => {
+    const db = createRecordsTestDb();
+    const d = deps(db, { fixture: async () => failingFixture() });
+    await plan(d);
+    expect(await plan(d)).toMatchObject({ paused: true, alerted: false, resumed: false });
+    expect(await getFillPaused(db)).toBe(true);
+    expect(await settingOf(db, SETTING_KEYS.breakerPauseCause)).toBe('fixture');
+    expect(d.alerts).toHaveLength(1);
+    expect(d.logs).not.toContain('records_fill_resumed');
+  });
+
+  it('keeps a fixture-caused pause when the fixture passes but a source is over the error threshold', async () => {
+    const db = createRecordsTestDb();
+    let today = failingFixture();
+    const d = deps(db, { fixture: async () => today });
+    await plan(d);
+
+    await insertBuilding(db, { id: 'b1' });
+    for (let i = 0; i < MIN_ATTEMPTS + 5; i += 1) await pullRow(db, `p${i}`, 'permits', 'error', NOW - i);
+    today = passingFixture();
+    expect(await plan(d)).toMatchObject({ paused: true, alerted: false, resumed: false });
+    expect(await getFillPaused(db)).toBe(true);
+    expect(d.alerts).toHaveLength(1);
+  });
+
+  it('does not take a fixture that ran no checks as proof of health', async () => {
+    const db = createRecordsTestDb();
+    let today = failingFixture();
+    const d = deps(db, { fixture: async () => today });
+    await plan(d);
+
+    today = fixtureResult();
+    expect(await plan(d)).toMatchObject({ paused: true, resumed: false });
+    expect(await getFillPaused(db)).toBe(true);
+  });
+
+  it('forgets the cause when a human resumes, so a later hand pause is never undone by the planner', async () => {
+    const db = createRecordsTestDb();
+    const d = deps(db, { fixture: async () => failingFixture() });
+    await plan(d);
+    expect(await settingOf(db, SETTING_KEYS.breakerPauseCause)).toBe('fixture');
+
+    await setFillPaused(db, false, NOW); // the Resume fill button
+    expect(await settingOf(db, SETTING_KEYS.breakerPauseCause)).toBeNull();
+    await setFillPaused(db, true, NOW); // later, the Pause button
+
+    expect(await plan(deps(db, { fixture: async () => passingFixture() }))).toMatchObject({ paused: true, resumed: false });
+    expect(await getFillPaused(db)).toBe(true);
+  });
+
+  it('a hand pause over a breaker pause takes ownership of it', async () => {
+    const db = createRecordsTestDb();
+    await plan(deps(db, { fixture: async () => failingFixture() }));
+    await setFillPaused(db, true, NOW); // someone presses Pause while the breaker holds it
+    expect(await settingOf(db, SETTING_KEYS.breakerPauseCause)).toBeNull();
+    expect(await plan(deps(db, { fixture: async () => passingFixture() }))).toMatchObject({ paused: true, resumed: false });
+  });
+
+  it('records the resume before sending its email, so a failing mailer cannot lose it', async () => {
+    const db = createRecordsTestDb();
+    await plan(deps(db, { fixture: async () => failingFixture() }));
+    const d = deps(db, {
+      fixture: async () => passingFixture(),
+      alert: async () => {
+        throw new Error('mailer down');
+      },
+    });
+    await expect(plan(d)).rejects.toThrow('mailer down');
+    expect(await getFillPaused(db)).toBe(false);
+    expect(await settingOf(db, SETTING_KEYS.breakerPauseCause)).toBeNull();
+    expect(d.logs).toContain('records_fill_resumed');
   });
 
   it('records the pause before sending the alert, so a failing mailer cannot lose it', async () => {

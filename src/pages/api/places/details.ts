@@ -2,6 +2,7 @@ import type { APIContext } from 'astro';
 import { getEnv } from '../../../lib/runtime';
 import { getDB } from '../../../lib/db';
 import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
+import { isBostonLocality, resolveBostonSubArea } from '../../../lib/locality';
 
 export async function GET(context: APIContext): Promise<Response> {
   const placeId = context.url.searchParams.get('placeId') || '';
@@ -81,12 +82,19 @@ export async function GET(context: APIContext): Promise<Response> {
     const streetName = getComponent('route');
     const streetAddress = streetNumber ? `${streetNumber} ${streetName}` : streetName;
 
+    // Google names small Boston sub-areas ("Aberdeen") where a reader expects the
+    // neighborhood ("Brighton"); store the neighborhood. Boston only — the names repeat
+    // elsewhere.
+    const city = getComponent('locality') || getComponent('sublocality');
+    const rawNeighborhood = getComponent('neighborhood') || getComponent('sublocality_level_1');
+    const neighborhood = rawNeighborhood && isBostonLocality(city) ? resolveBostonSubArea(rawNeighborhood) : rawNeighborhood;
+
     const place = {
       placeId: data.id,
       formattedAddress: data.formattedAddress,
       streetAddress,
-      neighborhood: getComponent('neighborhood') || getComponent('sublocality_level_1'),
-      city: getComponent('locality') || getComponent('sublocality'),
+      neighborhood,
+      city,
       state: getComponentShort('administrative_area_level_1'),
       zipCode: getComponent('postal_code'),
       latitude: data.location?.latitude,

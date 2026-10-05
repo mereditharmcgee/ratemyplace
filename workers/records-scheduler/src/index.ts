@@ -2,10 +2,10 @@
 // scheduler actually does lives in `src/lib/records/scheduler.ts`, where it is unit-tested
 // against the node:sqlite D1 double. This file only wires bindings to those dependencies.
 import type { D1Database, ScheduledEvent } from '@cloudflare/workers-types';
-import { sendRecordsBreakerEmail } from '../../../src/lib/email';
+import { sendRecordsBreakerEmail, sendRecordsResumedEmail } from '../../../src/lib/email';
 import { errorMessage } from '../../../src/lib/records/errors';
 import { runLanarkFixture } from '../../../src/lib/records/fixture';
-import { drain, liveDeps, plan, type SchedulerDeps } from '../../../src/lib/records/scheduler';
+import { RECORDS_RESUMED_SUBJECT, drain, liveDeps, plan, type SchedulerDeps } from '../../../src/lib/records/scheduler';
 import type { FetchLike, RecordsDb } from '../../../src/lib/records/types';
 
 interface Env {
@@ -55,8 +55,12 @@ function depsFor(env: Env): SchedulerDeps {
       // The alert is plain text, so the admin panel has to arrive as an absolute URL —
       // there is no document for a relative one to be relative to.
       const withLink = `${body}\n\n${env.SITE_URL}/admin/records`;
-      const result = await sendRecordsBreakerEmail(env.RESEND_API_KEY, to, subject, withLink);
-      if (!result.success) log('records_breaker_email_failed', { error: result.error }, 'error');
+      // `alert` stays one (subject, body) dependency; the scheduler's two subjects are
+      // constants, so the resume email is told apart by its subject and anything else is
+      // the breaker's.
+      const send = subject === RECORDS_RESUMED_SUBJECT ? sendRecordsResumedEmail : sendRecordsBreakerEmail;
+      const result = await send(env.RESEND_API_KEY, to, subject, withLink);
+      if (!result.success) log('records_breaker_email_failed', { subject, error: result.error }, 'error');
     },
     log,
   });

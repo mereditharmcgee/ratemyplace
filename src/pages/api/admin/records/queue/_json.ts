@@ -1,4 +1,4 @@
-// The JSON plumbing the three queue routes share, kept next to them rather than in
+// The JSON plumbing the queue routes share, kept next to them rather than in
 // `src/lib/` because nothing outside this directory uses it.
 //
 // The leading underscore is load-bearing: Astro excludes `_`-prefixed files under
