@@ -118,6 +118,9 @@ export default function BuildingMap({
   // Viewport refetches wait for the first (unbounded) load, so the one-time fit sees every
   // building rather than only those inside the default view the map opened on.
   const initialLoadDoneRef = useRef(false);
+  // Latest request wins: a slow response for a viewport the reader has already left must not
+  // overwrite the pins of the one they are looking at.
+  const requestSeqRef = useRef(0);
 
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loading, setLoading] = useState(true);
@@ -201,6 +204,7 @@ export default function BuildingMap({
 
   // Fetch buildings, optionally constrained to the current map viewport.
   const loadBuildings = useCallback(async (bounds?: google.maps.LatLngBounds | null) => {
+    const seq = ++requestSeqRef.current;
     try {
       let url = '/api/buildings/map';
       if (bounds) {
@@ -215,12 +219,15 @@ export default function BuildingMap({
         url += `?${params.toString()}`;
       }
       const response = await fetch(url);
-      const data = await response.json();
+      const data: { buildings?: Building[] } = await response.json();
+      if (seq !== requestSeqRef.current) return; // superseded by a newer request
       setBuildings(data.buildings || []);
     } catch (err) {
       console.error('Failed to fetch buildings:', err);
       setError('Failed to load building data');
     } finally {
+      // Not gated on `seq`: viewport refetches start only after the unbounded load has
+      // finished, so this never flips `loading` early, and the refetch gate must always open.
       if (!bounds) initialLoadDoneRef.current = true;
       setLoading(false);
     }
