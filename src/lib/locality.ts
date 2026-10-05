@@ -6,7 +6,7 @@
 // agrees: if the stored neighborhood is blank, or is itself one of the words
 // in the street address, fall back to the city instead.
 
-import { BOSTON_LOCALITY_NAMES } from './bostonLocalities';
+import { BOSTON_LOCALITY_NAMES, BOSTON_SUB_AREAS } from './bostonLocalities';
 
 interface LocalityBuilding {
   address?: string | null;
@@ -44,6 +44,22 @@ function normalize(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
+// `BOSTON_SUB_AREAS` keyed by `normalize()`, so "ABERDEEN", "aberdeen " and "Aberdeen"
+// all find Brighton.
+const SUB_AREA_TO_NEIGHBORHOOD: ReadonlyMap<string, string> = new Map(
+  Object.entries(BOSTON_SUB_AREAS).map(([subArea, neighborhood]) => [normalize(subArea), neighborhood])
+);
+
+/**
+ * The Boston neighborhood a Google-style sub-area sits in ("Aberdeen" -> "Brighton"), or the
+ * value trimmed and otherwise unchanged when it is not a known sub-area. The caller decides
+ * whether the building is in Boston; this only knows names.
+ */
+export function resolveBostonSubArea(value: string): string {
+  const trimmed = value.trim();
+  return SUB_AREA_TO_NEIGHBORHOOD.get(normalize(trimmed)) ?? trimmed;
+}
+
 /**
  * "Boston" or one of its neighborhoods, as Google Places and manual entry both spell the
  * city. A comma-delimited state tail is tolerated ("Boston, MA"); a comma-less one
@@ -66,7 +82,8 @@ function addressWords(address?: string | null): Set<string> {
 }
 
 /**
- * Returns the neighborhood to display, unless it is empty/whitespace or
+ * Returns the neighborhood to display (a Boston sub-area such as "Aberdeen" read as its
+ * neighborhood, "Brighton", when the city is Boston), unless it is empty/whitespace or
  * matches (case-insensitively, trimmed) a whitespace-separated word from the
  * street address — in which case it falls back to the city (or '' if the
  * city is also missing). Known neighborhoods that happen to also be street
@@ -79,6 +96,13 @@ export function displayLocality(building: LocalityBuilding): string {
 
   if (!neighborhood) {
     return city;
+  }
+
+  // A Boston sub-area reads as its neighborhood. Gated on the city because the names are
+  // not unique to Boston (Philadelphia has a Fairmount too).
+  if (isBostonLocality(city)) {
+    const alias = SUB_AREA_TO_NEIGHBORHOOD.get(normalize(neighborhood));
+    if (alias) return alias;
   }
 
   const normalizedNeighborhood = normalize(neighborhood);
