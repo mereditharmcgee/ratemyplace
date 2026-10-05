@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getScoreColor as getScoreColorPair, getScoreTextColor } from '../../lib/scoring-colors';
+import type { LandlordGeo } from '../../lib/admin/landlordMatch';
+import LandlordLinkPanel from './LandlordLinkPanel';
 
 interface Review {
   id: string;
@@ -9,6 +11,7 @@ interface Review {
   building_address: string;
   building_slug: string;
   building_city: string;
+  building_state: string | null;
   building_landlord_id: string | null;
   building_landlord_name: string | null;
   landlord_name: string | null;
@@ -25,11 +28,6 @@ interface Review {
   unit_number: string | null;
   rent_amount: number | null;
   would_recommend_new: string | null;
-}
-
-interface LandlordOption {
-  id: string;
-  name: string;
 }
 
 interface Props {
@@ -52,13 +50,8 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
   const [reviewDetails, setReviewDetails] = useState<Record<string, any>>({});
   const [loadingDetail, setLoadingDetail] = useState<string | null>(null);
 
-  // Landlord linking state
-  const [landlords, setLandlords] = useState<LandlordOption[]>([]);
-  const [linkingReview, setLinkingReview] = useState<string | null>(null);
-  const [linkMode, setLinkMode] = useState<'select' | 'create'>('select');
-  const [selectedLandlordId, setSelectedLandlordId] = useState('');
-  const [newLandlordName, setNewLandlordName] = useState('');
-  const [linkProcessing, setLinkProcessing] = useState(false);
+  // Landlords with their cities and states, for the link panel's same-name, same-place matching
+  const [landlords, setLandlords] = useState<LandlordGeo[]>([]);
 
   useEffect(() => {
     fetchReviews(0, true);
@@ -125,95 +118,15 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
     }
   };
 
-  const linkLandlord = async (review: Review) => {
-    setLinkProcessing(true);
-    try {
-      let landlordId = selectedLandlordId;
-
-      // Create new landlord if needed
-      if (linkMode === 'create') {
-        const name = newLandlordName.trim();
-        if (!name) {
-          alert('Landlord name is required');
-          setLinkProcessing(false);
-          return;
-        }
-        const createRes = await fetch('/api/admin/landlords', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name }),
-        });
-        const createData = await createRes.json();
-        if (!createRes.ok) {
-          alert(createData.error || 'Failed to create landlord');
-          setLinkProcessing(false);
-          return;
-        }
-        landlordId = createData.landlord.id;
-        // Refresh landlord list
-        fetchLandlords();
-      }
-
-      if (!landlordId) {
-        alert('Please select a landlord');
-        setLinkProcessing(false);
-        return;
-      }
-
-      // Assign landlord to the building
-      const res = await fetch(`/api/admin/buildings/${review.building_id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ landlord_id: landlordId }),
-      });
-
-      if (res.ok) {
-        const landlordName = linkMode === 'create'
-          ? newLandlordName.trim()
-          : landlords.find((l) => l.id === landlordId)?.name || '';
-
-        // Update local state for all reviews with this building
-        setReviews((prev) =>
-          prev.map((r) =>
-            r.building_id === review.building_id
-              ? { ...r, building_landlord_id: landlordId, building_landlord_name: landlordName }
-              : r
-          )
-        );
-        setLinkingReview(null);
-        resetLinkForm();
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to link landlord');
-      }
-    } catch {
-      alert('Failed to link landlord');
-    } finally {
-      setLinkProcessing(false);
-    }
-  };
-
-  const resetLinkForm = () => {
-    setLinkMode('select');
-    setSelectedLandlordId('');
-    setNewLandlordName('');
-  };
-
-  const startLinking = (reviewId: string, tenantLandlordName: string | null) => {
-    setLinkingReview(reviewId);
-    resetLinkForm();
-    // Pre-fill the new landlord name from what the tenant wrote
-    if (tenantLandlordName) {
-      setNewLandlordName(tenantLandlordName);
-      // Try to find a fuzzy match in existing landlords
-      const match = landlords.find((l) =>
-        l.name.toLowerCase() === tenantLandlordName.toLowerCase()
-      );
-      if (match) {
-        setLinkMode('select');
-        setSelectedLandlordId(match.id);
-      }
-    }
+  // Every review row for the building shows the new link.
+  const markBuildingLinked = (buildingId: string, landlordId: string, landlordName: string) => {
+    setReviews((prev) =>
+      prev.map((r) =>
+        r.building_id === buildingId
+          ? { ...r, building_landlord_id: landlordId, building_landlord_name: landlordName }
+          : r
+      )
+    );
   };
 
   const formatDate = (timestamp: number) => {
@@ -552,109 +465,12 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                   );
                 })()}
 
-                {/* Landlord Linking Section */}
-                {review.landlord_name && (
-                  <div className="mb-4 p-3 rounded-[6px] border border-purple-200 bg-purple-50">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h4 className="text-sm font-medium text-purple-800">Tenant named landlord</h4>
-                        <p className="text-sm text-purple-900 font-semibold mt-0.5">"{review.landlord_name}"</p>
-                        <p className="text-xs text-purple-600 mt-0.5">for {review.building_address}</p>
-                      </div>
-                      {review.building_landlord_id ? (
-                        <div className="text-right shrink-0">
-                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            Linked to: {review.building_landlord_name}
-                          </span>
-                        </div>
-                      ) : linkingReview === review.id ? null : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startLinking(review.id, review.landlord_name);
-                          }}
-                          className="shrink-0 px-3 py-1.5 bg-purple-600 text-white rounded-[6px] hover:bg-purple-700 text-sm font-medium"
-                        >
-                          Link Landlord
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Inline linking form */}
-                    {linkingReview === review.id && (
-                      <div className="mt-3 pt-3 border-t border-purple-200 space-y-3" onClick={(e) => e.stopPropagation()}>
-                        {/* Mode toggle */}
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setLinkMode('select')}
-                            className={`px-3 py-1 rounded text-sm font-medium ${
-                              linkMode === 'select'
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                            }`}
-                          >
-                            Choose Existing
-                          </button>
-                          <button
-                            onClick={() => setLinkMode('create')}
-                            className={`px-3 py-1 rounded text-sm font-medium ${
-                              linkMode === 'create'
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                            }`}
-                          >
-                            Create New
-                          </button>
-                        </div>
-
-                        {linkMode === 'select' ? (
-                          <div>
-                            <select
-                              value={selectedLandlordId}
-                              onChange={(e) => setSelectedLandlordId(e.target.value)}
-                              className="w-full px-3 py-2 border border-purple-300 rounded-[4px] focus:ring-2 focus:ring-purple-500 text-sm"
-                            >
-                              <option value="">Select a landlord...</option>
-                              {landlords.map((l) => (
-                                <option key={l.id} value={l.id}>{l.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                        ) : (
-                          <div>
-                            <input
-                              type="text"
-                              value={newLandlordName}
-                              onChange={(e) => setNewLandlordName(e.target.value)}
-                              placeholder="New landlord name"
-                              className="w-full px-3 py-2 border border-purple-300 rounded-[4px] focus:ring-2 focus:ring-purple-500 text-sm"
-                            />
-                            <p className="text-xs text-purple-600 mt-1">This will create a new landlord and assign them to this building.</p>
-                          </div>
-                        )}
-
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => linkLandlord(review)}
-                            disabled={linkProcessing}
-                            className="px-3 py-1.5 bg-purple-600 text-white rounded-[6px] hover:bg-purple-700 disabled:opacity-50 text-sm font-medium"
-                          >
-                            {linkProcessing ? 'Linking...' : linkMode === 'create' ? 'Create & Link' : 'Link to Building'}
-                          </button>
-                          <button
-                            onClick={() => { setLinkingReview(null); resetLinkForm(); }}
-                            className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-[6px] hover:bg-gray-300 text-sm"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <LandlordLinkPanel
+                  review={review}
+                  landlords={landlords}
+                  onLinked={markBuildingLinked}
+                  onLandlordCreated={fetchLandlords}
+                />
 
                 {/* Actions */}
                 <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-200">

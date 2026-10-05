@@ -1,20 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 import { NAMED_PARTY_MIN_REVIEWS } from '../../lib/scoring';
+import type { AdminLandlord } from '../../lib/api-types';
 
-interface Landlord {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  website: string | null;
-  phone: string | null;
-  email: string | null;
-  building_count: number;
-  review_count: number;
-  avg_score: number | null;
-  created_at: number;
-}
+type Landlord = AdminLandlord;
 
 interface LandlordsStats {
   total_landlords: number;
@@ -42,9 +31,31 @@ export default function LandlordsTable() {
   const [addForm, setAddForm] = useState({ name: '', email: '', phone: '', website: '', description: '' });
   const [adding, setAdding] = useState(false);
 
+  // `?id=` (from a building's "View landlord" link): expand that row once it is loaded.
+  const [targetId, setTargetId] = useState<string | null>(null);
+  // Set when an appended page added no rows: the list has ended whatever `total` says, so the
+  // deep-link search must stop rather than refetch the same offset forever.
+  const [listEnded, setListEnded] = useState(false);
+
   useEffect(() => {
+    setTargetId(new URLSearchParams(window.location.search).get('id')?.trim() || null);
     fetchLandlords(0, true);
   }, []);
+
+  useEffect(() => {
+    if (!targetId || loading || loadingMore || error) return;
+    if (landlords.some((l) => l.id === targetId)) {
+      setExpandedLandlord(targetId);
+      setTargetId(null);
+      // After the expanded row renders.
+      setTimeout(() => document.getElementById(`landlord-${targetId}`)?.scrollIntoView({ block: 'start' }), 0);
+    } else if (landlords.length < total && !listEnded) {
+      // The list is paged by name; keep loading until the landlord appears or the list ends.
+      fetchLandlords(landlords.length, false);
+    } else {
+      setTargetId(null);
+    }
+  }, [targetId, landlords, total, loading, loadingMore, error, listEnded]);
 
   // append=false replaces the list (initial load); append=true adds the new page.
   const fetchLandlords = async (offset: number, replace: boolean) => {
@@ -56,6 +67,7 @@ export default function LandlordsTable() {
 
       if (response.ok) {
         setLandlords((prev) => (replace ? data.landlords : [...prev, ...data.landlords]));
+        setListEnded(!replace && data.landlords.length === 0);
         setStats(data.stats);
         setTotal(data.total);
       } else {
@@ -79,6 +91,7 @@ export default function LandlordsTable() {
       website: landlord.website || '',
       phone: landlord.phone || '',
       email: landlord.email || '',
+      admin_notes: landlord.admin_notes || '',
     });
   };
 
@@ -329,6 +342,7 @@ export default function LandlordsTable() {
         {filteredLandlords.map((landlord) => (
           <div
             key={landlord.id}
+            id={`landlord-${landlord.id}`}
             className="bg-white rounded-[6px] border border-gray-200 overflow-hidden hover:shadow-sm transition-shadow"
           >
             {/* Landlord Header */}
@@ -443,6 +457,18 @@ export default function LandlordsTable() {
                           className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Admin notes (internal only)
+                        </label>
+                        <textarea
+                          value={editForm.admin_notes || ''}
+                          onChange={(e) => setEditForm({ ...editForm, admin_notes: e.target.value })}
+                          rows={2}
+                          maxLength={1000}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
+                        />
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -499,8 +525,20 @@ export default function LandlordsTable() {
                         <p className="text-sm text-gray-700">
                           {landlord.description || 'No description provided.'}
                         </p>
+                        <h4 className="text-sm font-medium text-gray-500 mt-3 mb-1">Buildings in</h4>
+                        <p className="text-sm text-gray-700">
+                          {[...landlord.cities, ...landlord.states].join(', ') || 'No buildings yet.'}
+                        </p>
                       </div>
                     </div>
+                    {landlord.admin_notes && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-500 mb-1">Admin notes (internal only)</h4>
+                        <p className="text-xs text-gray-900 bg-white border border-gray-200 p-2 rounded-[4px] whitespace-pre-wrap">
+                          {landlord.admin_notes}
+                        </p>
+                      </div>
+                    )}
                     <div className="flex gap-2 pt-4 border-t border-gray-200">
                       <button
                         onClick={() => startEditing(landlord)}
