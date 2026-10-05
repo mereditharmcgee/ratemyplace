@@ -11,6 +11,9 @@ import { logError } from '../../../lib/logger';
 // of this endpoint would have targeted every one of them.
 
 const SAMPLE_SIZE = 50;
+// The audit row lists every deleted building up to this many (always with the full count),
+// so one huge run cannot produce an unbounded audit_logs row.
+const AUDIT_LIST_CAP = 1000;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -85,18 +88,27 @@ export async function POST(context: APIContext): Promise<Response> {
       return json({ error: 'Cleanup refused: it would touch seeded or reviewed buildings' }, 409);
     }
 
-    const { sample } = await preview(db);
-
     // One statement, re-evaluating the predicate at delete time, with no per-id binds (D1
-    // caps bound parameters per statement). FK cascades clear the building's pulls, records,
-    // corrections and queue rows.
-    const result = await db
-      .prepare(`DELETE FROM buildings WHERE id IN (SELECT b.id FROM buildings b WHERE ${orphans.sql})`)
+    // caps bound parameters per statement). RETURNING hands back exactly the rows removed, so
+    // the audit names what was deleted rather than a sample read beforehand. The trailing
+    // source/review clause is hard-coded here, independent of the shared predicate, so even
+    // a race past the pre-check above cannot delete a seeded or reviewed building. FK cascades
+    // clear the building's pulls, records, corrections and queue rows.
+    const { results: removed } = await db
+      .prepare(`
+        DELETE FROM buildings
+        WHERE id IN (SELECT b.id FROM buildings b WHERE ${orphans.sql})
+          AND source = 'user'
+          AND NOT EXISTS (SELECT 1 FROM reviews WHERE building_id = buildings.id)
+        RETURNING id, address
+      `)
       .bind(...orphans.binds)
-      .run();
-    const deleted = result.meta?.changes ?? 0;
+      .all<{ id: string; address: string }>();
+    const deletedRows = removed ?? [];
+    const deleted = deletedRows.length;
 
     if (deleted > 0) {
+      const listed = deletedRows.slice(0, AUDIT_LIST_CAP);
       await createAuditLog(db, {
         adminUserId: user.id,
         adminIp: getClientIP(context),
@@ -106,8 +118,8 @@ export async function POST(context: APIContext): Promise<Response> {
         oldValue: {
           deleted,
           scope: 'user-added, outside Boston and New Haven, no reviews, no saves',
-          sample_ids: sample.map((b) => b.id),
-          sample_addresses: sample.map((b) => b.address),
+          listed: listed.length,
+          buildings: listed.map((b) => ({ id: b.id, address: b.address })),
         },
       });
     }

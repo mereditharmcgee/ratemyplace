@@ -21,6 +21,13 @@ describe('classifyLandlordCandidates', () => {
     expect(classifyLandlordCandidates('AA Management', { city: 'New Haven', state: 'ct' }, [nh]).exact).toEqual(nh);
   });
 
+  it('ignores a trailing ", ST" on either side: "New Haven, CT" matches "New Haven"', () => {
+    const nh = { id: 'll-nh', name: 'AA Management', cities: ['New Haven'], states: ['CT'] };
+    expect(classifyLandlordCandidates('AA Management', { city: 'New Haven, CT', state: 'CT' }, [nh]).exact).toEqual(nh);
+    const nhSuffixed = { id: 'll-nh2', name: 'AA Management', cities: ['New Haven, CT '], states: ['CT'] };
+    expect(classifyLandlordCandidates('AA Management', { city: 'new haven', state: 'CT' }, [nhSuffixed]).exact).toEqual(nhSuffixed);
+  });
+
   it('a city match in another state is elsewhere', () => {
     const portland = { id: 'll-me', name: 'Harbor Co', cities: ['Portland'], states: ['ME'] };
     const result = classifyLandlordCandidates('Harbor Co', { city: 'Portland', state: 'OR' }, [portland]);

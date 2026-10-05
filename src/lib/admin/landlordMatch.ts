@@ -17,12 +17,15 @@ export interface LandlordCandidates<T extends LandlordGeo> {
 
 const key = (value: string | null | undefined) => (value ?? '').trim().toLowerCase();
 
+/** A city compare key with any trailing ", ST" dropped, as `isBostonLocality` does, so "New Haven, CT" is New Haven. */
+const cityKey = (value: string | null | undefined) => key((value ?? '').replace(/,\s*[A-Za-z]{2}\s*$/, ''));
+
 function sameArea(landlord: LandlordGeo, building: { city: string | null; state: string | null }): boolean {
   const state = key(building.state);
   if (!state || !landlord.states.some((s) => key(s) === state)) return false;
-  const city = key(building.city);
+  const city = cityKey(building.city);
   if (!city) return false;
-  if (landlord.cities.some((c) => key(c) === city)) return true;
+  if (landlord.cities.some((c) => cityKey(c) === city)) return true;
   // Boston is spelled many ways (Allston, Dorchester, "Boston, MA"); any two of them are one city.
   return isBostonLocality(building.city) && landlord.cities.some((c) => isBostonLocality(c));
 }
