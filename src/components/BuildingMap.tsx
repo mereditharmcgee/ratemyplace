@@ -28,6 +28,18 @@ const BOSTON_CENTER: LatLngPoint = { lat: 42.3601, lng: -71.0589 };
 // Zoom when the map moves to the reader's own location.
 const USER_LOCATION_ZOOM = 14;
 
+// The global the Maps script calls once its libraries are usable. With `loading=async`,
+// `script.onload` fires before that, so it is not the ready signal; this callback is.
+const MAPS_READY_CALLBACK = '__rmpMapsReady';
+
+// How long the map must sit still before a viewport refetch.
+const IDLE_REFETCH_DEBOUNCE_MS = 300;
+
+/** True once the Maps API and the marker library can actually be constructed. */
+function mapsApiReady(): boolean {
+  return Boolean(window.google?.maps?.Map && window.google.maps.marker?.AdvancedMarkerElement);
+}
+
 // Marker hex + label come from the canonical brand system in src/lib/scoring-colors.ts.
 // Local getMarkerHex / getMarkerLabel exist only because Google Maps takes hex strings, not Tailwind classes.
 function getMarkerHex(score: number | null): string {
@@ -53,12 +65,17 @@ export default function BuildingMap({
   const didFitRef = useRef(false);
   const fittedBoxRef = useRef<LatLngBox | null>(null);
   const userLocationRef = useRef<LatLngPoint | null>(null);
+  // Viewport refetches wait for the first (unbounded) load, so the one-time fit sees every
+  // building rather than only those inside the default view the map opened on.
+  const initialLoadDoneRef = useRef(false);
 
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Script ready → map constructed → map interactive (first idle or tilesloaded).
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [tilesLoaded, setTilesLoaded] = useState(false);
+  const [mapCreated, setMapCreated] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
   const [locationRequested, setLocationRequested] = useState(false);
 
@@ -91,26 +108,44 @@ export default function BuildingMap({
     }
   }, [locationRequested]);
 
-  // Load Google Maps script
+  // Load the Google Maps script with `loading=async`; the API calls MAPS_READY_CALLBACK when
+  // it is ready to construct a map.
   useEffect(() => {
-    if (window.google?.maps) {
+    if (mapsApiReady()) {
       setMapLoaded(true);
       return;
     }
 
+    let active = true;
+    const onReady = () => {
+      // One-shot: remove the global once it has fired (unless a later mount replaced it).
+      if (window[MAPS_READY_CALLBACK] === onReady) delete window[MAPS_READY_CALLBACK];
+      if (active) setMapLoaded(true);
+    };
+    // Assigned before the script is appended, so it exists whenever the API looks for it.
+    window[MAPS_READY_CALLBACK] = onReady;
+
+    const params = new URLSearchParams({
+      key: apiKey,
+      libraries: 'marker',
+      v: 'weekly',
+      loading: 'async',
+      callback: MAPS_READY_CALLBACK,
+    });
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=marker&v=weekly`;
+    script.src = `https://maps.googleapis.com/maps/api/js?${params.toString()}`;
     script.async = true;
-    script.defer = true;
-    script.onload = () => setMapLoaded(true);
-    script.onerror = () => setError('Failed to load Google Maps');
+    script.onerror = () => {
+      if (window[MAPS_READY_CALLBACK] === onReady) delete window[MAPS_READY_CALLBACK];
+      if (active) setError('Failed to load Google Maps');
+    };
     document.head.appendChild(script);
 
     return () => {
-      // Cleanup script if component unmounts before load
-      if (!window.google?.maps) {
-        document.head.removeChild(script);
-      }
+      // A script already fetching still runs and still calls the callback, so the global
+      // stays in place (inert once `active` is false) and deletes itself when it fires.
+      active = false;
+      if (!mapsApiReady()) script.remove();
     };
   }, [apiKey]);
 
@@ -136,12 +171,13 @@ export default function BuildingMap({
       console.error('Failed to fetch buildings:', err);
       setError('Failed to load building data');
     } finally {
+      if (!bounds) initialLoadDoneRef.current = true;
       setLoading(false);
     }
   }, []);
 
-  // Initial (unbounded) load so the map can initialize; the idle listener below
-  // then refetches by viewport bounds as the user pans/zooms.
+  // Initial (unbounded) load, in parallel with the script and the map construction; the
+  // idle listener then refetches by viewport bounds as the user pans/zooms.
   useEffect(() => {
     loadBuildings();
   }, [loadBuildings]);
@@ -185,57 +221,53 @@ export default function BuildingMap({
     return container;
   }, []);
 
-  // Initialize map and markers
+  // Construct the map as soon as the script is ready and the container exists. This does
+  // not wait for the buildings fetch: markers are added by the effect below when data lands.
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current) return;
+    if (!mapLoaded || !mapRef.current || mapInstanceRef.current) return;
 
-    // Before the map exists we need at least one building to justify init;
-    // with none, clear the loading overlay and wait. Once the map IS
-    // initialized we fall through even when empty, so a pan into an empty
-    // viewport clears stale markers instead of leaving them behind.
-    if (buildings.length === 0 && !mapInstanceRef.current) {
-      if (!loading) setTilesLoaded(true);
-      return;
-    }
+    // Starts at the default view; the first non-empty marker build fits it to the markers.
+    // POI label styling lives in the cloud-console map style for `ratemyplace-map`.
+    const map = new google.maps.Map(mapRef.current, {
+      center: initialCenter,
+      zoom: initialZoom,
+      mapId: 'ratemyplace-map', // Required for AdvancedMarkerElement
+      disableDefaultUI: false,
+      zoomControl: true,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: true,
+    });
+    mapInstanceRef.current = map;
+    infoWindowRef.current = new google.maps.InfoWindow();
 
-    // Initialize map
-    if (!mapInstanceRef.current) {
-      // Starts at the default view; the fit below replaces it in the same pass.
-      mapInstanceRef.current = new google.maps.Map(mapRef.current, {
-        center: initialCenter,
-        zoom: initialZoom,
-        mapId: 'ratemyplace-map', // Required for AdvancedMarkerElement
-        disableDefaultUI: false,
-        zoomControl: true,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: true,
-        styles: [
-          {
-            featureType: 'poi',
-            elementType: 'labels',
-            stylers: [{ visibility: 'off' }]
-          }
-        ]
-      });
+    // The overlay comes down once the map is interactive: the first idle after construction,
+    // or the first full tile load, whichever fires first. Not on the buildings fetch.
+    const markReady = () => setMapReady(true);
+    google.maps.event.addListenerOnce(map, 'idle', markReady);
+    google.maps.event.addListenerOnce(map, 'tilesloaded', markReady);
 
-      infoWindowRef.current = new google.maps.InfoWindow();
+    // Refetch buildings for the current viewport whenever the map settles (debounced), so
+    // only in-view buildings are loaded as the user pans/zooms. This listener never fits or
+    // moves the map, so a refetch → marker rebuild cannot raise another idle and loop.
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    map.addListener('idle', () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (!initialLoadDoneRef.current) return;
+        const b = map.getBounds();
+        if (b) loadBuildings(b);
+      }, IDLE_REFETCH_DEBOUNCE_MS);
+    });
 
-      mapInstanceRef.current.addListener('tilesloaded', () => {
-        setTilesLoaded(true);
-      });
+    setMapCreated(true);
+  }, [mapLoaded, initialCenter, initialZoom, loadBuildings]);
 
-      // Refetch buildings for the current viewport whenever the map settles
-      // (debounced), so only in-view buildings are loaded as the user pans/zooms.
-      let idleTimer: ReturnType<typeof setTimeout> | undefined;
-      mapInstanceRef.current.addListener('idle', () => {
-        if (idleTimer) clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => {
-          const b = mapInstanceRef.current?.getBounds();
-          if (b) loadBuildings(b);
-        }, 300);
-      });
-    }
+  // Build markers whenever the buildings change, once the map exists. Runs on an empty list
+  // too, so a pan into an empty viewport clears stale markers instead of leaving them behind.
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!mapCreated || !map) return;
 
     // Clear existing markers
     markersRef.current.forEach(marker => marker.map = null);
@@ -246,7 +278,7 @@ export default function BuildingMap({
       const markerElement = createMarkerElement(building);
 
       const marker = new google.maps.marker.AdvancedMarkerElement({
-        map: mapInstanceRef.current,
+        map,
         position: { lat: building.latitude, lng: building.longitude },
         content: markerElement,
         title: building.address
@@ -315,9 +347,9 @@ export default function BuildingMap({
       markersRef.current.push(marker);
     });
 
-    // First non-empty build: fit the view to the markers, once.
-    const map = mapInstanceRef.current;
-    if (map && !didFitRef.current && buildings.length > 0) {
+    // First non-empty build: fit the view to the markers, once. The map may have existed
+    // (and gone idle) well before this; the fit still happens here, on the first data.
+    if (!didFitRef.current && buildings.length > 0) {
       const view = initialMapView(buildings.map((b) => ({ lat: b.latitude, lng: b.longitude })));
       if (view) {
         didFitRef.current = true;
@@ -342,7 +374,7 @@ export default function BuildingMap({
         });
       }
     }
-  }, [mapLoaded, buildings, initialCenter, initialZoom, createMarkerElement]);
+  }, [mapCreated, buildings, createMarkerElement]);
 
   if (error) {
     return (
@@ -363,8 +395,9 @@ export default function BuildingMap({
         className="w-full h-[500px] md:h-[600px] rounded-[6px] overflow-hidden"
       />
 
-      {/* Loading overlay — z-20 to stay above Google Maps canvas */}
-      {(loading || !mapLoaded || !tilesLoaded) && (
+      {/* Loading overlay — z-20 to stay above Google Maps canvas. Down as soon as the map is
+          interactive; the buildings fetch shows up as the "in view" badge instead. */}
+      {!mapReady && (
         <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center z-20">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-2"></div>
