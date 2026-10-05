@@ -8,7 +8,13 @@
 // claims means such a row parks itself after MAX_ATTEMPTS and waits for a human, while a row
 // that merely fails cleanly still gets its MAX_ATTEMPTS tries and a `last_error` each time.
 import { truncateError } from './errors';
-import { SETTING_KEYS, readSetting, writeSetting } from './settings';
+import {
+  SETTING_KEYS,
+  deleteSettingStatement,
+  readSetting,
+  writeSettingStatement,
+  type BreakerPauseCause,
+} from './settings';
 import type { QueueReason, RecordsDb } from './types';
 import type { BuildingRowForIdentity } from './identity';
 
@@ -227,6 +233,12 @@ export const REFRESH_AFTER_SECONDS = 30 * 86_400;
 export const FINISHED_RETENTION_SECONDS = 90 * 86_400;
 /** Ceiling on pending fill rows, so the queue table stays a working set, not a copy of the city. */
 export const FILL_TARGET = 2000;
+/**
+ * ZIPs the fill covers first: Allston (02134) and Brighton (02135), the owner's call on
+ * 2026-10-05. A sort preference, not a filter — the rest of the city follows in the usual
+ * neighborhood order once these run out.
+ */
+export const FILL_PRIORITY_ZIPS = ['02134', '02135'] as const;
 
 export interface PlannerOptions {
   now: number;
@@ -362,6 +374,10 @@ async function insertFillRows(db: RecordsDb, rows: { id: string }[], now: number
  * having no permits for a building is exactly what the panel wants to show — so an `empty`
  * pull ends the building's time in the fill.
  *
+ * FILL_PRIORITY_ZIPS comes second: among buildings at the same `has_any_pull`, Allston–
+ * Brighton goes first. A building with no ZIP compares as NULL, which DESC sorts last, so it
+ * never jumps the priority ZIPs.
+ *
  * `neighborhood IS NULL` sits next because SQLite sorts NULLs first by default and an
  * unplaced building should not jump ahead of a named neighborhood.
  */
@@ -383,9 +399,10 @@ export async function topUpFill(db: RecordsDb, options: PlannerOptions & { targe
         'AND NOT EXISTS (SELECT 1 FROM records_queue q WHERE q.building_id = b.id AND q.done_at IS NULL) ' +
         'AND NOT EXISTS (SELECT 1 FROM record_pulls rp WHERE rp.building_id = b.id ' +
         `AND rp.source_id IN (${inList}) AND rp.status IN ('ok','empty')) ` +
-        'ORDER BY has_any_pull, b.neighborhood IS NULL, b.neighborhood, b.street_key, b.st_num_lo, b.id LIMIT ?',
+        `ORDER BY has_any_pull, (b.zip_code IN (${placeholders(FILL_PRIORITY_ZIPS.length)})) DESC, ` +
+        'b.neighborhood IS NULL, b.neighborhood, b.street_key, b.st_num_lo, b.id LIMIT ?',
     )
-    .bind(...ids, ...ids, room)
+    .bind(...ids, ...ids, ...FILL_PRIORITY_ZIPS, room)
     .all<{ id: string }>();
   return insertFillRows(db, rows.results, options.now);
 }
@@ -430,8 +447,24 @@ export async function getFillPaused(db: RecordsDb): Promise<boolean> {
   return (await readSetting(db, SETTING_KEYS.fillPaused)) === '1';
 }
 
-export async function setFillPaused(db: RecordsDb, paused: boolean, now: number): Promise<void> {
-  await writeSetting(db, SETTING_KEYS.fillPaused, paused ? '1' : '0', now);
+/**
+ * Flips the fill switch and settles who owns the pause, in one batch.
+ *
+ * Only the breaker passes a `cause`, and only with `paused: true`; it is stored beside the flag
+ * so the planner knows the pause is its own to undo. Every other write — the admin Pause and
+ * Resume buttons, the planner's own auto-resume — deletes the cause. A hand resume therefore
+ * cannot leave a stale `fixture` behind for a later hand pause to inherit, and a hand pause
+ * laid over a breaker pause takes it over. One batch, so the flag never reads as paused by the
+ * breaker with no cause, or running with one.
+ */
+export async function setFillPaused(db: RecordsDb, paused: boolean, now: number, cause?: BreakerPauseCause): Promise<void> {
+  if (cause !== undefined && !paused) throw new Error('setFillPaused: a cause only goes with a pause');
+  await db.batch([
+    writeSettingStatement(db, SETTING_KEYS.fillPaused, paused ? '1' : '0', now),
+    cause === undefined
+      ? deleteSettingStatement(db, SETTING_KEYS.breakerPauseCause)
+      : writeSettingStatement(db, SETTING_KEYS.breakerPauseCause, cause, now),
+  ]);
 }
 
 export interface QueueStats {

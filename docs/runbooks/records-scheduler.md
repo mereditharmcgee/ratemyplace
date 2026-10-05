@@ -182,11 +182,38 @@ planner found one of two things:
   assessor outage fails every other source for the same building, and a breaker blind to it
   would watch five sources fail without ever naming the one thing that broke them.
 
-What the breaker does: sets `records_fill_paused = '1'`, logs `records_fill_paused` with the
-reasons, sends the one email, and stamps `records_breaker_last_alert`. It never unpauses —
-a source that flaps must not be able to pause and resume the fill behind everyone's back.
-Button, follower and refresh pulls keep running the whole time; only the city-wide fill is
-held.
+What the breaker does: sets `records_fill_paused = '1'` and, in the same write,
+`records_breaker_pause_cause` to `fixture` (the fixture failed — this wins if the error rate
+tripped too) or `errors` (only an error rate tripped); logs `records_fill_paused` with the
+reasons and the cause, sends the one email, and stamps `records_breaker_last_alert`. Button,
+follower and refresh pulls keep running the whole time; only the city-wide fill is held.
+
+**A fixture-caused pause resumes itself.** On 2026-09-17 the city portal returned 502s during
+the 06:00 fixture, the breaker paused the fill, and — because the breaker then never unpaused
+— one transient outage held the fill for eighteen days, until someone happened to look. Now,
+when the pause's recorded cause is `fixture`, the planner lifts it at the first 06:00 run
+where the fixture passes (at least one check ran, none failed, no source threw) and no source
+is over the error threshold. It deletes the cause, logs `records_fill_resumed` with the
+fixture summary, and sends a second email, "RateMyPlace records fill resumed". The
+`records_plan` line carries `resumed: true` that morning. Every pause and every resume emails,
+so a fixture that flaps is visible as a pair of emails a day rather than hidden.
+
+Two kinds of pause still wait for a human, by design:
+
+- **An `errors` pause.** The fill is most of what feeds a source's error rate, so once the
+  fill is paused a quiet day says nothing about whether the source is fixed.
+- **A pause with no cause.** Someone pressed Pause, or the pause predates the cause key (any
+  pause set before October 2026). The planner never undoes a human's decision.
+
+Any other write of the flag — the Pause or Resume button, or the planner's own resume —
+deletes the cause, so a hand pause laid over a breaker pause takes it over and is not
+auto-resumed. To see who owns a pause:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --command \
+  "SELECT key, value, updated_at FROM app_settings
+   WHERE key IN ('records_fill_paused', 'records_breaker_pause_cause')"
+```
 
 Before unpausing, find out whether the cause is fixed. `npm run records:check` runs the same
 fixture by hand against the live datasets and prints every check, which is the quickest
@@ -203,8 +230,43 @@ npx wrangler d1 execute ratemyplace-db --remote --command \
    ON CONFLICT(key) DO UPDATE SET value = '0', updated_at = unixepoch()"
 ```
 
+**A resume by SQL must also delete the cause.** The button does both in one write; the
+statement above only flips the flag, and a `fixture` cause left behind would let the planner
+undo the next hand pause. Run this straight after it:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --command \
+  "DELETE FROM app_settings WHERE key = 'records_breaker_pause_cause'"
+```
+
 The fill resumes on the next minute tick. If the cause has not actually cleared, the next
 06:00 planner pauses it again and emails again.
+
+## Backfilling reviewed buildings
+
+Approving a review queues a `follower` pull, but only since sub-project C; reviews approved
+before that never queued one, so some reviewed Boston buildings have no records on their page.
+**Run this once after the October 2026 deploy:** on `/admin/records`, press **Queue pulls for
+reviewed buildings** (or `POST /api/admin/records/queue/backfill-reviewed` with `{}`).
+
+It looks at every building with an approved review, keeps the Boston ones, and enqueues a
+`follower` row for each one whose records state is `never_pulled` — the same rule approval
+uses — and for each one with no `parcel_id` that has never been pulled. The 202 answer is the receipt: `enqueued`, `skipped`, `examined`, and `skippedByState`,
+which says why each skipped building was passed over (`pulled`, `requested`, `fill_queued`,
+`parked`, `ineligible`, `outside_boston`, `already_queued`). The rows drain ahead of the fill,
+three a minute, so a few dozen take a quarter of an hour or so.
+
+Most reviewed buildings came in from Google Places with no `parcel_id`. The backfill queues
+them anyway, because the pull resolves the parcel itself and writes `parcel_id` when the
+address matches one. When it matches none, or several, the pull writes an error row on every
+source with the resolution failure as the message; the queue row still completes in that one
+attempt, so there is no retry and nothing parks. Look for those error rows on the building's
+page, and fix the address (or use the correction workflow) before pulling it again by hand.
+
+Pressing it again is harmless: a building whose row is still pending reads `requested` and is
+skipped, with or without a parcel. `ineligible` in the receipt is a reviewed Boston building
+that has no `parcel_id` but has been pulled already — a condo whose resolution found no
+whole-building parcel, or an address that matched none — so it is not queued a second time.
 
 ## Retrying a parked row
 

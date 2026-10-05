@@ -178,6 +178,75 @@ describe('RecordsQueuePanel', () => {
     expect(container.textContent).toContain('Fill paused');
   });
 
+  it('queues pulls for reviewed buildings after a confirm, reports the counts, and re-fetches', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.endsWith('/backfill-reviewed')) {
+        return Promise.resolve(
+          jsonResponse(
+            { data: { enqueued: 2, skipped: 3, examined: 5, skippedByState: { pulled: 2, outside_boston: 1 } } },
+            true,
+            202,
+          ),
+        );
+      }
+      return Promise.resolve(jsonResponse(queuePayload()));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const confirmMock = vi.fn().mockReturnValue(true);
+    vi.stubGlobal('confirm', confirmMock);
+
+    const { container, getByText } = render(<RecordsQueuePanel />);
+    await waitFor(() => expect(getByText('Queue pulls for reviewed buildings')).toBeTruthy());
+    const loadsBefore = fetchMock.mock.calls.filter((call) => call[0] === '/api/admin/records/queue').length;
+
+    fireEvent.click(getByText('Queue pulls for reviewed buildings'));
+
+    await waitFor(() =>
+      expect(container.textContent).toContain(
+        'Queued 2 pulls. Skipped 3 of 5 reviewed buildings: 2 already pulled, 1 outside Boston.',
+      ),
+    );
+    expect(confirmMock).toHaveBeenCalledTimes(1);
+    const call = fetchMock.mock.calls.find((c) => String(c[0]).endsWith('/backfill-reviewed'));
+    expect(call?.[0]).toBe('/api/admin/records/queue/backfill-reviewed');
+    expect(call?.[1].method).toBe('POST');
+    expect(call?.[1].headers['Content-Type']).toBe('application/json');
+    expect(JSON.parse(call?.[1].body)).toEqual({});
+    // The follower count on screen has to move, and only the GET carries it.
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter((c) => c[0] === '/api/admin/records/queue').length).toBe(loadsBefore + 1),
+    );
+  });
+
+  it('does not queue anything when the backfill confirm is dismissed', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(queuePayload()));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
+
+    const { getByText } = render(<RecordsQueuePanel />);
+    await waitFor(() => expect(getByText('Queue pulls for reviewed buildings')).toBeTruthy());
+    fireEvent.click(getByText('Queue pulls for reviewed buildings'));
+
+    expect(fetchMock.mock.calls.filter((call) => String(call[0]).endsWith('/backfill-reviewed'))).toHaveLength(0);
+  });
+
+  it('says so when the backfill fails', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.endsWith('/backfill-reviewed')) {
+        return Promise.resolve(jsonResponse({ error: 'Failed to queue pulls for reviewed buildings' }, false, 500));
+      }
+      return Promise.resolve(jsonResponse(queuePayload()));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
+
+    const { container, getByText } = render(<RecordsQueuePanel />);
+    await waitFor(() => expect(getByText('Queue pulls for reviewed buildings')).toBeTruthy());
+    fireEvent.click(getByText('Queue pulls for reviewed buildings'));
+
+    await waitFor(() => expect(container.textContent).toContain('Could not queue pulls for reviewed buildings'));
+  });
+
   it('says out loud that the fill is meant to stay paused until the C3 site release', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(queuePayload())));
     const { container } = render(<RecordsQueuePanel />);
