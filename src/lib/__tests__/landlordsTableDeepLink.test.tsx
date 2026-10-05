@@ -48,6 +48,26 @@ describe('LandlordsTable ?id= deep link', () => {
     ]);
   });
 
+  it('stops paging when a page comes back empty while the total still claims more', async () => {
+    window.history.replaceState(null, '', '/admin/landlords?id=ll-missing');
+    const fetchMock = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes('offset=0') ? { landlords: [landlord('ll-1', 'A Co')], total: 5, stats } : { landlords: [], total: 5, stats },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { findByText } = render(<LandlordsTable />);
+    await findByText('A Co');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    // Give a runaway effect room to fire again before checking it did not.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/admin/landlords?limit=100&offset=0',
+      '/api/admin/landlords?limit=100&offset=1',
+    ]);
+  });
+
   it('without ?id= nothing is expanded', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ landlords: [landlord('ll-1', 'A Co', 'secret')], total: 1, stats }) })));
     const { findByText, queryByText } = render(<LandlordsTable />);

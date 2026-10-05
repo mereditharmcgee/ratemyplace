@@ -33,6 +33,9 @@ export default function LandlordsTable() {
 
   // `?id=` (from a building's "View landlord" link): expand that row once it is loaded.
   const [targetId, setTargetId] = useState<string | null>(null);
+  // Set when an appended page added no rows: the list has ended whatever `total` says, so the
+  // deep-link search must stop rather than refetch the same offset forever.
+  const [listEnded, setListEnded] = useState(false);
 
   useEffect(() => {
     setTargetId(new URLSearchParams(window.location.search).get('id')?.trim() || null);
@@ -46,13 +49,13 @@ export default function LandlordsTable() {
       setTargetId(null);
       // After the expanded row renders.
       setTimeout(() => document.getElementById(`landlord-${targetId}`)?.scrollIntoView({ block: 'start' }), 0);
-    } else if (landlords.length < total) {
+    } else if (landlords.length < total && !listEnded) {
       // The list is paged by name; keep loading until the landlord appears or the list ends.
       fetchLandlords(landlords.length, false);
     } else {
       setTargetId(null);
     }
-  }, [targetId, landlords, total, loading, loadingMore, error]);
+  }, [targetId, landlords, total, loading, loadingMore, error, listEnded]);
 
   // append=false replaces the list (initial load); append=true adds the new page.
   const fetchLandlords = async (offset: number, replace: boolean) => {
@@ -64,6 +67,7 @@ export default function LandlordsTable() {
 
       if (response.ok) {
         setLandlords((prev) => (replace ? data.landlords : [...prev, ...data.landlords]));
+        setListEnded(!replace && data.landlords.length === 0);
         setStats(data.stats);
         setTotal(data.total);
       } else {

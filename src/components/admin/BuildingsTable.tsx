@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { getScoreTextColor } from '../../lib/scoring-colors';
-import type { AdminBuilding, AdminBuildingsResponse, AdminBuildingsStats } from '../../lib/api-types';
+import type { AdminBuilding, AdminBuildingsResponse, AdminBuildingsStats, AdminLandlordsResponse } from '../../lib/api-types';
 import { adminBuildingsUrl, type AdminBuildingsFilter } from '../../lib/admin/buildingsFilter';
 import { applyBuildingPatch, buildingEditForm, buildingEditPatch, type BuildingEditForm } from '../../lib/admin/buildingEdit';
+import { landlordOptionLabel, type LandlordGeo } from '../../lib/admin/landlordMatch';
 import BuildingsFilterBar from './BuildingsFilterBar';
 import OrphanCleanupButton from './OrphanCleanupButton';
 import RecordsPullButton from './RecordsPullButton';
 
-interface LandlordOption {
+interface ManagerOption {
   id: string;
   name: string;
 }
@@ -37,13 +38,15 @@ export default function BuildingsTable() {
   const [editForm, setEditForm] = useState<BuildingEditForm>({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [landlords, setLandlords] = useState<LandlordOption[]>([]);
-  const [managers, setManagers] = useState<LandlordOption[]>([]);
+  const [landlords, setLandlords] = useState<LandlordGeo[]>([]);
+  const [managers, setManagers] = useState<ManagerOption[]>([]);
   const [enriching, setEnriching] = useState<string | null>(null);
   const [enrichResult, setEnrichResult] = useState<any>(null);
   // Only the newest list request may write state, so a slow response for an old filter
   // cannot overwrite the rows for the current one.
   const requestSeq = useRef(0);
+  // Bumped on Refresh and after a single-building delete so the orphan cleanup count refetches.
+  const [cleanupKey, setCleanupKey] = useState(0);
 
   const filter = useMemo<AdminBuildingsFilter>(
     () => ({ landlord: landlordId, q: search || null, orphans: orphansOnly }),
@@ -98,7 +101,17 @@ export default function BuildingsTable() {
     }
   };
 
-  const loadMore = () => fetchBuildings(buildings.length, false);
+  // A filter change still in flight owns the list: appending a page now would take the newer
+  // request number and add the new filter's rows onto the old filter's.
+  const loadMore = () => {
+    if (refreshing) return;
+    fetchBuildings(buildings.length, false);
+  };
+
+  const refresh = () => {
+    setCleanupKey((k) => k + 1);
+    fetchBuildings(0, true);
+  };
 
   const clearLandlord = () => {
     setLandlordId(null);
@@ -112,7 +125,7 @@ export default function BuildingsTable() {
     try {
       // limit=500 so the assign-landlord dropdown shows all options, not just the default page
       const response = await fetch('/api/admin/landlords?limit=500');
-      const data = await response.json();
+      const data = (await response.json()) as AdminLandlordsResponse;
       if (response.ok) setLandlords(data.landlords);
     } catch {}
   };
@@ -189,6 +202,7 @@ export default function BuildingsTable() {
         setBuildings((prev) => prev.filter((b) => b.id !== buildingId));
         setTotal((prev) => Math.max(0, prev - 1));
         setExpandedBuilding(null);
+        setCleanupKey((k) => k + 1);
         alert(`Successfully deleted "${data.deleted}". ${data.reviewsDeleted} review(s) were also deleted.`);
       } else {
         alert(data.error || 'Failed to delete building');
@@ -271,12 +285,12 @@ export default function BuildingsTable() {
           />
         </div>
         <button
-          onClick={() => fetchBuildings(0, true)}
+          onClick={refresh}
           className="px-4 py-2 bg-gray-100 text-gray-700 rounded-[6px] hover:bg-gray-200"
         >
           Refresh
         </button>
-        <OrphanCleanupButton onDeleted={() => fetchBuildings(0, true)} />
+        <OrphanCleanupButton refreshKey={cleanupKey} onDeleted={() => fetchBuildings(0, true)} />
       </div>
 
       {error && (
@@ -479,7 +493,7 @@ export default function BuildingsTable() {
                           >
                             <option value="">None</option>
                             {landlords.map((l) => (
-                              <option key={l.id} value={l.id}>{l.name}</option>
+                              <option key={l.id} value={l.id}>{landlordOptionLabel(l)}</option>
                             ))}
                           </select>
                         </div>
@@ -814,7 +828,7 @@ export default function BuildingsTable() {
         {buildings.length < total && (
           <button
             onClick={loadMore}
-            disabled={loadingMore}
+            disabled={loadingMore || refreshing}
             className="px-4 py-2 bg-teal-700 text-white rounded-[4px] hover:bg-teal-800 disabled:opacity-50 text-sm font-semibold"
           >
             {loadingMore ? 'Loading...' : `Load more (${total - buildings.length} remaining)`}

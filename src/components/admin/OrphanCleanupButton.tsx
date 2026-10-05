@@ -4,6 +4,8 @@ import type { AdminCleanupPreviewResponse } from '../../lib/api-types';
 interface Props {
   /** Called after a cleanup deleted rows, so the list can reload. */
   onDeleted: () => void;
+  /** Changes when the parent list was refreshed or lost a building; the count is refetched. */
+  refreshKey?: number;
 }
 
 type Preview = AdminCleanupPreviewResponse['data'];
@@ -20,13 +22,24 @@ async function fetchPreview(): Promise<Preview | null> {
  * reviews and no saves (the predicate is `orphanBuildingsWhere`). Seeded parcels are never
  * touched, and the label carries the count so the admin sees the scope before clicking.
  */
-export default function OrphanCleanupButton({ onDeleted }: Props) {
+export default function OrphanCleanupButton({ onDeleted, refreshKey = 0 }: Props) {
   const [count, setCount] = useState<number | null>(null);
   const [working, setWorking] = useState(false);
 
   useEffect(() => {
-    fetchPreview().then((preview) => setCount(preview ? preview.count : null)).catch(() => setCount(null));
-  }, []);
+    let current = true;
+    fetchPreview()
+      .then((preview) => {
+        if (current) setCount(preview ? preview.count : null);
+      })
+      .catch(() => {
+        if (current) setCount(null);
+      });
+    // A newer key's fetch supersedes this one; a slow older response must not overwrite it.
+    return () => {
+      current = false;
+    };
+  }, [refreshKey]);
 
   const run = async () => {
     setWorking(true);

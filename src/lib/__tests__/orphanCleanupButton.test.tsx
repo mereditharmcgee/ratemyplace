@@ -29,6 +29,16 @@ describe('OrphanCleanupButton', () => {
     expect((await findByRole('button', { name: `${LABEL} (3)` }))).toBeTruthy();
   });
 
+  it('refetches the count when refreshKey changes', async () => {
+    const fetchMock = stub(3);
+    const { findByRole, rerender } = render(<OrphanCleanupButton refreshKey={0} onDeleted={() => {}} />);
+    await findByRole('button', { name: `${LABEL} (3)` });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    stub(2);
+    rerender(<OrphanCleanupButton refreshKey={1} onDeleted={() => {}} />);
+    expect(await findByRole('button', { name: `${LABEL} (2)` })).toBeTruthy();
+  });
+
   it('is disabled when there is nothing to delete', async () => {
     stub(0);
     const { findByRole } = render(<OrphanCleanupButton onDeleted={() => {}} />);
