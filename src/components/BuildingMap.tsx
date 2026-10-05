@@ -84,6 +84,9 @@ function clusterRenderer(scoreOf: WeakMap<Marker, number | null>): Renderer {
         'font-weight: 600',
         'font-variant-numeric: tabular-nums',
         'cursor: pointer',
+        // AdvancedMarkerElement anchors content at its bottom centre, which suits a pin but
+        // would float a round badge half its height above the cluster. Centre it instead.
+        'transform: translateY(50%)',
       ].join('; ');
       badge.textContent = String(count);
 
