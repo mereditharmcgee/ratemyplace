@@ -45,3 +45,54 @@ export const BOSTON_LOCALITY_NAMES: readonly string[] = [
   'Roxbury Crossing',
   'Readville', // USPS city name for 02136/02137, both Boston-only (Hyde Park).
 ];
+
+// Smaller places inside a Boston neighborhood, as Google Places names them in the
+// `neighborhood` address component, mapped to the neighborhood a reader knows. Production
+// had "27 Lanark Road" stored as "Aberdeen" while every seeded row on the same street says
+// "Brighton". Every value here is a name in `BOSTON_LOCALITY_NAMES`.
+//
+// This is a display and storage alias only. It is deliberately NOT part of
+// `BOSTON_LOCALITY_NAMES`: identity and dedupe strip those names off the end of a street,
+// and "Fort Point" or "Savin Hill" there would change address keys. Three keys here
+// ('Dorchester Center', 'Roxbury Crossing', 'Readville') are also postal city names in
+// that list; that is fine, the two lists answer different questions.
+//
+// Keys are in display form; `locality.ts` normalizes them for lookup.
+export const BOSTON_SUB_AREAS: Readonly<Record<string, string>> = {
+  Aberdeen: 'Brighton',
+  'Oak Square': 'Brighton',
+  'Brighton Center': 'Brighton',
+  'Cleveland Circle': 'Brighton',
+  'Packards Corner': 'Allston',
+  Kenmore: 'Fenway',
+  Longwood: 'Fenway',
+  'Audubon Circle': 'Fenway',
+  'Bay Village': 'South End',
+  'Leather District': 'Downtown',
+  'Financial District': 'Downtown',
+  'Downtown Crossing': 'Downtown',
+  'Fort Point': 'Seaport',
+  'City Point': 'South Boston',
+  'Savin Hill': 'Dorchester',
+  'Fields Corner': 'Dorchester',
+  'Codman Square': 'Dorchester',
+  Ashmont: 'Dorchester',
+  'Lower Mills': 'Dorchester',
+  Neponset: 'Dorchester',
+  'Uphams Corner': 'Dorchester',
+  'Dorchester Center': 'Dorchester',
+  'Egleston Square': 'Jamaica Plain',
+  'Hyde Square': 'Jamaica Plain',
+  'Forest Hills': 'Jamaica Plain',
+  'Jackson Square': 'Jamaica Plain',
+  'Nubian Square': 'Roxbury',
+  'Dudley Square': 'Roxbury',
+  'Roxbury Crossing': 'Roxbury',
+  'Orient Heights': 'East Boston',
+  'Eagle Hill': 'East Boston',
+  'Jeffries Point': 'East Boston',
+  'Maverick Square': 'East Boston',
+  Fairmount: 'Hyde Park',
+  Readville: 'Hyde Park',
+  'Bellevue Hill': 'West Roxbury',
+};

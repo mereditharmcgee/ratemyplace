@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getScoreColor, getScoreHex } from '../lib/scoring-colors';
 import { displayLocality } from '../lib/locality';
+import { initialMapView, shouldPanToUser, type LatLngBox, type LatLngPoint } from '../lib/mapView';
 
 interface Building {
   id: string;
@@ -20,6 +21,13 @@ interface Props {
   initialZoom?: number;
 }
 
+// Where the map starts before the first fit. A module constant rather than a default-param
+// literal, so it is one object across renders and does not re-run the marker effect.
+const BOSTON_CENTER: LatLngPoint = { lat: 42.3601, lng: -71.0589 };
+
+// Zoom when the map moves to the reader's own location.
+const USER_LOCATION_ZOOM = 14;
+
 // Marker hex + label come from the canonical brand system in src/lib/scoring-colors.ts.
 // Local getMarkerHex / getMarkerLabel exist only because Google Maps takes hex strings, not Tailwind classes.
 function getMarkerHex(score: number | null): string {
@@ -33,13 +41,18 @@ function getMarkerLabel(score: number | null): string {
 
 export default function BuildingMap({
   apiKey,
-  initialCenter = { lat: 42.3601, lng: -71.0589 }, // Default to Boston
+  initialCenter = BOSTON_CENTER,
   initialZoom = 13
 }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  // The first view is fitted once, on the first load with markers; the viewport refetches
+  // that follow must never re-fit, or every pan would snap back.
+  const didFitRef = useRef(false);
+  const fittedBoxRef = useRef<LatLngBox | null>(null);
+  const userLocationRef = useRef<LatLngPoint | null>(null);
 
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +60,6 @@ export default function BuildingMap({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [tilesLoaded, setTilesLoaded] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationRequested, setLocationRequested] = useState(false);
 
   // Try to get user's location
@@ -62,11 +74,12 @@ export default function BuildingMap({
             lat: position.coords.latitude,
             lng: position.coords.longitude
           };
-          setUserLocation(newLocation);
-          // If map is already initialized, pan to user location
-          if (mapInstanceRef.current) {
+          userLocationRef.current = newLocation;
+          // Move to the reader only when they are inside the area the markers were fitted
+          // to. If the fit has not happened yet, the fit's own idle handler checks instead.
+          if (mapInstanceRef.current && shouldPanToUser(newLocation, fittedBoxRef.current)) {
             mapInstanceRef.current.panTo(newLocation);
-            mapInstanceRef.current.setZoom(14);
+            mapInstanceRef.current.setZoom(USER_LOCATION_ZOOM);
           }
         },
         (err) => {
@@ -187,11 +200,10 @@ export default function BuildingMap({
 
     // Initialize map
     if (!mapInstanceRef.current) {
-      // Use user location if available, otherwise use initialCenter
-      const mapCenter = userLocation || initialCenter;
+      // Starts at the default view; the fit below replaces it in the same pass.
       mapInstanceRef.current = new google.maps.Map(mapRef.current, {
-        center: mapCenter,
-        zoom: userLocation ? 14 : initialZoom,
+        center: initialCenter,
+        zoom: initialZoom,
         mapId: 'ratemyplace-map', // Required for AdvancedMarkerElement
         disableDefaultUI: false,
         zoomControl: true,
@@ -303,7 +315,34 @@ export default function BuildingMap({
       markersRef.current.push(marker);
     });
 
-  }, [mapLoaded, buildings, initialCenter, initialZoom, createMarkerElement, userLocation]);
+    // First non-empty build: fit the view to the markers, once.
+    const map = mapInstanceRef.current;
+    if (map && !didFitRef.current && buildings.length > 0) {
+      const view = initialMapView(buildings.map((b) => ({ lat: b.latitude, lng: b.longitude })));
+      if (view) {
+        didFitRef.current = true;
+        fittedBoxRef.current = view.box;
+        if (view.kind === 'center') {
+          map.setCenter(view.center);
+          map.setZoom(view.zoom);
+        } else {
+          map.fitBounds(view.box, view.padding);
+        }
+        google.maps.event.addListenerOnce(map, 'idle', () => {
+          // fitBounds zooms as close as it can; a tight cluster should not open at roof level.
+          const zoom = map.getZoom();
+          if (view.kind === 'fit' && zoom !== undefined && zoom > view.maxZoom) {
+            map.setZoom(view.maxZoom);
+          }
+          const user = userLocationRef.current;
+          if (user && shouldPanToUser(user, view.box)) {
+            map.panTo(user);
+            map.setZoom(USER_LOCATION_ZOOM);
+          }
+        });
+      }
+    }
+  }, [mapLoaded, buildings, initialCenter, initialZoom, createMarkerElement]);
 
   if (error) {
     return (

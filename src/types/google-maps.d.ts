@@ -6,9 +6,26 @@ declare namespace google.maps {
     constructor(el: HTMLElement, opts?: any);
     addListener(event: string, handler: (...args: any[]) => void): void;
     getBounds(): LatLngBounds | undefined;
+    getZoom(): number | undefined;
+    fitBounds(bounds: LatLngBounds | LatLngBoundsLiteral, padding?: number): void;
     panTo(latLng: { lat: number; lng: number }): void;
     setZoom(zoom: number): void;
     setCenter(latLng: { lat: number; lng: number }): void;
+  }
+
+  interface LatLngBoundsLiteral {
+    east: number;
+    north: number;
+    south: number;
+    west: number;
+  }
+
+  interface MapsEventListener {
+    remove(): void;
+  }
+
+  namespace event {
+    function addListenerOnce(instance: object, eventName: string, handler: () => void): MapsEventListener;
   }
 
   class InfoWindow {

@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { displayLocality, localityLine } from '../locality';
+import { BOSTON_SUB_AREAS } from '../bostonLocalities';
+import { displayLocality, localityLine, resolveBostonSubArea } from '../locality';
+
+describe('resolveBostonSubArea', () => {
+  it('maps a sub-area to its neighborhood, ignoring case and spacing', () => {
+    expect(resolveBostonSubArea('Aberdeen')).toBe('Brighton');
+    expect(resolveBostonSubArea('KENMORE')).toBe('Fenway');
+    expect(resolveBostonSubArea(' bay village ')).toBe('South End');
+  });
+
+  it('returns anything else trimmed but otherwise unchanged', () => {
+    expect(resolveBostonSubArea('Brighton')).toBe('Brighton');
+    expect(resolveBostonSubArea(' East Rock ')).toBe('East Rock');
+  });
+
+  it('only ever points at a neighborhood display already trusts', () => {
+    for (const target of Object.values(BOSTON_SUB_AREAS)) {
+      expect(displayLocality({ address: `1 ${target} St`, neighborhood: target, city: 'Boston' })).toBe(target);
+    }
+  });
+});
 
 describe('displayLocality', () => {
   it('falls back to city when the neighborhood is a street-name word from the geocoder', () => {
@@ -64,6 +84,33 @@ describe('displayLocality', () => {
       displayLocality({ address: '1027 Commonwealth, Boston', neighborhood: 'Commonwealth', city: 'Boston' })
     ).toBe('Boston');
   });
+
+  it('reads a Google sub-area as the Boston neighborhood it sits in', () => {
+    // Production: 27 Lanark Road came back from Google Places as "Aberdeen"; every seeded
+    // Lanark Road row says "Brighton".
+    expect(displayLocality({ address: '27 Lanark Road', neighborhood: 'Aberdeen', city: 'Boston' })).toBe('Brighton');
+    expect(displayLocality({ address: '27 Lanark Road', neighborhood: '  aberdeen ', city: 'Boston' })).toBe('Brighton');
+    expect(displayLocality({ address: '1 Main St', neighborhood: 'Fort Point', city: 'Boston' })).toBe('Seaport');
+    expect(displayLocality({ address: '1 Main St', neighborhood: 'Savin Hill', city: 'Dorchester' })).toBe('Dorchester');
+  });
+
+  it('resolves a sub-area even when it shares a word with the street', () => {
+    expect(displayLocality({ address: '5 Cleveland Circle', neighborhood: 'Cleveland Circle', city: 'Boston' })).toBe(
+      'Brighton'
+    );
+  });
+
+  it('leaves a sub-area name alone outside Boston', () => {
+    // Fairmount is a Philadelphia neighborhood too; the alias is a Boston fact.
+    expect(displayLocality({ address: '1 Main St', neighborhood: 'Fairmount', city: 'Philadelphia' })).toBe('Fairmount');
+  });
+
+  it('passes an unknown neighborhood through unchanged', () => {
+    expect(displayLocality({ address: '1 Elm St', neighborhood: 'Wooster Square', city: 'New Haven' })).toBe(
+      'Wooster Square'
+    );
+    expect(displayLocality({ address: '1 Main St', neighborhood: 'Somewhere New', city: 'Boston' })).toBe('Somewhere New');
+  });
 });
 
 describe('localityLine', () => {
@@ -77,6 +124,12 @@ describe('localityLine', () => {
     expect(
       localityLine({ address: '1027 Commonwealth Avenue', neighborhood: 'Commonwealth', city: 'Boston' }, 'MA')
     ).toBe('Boston, MA');
+  });
+
+  it('names the Boston neighborhood for a Google sub-area', () => {
+    expect(localityLine({ address: '27 Lanark Road', neighborhood: 'Aberdeen', city: 'Boston' }, 'MA')).toBe(
+      'Brighton, Boston, MA'
+    );
   });
 
   it('works without a state', () => {
