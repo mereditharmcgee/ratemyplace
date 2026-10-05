@@ -2,125 +2,131 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import { createAuditLog } from '../../../lib/audit';
 import { getClientIP } from '../../../lib/rateLimit';
+import { orphanBuildingsWhere } from '../../../lib/admin/orphanBuildings';
+import { logError } from '../../../lib/logger';
 
-// Admin endpoint to cleanup buildings with no reviews
-export async function POST(context: APIContext): Promise<Response> {
-  // Require authentication
-  if (!context.locals.user) {
-    return new Response(JSON.stringify({ error: 'Authentication required' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
+// Orphan cleanup. Scope is `orphanBuildingsWhere()` and nothing else: user-added buildings
+// outside Boston and New Haven with no review in any status and no saves. Seeded parcels
+// (tens of thousands of zero-review rows) are never in scope; the old "no reviews" version
+// of this endpoint would have targeted every one of them.
 
-  // Require admin
-  if (!context.locals.user.isAdmin) {
-    return new Response(JSON.stringify({ error: 'Admin access required' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
+const SAMPLE_SIZE = 50;
+// The audit row lists every deleted building up to this many (always with the full count),
+// so one huge run cannot produce an unbounded audit_logs row.
+const AUDIT_LIST_CAP = 1000;
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+function requireAdmin(context: APIContext): Response | null {
+  if (!context.locals.user) return json({ error: 'Authentication required' }, 401);
+  if (!context.locals.user.isAdmin) return json({ error: 'Admin access required' }, 403);
+  return null;
+}
+
+interface OrphanSample {
+  id: string;
+  address: string;
+  city: string | null;
+  state: string | null;
+  created_at: number;
+}
+
+async function preview(db: ReturnType<typeof getDB>): Promise<{ count: number; sample: OrphanSample[] }> {
+  const orphans = orphanBuildingsWhere();
+  const countRow = await db
+    .prepare(`SELECT COUNT(*) AS count FROM buildings b WHERE ${orphans.sql}`)
+    .bind(...orphans.binds)
+    .first<{ count: number }>();
+  const { results } = await db
+    .prepare(`
+      SELECT b.id, b.address, b.city, b.state, b.created_at
+      FROM buildings b
+      WHERE ${orphans.sql}
+      ORDER BY b.created_at DESC, b.id DESC
+      LIMIT ?
+    `)
+    .bind(...orphans.binds, SAMPLE_SIZE)
+    .all<OrphanSample>();
+  return { count: countRow?.count ?? 0, sample: results ?? [] };
+}
+
+// GET previews what POST would delete.
+export async function GET(context: APIContext): Promise<Response> {
+  const denied = requireAdmin(context);
+  if (denied) return denied;
 
   try {
-    const db = getDB(context);
-
-    // Find buildings with no reviews
-    const emptyBuildings = await db.prepare(`
-      SELECT b.id, b.address
-      FROM buildings b
-      LEFT JOIN reviews r ON b.id = r.building_id
-      GROUP BY b.id
-      HAVING COUNT(r.id) = 0
-    `).all<{ id: string; address: string }>();
-
-    const buildingsToDelete = emptyBuildings.results || [];
-
-    if (buildingsToDelete.length === 0) {
-      return new Response(JSON.stringify({
-        success: true,
-        message: 'No empty buildings found',
-        deleted: 0
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Delete all empty buildings
-    const ids = buildingsToDelete.map(b => b.id);
-    const placeholders = ids.map(() => '?').join(',');
-
-    await db.prepare(`DELETE FROM buildings WHERE id IN (${placeholders})`).bind(...ids).run();
-
-    // Audit log — one entry for the whole bulk delete, recording the count and
-    // the addresses removed (a single admin click can delete many rows).
-    await createAuditLog(db, {
-      adminUserId: context.locals.user.id,
-      adminIp: getClientIP(context),
-      actionType: 'buildings_bulk_deleted',
-      entityType: 'building',
-      entityId: ids.join(','),
-      oldValue: { deleted: buildingsToDelete.length, addresses: buildingsToDelete.map((b) => b.address) },
-    });
-
-    return new Response(JSON.stringify({
-      success: true,
-      message: `Deleted ${buildingsToDelete.length} building(s) with no reviews`,
-      deleted: buildingsToDelete.length,
-      buildings: buildingsToDelete.map(b => b.address)
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return json({ data: await preview(getDB(context)) });
   } catch (error) {
-    console.error('Cleanup error:', error);
-    return new Response(JSON.stringify({ error: 'Cleanup failed' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    logError('admin_cleanup_preview_failed', { error: error instanceof Error ? error.message : String(error) });
+    return json({ error: 'Failed to find orphan buildings' }, 500);
   }
 }
 
-// GET to preview what would be deleted
-export async function GET(context: APIContext): Promise<Response> {
-  // Require authentication
-  if (!context.locals.user) {
-    return new Response(JSON.stringify({ error: 'Authentication required' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-
-  // Require admin
-  if (!context.locals.user.isAdmin) {
-    return new Response(JSON.stringify({ error: 'Admin access required' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
+export async function POST(context: APIContext): Promise<Response> {
+  const denied = requireAdmin(context);
+  if (denied) return denied;
+  const user = context.locals.user!;
 
   try {
     const db = getDB(context);
+    const orphans = orphanBuildingsWhere();
 
-    // Find buildings with no reviews
-    const emptyBuildings = await db.prepare(`
-      SELECT b.id, b.address, b.city, b.created_at
-      FROM buildings b
-      LEFT JOIN reviews r ON b.id = r.building_id
-      GROUP BY b.id
-      HAVING COUNT(r.id) = 0
-      ORDER BY b.created_at DESC
-    `).all<{ id: string; address: string; city: string; created_at: number }>();
+    // Belt and braces: the predicate already excludes these, but a future edit to it must
+    // not be able to turn this button into a delete of seeded or reviewed buildings.
+    const unsafe = await db
+      .prepare(`
+        SELECT COUNT(*) AS count FROM buildings b
+        WHERE ${orphans.sql}
+          AND (b.source <> 'user' OR EXISTS (SELECT 1 FROM reviews r WHERE r.building_id = b.id))
+      `)
+      .bind(...orphans.binds)
+      .first<{ count: number }>();
+    if ((unsafe?.count ?? 0) > 0) {
+      logError('admin_cleanup_refused', { unsafe: unsafe?.count ?? 0 });
+      return json({ error: 'Cleanup refused: it would touch seeded or reviewed buildings' }, 409);
+    }
 
-    return new Response(JSON.stringify({
-      emptyBuildings: emptyBuildings.results || [],
-      count: (emptyBuildings.results || []).length
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    // One statement, re-evaluating the predicate at delete time, with no per-id binds (D1
+    // caps bound parameters per statement). RETURNING hands back exactly the rows removed, so
+    // the audit names what was deleted rather than a sample read beforehand. The trailing
+    // source/review clause is hard-coded here, independent of the shared predicate, so even
+    // a race past the pre-check above cannot delete a seeded or reviewed building. FK cascades
+    // clear the building's pulls, records, corrections and queue rows.
+    const { results: removed } = await db
+      .prepare(`
+        DELETE FROM buildings
+        WHERE id IN (SELECT b.id FROM buildings b WHERE ${orphans.sql})
+          AND source = 'user'
+          AND NOT EXISTS (SELECT 1 FROM reviews WHERE building_id = buildings.id)
+        RETURNING id, address
+      `)
+      .bind(...orphans.binds)
+      .all<{ id: string; address: string }>();
+    const deletedRows = removed ?? [];
+    const deleted = deletedRows.length;
+
+    if (deleted > 0) {
+      const listed = deletedRows.slice(0, AUDIT_LIST_CAP);
+      await createAuditLog(db, {
+        adminUserId: user.id,
+        adminIp: getClientIP(context),
+        actionType: 'buildings_bulk_deleted',
+        entityType: 'building',
+        entityId: `orphans:${deleted}`,
+        oldValue: {
+          deleted,
+          scope: 'user-added, outside Boston and New Haven, no reviews, no saves',
+          listed: listed.length,
+          buildings: listed.map((b) => ({ id: b.id, address: b.address })),
+        },
+      });
+    }
+
+    return json({ data: { deleted } });
   } catch (error) {
-    console.error('Error finding empty buildings:', error);
-    return new Response(JSON.stringify({ error: 'Failed to find empty buildings' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    logError('admin_cleanup_failed', { error: error instanceof Error ? error.message : String(error) });
+    return json({ error: 'Cleanup failed' }, 500);
   }
 }

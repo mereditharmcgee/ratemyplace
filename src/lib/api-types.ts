@@ -148,24 +148,59 @@ export interface BuildingsMapResponse {
   buildings: MapBuilding[];
 }
 
+/** One row of `GET /api/admin/buildings`. */
 export interface AdminBuilding {
   id: string;
   address: string;
   slug: string;
   neighborhood: string | null;
-  city: string;
-  state: string;
+  city: string | null;
+  state: string | null;
   zip_code: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  year_built: number | null;
+  unit_count: number | null;
+  building_type: string | null;
   landlord_id: string | null;
   landlord_name: string | null;
   property_manager_id: string | null;
-  manager_name: string | null;
-  review_count: number;
+  property_manager_name: string | null;
   created_at: number;
+  // Admin-only fields; the edit form round-trips them.
+  admin_notes: string | null;
+  owner_name: string | null;
+  owner_entity: string | null;
+  owner_website: string | null;
+  review_count: number;
+  avg_score: number | null;
+}
+
+export interface AdminBuildingsStats {
+  total_buildings: number;
+  with_reviews: number;
+  with_landlords: number;
+  total_reviews: number;
 }
 
 export interface AdminBuildingsResponse {
   buildings: AdminBuilding[];
+  /** Count of rows matching the active filters (all rows when none are active). */
+  total: number;
+  offset: number;
+  limit: number;
+  /** Whole-table figures, independent of the filters. */
+  stats: AdminBuildingsStats;
+  /** Present only when `?landlord=` was given; `landlord` is null for an unknown id. */
+  filter?: { landlord: { id: string; name: string } | null };
+}
+
+/** `GET /api/admin/cleanup`: what the orphan cleanup would delete. */
+export interface AdminCleanupPreviewResponse {
+  data: {
+    count: number;
+    sample: Array<{ id: string; address: string; city: string | null; state: string | null; created_at: number }>;
+  };
 }
 
 // =============================================================================
@@ -180,9 +215,16 @@ export interface AdminLandlord {
   website: string | null;
   phone: string | null;
   email: string | null;
+  /** Internal only; never selected by a public route. */
+  admin_notes: string | null;
   building_count: number;
   review_count: number;
+  avg_score: number | null;
   created_at: number;
+  /** Distinct cities of the landlord's buildings, as stored. Empty when it has none. */
+  cities: string[];
+  /** Distinct upper-cased states of the landlord's buildings. Empty when it has none. */
+  states: string[];
 }
 
 export interface AdminLandlordsResponse {
