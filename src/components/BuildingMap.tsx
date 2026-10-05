@@ -277,7 +277,9 @@ export default function BuildingMap({
     if (!mapLoaded || !mapRef.current || mapInstanceRef.current) return;
 
     // Starts at the default view; the first non-empty marker build fits it to the markers.
-    // POI label styling lives in the cloud-console map style for `ratemyplace-map`.
+    // No `styles` option: with a `mapId` set, Google ignores it, which is why the old
+    // POI-hiding styles never took effect. Hiding POI labels needs a cloud map style attached
+    // to this map ID — an owner action in the Google Cloud console, not code.
     const map = new google.maps.Map(mapRef.current, {
       center: initialCenter,
       zoom: initialZoom,
