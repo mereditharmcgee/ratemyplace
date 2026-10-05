@@ -17,7 +17,7 @@ import {
   topUpFill,
   type ClaimedRow,
 } from './queue';
-import { SETTING_KEYS, writeSetting } from './settings';
+import { SETTING_KEYS, readBreakerPauseCause, writeSetting, type BreakerPauseCause } from './settings';
 import type { FixtureResult } from './fixture';
 import type { BuildingRowForIdentity } from './identity';
 import type { PullSummary, RecordsDb } from './types';
@@ -92,7 +92,14 @@ export interface PlanResult {
   fixtureFailures: number;
   paused: boolean;
   alerted: boolean;
+  /** True when this run lifted a fixture-caused pause because the fixture passed again. */
+  resumed: boolean;
 }
+
+/** Subject of the breaker's pause email. The Worker routes on these two, so they live here once. */
+export const RECORDS_PAUSED_SUBJECT = 'RateMyPlace records fill paused';
+/** Subject of the planner's auto-resume email. */
+export const RECORDS_RESUMED_SUBJECT = 'RateMyPlace records fill resumed';
 
 /** The default dependency bag for the Worker; tests build their own. */
 export function liveDeps(db: RecordsDb, extra: Pick<SchedulerDeps, 'fixture' | 'alert' | 'log'>): SchedulerDeps {
@@ -225,8 +232,15 @@ function fixtureReport(fixture: FixtureResult): string {
 /**
  * The daily tick. Order matters: purge, then refresh, then fill top-up, then the fixture and
  * the error rates, so a breaker trip is judged on the day's pulls and stops the fill before
- * the next drain. The breaker only ever pauses — a human unpauses from the admin panel, so a
- * source that flaps cannot pause and resume the fill behind everyone's back.
+ * the next drain.
+ *
+ * The breaker records WHY it paused (`records_breaker_pause_cause`), and the planner undoes
+ * exactly one kind of pause: its own, caused by the fixture, on the first run where the
+ * fixture passes and no source is over the error threshold. That is at most one pause or one
+ * resume a day, each with its own email, so a flapping fixture shows up in the inbox rather
+ * than behind anyone's back. A human's pause (no cause) and an error-rate pause still wait for
+ * a human. Before this, one transient city-portal outage on 2026-09-17 held the fill paused
+ * for eighteen days.
  */
 export async function plan(deps: SchedulerDeps): Promise<PlanResult> {
   const now = deps.now();
@@ -271,20 +285,56 @@ export async function plan(deps: SchedulerDeps): Promise<PlanResult> {
   const wasPaused = await getFillPaused(deps.db);
   let alerted = false;
   if (reasons.length > 0 && !wasPaused) {
-    await setFillPaused(deps.db, true, now);
+    // The fixture wins when both tripped: it is the one cause the planner can see heal.
+    const cause: BreakerPauseCause = fixture.failures > 0 ? 'fixture' : 'errors';
+    await setFillPaused(deps.db, true, now, cause);
     // Logged before the alert goes out: the pause is what happened, and a mail provider having
     // a bad minute must not be the reason nothing recorded it.
-    deps.log('records_fill_paused', { reasons });
+    deps.log('records_fill_paused', { reasons, cause });
     const body = ['The city-wide records fill was paused automatically.', ''];
     if (rateReasons.length > 0) body.push(...rateReasons, '');
     body.push(
       fixtureReport(fixture),
       '',
-      'Button and refresh pulls keep running. Clear the pause from /admin/records once the cause is understood.',
+      'Button and refresh pulls keep running.',
+      cause === 'fixture'
+        ? 'This pause came from the fixture, so the 06:00 UTC planner resumes the fill on the first morning the fixture passes and no source is over the error threshold, and emails when it does. Resume it sooner from /admin/records once the cause is understood.'
+        : 'This pause came from a source error rate, so it stays until someone clears it from /admin/records once the cause is understood.',
     );
-    await deps.alert('RateMyPlace records fill paused', body.join('\n'));
+    await deps.alert(RECORDS_PAUSED_SUBJECT, body.join('\n'));
     await writeSetting(deps.db, SETTING_KEYS.breakerLastAlert, String(now), now);
     alerted = true;
+  }
+
+  let resumed = false;
+  if (wasPaused && reasons.length === 0 && fixtureProvesHealth(fixture)) {
+    // Only the breaker's own fixture pause. A pause with no cause belongs to a human, and an
+    // error-rate pause is judged on a rate the paused fill has stopped feeding: a quiet day is
+    // not evidence the source is fixed.
+    if ((await readBreakerPauseCause(deps.db)) === 'fixture') {
+      await setFillPaused(deps.db, false, now);
+      const summary = {
+        checksTotal: fixture.checks.length,
+        checksFailed: fixture.checksFailed,
+        sourceErrors: fixture.sourceErrors.length,
+        rowsBySource: fixture.rowsBySource,
+      };
+      // Logged before the email, for the same reason as the pause.
+      deps.log('records_fill_resumed', summary);
+      resumed = true;
+      await deps.alert(
+        RECORDS_RESUMED_SUBJECT,
+        [
+          'The city-wide records fill was resumed automatically.',
+          '',
+          `The breaker paused it because the Lanark fixture failed. This morning all ${plural(fixture.checks.length, 'check')} passed and no source is over the error threshold, so the fill starts again on the next minute tick.`,
+          '',
+          fixtureReport(fixture),
+          '',
+          'Nothing to do. If this keeps happening, the fixture is flapping: run npm run records:check and read the pause emails side by side.',
+        ].join('\n'),
+      );
+    }
   }
 
   return {
@@ -292,9 +342,18 @@ export async function plan(deps: SchedulerDeps): Promise<PlanResult> {
     fillEnqueued,
     purged,
     fixtureFailures: fixture.failures,
-    paused: reasons.length > 0 || wasPaused,
+    paused: !resumed && (reasons.length > 0 || wasPaused),
     alerted,
+    resumed,
   };
+}
+
+/**
+ * The fixture passing is the evidence for an auto-resume, so "nothing failed" is not enough on
+ * its own — that is also true of a run where nothing ran. At least one check has to have run.
+ */
+function fixtureProvesHealth(fixture: FixtureResult): boolean {
+  return fixture.failures === 0 && fixture.checksFailed === 0 && fixture.sourceErrors.length === 0 && fixture.checks.length > 0;
 }
 
 /**

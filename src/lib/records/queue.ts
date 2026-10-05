@@ -8,7 +8,13 @@
 // claims means such a row parks itself after MAX_ATTEMPTS and waits for a human, while a row
 // that merely fails cleanly still gets its MAX_ATTEMPTS tries and a `last_error` each time.
 import { truncateError } from './errors';
-import { SETTING_KEYS, readSetting, writeSetting } from './settings';
+import {
+  SETTING_KEYS,
+  deleteSettingStatement,
+  readSetting,
+  writeSettingStatement,
+  type BreakerPauseCause,
+} from './settings';
 import type { QueueReason, RecordsDb } from './types';
 import type { BuildingRowForIdentity } from './identity';
 
@@ -430,8 +436,24 @@ export async function getFillPaused(db: RecordsDb): Promise<boolean> {
   return (await readSetting(db, SETTING_KEYS.fillPaused)) === '1';
 }
 
-export async function setFillPaused(db: RecordsDb, paused: boolean, now: number): Promise<void> {
-  await writeSetting(db, SETTING_KEYS.fillPaused, paused ? '1' : '0', now);
+/**
+ * Flips the fill switch and settles who owns the pause, in one batch.
+ *
+ * Only the breaker passes a `cause`, and only with `paused: true`; it is stored beside the flag
+ * so the planner knows the pause is its own to undo. Every other write — the admin Pause and
+ * Resume buttons, the planner's own auto-resume — deletes the cause. A hand resume therefore
+ * cannot leave a stale `fixture` behind for a later hand pause to inherit, and a hand pause
+ * laid over a breaker pause takes it over. One batch, so the flag never reads as paused by the
+ * breaker with no cause, or running with one.
+ */
+export async function setFillPaused(db: RecordsDb, paused: boolean, now: number, cause?: BreakerPauseCause): Promise<void> {
+  if (cause !== undefined && !paused) throw new Error('setFillPaused: a cause only goes with a pause');
+  await db.batch([
+    writeSettingStatement(db, SETTING_KEYS.fillPaused, paused ? '1' : '0', now),
+    cause === undefined
+      ? deleteSettingStatement(db, SETTING_KEYS.breakerPauseCause)
+      : writeSettingStatement(db, SETTING_KEYS.breakerPauseCause, cause, now),
+  ]);
 }
 
 export interface QueueStats {

@@ -15,6 +15,10 @@ function validationError(field: string, message: string): Response {
  * rows — a reader pressing the button, a follower, a refresh — are never paused;
  * only the background fill is.
  *
+ * Either direction also deletes `records_breaker_pause_cause` (`setFillPaused` does both in
+ * one batch). A human's pause is never one the planner auto-resumes, and a human's resume
+ * leaves no stale `fixture` cause for a later pause to inherit.
+ *
  * No audit entry: pausing and unpausing are non-destructive operational switches,
  * not admin actions on someone's data. Nothing is written, deleted or published,
  * and the flag's own `updated_at` records when it last moved.

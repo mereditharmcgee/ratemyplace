@@ -332,6 +332,22 @@ suite('admin records queue routes', () => {
       expect(resumed.status).toBe(200);
       expect((await data<{ stats: RecordsQueueStats }>(resumed)).stats.fillPaused).toBe(false);
     });
+
+    it('Resume clears a breaker pause cause, so the planner never inherits it', async () => {
+      const db = createRecordsTestDb();
+      await db
+        .prepare("INSERT INTO app_settings (key, value, updated_at) VALUES (?, '1', ?), (?, 'fixture', ?)")
+        .bind(SETTING_KEYS.fillPaused, NOW, SETTING_KEYS.breakerPauseCause, NOW)
+        .run();
+
+      const resumed = await PAUSE(createContext(db, { body: { paused: false } }));
+      expect(resumed.status).toBe(200);
+      const cause = await db
+        .prepare('SELECT value FROM app_settings WHERE key = ?')
+        .bind(SETTING_KEYS.breakerPauseCause)
+        .first<{ value: string }>();
+      expect(cause).toBeNull();
+    });
   });
 
   describe('POST /api/admin/records/queue/retry', () => {
