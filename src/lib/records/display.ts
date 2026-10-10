@@ -49,7 +49,7 @@ export function orNotRecorded(value: string | number | null | undefined): string
 }
 
 export const PANEL_FRAMING_COPY =
-  'These are facts from City of Boston and Commonwealth of Massachusetts records, shown as recorded. No rating is applied to them and they are not part of any score.';
+  'These are facts from City of Boston records, shown as recorded. No rating is applied to them and they are not part of any score.';
 
 const PERMIT_COVERAGE_YEAR = /\d{4}/.exec(PERMIT_COVERAGE_START)?.[0] ?? PERMIT_COVERAGE_START;
 
