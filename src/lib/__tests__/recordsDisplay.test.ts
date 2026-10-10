@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   BANNED_WORDS,
   PANEL_COPY,
+  PANEL_FRAMING_COPY,
   ZERO_PERMITS_COPY,
   NO_VIOLATIONS_CAVEAT,
   KIND_LABELS,
@@ -315,6 +316,15 @@ describe('permitSummary', () => {
 
   it('returns a null total for an empty list', () => {
     expect(permitSummary([])).toEqual({ count: 0, declaredTotal: null, declaredCount: 0 });
+  });
+});
+
+describe('PANEL_FRAMING_COPY', () => {
+  // The framing line names who the facts come from. Every source wired up today is a City of
+  // Boston dataset; name the Commonwealth here only once a Commonwealth source actually ships.
+  it('names only the publisher whose records the panel actually shows', () => {
+    expect(PANEL_FRAMING_COPY).toContain('City of Boston');
+    expect(PANEL_FRAMING_COPY).not.toMatch(/Commonwealth|Massachusetts/);
   });
 });
 
