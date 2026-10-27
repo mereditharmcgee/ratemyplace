@@ -80,7 +80,7 @@ suite('findExistingBuilding', () => {
     expect(await resolveWithoutWriting(input({ placeId: 'gp-y', address: '5 Main St', city: 'Gilbert', zip: '85233' }))).toBeNull();
   });
 
-  it('known gap: an odd assessor suffix misses the address tier', async () => {
+  it('an odd assessor suffix (Wy) finds the seeded parcel through the address tier', async () => {
     await insertBuilding(db, {
       id: 'seed-appian',
       address: '9-11 Appian Wy',
@@ -93,11 +93,8 @@ suite('findExistingBuilding', () => {
       st_num_hi: 11,
     });
     const hit = await resolveWithoutWriting(input({ placeId: 'gp-app', address: '9 Appian Way', zip: '02134' }));
-    // Pins the gap until fix/street-suffix-search adds WY. When that is on main, rebase
-    // this branch and change the line below to
-    //   expect(hit).toEqual({ id: 'seed-appian', slug: '9-11-appian-wy-boston', tier: 'address_key' });
-    // A green CI run from before that rebase does not cover the merged tree.
-    expect(hit).toBeNull();
+    // "9 Appian Way" keys APPIAN WY now that SUFFIX_SPELLINGS carries the assessor's WY.
+    expect(hit).toEqual({ id: 'seed-appian', slug: '9-11-appian-wy-boston', tier: 'address_key' });
   });
 });
 
