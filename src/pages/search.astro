@@ -2,6 +2,7 @@
 import BaseLayout from '../components/layout/BaseLayout.astro';
 import SearchResults from '../components/search/SearchResults';
 import EmptyState from '../components/ui/EmptyState.astro';
+import OwnerMatches from '../components/search/OwnerMatches.astro';
 import { escapeLikePattern, fitsLikePattern, validateSearch } from '../lib/validation';
 import { buildingSearchOrder, buildingSearchSelect, buildingSearchWhere } from '../lib/searchSql';
 import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../lib/scoring-sql';
@@ -9,6 +10,7 @@ import { isSearchVariant } from '../lib/seo';
 import { isAreaSearch, parseSearchQuery, withoutHouseNumber } from '../lib/searchQuery';
 import { searchEmptyState } from '../lib/searchEmptyState';
 import { BROWSE_BUILDINGS_ORDER } from '../lib/searchSql';
+import { searchOwnerNames, type OwnerNameMatch } from '../lib/records/ownerList';
 
 const query = (Astro.url.searchParams.get('q') || '').trim();
 const type = Astro.url.searchParams.get('type') || 'all';
@@ -24,6 +26,9 @@ let landlords: any[] = [];
 let totalBuildings = 0;
 let totalLandlords = 0;
 let hasAnyListings = false;
+// Owner-of-record names from the assessor, matched alongside landlords (`searchOwnerNames`).
+let owners: OwnerNameMatch[] = [];
+let totalOwners = 0;
 
 // The same length cap `/api/search/results` applies (`validateSearch`, 200 characters on the
 // trimmed query), so the page and the endpoint agree about what is a search. Over that, no
@@ -113,6 +118,15 @@ if (query && !searchRejected) {
   } catch (error) {
     console.error('Search error:', error);
   }
+
+  // Landlord search also finds owner-of-record names: a different thing from a landlord a
+  // reviewer named, listed in its own section, and found whether or not anyone has reviewed one
+  // of the owner's buildings. `searchOwnerNames` never throws (no owners table yet is no match)
+  // and applies the person rule itself, so a typed name of someone who owns one home matches
+  // nothing.
+  if (type === 'all' || type === 'landlords') {
+    ({ matches: owners, total: totalOwners } = await searchOwnerNames(db, query));
+  }
 } else if (!query) {
   // Browse mode — all reviewed properties with totals. Boston first, most recently
   // reviewed: the order is `BROWSE_BUILDINGS_ORDER`, the same one Load more reads.
@@ -180,7 +194,8 @@ if (query && !searchRejected) {
   }
 }
 
-const hasResults = buildings.length > 0 || landlords.length > 0;
+const hasListResults = buildings.length > 0 || landlords.length > 0;
+const hasResults = hasListResults || owners.length > 0;
 // The no-match message follows what was searched (`searchEmptyState`): the Landlords filter
 // gets a landlord message, and a buildings search gets one in terms of what was typed (a
 // place, an address with a house number, or anything else).
@@ -221,7 +236,7 @@ const emptyState = searchEmptyState({ query, type, areaSearch, streetQuery });
     </form>
 
     {/* Search results */}
-    {query && hasResults && (
+    {query && hasListResults && (
       <SearchResults
         client:load
         initialBuildings={buildings}
@@ -231,6 +246,8 @@ const emptyState = searchEmptyState({ query, type, areaSearch, streetQuery });
         query={query}
       />
     )}
+
+    {query && <OwnerMatches matches={owners} total={totalOwners} />}
 
     {/* No results found */}
     {query && !hasResults && (

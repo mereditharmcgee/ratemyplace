@@ -21,7 +21,9 @@ describe('searchEmptyState', () => {
   it('gives the Landlords filter its own message and a way to search buildings', () => {
     const state = searchEmptyState({ query: 'Example Realty', type: 'landlords', ...none });
     expect(state.title).toBe('No landlords match that search');
-    expect(state.description).toBe('Only landlords with a reviewed building are listed. Try part of the name.');
+    expect(state.description).toBe(
+      'Landlords named in reviews are listed once one of their buildings has a review. Owners of record are listed when the owner is a business or has two or more residential buildings here. Try part of the name.',
+    );
     expect(state.next).toEqual({
       label: 'Search buildings instead',
       href: '/search?q=Example%20Realty&type=buildings',
@@ -137,7 +139,7 @@ suite('search page empty states, rendered', () => {
       const html = await renderSearch(database, 'Nobody Holdings', 'landlords');
       const text = mainText(html);
       expect(text).toContain('No landlords match that search');
-      expect(text).toContain('Only landlords with a reviewed building are listed.');
+      expect(text).toContain('Landlords named in reviews are listed once one of their buildings has a review.');
       expect(text).not.toContain('No buildings match');
       expect(text).not.toContain('partial street name');
       const link = mainLinks(html).find((a) => a.textContent?.trim() === 'Search buildings instead');
