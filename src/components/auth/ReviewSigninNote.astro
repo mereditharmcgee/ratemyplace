@@ -1,0 +1,18 @@
+---
+// The note on /auth/signin and /auth/signup for someone sent there by "Write a review":
+// which building, and who sees the reviewer's name. The copy and the lookup live in
+// src/lib/reviewSignin.ts; this only renders them.
+import { REVIEW_SIGNIN_COPY } from '../../lib/reviewSignin';
+
+interface Props {
+  /** The building being reviewed, or null to show only the privacy line. */
+  place: string | null;
+}
+
+const { place } = Astro.props;
+---
+
+<div class="mt-4 rounded-[6px] border border-slate-200 bg-white p-4 text-sm text-gray-700" data-review-signin-note>
+  {place && <p class="font-semibold text-gray-900" data-review-place>{REVIEW_SIGNIN_COPY.reviewing(place)}</p>}
+  <p class={place ? 'mt-1' : undefined}>{REVIEW_SIGNIN_COPY.privacy}</p>
+</div>
