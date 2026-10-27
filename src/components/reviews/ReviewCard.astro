@@ -1,9 +1,9 @@
 ---
 import StarRating from '../ratings/StarRating.astro';
 import VerifiedBadge from '../ui/VerifiedBadge.astro';
-import EmailVerifiedBadge from '../ui/EmailVerifiedBadge.astro';
 import SeasonChip from '../ui/SeasonChip.astro';
 import { formatRecency } from '../../lib/privacy';
+import { bedroomsLabel, resolveUnitType, unitTypeLabel } from '../../lib/reviewDisplay';
 import { calculateDomainScores, ITEM_WEIGHTS } from '../../lib/scoring';
 import { getScoreTextColor, getScoreColor, getScoreBgTint } from '../../lib/scoring-colors';
 
@@ -18,18 +18,10 @@ const { review, showBuilding = false, compact = false } = Astro.props;
 // Calculate domain sub-scores using the weighted algorithm
 const domainScores = calculateDomainScores(review);
 
-const unitTypeLabels: Record<string, string> = {
-  'studio': 'Studio',
-  '1br': '1 bedroom',
-  '2br': '2 bedrooms',
-  '3br': '3 bedrooms',
-  '4br+': '4+ bedrooms',
-  'house': 'House'
-};
-
-// Build unit display string (unit number is admin-only for privacy)
-const unitTypeLabel = unitTypeLabels[review.unit_type] || review.unit_type;
-const unitDisplay = unitTypeLabel;
+// Build unit display string (unit number is admin-only for privacy). The header label and
+// the bedrooms chip both come from the bedrooms answer when it is known, so they agree.
+const unitDisplay = unitTypeLabel(resolveUnitType(review));
+const bedroomsDisplay = bedroomsLabel(review.bedrooms);
 
 const recencyLabel = formatRecency(review);
 
@@ -232,11 +224,11 @@ const pestLabels: Record<string, string> = {
   )}
 
   <!-- Unit Details -->
-  {(review.bedrooms || review.bathrooms || review.square_footage) && (
+  {(bedroomsDisplay || review.bathrooms || review.square_footage) && (
     <div class="flex flex-wrap gap-3 mb-4 text-sm">
-      {review.bedrooms && (
+      {bedroomsDisplay && (
         <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded">
-          {review.bedrooms} bed{review.bedrooms !== '1' ? 's' : ''}
+          {bedroomsDisplay}
         </span>
       )}
       {review.bathrooms && (
@@ -521,7 +513,6 @@ const pestLabels: Record<string, string> = {
             ? 'Maybe / It depends'
             : 'Would not recommend'}
       </span>
-      {review.user_email_verified === 1 && <EmailVerifiedBadge size="sm" />}
       {review.is_verified === 1 && <VerifiedBadge size="sm" />}
     </div>
   </div>

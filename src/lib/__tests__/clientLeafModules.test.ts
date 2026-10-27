@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 // to the client by accident. Type-only imports are erased at build time and are fine.
 const LEAF_MODULES = [
   'src/lib/authRedirect.ts',
+  'src/lib/homeSearchItems.ts',
   'src/lib/mapCluster.ts',
   'src/lib/reviewPaths.ts',
   'src/lib/reviewSubmitOutcome.ts',

@@ -133,7 +133,7 @@ describe('named-party score visibility in search results', () => {
     }));
 
     const { container, getByPlaceholderText } = render(<HomeSearch />);
-    fireEvent.change(getByPlaceholderText('Search by address, neighborhood, or landlord...'), {
+    fireEvent.change(getByPlaceholderText('Address, neighborhood, or landlord'), {
       target: { value: 'Thin' },
     });
 
@@ -191,7 +191,7 @@ describe('named-party score visibility in search results', () => {
     }));
 
     const { container, getByPlaceholderText } = render(<HomeSearch />);
-    fireEvent.change(getByPlaceholderText('Search by address, neighborhood, or landlord...'), {
+    fireEvent.change(getByPlaceholderText('Address, neighborhood, or landlord'), {
       target: { value: 'Legacy' },
     });
 

@@ -13,9 +13,9 @@ describe('building page source', () => {
     expect(source).toMatch(/description=\{meta\.description\}/);
   });
 
-  it('renders the no-reviews card from display.ts copy', () => {
-    for (const name of ['NO_REVIEWS_CARD_TITLE', 'NO_REVIEWS_CARD_BODY', 'NO_REVIEWS_BREAKDOWN_COPY']) {
-      expect(source).toContain(`{${name}}`);
-    }
+  it('has one write-review link, in the header, for reviewed and unreviewed buildings alike', () => {
+    // An unreviewed page used to carry three, one per "no reviews" block. The rendered layout,
+    // records first when there is no review, is checked in buildingPageLayout.test.ts.
+    expect(source.match(/\/review\/new\?building=/g)).toHaveLength(1);
   });
 });
