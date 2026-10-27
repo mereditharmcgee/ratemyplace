@@ -284,6 +284,34 @@ export function formatPullDate(unix: number): string {
   return PULL_DATE_FORMAT.format(new Date(unix * 1000));
 }
 
+/**
+ * The line under the panel heading. The date is when this site pulled the records from the
+ * city, not when the city last updated its datasets, and the wording says so: it read
+ * "City of Boston · pulled <date>", and each row's "as of <date>" read as the city's own date.
+ */
+export function pulledFromLine(unix: number): string {
+  return `Pulled from City of Boston open data on ${formatPullDate(unix)}.`;
+}
+
+/**
+ * Beside the pull date once the stored pull is older than the refresh interval
+ * (`provenance.ts`). Analyze Boston updates the 311, ISD, permit, Public Works and RentSmart
+ * resources daily; the assessor once a year.
+ */
+export const STALE_PULL_NOTE = 'The city may have added records since then.';
+
+/** Each ledger row's own retrieval date, worded the same way as the panel's line. */
+export function rowPulledLabel(unix: number): string {
+  return `pulled ${formatPullDate(unix)}`;
+}
+
+// The source list at the foot of the panel. The license title and every link come from
+// `provenance.ts`; these are the words around them.
+export const SOURCES_HEADING = 'Sources';
+export const SOURCES_CREDIT_LEAD = 'Data from the City of Boston, published on';
+export const ANALYZE_BOSTON_LINK_TEXT = 'Analyze Boston (data.boston.gov)';
+export const SOURCES_LICENSE_LEAD = 'under the';
+
 export interface PermitSummary {
   count: number;
   /** Sum of the permits that carried a declared valuation; null when none did. A missing figure is not $0. */
@@ -598,6 +626,11 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   STILL_OPEN_LABEL,
   STILL_OPEN_NOTE,
   SHOW_LESS_LABEL,
+  STALE_PULL_NOTE,
+  SOURCES_HEADING,
+  SOURCES_CREDIT_LEAD,
+  ANALYZE_BOSTON_LINK_TEXT,
+  SOURCES_LICENSE_LEAD,
   ...Object.fromEntries(
     Object.entries(KIND_LABELS).map(([kind, label]) => [`KIND_LABELS.${kind}`, label]),
   ),
@@ -610,6 +643,8 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
     ]),
   ),
   'unavailableCopy()': unavailableCopy(SAMPLE_PULL_DATE),
+  'pulledFromLine()': pulledFromLine(SAMPLE_PULL_DATE),
+  'rowPulledLabel()': rowPulledLabel(SAMPLE_PULL_DATE),
   'openSubCount() — empty': openSubCount(0, 0),
   'openSubCount() — all closed': openSubCount(0, 3),
   'openSubCount() — some open': openSubCount(2, 3),

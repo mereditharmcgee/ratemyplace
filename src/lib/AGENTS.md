@@ -398,6 +398,16 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   toward hiding: a hidden business address costs a reader one lookup, a published home
   address cannot be taken back. `BANNED_WORDS` in the same file is scanned against the
   panel's templates by `__tests__/recordsPanelCopy.test.ts`.
+- **`provenance.ts` is the panel's source list and its freshness rule.** `recordsCitations`
+  turns the source ids a building has pulls for into resource-level Analyze Boston links
+  (`<dataset page>/resource/<id>`), built only from the resource-id constants in
+  `sources/boston/*.ts`: a 311 pull cites all sixteen yearly files plus the new-system file,
+  the assessor cites the fiscal years pulled, and an unknown id is left out. The license line
+  is what CKAN `package_show` reported for all six packages on 2026-10-27 (ODC PDDL); if a
+  package's `license_title` changes, the one-line credit stops being true and has to change
+  here. `showStalePullNote` adds a plain note beside the pull date on a `pulled` building
+  whose newest pull is older than `REFRESH_AFTER_SECONDS` (30 days). It is a label only: the
+  reader button still refuses a `pulled` building (409), so it is not offered there.
 
 ### Search, page metadata, and the sitemap
 
