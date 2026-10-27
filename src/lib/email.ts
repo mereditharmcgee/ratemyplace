@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import type { CreateEmailOptions } from 'resend';
+import { formatEasternDateTime } from './format';
 
 /**
  * Why a send did not go out, in a form the email tracker can store and the admin dashboard
@@ -661,5 +662,120 @@ async function sendRecordsSchedulerEmail(
     to: toEmail,
     subject,
     text: body,
+  });
+}
+
+/** Every intake that needs the owner's action and gets a notice. */
+export const OWNER_NOTICE_KINDS = [
+  'review_submitted',
+  'review_edited',
+  'bug_report',
+  'record_correction',
+  'dispute',
+  'verification_upload',
+] as const;
+
+export type OwnerNoticeKind = (typeof OWNER_NOTICE_KINDS)[number];
+
+/** A building address longer than this is cut, so one odd row cannot balloon a notice. */
+export const OWNER_NOTICE_MAX_ADDRESS = 200;
+
+/** Trusted copy constants — interpolated raw, never through escapeHtml. */
+const OWNER_NOTICE_COPY: Record<OwnerNoticeKind, { subject: string; lede: string; cta: string }> = {
+  review_submitted: {
+    subject: 'New review to moderate',
+    lede: 'A new review is waiting in the moderation queue. It stays hidden until you approve it.',
+    cta: 'Open pending reviews',
+  },
+  review_edited: {
+    subject: 'Edited review to re-moderate',
+    lede: 'A reviewer edited a review you had already moderated. Editing sends it back to pending, so it is hidden until you approve it again.',
+    cta: 'Open pending reviews',
+  },
+  bug_report: {
+    subject: 'New bug report',
+    lede: 'Someone filed a bug report.',
+    cta: 'Open bug reports',
+  },
+  record_correction: {
+    subject: 'New public record correction',
+    lede: "Someone reported an error in a building's public records.",
+    cta: 'Open record corrections',
+  },
+  dispute: {
+    subject: 'New landlord dispute',
+    lede: 'A landlord filed a dispute about a review.',
+    cta: 'Open disputes',
+  },
+  verification_upload: {
+    subject: 'New tenancy document to verify',
+    lede: 'A reviewer uploaded a document to verify their tenancy.',
+    cta: 'Open verification requests',
+  },
+};
+
+function truncateAddress(address: string): string {
+  return address.length > OWNER_NOTICE_MAX_ADDRESS ? `${address.slice(0, OWNER_NOTICE_MAX_ADDRESS)}\u2026` : address;
+}
+
+/**
+ * Tell the owner that an intake is waiting on them.
+ *
+ * Carries no PII by construction: a kind, a building address (public on the building page
+ * anyway), the time it arrived, and a link to the admin queue. No review text, no names, no
+ * tenant or landlord email — the admin page holds those behind sign-in.
+ *
+ * The subject is system text plus an Eastern time suffix (no user input, so no header
+ * injection); the suffix also stops Gmail threading every notice into one conversation.
+ *
+ * @param apiKey - Resend API key
+ * @param toEmail - The owner inbox (OWNER_NOTIFY_EMAIL)
+ * @param notice.adminUrl - System-generated admin link (NOT escaped)
+ */
+export async function sendOwnerNoticeEmail(
+  apiKey: string,
+  toEmail: string,
+  notice: { kind: OwnerNoticeKind; buildingAddress: string | null; receivedAt: number; adminUrl: string }
+): Promise<EmailResult> {
+  const copy = OWNER_NOTICE_COPY[notice.kind];
+  const received = formatEasternDateTime(notice.receivedAt);
+  const buildingLine = notice.buildingAddress
+    ? `
+    <p style="margin: 0 0 8px 0;">Building: ${escapeHtml(truncateAddress(notice.buildingAddress))}</p>`
+    : '';
+
+  return deliver(apiKey, {
+    from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+    to: toEmail,
+    subject: `${copy.subject} (${received})`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">${copy.subject}</h2>
+
+  <p>${copy.lede}</p>
+
+  <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">${buildingLine}
+    <p style="margin: 0;">Received: ${received}</p>
+  </div>
+
+  <p style="margin: 30px 0;">
+    <a href="${notice.adminUrl}"
+       style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+      ${copy.cta}
+    </a>
+  </p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">This is an automated admin notification from RateMyPlace Boston.</p>
+</body>
+</html>
+      `,
   });
 }
