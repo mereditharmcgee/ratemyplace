@@ -59,4 +59,17 @@ describe('permitsSource', () => {
     const result = await permitsSource.run(fiftyFive, fetchImpl);
     expect(result.query).toContain('ORDER BY "issued_date" DESC, "permitnumber", "_id" LIMIT 500');
   });
+
+  it('tries the long form of an assessor-only suffix: GRAMPIAN WY and GRAMPIAN WAY', async () => {
+    const grampian = buildIdentity({ id: 'g', address: '9 Grampian Wy', city: 'Boston', state: 'MA', zip_code: '02125', parcel_id: '1302537000', sam_id: null });
+    const result = await permitsSource.run(grampian, fixtureFetch([]));
+    expect(result.query).toContain(`upper("address") LIKE '9 GRAMPIAN WY%' ESCAPE '!'`);
+    expect(result.query).toContain(`upper("address") LIKE '9 GRAMPIAN WAY%' ESCAPE '!'`);
+  });
+
+  it('tries LN for an assessor La street, since the permits feed writes RADFORD LN', async () => {
+    const radford = buildIdentity({ id: 'r', address: '11 Radford La', city: 'Boston', state: 'MA', zip_code: '02132', parcel_id: null, sam_id: null });
+    const result = await permitsSource.run(radford, fixtureFetch([]));
+    expect(result.query).toContain(`upper("address") LIKE '11 RADFORD LN%' ESCAPE '!'`);
+  });
 });

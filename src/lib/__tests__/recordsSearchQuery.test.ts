@@ -35,6 +35,13 @@ describe('normalizeSearchQuery', () => {
       ['aa'], ['bb'], ['cc'], ['dd'], ['ee'], ['ff'], ['gg'], ['hh'],
     ]);
   });
+  it('expands the assessor suffixes added in October 2026 both ways', () => {
+    expect(normalizeSearchQuery('grampian way')).toEqual([['grampian'], ['way', 'wy']]);
+    expect(normalizeSearchQuery('grampian wy')).toEqual([['grampian'], ['wy', 'way']]);
+    expect(normalizeSearchQuery('cummins highway')).toEqual([['cummins'], ['highway', 'hw', 'hwy']]);
+    expect(normalizeSearchQuery('radford lane')).toEqual([['radford'], ['lane', 'la', 'ln']]);
+    expect(normalizeSearchQuery('conry crescent')).toEqual([['conry'], ['crescent', 'cr', 'cres']]);
+  });
   // SUFFIX_SPELLINGS has two consumers (records identity keys and this search
   // expansion). This is the guardrail that stops them drifting.
   it('offers every spelling in the row for each row of SUFFIX_SPELLINGS', () => {
