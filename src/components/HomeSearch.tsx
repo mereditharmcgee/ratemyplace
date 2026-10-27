@@ -1,36 +1,29 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getScoreBgTint, getScoreTextColor } from '../lib/scoring-colors';
 import { getNamedPartyScoreState, NAMED_PARTY_MIN_REVIEWS } from '../lib/scoring';
-
-interface DbResult {
-  id: string;
-  type: 'building' | 'landlord';
-  title: string;
-  subtitle: string;
-  slug: string;
-  reviewCount: number;
-  avgScore: number | null;
-}
-
-interface GooglePrediction {
-  placeId: string;
-  description: string;
-  mainText: string;
-  secondaryText: string;
-}
-
-type DropdownItem =
-  | { source: 'local'; data: DbResult }
-  | { source: 'google'; data: GooglePrediction };
+import { existingBuildingReviewPath } from '../lib/reviewPaths';
+import {
+  homeDropdownItems,
+  homeItemHref,
+  placeReviewHref,
+  type HomeDbResult,
+  type HomeDropdownItem,
+  type HomePrediction,
+  type HomeReviewTarget,
+} from '../lib/homeSearchItems';
 
 function generateSessionToken(): string {
   return crypto.randomUUID();
 }
 
+function reviewHref(target: HomeReviewTarget): string {
+  return 'buildingId' in target ? existingBuildingReviewPath(target.buildingId) : placeReviewHref(target.placeId);
+}
+
 export default function HomeSearch() {
   const [inputValue, setInputValue] = useState('');
-  const [dbResults, setDbResults] = useState<DbResult[]>([]);
-  const [googleResults, setGoogleResults] = useState<GooglePrediction[]>([]);
+  const [dbResults, setDbResults] = useState<HomeDbResult[]>([]);
+  const [googleResults, setGoogleResults] = useState<HomePrediction[]>([]);
   const [isLoadingDb, setIsLoadingDb] = useState(false);
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -41,20 +34,9 @@ export default function HomeSearch() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dbDebounceRef = useRef<NodeJS.Timeout>();
 
-  // Google rows surface addresses we don't have yet. Clicking one navigates
-  // straight into /review/new?placeId=..., which opens the building at unit
-  // details when we already have it, otherwise the address step pre-filled
-  // for one Continue.
-  // Filter out Google rows that exactly match an existing DB building so
-  // we don't show the same address twice.
-  const items: DropdownItem[] = [
-    ...dbResults.map((r): DropdownItem => ({ source: 'local', data: r })),
-    ...googleResults
-      .filter(g => !dbResults.some(d =>
-        d.type === 'building' && d.title.toLowerCase() === g.mainText.toLowerCase()
-      ))
-      .map((g): DropdownItem => ({ source: 'google', data: g })),
-  ];
+  // Buildings already on RateMyPlace first (ours, then Google suggestions the server matched
+  // to a building page), then landlords, then other addresses. See homeSearchItems.ts.
+  const items: HomeDropdownItem[] = homeDropdownItems(dbResults, googleResults);
 
   const fetchGoogleResults = useCallback(async (input: string) => {
     if (input.length < 3) {
@@ -63,7 +45,9 @@ export default function HomeSearch() {
     }
     setIsLoadingGoogle(true);
     try {
-      const params = new URLSearchParams({ input, sessionToken });
+      // scope=boston: biased to Boston, Massachusetts only, matched to our buildings. The
+      // review form's address search does not send it and keeps any US address.
+      const params = new URLSearchParams({ input, sessionToken, scope: 'boston' });
       const response = await fetch(`/api/places/autocomplete?${params}`);
       const data = await response.json();
       setGoogleResults(data.predictions || []);
@@ -121,20 +105,14 @@ export default function HomeSearch() {
     dbDebounceRef.current = setTimeout(() => fetchDbResults(value), 150);
   };
 
-  const handleSelectItem = (item: DropdownItem) => {
+  const handleSelectItem = (item: HomeDropdownItem) => {
     setShowDropdown(false);
     setDbResults([]);
     setGoogleResults([]);
-
-    if (item.source === 'local') {
-      const { type, slug } = item.data;
-      window.location.href = `/${type === 'building' ? 'building' : 'landlord'}/${slug}`;
-    } else {
-      // Google "new address" row: hand off to /review/new with the placeId.
-      // The page opens the building at unit details when we already have it,
-      // otherwise the address step pre-filled for one Continue.
-      window.location.href = `/review/new?placeId=${encodeURIComponent(item.data.placeId)}`;
-    }
+    // A building opens its page, a landlord its page. An address we have no page for hands
+    // off to /review/new with the placeId, which still opens the building at unit details
+    // if it turns out we have it, otherwise the address step pre-filled for one Continue.
+    window.location.href = homeItemHref(item);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -183,7 +161,8 @@ export default function HomeSearch() {
   }, []);
 
   const isLoading = isLoadingDb || isLoadingGoogle;
-  const googleItems = items.filter((i): i is { source: 'google'; data: GooglePrediction } => i.source === 'google');
+  const firstAddressIndex = items.findIndex((i) => i.kind === 'address');
+  const hasOwnRows = items.some((i) => i.kind !== 'address');
 
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
@@ -196,8 +175,9 @@ export default function HomeSearch() {
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             onFocus={() => items.length > 0 && setShowDropdown(true)}
-            placeholder="Search by address, neighborhood, or landlord..."
-            className="w-full px-6 py-4 rounded-[4px] bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-teal-300"
+            placeholder="Address, neighborhood, or landlord"
+            aria-label="Search by address, neighborhood, or landlord"
+            className="w-full px-4 sm:px-6 py-4 rounded-[4px] bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-teal-300"
             autoComplete="off"
           />
           {isLoading && (
@@ -214,22 +194,69 @@ export default function HomeSearch() {
               ref={dropdownRef}
               className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto"
             >
-              {dbResults.length > 0 && (
+              {hasOwnRows && (
                 <div className="px-4 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 border-b border-teal-100">
-                  In our system
+                  On RateMyPlace
                 </div>
               )}
               {items.map((item, index) => {
                 const highlighted = highlightedIndex === index;
-                if (item.source === 'local') {
-                  const score = item.data.avgScore;
-                  const namedPartyScoreState = item.data.type === 'landlord'
-                    ? getNamedPartyScoreState(item.data.reviewCount, score)
-                    : null;
+
+                if (item.kind === 'building') {
+                  const score = item.avgScore;
+                  return (
+                    <div
+                      key={item.key}
+                      onMouseEnter={() => setHighlightedIndex(index)}
+                      className={`relative border-b border-gray-100 transition-colors ${
+                        highlighted ? 'bg-teal-50' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSelectItem(item)}
+                        className="w-full text-left px-4 pt-3 pb-2"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-gray-900 truncate">{item.title}</div>
+                            <div className="text-sm text-gray-500 truncate">{item.subtitle}</div>
+                          </div>
+                          <div className="flex-shrink-0 flex items-center gap-2">
+                            {score !== null && (
+                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getScoreBgTint(score)} ${getScoreTextColor(score)}`}>
+                                {score.toFixed(1)}
+                              </span>
+                            )}
+                            {item.reviewCount > 0 && (
+                              <span className="text-xs text-gray-400">
+                                {item.reviewCount} review{item.reviewCount !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="inline-block mt-1 py-1 text-xs font-medium text-teal-700">
+                          See this building →
+                        </span>
+                      </button>
+                      <a
+                        href={reviewHref(item.review)}
+                        className="absolute right-4 bottom-2 py-1 px-1 text-xs text-gray-600 underline hover:text-teal-700"
+                      >
+                        Write a review
+                      </a>
+                    </div>
+                  );
+                }
+
+                if (item.kind === 'landlord') {
+                  const result = item.result;
+                  const score = result.avgScore;
+                  const namedPartyScoreState = getNamedPartyScoreState(result.reviewCount, score);
 
                   return (
                     <button
-                      key={`db-${item.data.id}`}
+                      key={item.key}
                       type="button"
                       onClick={() => handleSelectItem(item)}
                       onMouseEnter={() => setHighlightedIndex(index)}
@@ -239,11 +266,11 @@ export default function HomeSearch() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <div className="font-medium text-gray-900 truncate">{item.data.title}</div>
-                          <div className="text-sm text-gray-500 truncate">{item.data.subtitle}</div>
+                          <div className="font-medium text-gray-900 truncate">{result.title}</div>
+                          <div className="text-sm text-gray-500 truncate">{result.subtitle}</div>
                         </div>
                         <div className="flex-shrink-0 flex items-center gap-2">
-                          {score !== null && (item.data.type === 'building' || namedPartyScoreState === 'available') && (
+                          {score !== null && namedPartyScoreState === 'available' && (
                             <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getScoreBgTint(score)} ${getScoreTextColor(score)}`}>
                               {score.toFixed(1)}
                             </span>
@@ -256,30 +283,26 @@ export default function HomeSearch() {
                           {namedPartyScoreState === 'unavailable' && (
                             <span className="text-xs text-gray-500">Score unavailable</span>
                           )}
-                          {item.data.reviewCount > 0 && (
+                          {result.reviewCount > 0 && (
                             <span className="text-xs text-gray-400">
-                              {item.data.reviewCount} review{item.data.reviewCount !== 1 ? 's' : ''}
+                              {result.reviewCount} review{result.reviewCount !== 1 ? 's' : ''}
                             </span>
                           )}
-                          {item.data.type === 'landlord' && (
-                            <span className="text-xs text-purple-500 font-medium">Landlord</span>
-                          )}
+                          <span className="text-xs text-purple-500 font-medium">Landlord</span>
                         </div>
                       </div>
                     </button>
                   );
                 }
 
-                // Google "add new" row — visually distinct from DB matches so
-                // it's clear this is an action that creates a new entry, not
-                // a destination that lands on an existing property page.
-                const firstGoogleIndex = dbResults.length;
-                const isFirstGoogle = index === firstGoogleIndex;
+                // A Google address with no page on RateMyPlace that we could match. Visually
+                // distinct from the rows above: it starts a review rather than opening a page.
+                const prediction = item.prediction;
                 return (
-                  <div key={`g-${item.data.placeId}`}>
-                    {isFirstGoogle && (
+                  <div key={item.key}>
+                    {index === firstAddressIndex && (
                       <div className="px-4 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border-y border-gray-100">
-                        Add a review for an address we don't have yet
+                        Other addresses
                       </div>
                     )}
                     <button
@@ -294,8 +317,8 @@ export default function HomeSearch() {
                         +
                       </span>
                       <div className="min-w-0 flex-1">
-                        <div className="font-medium text-gray-900 truncate">{item.data.mainText}</div>
-                        <div className="text-sm text-gray-500 truncate">{item.data.secondaryText}</div>
+                        <div className="font-medium text-gray-900 truncate">{prediction.mainText}</div>
+                        <div className="text-sm text-gray-500 truncate">{prediction.secondaryText}</div>
                       </div>
                       <span className="flex-shrink-0 text-xs text-teal-700 font-medium">
                         Start a review →
@@ -304,7 +327,7 @@ export default function HomeSearch() {
                   </div>
                 );
               })}
-              {googleItems.length > 0 && (
+              {googleResults.length > 0 && (
                 <div className="px-4 py-2 text-xs text-gray-400 bg-gray-50 flex items-center gap-1">
                   <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>

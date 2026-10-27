@@ -96,7 +96,7 @@ export interface RequestsSection extends LedgerSection {
   /** The open rows on their own, listed above the full disclosure. */
   openRows: RecordRow[];
   years: YearCount[];
-  /** Years inside `years` whose city 311 file is empty, drawn as missing rather than as zero. */
+  /** Years inside `years` the city 311 API returns no rows for, drawn as missing rather than as zero. */
   missingYears: number[];
   /** The line under the chart that says why those years are missing. Null when there are none. */
   missingYearsNote: string | null;
@@ -205,12 +205,15 @@ function openNoteFor(openCount: number): string | null {
 const REQUEST_NOUN = { one: 'request', many: 'requests' };
 
 /**
- * Calendar years whose legacy 311 file on data.boston.gov holds no rows, so no building can show
- * a request from them and a zero bar there would be the city's file, not the building. Checked
- * 2026-10-27 with `datastore_search` on every `LEGACY_311_RESOURCES` id: the 2011 and 2014
- * resources report a total of 0 rows, and every other year from 2012 to 2026 holds more than
- * 100,000. The new-system resource starts in 2025, so it fills neither year. When the city
- * restores a year's file, take that year out of this list.
+ * Calendar years whose legacy 311 resource on data.boston.gov returns no rows from the datastore
+ * (the CKAN API our pull reads), so no building can show a request from them and a zero bar there
+ * would be the city's API, not the building. The source CSV for each year is still listed on the
+ * resource page and holds data; only the datastore copy is empty (`resource_show` reports
+ * `datastore_contains_all_records_of_source_file: false` for both). Checked 2026-10-27 with
+ * `datastore_search` on every `LEGACY_311_RESOURCES` id: the 2011 and 2014 resources report a
+ * total of 0 rows, and every other year from 2012 to 2026 holds more than 100,000. The new-system
+ * resource starts in 2025, so it fills neither year. When the city reloads a year into the
+ * datastore, take that year out of this list.
  */
 export const EMPTY_311_YEARS: readonly number[] = [2011, 2014];
 

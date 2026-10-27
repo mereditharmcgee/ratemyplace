@@ -530,15 +530,15 @@ function joinYears(years: readonly number[]): string {
 }
 
 /**
- * Under a 311 year chart whose span crosses a year the city's 311 file is empty for (see
+ * Under a 311 year chart whose span crosses a year the city's 311 API returns no rows for (see
  * `EMPTY_311_YEARS` in `ledger.ts`). The bar for that year is drawn as missing rather than as a
  * zero, and this says why. Null when the chart crosses no such year.
  */
 export function missingYearsNote(years: readonly number[]): string | null {
   if (years.length === 0) return null;
   return years.length === 1
-    ? `${years[0]} is marked as missing data, not zero. The city's 311 file for that year is currently empty.`
-    : `${joinYears(years)} are marked as missing data, not zero. The city's 311 files for those years are currently empty.`;
+    ? `${years[0]} is marked as missing data, not zero. The city's open data API currently returns no 311 records for that year.`
+    : `${joinYears(years)} are marked as missing data, not zero. The city's open data API currently returns no 311 records for those years.`;
 }
 
 /**
