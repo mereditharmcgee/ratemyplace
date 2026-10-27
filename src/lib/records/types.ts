@@ -25,6 +25,15 @@ export interface AssessmentPayload {
   landValue: number | null;
   buildingValue: number | null;
   condominium: boolean;
+  /**
+   * The parcel's own house numbers and ZIP as the current-year assessor records them
+   * (`ST_NUM`, `ST_NUM2`, `ZIP_CODE`). Current fiscal year only; absent on other years and on
+   * rows stored before October 2026. Read to tell whether the parcel covers house numbers the
+   * page's address does not, which makes an address-keyed zero uncertain.
+   */
+  parcelStreetNumber?: string | null;
+  parcelStreetNumberHigh?: string | null;
+  parcelZip?: string | null;
 }
 
 export interface PermitPayload {
@@ -121,10 +130,39 @@ export const NO_QUERY = 'no query';
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
+/**
+ * Why an address's house numbers could not all be listed for the address-keyed feeds:
+ * `wide_range` spans more numbers than `MAX_RANGE_NUMBERS`, so only its endpoints are searched;
+ * `mixed_parity` has one odd and one even endpoint, so there is no single side of the street to
+ * expand along.
+ */
+export type AddressMatchUncertainty = 'wide_range' | 'mixed_parity';
+
 export interface BuildingIdentity {
   buildingId: string;
-  /** Individual street numbers, e.g. ['23','27'] for '23-27'. */
+  /**
+   * Individual street numbers as written, e.g. ['23','27'] for '23-27'. Parcel resolution keys
+   * on these, so an expanded middle number can never pull a neighbouring parcel into it.
+   */
   numbers: string[];
+  /**
+   * Every house number the address-keyed feeds match exactly: `numbers` plus each same-parity
+   * number between a numeric range's endpoints, ascending ('31-35' -> ['31','33','35']). Equal
+   * to `numbers` for a single number, a lettered range, or a range left unexpanded (see
+   * `matchUncertainty`).
+   */
+  matchNumbers: string[];
+  /** The address's lowest and highest house number as integers (a lettered number counts as its digits), or null. */
+  span: { low: number; high: number } | null;
+  /**
+   * Same-parity house numbers below `span.low` and above `span.high`, nearest first, within
+   * `ENCLOSING_RANGE_WINDOW`: where a city record filed under a wider range that contains this
+   * address would start and end ('501-507' contains 503). Empty when there is no span.
+   */
+  enclosingLows: string[];
+  enclosingHighs: string[];
+  /** Why the address's house numbers could not all be listed for matching, or null when they were. */
+  matchUncertainty: AddressMatchUncertainty | null;
   /** The hyphenated range as written, e.g. '23-27', or null. */
   rangeForm: string | null;
   /** Uppercase street with short suffix, e.g. 'LANARK RD'. */
@@ -144,7 +182,15 @@ export interface BuildingIdentity {
   /** Parcel id with leading zero stripped, or null. */
   parcelNumeric: string | null;
   condominium: boolean;
+  /** The building page's ZIP as stored, e.g. '02135'. */
   zip: string | null;
+  /**
+   * The current-year parcel's ZIP (the assessor's `ZIP_CODE`, five digits), set by the pull once
+   * that assessor row is stored; null before then and for a building with no parcel. Matching
+   * only: the address-keyed feeds accept it beside `zip` (`recordZips`), and the building row is
+   * never changed.
+   */
+  parcelZip: string | null;
   /** Boston SAM id when the building already has one. */
   samId: string | null;
 }

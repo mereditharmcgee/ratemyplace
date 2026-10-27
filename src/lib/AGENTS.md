@@ -300,6 +300,37 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   identity that the short and long forms do not already prefix-cover, because the feeds
   spell suffixes differently (permits write `RADFORD LN` where the assessor writes
   `RADFORD LA`; legacy 311 writes `VFW PKWY` for the assessor's `VFW PW`).
+- **Range addresses match every number on their side of the street.** `buildIdentity`
+  keeps `numbers` as written (parcel resolution keys on them, so a middle number can never
+  pull in a neighbouring parcel) and adds `matchNumbers`, every same-parity number between a
+  plain range's endpoints, capped at `MAX_RANGE_NUMBERS`. The address-keyed feeds also find a
+  city record filed under a wider range that contains the address: the violation feeds pair
+  `enclosingLows` with `enclosingHighs` in two `IN` lists, and 311 adds one regex clause
+  (`rangeAddressClause` / `rangeNumberClause` in `ckan.ts`) whose rows are then checked by
+  `houseNumberTokenMatches`, since a range that starts below the address can end below it too.
+  One regex, not one LIKE per number: each LIKE re-runs `upper()` over a whole 311 year, and
+  the GET URL tops out near 8 KB (HTTP 414). The regex arm keeps the interpolation invariant
+  by a digits-only guard on numbers and a plain-text guard on street spellings, with no
+  backslash anywhere. Permits take the middle numbers only; their parcel arm covers the rest.
+- **The 311 and violation-feed ZIP filters also accept the parcel's ZIP.** The current-year
+  assessor row carries the parcel's own `ZIP_CODE`, and `pullBuildingRecords` copies it onto
+  `identity.parcelZip` (through `zip5`) once that row is stored. It starts from the ZIP on the
+  row an earlier pull stored, so a current-year assessor that fails (or whose write fails) does
+  not drop the parcel ZIP and empty the records attached under it. A freshly stored row replaces
+  it; on a failed write the fresh ZIP fills in only when the stored row has none. Either way the
+  stored row's ZIP is one the feeds searched. The assessor years run first in
+  `sourcesForCity`, so 311, ISD and Public Works see it; `recordZips` then lists the page ZIP
+  plus the parcel's when they differ, and `zipEqualsClause` writes `=` for one and `IN` for two.
+  It only widens: a page with no usable ZIP stays unnarrowed rather than narrowed to the
+  parcel's, and the building row is never changed. Permits keep the page ZIP (their parcel arm
+  covers the rest). The fixture runs its sources concurrently and never sets `parcelZip`.
+- **`matchConfidence.ts` decides when an address-keyed zero is not a finding.** A range too
+  wide to expand, a mixed-parity range, or a current-year parcel (`parcelStreetNumber` /
+  `parcelStreetNumberHigh`, FY2026 only) that covers numbers the page's address does not:
+  then each empty 311 group, Public Works and ISD say "not matched with confidence" instead of
+  "none on record" (a 311 group with requests keeps its count). A page ZIP that differs from
+  the parcel's is not a reason, because the pull searches both. It reads only stored data, so
+  it needs no column, and a payload stored before October 2026 reads as no reason.
 - **`seed/` is the bulk pipeline, not a request path.** `scripts/records-seed-boston.ts`
   downloads the assessor and SAM resources once (`fetchAllRows` in `ckan.ts`), and the pure
   modules under `records/seed/` filter, collapse, format, match, and emit SQL. Every string

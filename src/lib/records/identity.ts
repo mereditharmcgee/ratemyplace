@@ -1,6 +1,134 @@
 import { BOSTON_LOCALITY_NAMES } from '../bostonLocalities';
 import { parseStreetAddress } from '../enrichment/helpers';
-import type { BuildingIdentity } from './types';
+import type { AddressMatchUncertainty, BuildingIdentity } from './types';
+
+/**
+ * The most house numbers one range address is expanded to, endpoints included. A range wider
+ * than this keeps its endpoints only and is marked `wide_range`: listing every number of a
+ * 300-number complex would push the CKAN SQL past the endpoint's URL limit (about 8 KB, verified
+ * live 2026-10-27), and the page says its match is uncertain instead of guessing.
+ */
+export const MAX_RANGE_NUMBERS = 30;
+
+/**
+ * How far below and above an address a city record filed under a wider range is looked for, in
+ * house numbers. '501-507 Example Av' contains 503 and starts 2 below it; 40 covers every range
+ * example seen in the October 2026 review with room to spare, at 20 extra literals a side.
+ */
+export const ENCLOSING_RANGE_WINDOW = 40;
+
+/** The number's integer value, a lettered number counting as its digits ('12A' -> 12); null when it has none. */
+function houseNumberValue(part: string): number | null {
+  const match = /^(\d+)[A-Z]*$/.exec(part);
+  if (!match) return null;
+  const value = Number.parseInt(match[1], 10);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+export interface NumberExpansion {
+  matchNumbers: string[];
+  span: { low: number; high: number } | null;
+  enclosingLows: string[];
+  enclosingHighs: string[];
+  matchUncertainty: AddressMatchUncertainty | null;
+}
+
+/** `count` same-parity numbers stepping away from `from` by `step` (plus or minus 2), stopping before zero. */
+function steppedNumbers(from: number, step: number, count: number): string[] {
+  const out: string[] = [];
+  for (let n = from + step, i = 0; i < count && n > 0; n += step, i += 1) out.push(String(n));
+  return out;
+}
+
+/**
+ * The house numbers an address is matched on. A plain numeric range ('31-39') expands to every
+ * number on the same side of the street between its endpoints ('31','33','35','37','39'), because
+ * the city files records under any one of them. A lettered range ('100-100A') or a single number
+ * is left as written. A range whose endpoints differ in parity, or that would expand past
+ * `MAX_RANGE_NUMBERS`, keeps its endpoints and says why, so the page can say its match is
+ * uncertain rather than report a zero it did not search for.
+ *
+ * `parts` are the uppercase hyphen-split number tokens; `numbers` is the as-written list
+ * `buildIdentity` already derived from them, returned untouched whenever nothing is expanded.
+ */
+export function expandHouseNumbers(parts: readonly string[], numbers: readonly string[]): NumberExpansion {
+  const values = parts.map(houseNumberValue).filter((v): v is number => v !== null);
+  if (values.length === 0) {
+    return { matchNumbers: [...numbers], span: null, enclosingLows: [], enclosingHighs: [], matchUncertainty: null };
+  }
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  const span = { low, high };
+  if ((high - low) % 2 !== 0) {
+    // No single side of the street to expand along, and no same-parity range can enclose it.
+    return { matchNumbers: [...numbers], span, enclosingLows: [], enclosingHighs: [], matchUncertainty: 'mixed_parity' };
+  }
+  const windowSteps = ENCLOSING_RANGE_WINDOW / 2;
+  const enclosingLows = steppedNumbers(low, -2, windowSteps);
+  const enclosingHighs = steppedNumbers(high, 2, windowSteps);
+  const plainRange = parts.length === 2 && parts.every((p) => /^\d+$/.test(p)) && low !== high;
+  if (!plainRange) {
+    return { matchNumbers: [...numbers], span, enclosingLows, enclosingHighs, matchUncertainty: null };
+  }
+  if ((high - low) / 2 + 1 > MAX_RANGE_NUMBERS) {
+    return { matchNumbers: [...numbers], span, enclosingLows, enclosingHighs, matchUncertainty: 'wide_range' };
+  }
+  const matchNumbers: string[] = [];
+  for (let n = low; n <= high; n += 2) matchNumbers.push(String(n));
+  return { matchNumbers, span, enclosingLows, enclosingHighs, matchUncertainty: null };
+}
+
+/**
+ * Whether a city record's leading house-number token belongs to this identity. Applied after a
+ * query that also looked for ranges starting below the address (`enclosingLows`): such a range
+ * can end below it too, and is kept only when it reaches the address on the same side of the
+ * street. Every token the plain number patterns match (a single or lettered number, or the
+ * address's own range as written) is kept, so this can only remove what the range arm added.
+ */
+export function houseNumberTokenMatches(
+  token: string | null,
+  identity: Pick<BuildingIdentity, 'rangeForm' | 'span' | 'matchNumbers'>,
+): boolean {
+  if (!token) return true;
+  const upper = token.trim().toUpperCase();
+  if (identity.rangeForm && upper === identity.rangeForm) return true;
+  const startsRange = /^(\d+)[A-Z]?-/.exec(upper);
+  if (!startsRange) return true;
+  const first = Number.parseInt(startsRange[1], 10);
+  const range = /^(\d+)[A-Z]?-(\d+)[A-Z]?$/.exec(upper);
+  if (!range || !identity.span) return identity.matchNumbers.includes(String(first));
+  const second = Number.parseInt(range[2], 10);
+  const low = Math.min(first, second);
+  const high = Math.max(first, second);
+  const { span } = identity;
+  // Some number inside both ranges that is on the record's side of the street (the parity of
+  // either of its ends) and on the address's side (the parity of either of its ends).
+  for (let n = Math.max(low, span.low); n <= Math.min(high, span.high); n += 1) {
+    const onRecordSide = n % 2 === low % 2 || n % 2 === high % 2;
+    const onAddressSide = n % 2 === span.low % 2 || n % 2 === span.high % 2;
+    if (onRecordSide && onAddressSide) return true;
+  }
+  return false;
+}
+
+/** The first whitespace-separated word of a free-text address: its house-number token. */
+export function leadingToken(address: string | null): string | null {
+  if (!address) return null;
+  const word = address.trim().split(/\s+/)[0];
+  return word ? word : null;
+}
+
+/**
+ * Why a stored address's house numbers could not all be matched, derived the same way
+ * `buildIdentity` derives it at pull time. Null when the address matched on every number, or
+ * cannot be parsed (an unparseable address never pulled, so there is no zero to qualify).
+ */
+export function addressMatchUncertainty(address: string): AddressMatchUncertainty | null {
+  const parsed = parseStreetAddress(address.trim());
+  if (!parsed) return null;
+  const parts = Array.from(new Set(parsed.number.toUpperCase().split('-').filter(Boolean)));
+  return expandHouseNumbers(parts, parts).matchUncertainty;
+}
 
 export interface BuildingRowForIdentity {
   id: string;
@@ -211,10 +339,16 @@ export function buildIdentity(building: BuildingRowForIdentity): BuildingIdentit
 
   const numberForms = rangeForm ? [...numbers, rangeForm] : numbers;
   const parcelId = toCanonicalParcel(building.parcel_id);
+  const expansion = expandHouseNumbers(parts, numbers);
 
   return {
     buildingId: building.id,
     numbers,
+    matchNumbers: expansion.matchNumbers,
+    span: expansion.span,
+    enclosingLows: expansion.enclosingLows,
+    enclosingHighs: expansion.enclosingHighs,
+    matchUncertainty: expansion.matchUncertainty,
     rangeForm,
     streetShort,
     streetLong,
@@ -227,8 +361,29 @@ export function buildIdentity(building: BuildingRowForIdentity): BuildingIdentit
     // Placeholder: parcel resolution (assessor) overwrites this before any source runs.
     condominium: false,
     zip: building.zip_code,
+    // Placeholder: the pull fills it in from the current-year assessor row (pull.ts).
+    parcelZip: null,
     samId: building.sam_id,
   };
+}
+
+const ZIP5 = /^\d{5}$/;
+
+/**
+ * The ZIPs the address-keyed feeds (311, ISD violations, Public Works tickets) are narrowed to:
+ * the page's own, plus the current-year parcel's when the pull has read one and it differs. A
+ * page whose ZIP disagrees with the assessor's would otherwise lose every record the city filed
+ * under the parcel's ZIP. It only ever widens: with no usable page ZIP it is empty, and the feeds
+ * stay unnarrowed as before, rather than being narrowed to the parcel's.
+ *
+ * Five digits only. That is the digits-only guard that lets the adapters interpolate these
+ * values (each still goes through `sqlLiteral`).
+ */
+export function recordZips(identity: Pick<BuildingIdentity, 'zip' | 'parcelZip'>): string[] {
+  const page = identity.zip;
+  if (page == null || !ZIP5.test(page)) return [];
+  const parcel = identity.parcelZip;
+  return parcel != null && ZIP5.test(parcel) && parcel !== page ? [page, parcel] : [page];
 }
 
 export { SUFFIX_SPELLINGS };

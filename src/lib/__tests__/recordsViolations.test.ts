@@ -40,8 +40,8 @@ describe('enforcementSource', () => {
     const fetchImpl = fixtureFetch([{ resourceId: ENFORCEMENT_RESOURCE_ID, records: lanarkRows }]);
     const result = await enforcementSource.run(lanark, fetchImpl);
     expect(result.query).toContain(`upper("violation_street") = 'LANARK'`);
-    expect(result.query).toContain(`"violation_stno" IN ('23','27')`);
-    expect(result.query).toContain(`"violation_sthigh" IN ('23','27')`);
+    expect(result.query).toContain(`"violation_stno" IN ('23','25','27')`);
+    expect(result.query).toContain(`"violation_sthigh" IN ('23','25','27')`);
     expect(result.query).toContain(`upper("violation_suffix") IN ('RD','ROAD')`);
     expect(result.query).toContain(`("violation_zip" IS NULL OR "violation_zip" = '' OR "violation_zip" = '02135')`);
     expect(result.query).toContain(`ORDER BY "status_dttm" DESC NULLS LAST, "case_no", "code", "_id" LIMIT 500`);

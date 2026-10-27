@@ -245,7 +245,8 @@ export function assessorSource(year: AssessorYear): RecordSource {
       }
       // A parcel with several buildings returns a row per BLDG_SEQ; ordering makes the
       // one row we keep the same one on every pull instead of whatever CKAN returns first.
-      const sql = `SELECT ${selectList(year.columns)} FROM "${year.resourceId}" WHERE "PID" IN (${parcelLiterals(identity)}) ORDER BY "BLDG_SEQ" LIMIT 5`;
+      const columns = isCurrent ? `${selectList(year.columns)},${PARCEL_ADDRESS_COLUMNS.map((c) => `"${c}"`).join(',')}` : selectList(year.columns);
+      const sql = `SELECT ${columns} FROM "${year.resourceId}" WHERE "PID" IN (${parcelLiterals(identity)}) ORDER BY "BLDG_SEQ" LIMIT 5`;
       let rows: Row[];
       try {
         rows = await ckanSql<Row>(sql, fetchImpl);
@@ -265,10 +266,25 @@ export function assessorSource(year: AssessorYear): RecordSource {
         rows: rows.slice(0, 1).map((row) => ({
           kind: 'assessment' as const,
           sourceKey: year.fiscalYear,
-          payload: assessmentFromRow(row, year),
+          payload: isCurrent ? { ...assessmentFromRow(row, year), ...parcelAddressFields(row) } : assessmentFromRow(row, year),
           sourceUrl: ASSESSOR_PAGE_URL,
         })),
       };
     },
+  };
+}
+
+/**
+ * The current year's own house numbers and ZIP for the parcel (verified present in the FY2026
+ * resource 2026-10-27). Older years are not asked for them: a column a year lacks fails that
+ * year's query, and only the mail columns have a skip path.
+ */
+const PARCEL_ADDRESS_COLUMNS = ['ST_NUM', 'ST_NUM2', 'ZIP_CODE'] as const;
+
+function parcelAddressFields(row: Row): Pick<AssessmentPayload, 'parcelStreetNumber' | 'parcelStreetNumberHigh' | 'parcelZip'> {
+  return {
+    parcelStreetNumber: text(row.ST_NUM),
+    parcelStreetNumberHigh: text(row.ST_NUM2),
+    parcelZip: text(row.ZIP_CODE),
   };
 }

@@ -3,7 +3,7 @@
 // it safe: every interpolated value passes through `sqlLiteral`/`addressLikeClauses` or a
 // digits-only guard, and every identifier (table/column name) is a code constant, never
 // user input.
-import { addressLikeClauses, ckanSql, parseMoney, ROW_CAP, sqlLiteral, textOrNull } from '../../ckan';
+import { addressLikeClauses, ckanSql, parseMoney, rangeAddressClause, ROW_CAP, sqlLiteral, textOrNull } from '../../ckan';
 import type { PermitPayload, RecordSource, SourceResult } from '../../types';
 
 export const PERMITS_RESOURCE_ID = '6ddcd912-32a0-43df-9908-63574f8c7e77';
@@ -23,7 +23,11 @@ export const permitsSource: RecordSource = {
   pageUrl: PERMITS_PAGE_URL,
   kinds: ['permit'],
   async run(identity, fetchImpl): Promise<SourceResult> {
-    const addressClauses = addressLikeClauses('address', identity);
+    // The middle numbers of a range address, and a permit filed under a range that starts on one
+    // of the address's numbers. Not ranges that start below it: a permit row carries no number
+    // check after the query, and the parcel arm already covers the parcel's own permits.
+    const rangeClause = rangeAddressClause('address', identity, { enclosing: false });
+    const addressClauses = [...addressLikeClauses('address', identity), ...(rangeClause ? [rangeClause] : [])];
     // Qualifying the address arm by zip is why a Center St in one Boston neighborhood
     // does not attach permits filed against a same-named Center St in another.
     const addressArm =

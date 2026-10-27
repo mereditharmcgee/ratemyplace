@@ -5,6 +5,7 @@
 // (a source's mapping can change after rows were written).
 import { logError } from '../logger';
 import { sourcesForCity, type Jurisdiction } from './jurisdictions';
+import { recordsMatchUncertainty, type RecordsMatchUncertainty } from './matchConfidence';
 import type {
   AssessmentPayload,
   EnforcementTicketPayload,
@@ -55,6 +56,11 @@ export interface BuildingRecordsView {
   /** Kinds with at least one payload that failed validation, sorted. */
   invalidKinds: RecordKind[];
   corrections: CorrectionNote[];
+  /**
+   * Why the address-keyed feeds may have missed records for this building, or null. Optional so a
+   * hand-built view in a test reads as "no reason given". See `matchConfidence.ts`.
+   */
+  matchUncertainty?: RecordsMatchUncertainty | null;
 }
 
 /** Dataset pages keyed by source id (CKAN resource id), one map per jurisdiction. Built lazily, once each. */
@@ -208,7 +214,23 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
     .bind(buildingId)
     .all<CorrectionRow>();
 
-  return assembleRecordsView(buildingId, pulls.results, recordRows.results, correctionRows.results);
+  // The building's own address, for the match-confidence note. A failed read costs the panel
+  // only that note, never the records.
+  let address: string | null = null;
+  try {
+    const building = await db
+      .prepare('SELECT address FROM buildings WHERE id = ?')
+      .bind(buildingId)
+      .first<{ address: string | null }>();
+    address = building?.address ?? null;
+  } catch (error) {
+    logError('building_records_match_confidence_failed', {
+      buildingId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  return assembleRecordsView(buildingId, pulls.results, recordRows.results, correctionRows.results, address);
 }
 
 /** The most buildings `getRecordsViews` reads at once: well under D1's 100 bound parameters with the kinds added. */
@@ -259,7 +281,7 @@ export async function getRecordsViews(
   for (const id of ids) {
     const buildingPulls = pullsById.get(id);
     if (!buildingPulls) continue;
-    const view = assembleRecordsView(id, buildingPulls, recordsById.get(id) ?? [], []);
+    const view = assembleRecordsView(id, buildingPulls, recordsById.get(id) ?? [], [], null);
     if (view) views.set(id, view);
   }
   return views;
@@ -285,6 +307,8 @@ function assembleRecordsView(
   pulls: readonly PullRow[],
   recordRows: readonly RecordRowStorage[],
   correctionRows: readonly CorrectionRow[],
+  /** The building's address for the match-confidence note, or null to show none. */
+  address: string | null,
 ): BuildingRecordsView | null {
   if (pulls.length === 0) return null;
 
@@ -386,6 +410,12 @@ function assembleRecordsView(
     notes: row.resolution_notes,
   }));
 
+  const current = assessments[0] ?? null;
+  const matchUncertainty: RecordsMatchUncertainty | null =
+    address === null
+      ? null
+      : recordsMatchUncertainty({ address, current: current && !current.condominium ? current : null });
+
   return {
     pulledAt,
     sources,
@@ -397,6 +427,7 @@ function assembleRecordsView(
     rentsmart,
     invalidKinds: invalid,
     corrections,
+    matchUncertainty,
   };
 }
 

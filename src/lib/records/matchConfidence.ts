@@ -1,0 +1,69 @@
+// Whether the address-keyed record feeds (311, ISD violations, Public Works tickets) could be
+// matched to a building with confidence. Those feeds key on house number and street, so a
+// zero from them is only a finding when every number the building goes by was searched. When
+// one was not, the panel says the records could not be matched with confidence instead of
+// "none on record", and says why.
+//
+// A page ZIP that disagrees with the parcel's is not a reason: the pull searches those feeds
+// under both ZIPs (`recordZips` in identity.ts), taking the parcel's from the current-year row it
+// stores, or from the row already stored when this pull's assessor fails (`pull.ts`). So the
+// parcel ZIP this module could compare is always one the feeds were searched under.
+//
+// Read side only: derived from the stored address and the stored current-year assessment, so
+// it needs no column of its own and changes nothing that is written.
+import { parseStreetAddress } from '../enrichment/helpers';
+import { addressMatchUncertainty, expandHouseNumbers } from './identity';
+import type { AddressMatchUncertainty, AssessmentPayload } from './types';
+
+/**
+ * `wide_range` / `mixed_parity`: the address itself could not be expanded (see
+ * `expandHouseNumbers`). `parcel_wider`: the city's parcel covers house numbers this address
+ * does not, and the feeds file records under those numbers too.
+ */
+export type RecordsMatchUncertainty = AddressMatchUncertainty | 'parcel_wider';
+
+export interface MatchConfidenceInput {
+  address: string | null;
+  /** The current fiscal year's assessment, when one is stored. */
+  current: Pick<AssessmentPayload, 'parcelStreetNumber' | 'parcelStreetNumberHigh'> | null;
+}
+
+function numberValue(value: string | null | undefined): number | null {
+  const match = /^\s*(\d+)/.exec(value ?? '');
+  if (!match) return null;
+  const n = Number.parseInt(match[1], 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** The address's own numeric span, the way `buildIdentity` derives it. */
+function addressSpan(address: string): { low: number; high: number } | null {
+  const parsed = parseStreetAddress(address.trim());
+  if (!parsed) return null;
+  const parts = Array.from(new Set(parsed.number.toUpperCase().split('-').filter(Boolean)));
+  return expandHouseNumbers(parts, parts).span;
+}
+
+/**
+ * The first reason the address-keyed feeds may have missed records for this building, or null
+ * when nothing says so. Errs toward null: a field that is absent (an assessment stored before
+ * the parcel's own numbers were captured, a condominium with no parcel) is not evidence.
+ */
+export function recordsMatchUncertainty(input: MatchConfidenceInput): RecordsMatchUncertainty | null {
+  if (!input.address) return null;
+  const fromAddress = addressMatchUncertainty(input.address);
+  if (fromAddress) return fromAddress;
+
+  const current = input.current;
+  if (!current) return null;
+
+  const span = addressSpan(input.address);
+  const parcelValues = [numberValue(current.parcelStreetNumber), numberValue(current.parcelStreetNumberHigh)].filter(
+    (n): n is number => n !== null,
+  );
+  if (span && parcelValues.length > 0) {
+    const parcelLow = Math.min(...parcelValues);
+    const parcelHigh = Math.max(...parcelValues);
+    if (parcelLow < span.low || parcelHigh > span.high) return 'parcel_wider';
+  }
+  return null;
+}

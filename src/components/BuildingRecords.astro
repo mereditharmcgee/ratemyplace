@@ -236,7 +236,9 @@ const chartsClass = 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5';
           count={ledger.violations.count}
           subCount={ledger.violations.subCount}>
           <SourceState status={ledger.violations.status} hasRows={ledger.violations.hasRows}>
-            {ledger.violations.cases.length === 0 ? (
+            {ledger.violations.matchNote ? (
+              <p class={bodyClass}>{ledger.violations.matchNote}</p>
+            ) : ledger.violations.cases.length === 0 ? (
               <>
                 <p class={bodyClass}>No violations on record.</p>
                 <p class={noteClass}>{NO_VIOLATIONS_CAVEAT}</p>
@@ -314,7 +316,9 @@ const chartsClass = 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5';
           count={ledger.enforcement.count}
           subCount={ledger.enforcement.subCount}>
           <SourceState status={ledger.enforcement.status} hasRows={ledger.enforcement.hasRows}>
-            {ledger.enforcement.cases.length === 0 ? (
+            {ledger.enforcement.matchNote ? (
+              <p class={bodyClass}>{ledger.enforcement.matchNote}</p>
+            ) : ledger.enforcement.cases.length === 0 ? (
               <p class={bodyClass}>No code enforcement tickets on record.</p>
             ) : (
               <>

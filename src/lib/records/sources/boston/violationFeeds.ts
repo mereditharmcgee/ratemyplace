@@ -1,7 +1,8 @@
 // CKAN's SQL endpoint has no parameter binding, so this module is the repo's documented
 // exception to "parameterized queries always" (see AGENTS.md). The invariant that keeps
-// it safe: every interpolated value passes through `sqlLiteral`, and every identifier
-// (table/column name) is a code constant, never user input.
+// it safe: every interpolated value passes through `sqlLiteral` (ZIPs through `zipEqualsClause`,
+// a five-digit guard in front of `sqlLiteral`), and every identifier (table/column name) is a
+// code constant, never user input.
 //
 // Boston's violation and code-enforcement feeds store the street name with no directional
 // and no suffix (`violation_street` "Newton", `violation_suffix` "ST" for "W Newton St";
@@ -12,9 +13,10 @@
 // That is a known, accepted residual — the correction workflow exists for exactly this case.
 //
 // Ranges are stored split (`violation_stno`/`violation_sthigh`) rather than hyphenated, so
-// matching goes through `identity.numbers` against both columns; `identity.rangeForm` is
-// never sent to this feed. `violation_sthigh` has a second, unrelated meaning: for a
-// lettered number like "120A" the feed stores `violation_stno` "120" and `violation_sthigh`
+// matching goes through `identity.matchNumbers` (every same-parity number of a range address)
+// against both columns, plus one arm for a stored range that encloses the address
+// (`enclosingLows` x `enclosingHighs`); `identity.rangeForm` is never sent to this feed.
+// `violation_sthigh` has a second, unrelated meaning: for a lettered number like "120A" the feed stores `violation_stno` "120" and `violation_sthigh`
 // "A" — `buildAddress` below tells the two apart by whether `sthigh` is purely alphabetic.
 //
 // Matching on `violation_sthigh` against `identity.numbers` also means a stored range row
@@ -29,7 +31,8 @@
 // tolerating it only risks attaching a record with a genuinely different suffix or zip (a
 // false positive) — a risk already accepted elsewhere in this module and covered by the
 // same correction workflow.
-import { ckanSql, ROW_CAP, sqlLiteral, textOrNull } from '../../ckan';
+import { ckanSql, ROW_CAP, sqlLiteral, textOrNull, zipEqualsClause } from '../../ckan';
+import { recordZips } from '../../identity';
 import type { BuildingIdentity, EnforcementTicketPayload, RecordSource, SourceResult, ViolationPayload } from '../../types';
 
 type Row = Record<string, string | number | null>;
@@ -121,10 +124,17 @@ export function violationFeedSource(config: ViolationFeedConfig): RecordSource {
     kinds: [config.kind],
     async run(identity, fetchImpl): Promise<SourceResult> {
       const bareStreet = bareStreetName(identity);
-      const numbersSql = identity.numbers.map(sqlLiteral).join(',');
+      const numbersSql = identity.matchNumbers.map(sqlLiteral).join(',');
+      // A stored range that starts below the address and ends above it ('501'/'507' for 503)
+      // has neither end among the address's numbers. Pairing a same-parity low below with a
+      // same-parity high above is exact containment with no casts, and both lists are digits.
+      const enclosing =
+        identity.enclosingLows.length > 0 && identity.enclosingHighs.length > 0
+          ? ` OR ("violation_stno" IN (${identity.enclosingLows.map(sqlLiteral).join(',')}) AND "violation_sthigh" IN (${identity.enclosingHighs.map(sqlLiteral).join(',')}))`
+          : '';
       const clauses = [
         `upper("violation_street") = ${sqlLiteral(bareStreet)}`,
-        `("violation_stno" IN (${numbersSql}) OR "violation_sthigh" IN (${numbersSql}))`,
+        `("violation_stno" IN (${numbersSql}) OR "violation_sthigh" IN (${numbersSql})${enclosing})`,
       ];
       const spellings = suffixSpellings(identity);
       if (spellings.length > 0) {
@@ -132,8 +142,12 @@ export function violationFeedSource(config: ViolationFeedConfig): RecordSource {
           `("violation_suffix" IS NULL OR "violation_suffix" = '' OR upper("violation_suffix") IN (${spellings.map(sqlLiteral).join(',')}))`,
         );
       }
-      if (identity.zip && /^\d{5}$/.test(identity.zip)) {
-        clauses.push(`("violation_zip" IS NULL OR "violation_zip" = '' OR "violation_zip" = ${sqlLiteral(identity.zip)})`);
+      // The page's ZIP, plus the current-year parcel's when the two differ (`recordZips`): a
+      // page whose ZIP disagrees with the assessor's would otherwise drop every case the city
+      // filed under the parcel's ZIP.
+      const zips = recordZips(identity);
+      if (zips.length > 0) {
+        clauses.push(`("violation_zip" IS NULL OR "violation_zip" = '' OR ${zipEqualsClause('violation_zip', zips)})`);
       }
       const sql =
         `SELECT ${columns.map((c) => `"${c}"`).join(',')} FROM "${config.resourceId}" ` +

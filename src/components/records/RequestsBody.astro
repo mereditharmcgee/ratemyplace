@@ -11,7 +11,11 @@ import YearBars from './YearBars.astro';
 
 interface Props {
   section: RequestsSection;
-  /** What the section says when this group holds no requests, e.g. `No living conditions requests on record.` */
+  /**
+   * What the section says when this group holds no requests, e.g. `No living conditions requests on
+   * record.` Replaced by the section's `matchNote` when the address match is uncertain, since then
+   * an empty group is not a finding.
+   */
   emptyCopy: string;
 }
 
@@ -20,7 +24,9 @@ const { section, emptyCopy } = Astro.props;
 const chartsClass = 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5';
 ---
 
-{section.rows.length === 0 ? (
+{section.matchNote ? (
+  <p class="text-sm text-gray-600">{section.matchNote}</p>
+) : section.rows.length === 0 ? (
   <p class="text-sm text-gray-600">{emptyCopy}</p>
 ) : (
   <>

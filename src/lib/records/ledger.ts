@@ -31,6 +31,8 @@ import {
   otherRequestsLine,
   permitSummary,
   rentSmartDisagreement,
+  uncertainMatchCopy,
+  UNCERTAIN_MATCH_SUBCOUNT,
   showAllLabel,
   statusText,
   stillOpenLabel,
@@ -84,6 +86,12 @@ export interface LedgerSection {
   cappedNote: string | null;
   /** The rows behind the count, in the order the section lists them. */
   rows: RecordRow[];
+  /**
+   * Set only on an address-keyed source (311, Public Works, ISD) that found nothing for a
+   * building whose match is uncertain: the sentence the section shows instead of its "no records"
+   * line. Null everywhere else.
+   */
+  matchNote: string | null;
   /**
    * The line that says what an open case means, when this section words one as still open in
    * city records. Null when it lists none, and always null for permits, whose status is kept.
@@ -186,6 +194,18 @@ function cappedNote(rowCount: number, note: string): string | null {
   return rowCount >= ROW_CAP ? note : null;
 }
 
+/**
+ * An address-keyed source that answered with nothing, for a building whose match is uncertain,
+ * cannot say "none on record": the search did not cover every number the building goes by.
+ */
+function uncertainZero(
+  uncertainty: BuildingRecordsView['matchUncertainty'],
+  countable: boolean,
+  total: number,
+): string | null {
+  return uncertainty && countable && total === 0 ? uncertainMatchCopy(uncertainty) : null;
+}
+
 function closedTrailing(closedAt: string | null): string | null {
   return closedAt ? ` · closed ${formatRecordDate(closedAt)}` : null;
 }
@@ -251,11 +271,14 @@ function requestsSection(
     statusLabel: caseStatusLabel(row.status, row.openedAt),
     trailing,
   });
+  // Each group prints its own "no requests on record" line, so each group's zero is its own
+  // claim, and an uncertain match keeps any of them from making it.
+  const matchNote = uncertainZero(view.matchUncertainty, countable, rows.length);
   return {
     status,
     hasRows,
     count: countable ? String(rows.length) : NO_COUNT,
-    subCount: countable ? stillOpenSubCount(open.length, rows.length) : '',
+    subCount: matchNote ? UNCERTAIN_MATCH_SUBCOUNT : countable ? stillOpenSubCount(open.length, rows.length) : '',
     span: countable ? yearSpanLabel(observedYears(years)) : null,
     note: null,
     // 311's cap applies before grouping, so every group carries the note when it bites.
@@ -263,6 +286,7 @@ function requestsSection(
     rows: rows.map((row) => toRow(row, closedTrailing(row.closedAt))),
     openNote: openNoteFor(open.length),
     openRows: open.map((row) => toRow(row, null)),
+    matchNote,
     years,
     missingYears,
     missingYearsNote: missingYearsNote(missingYears),
@@ -386,6 +410,8 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
       statusLabel: statusText(row.status),
       trailing: null,
     })),
+    // Permits key on the parcel as well as the address, so their zero is not an address match.
+    matchNote: null,
     openNote: null,
     showAll: showAllLabel(summary.count, { one: 'permit', many: 'permits' }),
     summary,
@@ -406,16 +432,22 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
   const openTickets = tickets.filter((entry) => entry.open).length;
   const enforcementYears = countByYear(tickets, (entry) => entry.date, { to: currentYear });
 
+  const enforcementMatchNote = uncertainZero(view.matchUncertainty, enforcementCountable, view.enforcement.length);
   const enforcement: EnforcementSection = {
     status: enforcementStatus,
     hasRows: view.enforcement.length > 0,
     count: enforcementCountable ? String(tickets.length) : NO_COUNT,
-    subCount: enforcementCountable ? stillOpenSubCount(openTickets, tickets.length) : '',
+    subCount: enforcementMatchNote
+      ? UNCERTAIN_MATCH_SUBCOUNT
+      : enforcementCountable
+        ? stillOpenSubCount(openTickets, tickets.length)
+        : '',
     span: enforcementCountable ? yearSpanLabel(observedYears(enforcementYears)) : null,
     note: enforcementCountable ? ticketLinesNote(view.enforcement.length, tickets.length) : null,
     // The cap counts violation lines, not tickets, so the note names lines.
     cappedNote: cappedNote(view.enforcement.length, CAPPED_VIOLATION_LINES_COPY),
     rows: tickets.flatMap((entry) => entry.lines),
+    matchNote: enforcementMatchNote,
     openNote: openNoteFor(openTickets),
     showAll: showAllLabel(tickets.length, { one: 'ticket', many: 'tickets' }),
     cases: tickets,
@@ -436,16 +468,22 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
   const openCases = cases.filter((entry) => entry.open).length;
   const violationYears = countByYear(cases, (entry) => entry.date, { to: currentYear });
 
+  const violationsMatchNote = uncertainZero(view.matchUncertainty, violationsCountable, view.violations.length);
   const violations: ViolationsSection = {
     status: violationStatus,
     hasRows: view.violations.length > 0,
     count: violationsCountable ? String(cases.length) : NO_COUNT,
-    subCount: violationsCountable ? stillOpenSubCount(openCases, cases.length) : '',
+    subCount: violationsMatchNote
+      ? UNCERTAIN_MATCH_SUBCOUNT
+      : violationsCountable
+        ? stillOpenSubCount(openCases, cases.length)
+        : '',
     span: violationsCountable ? yearSpanLabel(observedYears(violationYears)) : null,
     note: violationsCountable ? caseLinesNote(view.violations.length, cases.length) : null,
     // The cap counts code lines, not cases, so the note names lines.
     cappedNote: cappedNote(view.violations.length, CAPPED_CODE_LINES_COPY),
     rows: cases.flatMap((entry) => entry.lines),
+    matchNote: violationsMatchNote,
     openNote: openNoteFor(openCases),
     showAll: showAllLabel(cases.length, { one: 'case', many: 'cases' }),
     cases,
