@@ -271,6 +271,10 @@ export function permitSummary(permits: PermitPayload[]): PermitSummary {
  * One-directional by design. RentSmart is a periodic roll-up of the same city data, so it
  * lagging the raw 311 feed is expected and unremarkable; only an excess — the roll-up
  * claiming more housing complaints than the records above show — is worth a note.
+ *
+ * RentSmart is matched by parcel (`sources/boston/rentsmart.ts`) while the 311 list is matched
+ * by address, and a parcel can hold several addresses. The sentence says "this parcel" and
+ * says why the two counts can differ, rather than claiming a gap at this address.
  */
 export function rentSmartDisagreement(rows: RentSmartPayload[], listedRequestCount: number): string | null {
   const complaintCount = rows.filter(
@@ -278,7 +282,7 @@ export function rentSmartDisagreement(rows: RentSmartPayload[], listedRequestCou
   ).length;
   if (complaintCount <= listedRequestCount) return null;
   const noun = complaintCount === 1 ? 'housing complaint' : 'housing complaints';
-  return `The city's RentSmart summary reports ${complaintCount} ${noun} for this address; the 311 records above show ${listedRequestCount}.`;
+  return `The city's RentSmart summary reports ${complaintCount} ${noun} for this parcel; the 311 records above show ${listedRequestCount}. A parcel can include more than one address.`;
 }
 
 /**
