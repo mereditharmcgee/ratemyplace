@@ -144,8 +144,10 @@ describe('maybeEnv', () => {
     try {
       expect(() => maybeEnv(locals)).not.toThrow();
       expect(maybeEnv(locals)).toBeUndefined();
-      // Logged once per isolate, not once per page: two calls, at most one line.
-      expect(errorSpy.mock.calls.length).toBeLessThanOrEqual(1);
+      // Logged once per isolate, not once per page: two calls, exactly one line. This is the
+      // only test in the file that reaches the throwing path, so the module flag starts unset.
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(errorSpy.mock.calls[0][0] as string).event).toBe('maybeEnv: runtime env unreadable');
     } finally {
       errorSpy.mockRestore();
     }
