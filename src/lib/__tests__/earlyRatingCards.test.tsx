@@ -4,7 +4,7 @@ import { cleanup, render } from '@testing-library/react';
 import SearchResults from '../../components/search/SearchResults';
 import BuildingScoreSummary from '../../components/ratings/BuildingScoreSummary.astro';
 import { NAMED_PARTY_MIN_REVIEWS } from '../scoring';
-import { getEarlyScoreTextColor, getScoreTextColor } from '../scoring-colors';
+import { getEarlyScoreStyle, getScoreColor, getScoreTextColor } from '../scoring-colors';
 
 /**
  * Listing cards: a building score from fewer than NAMED_PARTY_MIN_REVIEWS reviews is an
@@ -38,9 +38,21 @@ describe('search result card', () => {
     expect(score!.textContent).toContain('from 1 review');
     expect(score!.textContent).toContain('Early rating');
     const number = score!.firstElementChild as HTMLElement;
-    expect(number.className).toContain(getEarlyScoreTextColor(3.9));
+    expect(number.textContent).toBe('3.9');
+    expect(number.className).toContain(getEarlyScoreStyle(3.9).text);
+    expect(number.className).not.toContain(getScoreTextColor(3.9));
     expect(number.className).toContain('font-semibold');
     expect(number.className).not.toContain('font-bold');
+    const marker = number.querySelector('[data-early-score-marker]');
+    expect(marker?.getAttribute('aria-hidden')).toBe('true');
+    expect(marker?.className).toContain(getScoreColor(3.9).bg);
+  });
+
+  it('mutes a low early score instead of drawing it in full red', () => {
+    const number = searchCard(1, 1.4).querySelector('[data-early-rating]')!.firstElementChild as HTMLElement;
+    expect(number.className).toContain(getEarlyScoreStyle(1.4).text);
+    expect(number.className).not.toContain('text-red-');
+    expect(number.querySelector('[data-early-score-marker]')?.className).toContain('bg-red-700');
   });
 
   it('marks every count below the threshold, using the constant', () => {
@@ -57,6 +69,7 @@ describe('search result card', () => {
     expect(container.textContent).not.toContain('from ');
     expect(container.innerHTML).toContain(getScoreTextColor(1.4));
     expect(container.innerHTML).toContain('font-bold');
+    expect(container.querySelector('[data-early-score-marker]')).toBeNull();
   });
 
   it('leaves a building with no review as it was', () => {
@@ -89,7 +102,9 @@ describe('BuildingScoreSummary (landlord and property manager pages)', () => {
     expect(root.textContent).toContain('2.4');
     expect(root.textContent).toContain('from 2 reviews');
     expect(root.textContent).toContain('Early rating');
-    expect(root.innerHTML).toContain(getEarlyScoreTextColor(2.4));
+    expect(root.innerHTML).toContain(getEarlyScoreStyle(2.4).text);
+    expect(root.innerHTML).not.toContain(getScoreTextColor(2.4));
+    expect(root.querySelector('[data-early-score-marker]')?.getAttribute('class')).toContain(getScoreColor(2.4).bg);
   });
 
   it('leaves an established score as it was', async () => {

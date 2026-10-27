@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import HomeSearch from '../../components/HomeSearch';
+import { NAMED_PARTY_MIN_REVIEWS } from '../scoring';
+import { getEarlyScoreStyle, getScoreBgTint, getScoreColor, getScoreTextColor } from '../scoring-colors';
 
 // The homepage dropdown: Boston-scoped Google suggestions, buildings already on RateMyPlace
 // first with "See this building" and a secondary "Write a review", and a neutral header over
@@ -83,6 +85,37 @@ describe('HomeSearch dropdown', () => {
     const addressRow = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('99 Example Road'));
     expect(addressRow?.textContent).toContain('Start a review');
     expect(addressRow?.textContent).not.toContain('See this building');
+  });
+
+  it('mutes an early building score to gray with a band dot, as the building page does', async () => {
+    const early = { ...ownBuilding, id: 'b2', title: '14 Example Road', slug: '14-example-road-boston', reviewCount: 1, avgScore: 1.4 };
+    const established = {
+      ...ownBuilding,
+      id: 'b3',
+      title: '16 Example Road',
+      slug: '16-example-road-boston',
+      reviewCount: NAMED_PARTY_MIN_REVIEWS,
+      avgScore: 1.4,
+    };
+    stubFetch([early, established], []);
+    const { getByRole, container } = render(<HomeSearch />);
+    type(getByRole, 'Example Road');
+    await waitFor(() => expect(container.textContent).toContain('16 Example Road'));
+
+    const [earlyScore, establishedScore] = Array.from(container.querySelectorAll('[data-home-score]'));
+    expect(earlyScore.textContent).toBe('1.4');
+    expect(earlyScore.className).toContain(getScoreBgTint(1.4));
+    expect(earlyScore.className).toContain(getEarlyScoreStyle(1.4).text);
+    expect(earlyScore.className).toContain('font-semibold');
+    expect(earlyScore.className).not.toContain('font-bold');
+    expect(earlyScore.className).not.toContain('text-red-');
+    const marker = earlyScore.querySelector('[data-early-score-marker]');
+    expect(marker?.getAttribute('aria-hidden')).toBe('true');
+    expect(marker?.className).toContain(getScoreColor(1.4).bg);
+
+    expect(establishedScore.textContent).toBe('1.4');
+    expect(establishedScore.className).toContain(`font-bold ${getScoreTextColor(1.4)}`);
+    expect(establishedScore.querySelector('[data-early-score-marker]')).toBeNull();
   });
 
   it('never says we do not have an address', async () => {

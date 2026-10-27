@@ -7,6 +7,7 @@ import {
   buildingRateCounts,
   countOfReviews,
   earlyRatingNote,
+  earlyScoreMarkerClass,
   isEarlyRating,
   issueRateText,
   mapReviewLine,
@@ -19,7 +20,7 @@ import {
   unitRecommendText,
 } from '../earlyRating';
 import { NAMED_PARTY_MIN_REVIEWS, calculateBuildingAverages } from '../scoring';
-import { getEarlyScoreTextColor, getScoreTextColor } from '../scoring-colors';
+import { getEarlyScoreStyle, getScoreColor, getScoreTextColor } from '../scoring-colors';
 
 const MIN = NAMED_PARTY_MIN_REVIEWS;
 
@@ -73,13 +74,27 @@ describe('review count wording', () => {
 });
 
 describe('scoreNumberClass', () => {
-  it('draws an early score lighter: lighter band shade, lighter weight', () => {
-    expect(scoreNumberClass(3.9, 1)).toBe(`font-semibold ${getEarlyScoreTextColor(3.9)}`);
-    expect(scoreNumberClass(1.4, MIN - 1)).toBe(`font-semibold ${getEarlyScoreTextColor(1.4)}`);
+  it('mutes an early score: neutral gray, lighter weight, no band colour', () => {
+    expect(scoreNumberClass(3.9, 1)).toBe(`font-semibold ${getEarlyScoreStyle(3.9).text}`);
+    expect(scoreNumberClass(1.4, MIN - 1)).toBe(`font-semibold ${getEarlyScoreStyle(1.4).text}`);
+    expect(scoreNumberClass(1.4, 1)).not.toContain(getScoreTextColor(1.4));
+    expect(scoreNumberClass(3.1, 1)).not.toContain(getScoreTextColor(3.1));
   });
 
   it('leaves an established score as it was', () => {
     expect(scoreNumberClass(3.9, MIN)).toBe(`font-bold ${getScoreTextColor(3.9)}`);
+  });
+});
+
+describe('earlyScoreMarkerClass', () => {
+  it('is a small dot in the band fill, so an early score keeps its band', () => {
+    for (const score of [1.4, 2.5, 3.1, 3.9, 4.6]) {
+      const cls = earlyScoreMarkerClass(score);
+      expect(cls).toContain(getScoreColor(score).bg);
+      expect(cls).toContain('rounded-full');
+    }
+    expect(earlyScoreMarkerClass(1.4)).toContain('bg-red-700');
+    expect(earlyScoreMarkerClass(3.1)).toContain('bg-amber-500');
   });
 });
 
