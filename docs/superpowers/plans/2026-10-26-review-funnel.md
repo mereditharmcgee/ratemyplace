@@ -891,10 +891,10 @@ Merging to `main` auto-deploys the site. The records Worker is unaffected.
 3. **The sign-in page carries the path.** Run `curl -s 'https://ratemyplace.org/auth/signin?redirect=%2Freview%2Fnew%3Fbuilding%3Dseed-1202188000' | grep -o 'data-redirect="[^"]*"\|href="/api/auth/google[^"]*"\|href="/auth/signup[^"]*"'`. All three carry the path.
 4. **Hostile paths are dropped.** Repeat step 3 with each of `redirect=%2F%2Fevil.example`, `redirect=%2F.%2F%2Fevil.example`, `redirect=%2F%2e%2e%2F%2Fevil.example` and `redirect=%2Fa%2F..%2F%2Fevil.example`. Each must show `data-redirect="/"`, a bare Google href and a bare sign-up href.
 5. **OAuth start.** Run `curl -s -D - -o /dev/null 'https://ratemyplace.org/api/auth/google?redirect=%2Freview%2Fnew' | grep -i -E '^(location|set-cookie):'`. Expect:
-   - `oauth_return_to=%2Freview%2Fnew; Path=/api/auth/google; HttpOnly; Secure; SameSite=Lax; Max-Age=600`;
+   - a `set-cookie` for `oauth_return_to=%2Freview%2Fnew` that carries each of `Max-Age=600`, `Path=/api/auth/google`, `HttpOnly`, `Secure` and `SameSite=Lax`. Check each attribute, not the whole line: the order is the cookie serializer's. Astro 5.18 prints `oauth_return_to=%2Freview%2Fnew; Max-Age=600; Path=/api/auth/google; HttpOnly; Secure; SameSite=Lax`;
    - a Location at accounts.google.com with `redirect_uri=https%3A%2F%2Fratemyplace.org%2Fapi%2Fauth%2Fgoogle%2Fcallback`.
 
-   With `redirect=%2F.%2F%2Fevil.example`, there is no `oauth_return_to` set-cookie, or only a deleting one.
+   With `redirect=%2F.%2F%2Fevil.example`, there is no `oauth_return_to` set-cookie, or only a deleting one (`oauth_return_to=deleted; Path=/api/auth/google; Expires=Thu, 01 Jan 1970 00:00:00 GMT`).
 6. **OAuth callback error branch.** Run `curl -s -D - -o /dev/null -H 'Cookie: oauth_return_to=%2Freview%2Fnew' 'https://ratemyplace.org/api/auth/google/callback?error=access_denied' | grep -i '^location'`. Expect `/auth/signin?error=oauth_denied&redirect=%2Freview%2Fnew`. With `Cookie: oauth_return_to=%2F.%2F%2Fevil.example`, expect exactly `/auth/signin?error=oauth_denied`.
 7. **Run the section 4 data step if the owner approved it.** Note the baseline `SELECT COUNT(*) FROM buildings WHERE source='user'`.
 8. **Owner, in a real browser** (Claude must not complete Turnstile or sign in):
