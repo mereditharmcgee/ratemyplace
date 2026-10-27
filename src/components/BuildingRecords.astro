@@ -43,6 +43,7 @@ import {
   showStalePullNote,
 } from '../lib/records/provenance';
 import { ledgerModel } from '../lib/records/ledger';
+import { ownerOfRecordHref } from '../lib/records/ownerList';
 import { recordsRequestState, type RecordsRequestState } from '../lib/records/coverage';
 import { FY2026_RESOURCE_ID } from '../lib/records/sources/boston/assessor';
 import { RECORD_GROUPS, type RecordGroup, type RecordGroupId } from '../lib/records/recordGroups';
@@ -97,6 +98,10 @@ if (view) {
 }
 
 const current = view?.assessments[0] ?? null;
+// The owner of record links to the other buildings recorded under the same name only when the
+// rules in `lib/records/ownerList.ts` allow it; otherwise, and whenever the owners table cannot
+// be read, it stays plain text. Never throws.
+const ownerHref = view && current ? await ownerOfRecordHref(Astro.locals.runtime.env.DB, buildingId, current) : null;
 const assessorStatus = view?.sources[FY2026_RESOURCE_ID] ?? null;
 const ledger = view ? ledgerModel(view, new Date()) : null;
 
@@ -167,7 +172,7 @@ const chartsClass = 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5';
              panel does not name an owner for one — so it does not chart one either. */
           <p class={bodyClass}>{CONDOMINIUM_COPY}</p>
         ) : (
-          <FactsStrip current={current} all={view.assessments} />
+          <FactsStrip current={current} all={view.assessments} ownerHref={ownerHref} />
         )}
       </SourceState>
     </div>

@@ -186,9 +186,103 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
 
   if (pulls.results.length === 0) return null;
 
+  const recordRows = await db
+    .prepare('SELECT kind, payload FROM building_records WHERE building_id = ? ORDER BY kind, source_key')
+    .bind(buildingId)
+    .all<RecordRowStorage>();
+
+  const correctionRows = await db
+    .prepare(
+      "SELECT record_kind, resolved_at, resolution_notes FROM record_corrections " +
+        "WHERE building_id = ? AND status = 'resolved' AND resolution = 'source_mismatch_noted' AND resolution_notes IS NOT NULL " +
+        'ORDER BY resolved_at DESC, rowid DESC',
+    )
+    .bind(buildingId)
+    .all<CorrectionRow>();
+
+  return assembleRecordsView(buildingId, pulls.results, recordRows.results, correctionRows.results);
+}
+
+/** The most buildings `getRecordsViews` reads at once: well under D1's 100 bound parameters with the kinds added. */
+export const MAX_VIEWS_PER_READ = 50;
+
+/**
+ * The panel's view for several buildings at once, for a list that shows each one's record
+ * counts (the owner of record list). Two statements for the whole list rather than three per
+ * building: every pull row of the given buildings, then their stored rows of the given kinds.
+ * Each view is assembled exactly as `getBuildingRecords` assembles one, so a count read off it
+ * through `ledgerModel` is the count the building's own panel shows. Corrections are not read:
+ * they annotate rows, they never change a count. A building with no pull row has no entry,
+ * which is `getBuildingRecords` answering null.
+ */
+export async function getRecordsViews(
+  db: RecordsDb,
+  buildingIds: readonly string[],
+  kinds: readonly RecordKind[],
+): Promise<Map<string, BuildingRecordsView>> {
+  const views = new Map<string, BuildingRecordsView>();
+  const ids = Array.from(new Set(buildingIds));
+  if (ids.length === 0) return views;
+  if (ids.length > MAX_VIEWS_PER_READ) throw new Error(`getRecordsViews reads at most ${MAX_VIEWS_PER_READ} buildings at once`);
+  const idList = ids.map(() => '?').join(',');
+
+  const pulls = await db
+    .prepare(
+      `SELECT building_id, source_id, source_label, status, error_message, retrieved_at FROM record_pulls WHERE building_id IN (${idList}) ` +
+        'ORDER BY building_id, retrieved_at ASC, rowid ASC',
+    )
+    .bind(...ids)
+    .all<PullRow & { building_id: string }>();
+  if (pulls.results.length === 0) return views;
+
+  const records =
+    kinds.length === 0
+      ? { results: [] as Array<RecordRowStorage & { building_id: string }> }
+      : await db
+          .prepare(
+            `SELECT building_id, kind, payload FROM building_records WHERE building_id IN (${idList}) ` +
+              `AND kind IN (${kinds.map(() => '?').join(',')}) ORDER BY building_id, kind, source_key`,
+          )
+          .bind(...ids, ...kinds)
+          .all<RecordRowStorage & { building_id: string }>();
+
+  const pullsById = groupBy(pulls.results, (row) => row.building_id);
+  const recordsById = groupBy(records.results, (row) => row.building_id);
+  for (const id of ids) {
+    const buildingPulls = pullsById.get(id);
+    if (!buildingPulls) continue;
+    const view = assembleRecordsView(id, buildingPulls, recordsById.get(id) ?? [], []);
+    if (view) views.set(id, view);
+  }
+  return views;
+}
+
+function groupBy<T>(rows: readonly T[], keyOf: (row: T) => string): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    const group = groups.get(key);
+    if (group) group.push(row);
+    else groups.set(key, [row]);
+  }
+  return groups;
+}
+
+/**
+ * Stored rows to the typed, validated view. `pulls` must be oldest first with rowid breaking a
+ * tie, and `recordRows` ordered by kind and source key, as both readers above select them.
+ */
+function assembleRecordsView(
+  buildingId: string,
+  pulls: readonly PullRow[],
+  recordRows: readonly RecordRowStorage[],
+  correctionRows: readonly CorrectionRow[],
+): BuildingRecordsView | null {
+  if (pulls.length === 0) return null;
+
   let pulledAt = 0;
   const sources: Record<string, SourceStatus> = {};
-  for (const row of pulls.results) {
+  for (const row of pulls) {
     if (row.retrieved_at > pulledAt) pulledAt = row.retrieved_at;
     const existing = sources[row.source_id];
     if (!existing || row.retrieved_at >= existing.retrievedAt) {
@@ -212,12 +306,7 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
   const rentsmart: RentSmartPayload[] = [];
   const invalidKinds = new Set<RecordKind>();
 
-  const recordRows = await db
-    .prepare('SELECT kind, payload FROM building_records WHERE building_id = ? ORDER BY kind, source_key')
-    .bind(buildingId)
-    .all<RecordRowStorage>();
-
-  for (const row of recordRows.results) {
+  for (const row of recordRows) {
     let parsed: unknown;
     try {
       parsed = JSON.parse(row.payload);
@@ -285,16 +374,7 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
   serviceRequests.sort(byDateDesc((r) => r.openedAt, (r) => r.caseId));
   rentsmart.sort(byDateDesc((r) => r.date, (r) => r.rowId));
 
-  const correctionRows = await db
-    .prepare(
-      "SELECT record_kind, resolved_at, resolution_notes FROM record_corrections " +
-        "WHERE building_id = ? AND status = 'resolved' AND resolution = 'source_mismatch_noted' AND resolution_notes IS NOT NULL " +
-        'ORDER BY resolved_at DESC, rowid DESC',
-    )
-    .bind(buildingId)
-    .all<CorrectionRow>();
-
-  const corrections: CorrectionNote[] = correctionRows.results.map((row) => ({
+  const corrections: CorrectionNote[] = correctionRows.map((row) => ({
     recordKind: row.record_kind,
     resolvedAt: row.resolved_at,
     notes: row.resolution_notes,

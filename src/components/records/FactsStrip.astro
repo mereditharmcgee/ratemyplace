@@ -6,6 +6,10 @@
 // The mailing address is behind `showMailingAddress`, which publishes a tax address only for
 // an owner that reads as an entity. That gate is a privacy control, not a formatting choice —
 // see the note on it in `display.ts` before changing anything here.
+//
+// The owner of record is a link only when `ownerHref` is given. `ownerOfRecordHref` in
+// `lib/records/ownerList.ts` decides that on the server (an entity, or a person with two or more
+// residential parcels here, never a condominium), so this template never decides it.
 import { assessmentSeries, sparklinePoints } from '../../lib/records/charts';
 import {
   showMailingAddress,
@@ -21,9 +25,11 @@ interface Props {
   current: AssessmentPayload;
   /** Every stored fiscal year, for the value series. */
   all: AssessmentPayload[];
+  /** The owner of record list for this owner, or null to print the name as plain text. */
+  ownerHref?: string | null;
 }
 
-const { current, all } = Astro.props;
+const { current, all, ownerHref = null } = Astro.props;
 
 /** Mid-sentence in a sub-line, where the capitalised constant would read as a new sentence. */
 function orNotRecordedInline(value: string | number | null | undefined): string {
@@ -70,7 +76,11 @@ const SUB = 'mt-1 block text-xs text-gray-500';
   <div class={cells[0]}>
     <dt class={LABEL}>Owner of record</dt>
     <dd class={`${VALUE} break-words`}>
-      {orNotRecorded(current.owner)}
+      {ownerHref ? (
+        <a href={ownerHref} class="py-1.5 text-teal-700 underline underline-offset-2 hover:text-teal-800">{current.owner}</a>
+      ) : (
+        orNotRecorded(current.owner)
+      )}
       <span class={SUB}>Assessor {current.fiscalYear} · parcel {orNotRecordedInline(current.parcelId)}</span>
       {showMailingAddress(current.owner) && (
         <span class={`${SUB} break-words`}>Tax mailing address: {mailingAddressLine(current)}</span>
