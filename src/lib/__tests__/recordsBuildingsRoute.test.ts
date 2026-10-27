@@ -3,6 +3,7 @@ import type { APIContext } from 'astro';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 import { GET, POST } from '../../pages/api/buildings';
+import { findExistingBuilding, resolveInputFrom } from '../buildingResolve';
 
 const suite = sqliteAvailable ? describe : describe.skip;
 
@@ -139,6 +140,47 @@ suite('POST /api/buildings with seeded dedupe', () => {
     const res = await POST(createContext(db, { streetAddress: '9 Pine St.', city: 'Cambridge', state: 'MA', zipCode: null }));
     expect(res.status).toBe(201);
     expect((await res.json()).building.slug).toBe('9-pine-st-cambridge-2');
+  });
+});
+
+/**
+ * The /review/new?placeId= handoff answers "which building is this?" with
+ * findExistingBuilding and never writes; POST answers the same question and then creates.
+ * The two must agree, or the handoff would send a reader to one page and Continue to another.
+ */
+suite('findExistingBuilding agrees with POST /api/buildings', () => {
+  let db: TestD1Database;
+  beforeEach(async () => {
+    db = createRecordsTestDb();
+    await db.prepare("INSERT INTO users (id, email) VALUES ('user-1', 'u@example.com')").run();
+    await insertBuilding(db, { id: 'seed-1', address: '23-27 Lanark Rd', slug: '23-27-lanark-rd-boston', source: 'seed', street_key: 'LANARK RD', st_num_lo: 23, st_num_hi: 27, parcel_id: '1' });
+    await insertBuilding(db, { id: 'nh-elm', address: '1 Elm St', slug: '1-elm-st-new-haven', city: 'New Haven', state: 'CT', zip_code: '06511' });
+  });
+
+  it.each([
+    ['a seeded-range hit', { placeId: 'gp-1', streetAddress: '25 Lanark Rd', city: 'Boston', state: 'MA', zipCode: '02135' }],
+    ['an exact manual entry', { streetAddress: '1 elm st', city: 'new haven', state: 'CT', zipCode: null }],
+    ['a new address', { placeId: 'gp-2', streetAddress: '5 Oak St', city: 'Dorchester', state: 'MA', zipCode: '02122' }],
+  ])('%s', async (_label, body) => {
+    const resolveInput = resolveInputFrom(body);
+    if (!resolveInput) throw new Error('input should be usable');
+    const predicted = await findExistingBuilding(db, resolveInput);
+    const res = await POST(createContext(db, body));
+    const json = await res.json();
+    if (predicted) {
+      expect(res.status).toBe(200);
+      expect(json.building.id).toBe(predicted.id);
+    } else {
+      expect(res.status).toBe(201);
+    }
+  });
+
+  it('a malformed place id is treated as absent', async () => {
+    const res = await POST(createContext(db, { placeId: '../x', streetAddress: '9 Pine St', city: 'Cambridge', state: 'MA', zipCode: null }));
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()).building;
+    const row = (await rows(db)).find((r) => r.id === id);
+    expect(row?.google_place_id).toBeNull();
   });
 });
 
