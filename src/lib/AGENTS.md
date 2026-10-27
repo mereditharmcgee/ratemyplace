@@ -309,7 +309,10 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   the next word in the same comma segment is a street suffix in any `SUFFIX_SPELLINGS`
   spelling ("Brighton Ave", "Allston St", "Boston St"), or when it follows "the" ("The
   Fenway"). The first number is the house number; later numbers, "apt"/"unit" plus the next
-  word, and anything after "#" are unit numbers and are dropped. A query that leaves no
+  word, and anything after "#" are unit numbers and are dropped. A hyphenated word with no
+  digit is split ("Allston-Brighton" is two places); "14-18" and a ZIP+4 stay whole. A house
+  number with only a place beside it ("7 Allston") keeps the place as its street word too,
+  or the number alone would match every building with that number. A query that leaves no
   street word and no number but names a place or ZIP is an area search (`isAreaSearch`).
 - **`coverage.ts` is the page-state table, read-only.** `recordsRequestState` answers
   `ineligible` / `pulled` / `fill_queued` / `parked` / `requested` / `never_pulled` in that

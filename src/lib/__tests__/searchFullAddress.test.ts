@@ -192,6 +192,26 @@ suite('search by full address', () => {
     expect(await search(db, '300 Hyde Park Ave')).toEqual(['hp-ave']);
   });
 
+  it('a house number and a place with no street reads the place as the street', async () => {
+    // Taking the place out would leave the number alone, which every building numbered 7 matches.
+    const db = createRecordsTestDb();
+    await seeded(db, { id: 'allston-st', address: '7 Allston Street', neighborhood: 'Dorchester', zip: '02124', lo: 7 });
+    await seeded(db, { id: 'away', address: '7 Sample Road', neighborhood: 'Roxbury', zip: '02119', lo: 7 });
+    const rows = await search(db, '7 Allston');
+    expect(rows[0]).toBe('allston-st');
+    expect(rows).not.toContain('away');
+  });
+
+  it('reads a hyphenated neighborhood pair as two places', async () => {
+    const db = createRecordsTestDb();
+    await seeded(db, { id: 'wood', address: '12 Wood Street', neighborhood: 'Brighton', zip: '02135', lo: 12 });
+    await seeded(db, { id: 'allston', address: '20 Sample Road', neighborhood: 'Allston', zip: '02134', lo: 20 });
+    await seeded(db, { id: 'away', address: '3 Sample Road', neighborhood: 'Roxbury', zip: '02119', lo: 3 });
+    expect((await search(db, '12 Wood St, Allston-Brighton'))[0]).toBe('wood');
+    expect((await search(db, '12 Wood St, Allston-Brighton, MA 02135'))[0]).toBe('wood');
+    expect((await search(db, 'Allston-Brighton')).sort()).toEqual(['allston', 'wood']);
+  });
+
   it('a street plus a neighborhood lists that street, the neighborhood first', async () => {
     const db = createRecordsTestDb();
     await seeded(db, { id: 'allston', address: '100 Example Avenue', neighborhood: 'Allston', zip: '02134', lo: 100 });
@@ -279,10 +299,12 @@ suite('search order and paging', () => {
   });
 
   it('stays under the D1 parameter limit for the widest query the parser allows', () => {
-    // Eight distinct suffix words (the term cap), the longest suffix rows, a range, three
-    // places and two ZIPs: the most binds one search can produce.
-    const widest = '14-18 te ter terr terrace ave la pw hw Allston Brighton Roxbury Fenway 02134 02135 02136';
-    for (const query of [widest, `${widest} apt 2`, 'Allston Brighton Roxbury 02134 02135']) {
+    // Eight distinct suffix words (the term cap) from the longest suffix rows, a range, three
+    // postal names (each adds the neighborhood it sits in, so six places) and two ZIPs: the
+    // most binds one search can produce. That is 96 with LIMIT and OFFSET, 4 under the limit.
+    const widest = '14-18 te ter terr terrace ave la pw hw Dorchester Center Roxbury Crossing Readville 02134 02135 02136';
+    const placesAsStreet = '14-18 Dorchester Center, Roxbury Crossing, Readville, 02134 02135';
+    for (const query of [widest, `${widest} apt 2`, 'Allston Brighton Roxbury 02134 02135', placesAsStreet]) {
       const where = buildingSearchWhere(query);
       const order = buildingSearchOrder(query);
       // + LIMIT and OFFSET
