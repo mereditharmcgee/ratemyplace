@@ -352,6 +352,15 @@ Things that have already cost time. Read before debugging.
   `/robots.txt` serves `Disallow: /` on any host that is not `SITE_URL`'s, so a preview
   deploy is not asking a crawler to index a second copy of every page — a permissive
   robots.txt on preview is the bug, not the empty one.
+- **The social preview image is a committed PNG, mirrored in two places.**
+  `public/brand/social/og-default.png` (served) and `brand/social/og-default.png` (the brand
+  asset) are byte-identical; both are rendered from `brand/social/og-default.html` by
+  `npm run og:render`, which needs network (Google Fonts) and Playwright's Chromium. Platforms
+  cache previews by image URL, so a replacement image gets a new filename and
+  `DEFAULT_OG_IMAGE.path` in `src/lib/seo.ts` changes with it. Every new page must be
+  classified (sitemap page, indexable dynamic route, or `noindex`) in
+  `src/lib/__tests__/pageIndexing.test.ts`. Until October 2026 the OG tags were relative and
+  pointed at a file that did not exist, so every shared link previewed with no image.
 - **`Window.turnstile` is declared once in `src/env.d.ts`; never add a per-component
   `declare global` for it.** TypeScript merges augmentations project-wide, so three
   components each carrying an identical copy compiled fine and drifted quietly instead.
@@ -400,7 +409,7 @@ when adding an endpoint.
 | Doc | Role |
 |-----|------|
 | [`MASTER.md`](MASTER.md) | **Canonical product spec** — mission, ethics, full rating instrument, privacy model, verification, moderation policy |
-| [`brand.md`](brand.md) | Brand handbook v1.4 — voice, color, typography, component fingerprint. Accurate and implemented. A separate brand bible v1.0 outranks it where they disagree |
+| [`brand.md`](brand.md) | Brand handbook v1.5 — voice, color, typography, component fingerprint. Accurate and implemented. A separate brand bible v1.0 outranks it where they disagree |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Technical architecture reference |
 | [`SECURITY.md`](SECURITY.md) | Security policy |
 | `.planning/` | Milestone system — `STATE.md`, `ROADMAP.md`, `PROJECT.md`, per-milestone requirements and audits |

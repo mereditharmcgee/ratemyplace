@@ -521,6 +521,17 @@ On a match: set `google_place_id`, and `latitude`/`longitude` if null, and retur
 > only when a building has zero approved reviews **and** a Boston jurisdiction **and** a parcel
 > id, and the title avoids a doubled ", Boston" when the address already carries it.
 >
+> > **Amended 2026-10-26 (link previews).** The records title now names the neighbourhood:
+> > `<address>, <neighbourhood>, Boston`, with East Boston and South Boston standing on their
+> > own (`<address>, East Boston`), and the description reads `City of Boston records for
+> > <address>, <neighbourhood>: …`. The neighbourhood is named only when `bostonLocalityName`
+> > recognises it, in display spelling; a blank, street-word, junk or out-of-city value
+> > ("St. Elizabeth's", "Chestnut Hill") gives `<address>, Boston`, and a Boston locality the
+> > address already carries is not repeated. Before this, 711 seeded URLs shared a title with
+> > another page, 177 of the groups across different addresses or ZIPs. Twin parcels at one
+> > address and ZIP (about 120 groups) still share a title and description by design: the
+> > parcel id stays out of the metadata.
+>
 > **Two operational residues** for the runbook and follow-ups, not defects here: `robots.txt`
 > on a preview host (`*.pages.dev`) advertises the production sitemap, which is harmless only if
 > Cloudflare sends `X-Robots-Tag: noindex` on preview deployments; and Pages Functions responses
