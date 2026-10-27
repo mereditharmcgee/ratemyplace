@@ -365,6 +365,15 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   every Boston building, reviewed ones first; browse mode, the landlord queries and the map
   keep their `HAVING COUNT(r.id) > 0`. `__tests__/recordsSearchParity.test.ts` fails if
   either call site stops using the fragments.
+- **Browse mode is Boston first, most recently reviewed.** Its query stays in the two call
+  sites, but its ORDER BY is `BROWSE_BUILDINGS_ORDER` in `searchSql.ts`: Boston buildings
+  (`BOSTON_CITY_SQL`, the same city test `has_records` uses, without the parcel check), then
+  the rest, each by newest approved review `created_at`, then `b.id` so Load more pages never
+  overlap. The reviews row has no approval time (`moderated_at` is never written, `updated_at`
+  moves on later moderation saves); it exists only in the admin `audit_logs` table, which a
+  public query should not join, and submission and approval are days apart at most. Hence
+  submission time. It orders rows only and is never shown.
+  `__tests__/searchBrowseOrder.test.ts` pins the order against SQLite.
 - **`buildingMeta.ts` decides the records-page title.** `buildingPageMeta` swaps in the
   records-flavored title and description only when a building has zero approved reviews, a
   Boston jurisdiction (`jurisdictionForCity`) and a parcel id. Reviewed pages keep the review
