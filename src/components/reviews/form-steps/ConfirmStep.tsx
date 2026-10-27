@@ -3,6 +3,22 @@ import { unitItems, buildingItems, landlordItems, supplementaryItems } from '../
 import { bedroomOptions, bathroomOptions } from '../../../lib/formOptions';
 import type { Building, UnitDetails, Tenancy, ReviewData } from './types';
 
+const TURNSTILE_SITEKEY = '0x4AAAAAACo4KpkxsacPhM2r';
+const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+const TURNSTILE_SCRIPT_SELECTOR = 'script[src^="https://challenges.cloudflare.com/turnstile/"]';
+const POLL_MS = 100;
+const POLL_TICKS = 100; // 10 seconds
+
+export const TURNSTILE_LOAD_FAILED_COPY =
+  "Bot verification didn't load. Check your connection, or allow challenges.cloudflare.com if you use a content blocker, then press Try again. Your answers stay on this page.";
+export const TURNSTILE_WAITING_COPY = 'Waiting for bot verification…';
+/** Rendered around a sign-in link: before, the link text, after. */
+export const SESSION_EXPIRED_COPY = {
+  before: 'You were signed out while writing this. ',
+  link: 'Sign in in a new tab',
+  after: ', then come back and press Submit Review again. Your answers are still here.',
+} as const;
+
 interface Props {
   building: Building | null;
   unitDetails: UnitDetails;
@@ -17,6 +33,10 @@ interface Props {
   error: string | null;
   onBack: () => void;
   onSubmit: () => void;
+  /** Bumped by the parent after a failed POST: the widget resets once per bump. */
+  turnstileResetSignal: number;
+  /** The last POST answered 401. */
+  authExpired: boolean;
 }
 
 export default function ConfirmStep({
@@ -33,6 +53,8 @@ export default function ConfirmStep({
   error,
   onBack,
   onSubmit,
+  turnstileResetSignal,
+  authExpired,
 }: Props) {
   const turnstileRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
@@ -40,12 +62,24 @@ export default function ConfirmStep({
   // gets its own state and shares the one error banner below.
   const [turnstileError, setTurnstileError] = useState<string | null>(null);
 
+  // The script never arrived within POLL_TICKS. "Try again" clears it and polls again.
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  // The signal this mount started with: a remount does not reset its own fresh widget.
+  const lastResetRef = useRef(turnstileResetSignal);
+
+  // Render once, as soon as api.js is there; wait for it at most POLL_TICKS x POLL_MS.
   useEffect(() => {
-    const renderWidget = () => {
-      if (!turnstileRef.current || !window.turnstile || widgetIdRef.current) return;
+    const renderWidget = (): boolean => {
+      if (!turnstileRef.current || !window.turnstile) return false;
+      if (widgetIdRef.current) return true;
       widgetIdRef.current = window.turnstile.render(turnstileRef.current, {
-        sitekey: '0x4AAAAAACo4KpkxsacPhM2r',
+        sitekey: TURNSTILE_SITEKEY,
         theme: 'light',
+        // Stores the token and nothing else. It must never submit: the parent resets this
+        // widget after a failed POST, a reset re-fires this callback, and a callback that
+        // submitted would loop (AGENTS.md Traps, "Never call turnstile.reset() from a
+        // callback that submits"). The writer presses Submit.
         callback: (token: string) => {
           setTurnstileError(null);
           onTurnstileToken(token);
@@ -63,29 +97,59 @@ export default function ConfirmStep({
           setTurnstileError('Bot verification failed. Please try again.');
         },
       });
+      return true;
     };
 
-    // If turnstile script is already loaded, render immediately
-    if (window.turnstile) {
-      renderWidget();
-    } else {
-      // Wait for the script to load
-      const interval = setInterval(() => {
-        if (window.turnstile) {
-          clearInterval(interval);
-          renderWidget();
-        }
-      }, 100);
-      return () => clearInterval(interval);
-    }
-
-    return () => {
-      if (widgetIdRef.current && window.turnstile) {
-        window.turnstile.remove(widgetIdRef.current);
-        widgetIdRef.current = null;
+    if (renderWidget()) return;
+    let ticks = 0;
+    const interval = setInterval(() => {
+      ticks += 1;
+      if (renderWidget()) {
+        clearInterval(interval);
+      } else if (ticks >= POLL_TICKS) {
+        clearInterval(interval);
+        setLoadFailed(true);
       }
+    }, POLL_MS);
+    return () => clearInterval(interval);
+  }, [loadAttempt]);
+
+  // Unmount only: remove whichever widget this step rendered, however late it arrived, and
+  // drop its token. `onTurnstileToken` is the parent's stable state setter.
+  useEffect(() => {
+    return () => {
+      if (widgetIdRef.current && window.turnstile) window.turnstile.remove(widgetIdRef.current);
+      widgetIdRef.current = null;
+      onTurnstileToken(null);
     };
   }, []);
+
+  // One reset per bump. The parent clears the token before bumping, so the fresh token the
+  // reset produces is never overwritten.
+  useEffect(() => {
+    if (turnstileResetSignal === lastResetRef.current) return;
+    lastResetRef.current = turnstileResetSignal;
+    if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
+  }, [turnstileResetSignal]);
+
+  const handleRetryLoad = () => {
+    setLoadFailed(false);
+    // A Turnstile <script> still in the DOM is pending or loaded: a failed one removes itself
+    // (new.astro's capture listener, and the listener below). Inject only when none is left,
+    // so api.js never executes twice.
+    if (!window.turnstile && !document.querySelector(TURNSTILE_SCRIPT_SELECTOR)) {
+      const script = document.createElement('script');
+      script.src = TURNSTILE_SRC;
+      script.async = true;
+      script.dataset.rmpTurnstileRetry = '';
+      script.addEventListener('error', () => script.remove(), { once: true });
+      document.head.appendChild(script);
+    }
+    setLoadAttempt((n) => n + 1);
+  };
+
+  const bannerMessage = error || turnstileError || (loadFailed ? TURNSTILE_LOAD_FAILED_COPY : null);
+  const waiting = privacyAcknowledged && !turnstileToken && !turnstileError && !loadFailed && !loading;
 
   const unitScoreCount = unitItems.filter((item) => scores[item.key] !== undefined).length;
   const buildingScoreCount = buildingItems.filter((item) => scores[item.key] !== undefined).length;
@@ -134,10 +198,29 @@ export default function ConfirmStep({
         </div>
       </div>
 
-      {(error || turnstileError) && (
+      {bannerMessage && (
         <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
-          {error || turnstileError}
+          <p>{bannerMessage}</p>
+          {loadFailed && (
+            <button
+              type="button"
+              onClick={handleRetryLoad}
+              className="mt-3 h-11 inline-flex items-center justify-center px-6 border border-red-300 bg-white text-red-700 font-semibold rounded-[4px] hover:bg-red-50"
+            >
+              Try again
+            </button>
+          )}
         </div>
+      )}
+
+      {authExpired && (
+        <p role="alert" className="bg-amber-50 border border-amber-200 rounded-[6px] p-4 text-sm text-amber-800">
+          {SESSION_EXPIRED_COPY.before}
+          <a href="/auth/signin" target="_blank" rel="noopener" className="underline font-medium hover:text-amber-900">
+            {SESSION_EXPIRED_COPY.link}
+          </a>
+          {SESSION_EXPIRED_COPY.after}
+        </p>
       )}
 
       <div className="bg-white border border-gray-200 rounded-[6px] p-6">
@@ -202,6 +285,10 @@ export default function ConfirmStep({
           {loading ? 'Submitting...' : 'Submit Review'}
         </button>
       </div>
+
+      <p aria-live="polite" className="text-sm text-gray-500 text-right min-h-5">
+        {waiting ? TURNSTILE_WAITING_COPY : ''}
+      </p>
     </div>
   );
 }

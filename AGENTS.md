@@ -86,6 +86,7 @@ npm run db:setup   # db:fresh then db:seed (local D1 only)
 npm run ops:metrics   # regenerate ops/METRICS.md from production (read-only)
 npm run records:check   # live Lanark fixture check (hits data.boston.gov), run by hand
 npm run records:seed -- --dry-run   # Boston bulk seed; --write / --apply --local / --apply --remote
+npm run records:suffix-backfill -- --remote   # after a SUFFIX_SPELLINGS change: generates re-key/respell/refresh SQL, applies nothing
 npm run records:worker        # run the records-scheduler Worker locally (stop `npm run dev` first)
 npm run records:worker:deploy # deploy the records-scheduler Worker — separate from the site deploy
 ```
@@ -258,7 +259,9 @@ Things that have already cost time. Read before debugging.
   npm advisory not listed in `audit-allowlist.json`; each entry carries the reason it does
   not apply to this deployment and an expiry date, after which CI fails again. Added
   2026-09-09 for the Astro AVIF advisory (GHSA-26w7-cxv4-gfx2), which needs Astro 7 to
-  fix. Never add an entry without a reason and a date.
+  fix; extended 2026-10-27 to 2027-06-30. Never add an entry without a reason and a date.
+  The Astro upgrade is not a version bump: Astro 6+ needs `@astrojs/cloudflare` 13+, which
+  dropped Cloudflare Pages, so it means moving the site to a Worker with static assets.
 - **There is a second deployable.** `workers/records-scheduler/` is a Cron Worker that runs
   the records queue; Pages has no cron triggers. Pushing `main` deploys the site and nothing
   else, so a change to `src/lib/records/scheduler.ts` or `queue.ts` is live in the admin
@@ -359,7 +362,9 @@ Things that have already cost time. Read before debugging.
   cannot appear on one and not the other. Browse mode (no query), the landlord queries and
   `src/pages/api/buildings/map.ts` keep their `HAVING COUNT(r.id) > 0`.
   `recordsSearchParity.test.ts` fails if either call site stops using the fragments or if
-  the browse-mode and landlord counts change.
+  the browse-mode and landlord counts change. The typed spelling of each term matches
+  anywhere in the address; every other spelling of its suffix row matches only as a whole
+  word (`ADDRESS_WORDS` in `searchSql.ts`).
 - **`/sitemap.xml`, `/sitemaps/*.xml`, and `/robots.txt` are D1-backed routes** in
   `src/pages/`, not files in `public/`. The static-page allowlist is `STATIC_SITEMAP_PATHS`
   in `src/lib/sitemap.ts`; a new public page is not in the sitemap until it is added there.
@@ -377,6 +382,25 @@ Things that have already cost time. Read before debugging.
   a failed POST only where the callback merely stores the token —
   `src/components/records/RecordCorrectionForm.tsx` is that shape. Either way, gate a
   submitting callback on a press flag so an auto-solve cannot post on its own.
+- **`GET /review/new` never writes a `buildings` row.** The `?placeId=` handoff from the
+  homepage resolves read-only through `findExistingBuilding` (`src/lib/buildingResolve.ts`,
+  via `resolveReviewHandoff` in `src/lib/reviewHandoff.ts`). It either 302s to the existing
+  building (`?building=`, plus `&partOf=1` when the city's parcel spans a different number
+  range) or pre-fills the address step, whose Continue POSTs `/api/buildings`. Before
+  October 2026 it inserted on page load, with no address tier and no key columns, and 11
+  zero-review rows came from it. Island props on that page come only from
+  `loadReviewFormBuilding`'s four columns.
+- **Sign-in return paths go through `safeRedirectPath` (`src/lib/authRedirect.ts`).** That
+  covers `?redirect=` on `/auth/signin` and `/auth/signup`, and the `oauth_return_to`
+  cookie the Google flow carries (scoped to `/api/auth/google`, beside an unchanged
+  `oauth_state`). Any other reader of a return path must use it, or it is an open redirect.
+  A naive "resolve with `new URL` and take the pathname" turns `/.//evil.example` into
+  `//evil.example`, which a browser reads as another host.
+- **React islands import only leaf modules from `src/lib`.** `reviewPaths`,
+  `reviewSubmitOutcome` and `authRedirect` have no runtime imports, which
+  `clientLeafModules.test.ts` enforces. Importing a server module such as `reviewHandoff`,
+  `buildingResolve`, `places` or `records/*` into an island ships its module-level code to
+  every browser.
 - **`buildings.updated_at` feeds sitemap `lastmod`.** Do not bump it on a no-op write; a
   write-through that stamps nothing new would move a page's date for every crawler with no
   content change behind it. `POST /api/buildings` only stamps a matched row when it has

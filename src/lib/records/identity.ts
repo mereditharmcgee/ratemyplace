@@ -12,7 +12,22 @@ export interface BuildingRowForIdentity {
   sam_id: string | null;
 }
 
-/** Assessor spelling first, then every other spelling seen in Boston datasets. Verified 2026-09-07. */
+/**
+ * Assessor spelling first, then every other spelling seen in Boston datasets.
+ *
+ * The first spelling of a row is the KEY spelling: `streetKey` / `addressKey` end every stored
+ * `buildings.street_key` in it, so it must stay the assessor's. Changing a first spelling
+ * re-keys stored rows; run `npm run records:suffix-backfill` and apply its files by hand.
+ * `recordsAddressKey.test.ts` pins the first spellings.
+ *
+ * Verified 2026-09-07; extended 2026-10 with WY/HW/PW/CI/LA/RO/AL/CR. Provenance for those, from
+ * read-only CKAN queries: the assessor and the permits `address` column write GRAMPIAN WY,
+ * CUMMINS HW, VFW PW, MAMELON CI, HOLDEN RO, BOARD AL and CONRY CR; the assessor writes
+ * GREENOUGH LA (one parcel NEPONSET FIELD LN) where permits write RADFORD LN; the violation and
+ * enforcement feeds store the bare street plus `violation_suffix` WY/HW/PW/CI/RO/AL/CR and LN;
+ * 311's new system writes GRAMPIAN WAY, CUMMINS HWY, VFW PKWY, ROCKVALE CIR, RADFORD LN,
+ * HOLDEN ROW and BAKERS ALY; legacy 311 `location` adds CONRY CRES.
+ */
 const SUFFIX_SPELLINGS: ReadonlyArray<readonly string[]> = [
   ['AV', 'AVE', 'AVENUE'],
   ['ST', 'STREET'],
@@ -21,16 +36,18 @@ const SUFFIX_SPELLINGS: ReadonlyArray<readonly string[]> = [
   ['PL', 'PLACE'],
   ['TE', 'TER', 'TERR', 'TERRACE'],
   ['CT', 'COURT'],
-  ['LN', 'LANE'],
+  ['LA', 'LN', 'LANE'],          // assessor: GREENOUGH LA (one parcel NEPONSET FIELD LN); permits, violation feeds, 311: LN
   ['BLVD', 'BOULEVARD'],
-  ['PKWY', 'PARKWAY'],
-  ['HWY', 'HIGHWAY'],
+  ['PW', 'PKWY', 'PARKWAY'],     // assessor, permits, violation feeds: VFW PW; 311: VFW PKWY
+  ['HW', 'HWY', 'HIGHWAY'],      // assessor, permits, violation feeds: CUMMINS HW; 311: CUMMINS HWY
   ['SQ', 'SQUARE'],
-  ['CIR', 'CIRCLE'],
-  ['PK', 'PARK'],        // assessor: UNION PK; 311: Union Park
-  ['WHARF', 'WH', 'WHF'], // assessor: ROWES WHARF; enforcement suffix: WH
-  ['ROW'],
-  ['WAY'],
+  ['CI', 'CIR', 'CIRCLE'],       // assessor, permits, violation feeds: MAMELON CI; 311: MAMELON CIR
+  ['PK', 'PARK'],                // assessor: UNION PK; 311: Union Park
+  ['WHARF', 'WH', 'WHF'],        // assessor: ROWES WHARF; enforcement suffix: WH
+  ['RO', 'ROW'],                 // assessor, permits, violation feeds: HOLDEN RO; 311: HOLDEN ROW
+  ['WY', 'WAY'],                 // assessor, permits, violation feeds: GRAMPIAN WY; 311: GRAMPIAN WAY
+  ['AL', 'ALY', 'ALLEY'],        // assessor, permits, violation feeds: BOARD AL; 311: BAKERS ALY
+  ['CR', 'CRES', 'CRESCENT'],    // assessor, permits, enforcement: CONRY CR; legacy 311: CONRY CRES
 ];
 
 /** Any spelling -> its row. Derived so there is only one table to maintain. */

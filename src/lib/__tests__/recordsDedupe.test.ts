@@ -164,6 +164,33 @@ suite('findBuildingByAddress', () => {
     expect(await findBuildingByAddress(db, { address: 'Lanark Rd', city: 'Boston', zip: null })).toBeNull();
     expect(await findBuildingByAddress(db, { address: '3 Lanark Rd', city: 'Boston', zip: null })).toBeNull();
   });
+
+  it('lands a typed Way on the assessor Wy parcel', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'seed-appian', address: '9-11 Appian Wy', slug: '9-11-appian-wy-boston', zip_code: '02134', source: 'seed', street_key: 'APPIAN WY', st_num_lo: 9, st_num_hi: 11, parcel_id: '2201144001' });
+    const hit = { id: 'seed-appian', slug: '9-11-appian-wy-boston' };
+    expect(await findBuildingByAddress(db, { address: '9 Appian Way', city: 'Boston', zip: '02134' })).toEqual(hit);
+    expect(await findBuildingByAddress(db, { address: '9 Appian Way', city: 'Allston', zip: '02134' })).toEqual(hit);
+    // The key, not the display address, is what dedupe reads: a respelled row still matches.
+    await db.prepare("UPDATE buildings SET address = '9-11 Appian Way' WHERE id = 'seed-appian'").run();
+    expect(await findBuildingByAddress(db, { address: '9 Appian Way', city: 'Allston', zip: '02134' })).toEqual(hit);
+  });
+
+  it('lands a typed Lane or Ln on the assessor La parcel', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'seed-greenough', address: '1 Greenough La', source: 'seed', street_key: 'GREENOUGH LA', st_num_lo: 1, st_num_hi: 1 });
+    const hit = { id: 'seed-greenough', slug: 'seed-greenough' };
+    expect(await findBuildingByAddress(db, { address: '1 Greenough Lane', city: 'Boston', zip: null })).toEqual(hit);
+    expect(await findBuildingByAddress(db, { address: '1 Greenough Ln', city: 'Boston', zip: null })).toEqual(hit);
+  });
+
+  it('needs the one stored LN key re-keyed to LA, which is why rekey.sql is not optional', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'seed-neponset', address: '29 Neponset Field Lane', source: 'seed', street_key: 'NEPONSET FIELD LA', st_num_lo: 29, st_num_hi: 29 });
+    expect(await findBuildingByAddress(db, { address: '29 Neponset Field Lane', city: 'Boston', zip: null })).toEqual({ id: 'seed-neponset', slug: 'seed-neponset' });
+    await db.prepare("UPDATE buildings SET street_key = 'NEPONSET FIELD LN' WHERE id = 'seed-neponset'").run();
+    expect(await findBuildingByAddress(db, { address: '29 Neponset Field Lane', city: 'Boston', zip: null })).toBeNull();
+  });
 });
 
 describe('isBostonLocality', () => {

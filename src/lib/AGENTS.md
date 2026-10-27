@@ -257,7 +257,10 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
 - **`identity.ts`** turns a `buildings` row into every address form worth querying
   (short and long, range and split, directional stripped) plus both parcel forms. The
   feeds disagree about how an address is stored; normalization lives here, not in the
-  sources.
+  sources. `addressLikeClauses` in `ckan.ts` then tries every street spelling on the
+  identity that the short and long forms do not already prefix-cover, because the feeds
+  spell suffixes differently (permits write `RADFORD LN` where the assessor writes
+  `RADFORD LA`; legacy 311 writes `VFW PKWY` for the assessor's `VFW PW`).
 - **`seed/` is the bulk pipeline, not a request path.** `scripts/records-seed-boston.ts`
   downloads the assessor and SAM resources once (`fetchAllRows` in `ckan.ts`), and the pure
   modules under `records/seed/` filter, collapse, format, match, and emit SQL. Every string
@@ -271,6 +274,13 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   key that silently collides. That rule is `isDegenerateStreet`, defined once in
   `identity.ts` and called from four places (`buildIdentity`, `streetKey`, `addressKey`, and
   `seed/format.ts`); change the rule there, not at a call site.
+  The first spelling of each `SUFFIX_SPELLINGS` row is the key spelling and must stay the
+  assessor's; `recordsAddressKey.test.ts` pins it. The October 2026 additions put
+  `WY`/`HW`/`PW`/`CI`/`LA`/`RO`/`AL`/`CR` ahead of `WAY`/`HWY`/`PKWY`/`CIR`/`LN`/`ROW`, so
+  374 of the 375 affected stored keys did not move. After any change to the table, run
+  `npm run records:suffix-backfill -- --remote --pulled-since <T_live>` (it only reads, via
+  `seed/suffixBackfill.ts`) and apply its files by hand, in the order its `summary.txt` gives:
+  the re-key is mandatory, the respell is optional, and the refresh waits for a live pilot.
 - **Matching is parcel id first, then address.** `seed/match.ts` trusts an existing row's own
   `parcel_id` outright, and only falls back to street key plus number-range containment. It
   breaks a two-parcel tie with the ZIP, because street keys repeat across neighborhoods
@@ -312,10 +322,14 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   `Retry-After` on the cap branch is computed from the oldest counted row, so the number it
   gives is the real wait rather than a fixed guess. The numbers live here so the route, its
   tests, and the privacy-page copy cannot fork.
-- **`dedupe.ts` refuses rather than guesses — and the tier order is the route's, not the
-  module's.** `POST /api/buildings` runs three tiers: an exact Google **place id**, then
+- **`dedupe.ts` refuses rather than guesses — and the tier order lives in
+  `buildingResolve.ts`, not here.** `findExistingBuilding` runs three read-only tiers: an
+  exact Google **place id** (`findBuildingByPlaceId`, the one spelling of tier 1), then
   `findBuildingByAddress`, then an exact case-insensitive **(address, city)** for a manual
-  entry with no place id. Only the middle tier is in `dedupe.ts`, and inside it the order is
+  entry with no place id. `POST /api/buildings` and the `/review/new?placeId=` handoff both
+  call it, so the handoff and Continue cannot disagree about which page an address belongs
+  on; only POST writes (it stamps a matched address-tier row, and creates otherwise). Only
+  the middle tier is in `dedupe.ts`, and inside it the order is
   Boston address key plus range containment under the parity rule → ZIP tiebreak → survivor
   ranking: a user row before its seeded twin, then the narrower span, then the oldest.
   `findBuildingByAddress` itself returns **null** (the route creates a page) whenever it

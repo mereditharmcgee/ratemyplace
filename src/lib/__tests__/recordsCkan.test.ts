@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { addressLikeClauses, ckanSql, sqlLiteral, parseMoney, parseIntOrNull, ROW_CAP, FETCH_TIMEOUT_MS } from '../records/ckan';
+import { SUFFIX_SPELLINGS, buildIdentity } from '../records/identity';
 import { SourceError, type BuildingIdentity, type RecordRow } from '../records/types';
 
 /** Minimal BuildingIdentity stub — addressLikeClauses only reads the two address-form fields. */
@@ -39,6 +40,49 @@ describe('addressLikeClauses', () => {
     const regex = new RegExp('^' + literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '.*$');
     expect(regex.test('55 LANARK RD REAR')).toBe(true);
     expect(regex.test('551 LANARK RD')).toBe(false);
+  });
+});
+
+describe('addressLikeClauses tries every street spelling', () => {
+  /** The literal prefix inside each `LIKE '<prefix>%' ESCAPE '!'`, with both escapes undone. */
+  function prefixes(address: string): string[] {
+    const identity = buildIdentity({ id: 'b', address, city: 'Boston', state: 'MA', zip_code: null, parcel_id: null, sam_id: null });
+    return addressLikeClauses('address', identity).map((clause) => {
+      const inner = clause.match(/LIKE '(.*)%' ESCAPE '!'$/)![1];
+      return inner.replace(/''/g, "'").replace(/!(.)/g, '$1');
+    });
+  }
+
+  it('adds the spellings neither the short nor the long form prefixes', () => {
+    // Permits write RADFORD LN where the assessor writes RADFORD LA; legacy 311 writes VFW PKWY.
+    expect(prefixes('530 VFW Pw')).toEqual(['530 VFW PW', '530 VFW PARKWAY', '530 VFW PKWY']);
+    expect(prefixes('11 Radford La')).toEqual(['11 RADFORD LA', '11 RADFORD LANE', '11 RADFORD LN']);
+    // The enforcement feed's WH for Battery Wharf; WHF is already behind WH.
+    expect(prefixes('10 Battery Wharf')).toEqual(['10 BATTERY WHARF', '10 BATTERY WH']);
+  });
+
+  it('leaves a street whose short form prefixes its other spellings exactly as it was', () => {
+    expect(prefixes('1027 Commonwealth Ave')).toEqual(['1027 COMMONWEALTH AV', '1027 COMMONWEALTH AVENUE']);
+    expect(prefixes('12 Main Ter')).toEqual(['12 MAIN TE', '12 MAIN TERRACE']);
+    expect(prefixes('23-27 Lanark Rd')).toEqual([
+      '23 LANARK RD', '27 LANARK RD', '23-27 LANARK RD', '23 LANARK ROAD', '27 LANARK ROAD', '23-27 LANARK ROAD',
+    ]);
+  });
+
+  it('covers every number form times every street form, for every suffix spelling in the table', () => {
+    for (const row of SUFFIX_SPELLINGS) {
+      for (const spelling of row) {
+        const address = `5-7 Test ${spelling}`;
+        const identity = buildIdentity({ id: 'b', address, city: 'Boston', state: 'MA', zip_code: null, parcel_id: null, sam_id: null });
+        const covered = prefixes(address);
+        for (const number of ['5', '7', '5-7']) {
+          for (const street of identity.streetForms) {
+            const form = `${number} ${street}`;
+            expect(covered.some((prefix) => form.startsWith(prefix)), `${address}: ${form}`).toBe(true);
+          }
+        }
+      }
+    }
   });
 });
 
