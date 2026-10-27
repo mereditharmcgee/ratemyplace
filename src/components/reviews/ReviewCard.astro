@@ -1,7 +1,6 @@
 ---
 import StarRating from '../ratings/StarRating.astro';
 import VerifiedBadge from '../ui/VerifiedBadge.astro';
-import EmailVerifiedBadge from '../ui/EmailVerifiedBadge.astro';
 import SeasonChip from '../ui/SeasonChip.astro';
 import { formatRecency } from '../../lib/privacy';
 import { calculateDomainScores, ITEM_WEIGHTS } from '../../lib/scoring';
@@ -521,7 +520,6 @@ const pestLabels: Record<string, string> = {
             ? 'Maybe / It depends'
             : 'Would not recommend'}
       </span>
-      {review.user_email_verified === 1 && <EmailVerifiedBadge size="sm" />}
       {review.is_verified === 1 && <VerifiedBadge size="sm" />}
     </div>
   </div>
