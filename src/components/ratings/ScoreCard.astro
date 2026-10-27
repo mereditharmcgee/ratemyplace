@@ -163,7 +163,9 @@ const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.k
       <div class="pt-3 border-t border-gray-100">
         <p class="text-xs text-gray-400">
           Scores are weighted by health and safety factors. Newer reviews count more than older ones.
-          <a href="/methodology" class="text-teal-500 hover:text-teal-700 ml-1">Learn more</a>
+          {/* Padded to a 28px-tall hit area (bare text-xs measured 65x15), with a matching
+              negative margin so the note keeps its line height. */}
+          <a href="/methodology" class="-my-1.5 inline-block py-1.5 text-teal-500 hover:text-teal-700 ml-1">Learn more</a>
         </p>
       </div>
     </div>
