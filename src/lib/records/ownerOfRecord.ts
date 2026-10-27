@@ -75,6 +75,8 @@ export function isResidentialAssessment(assessment: Pick<AssessmentPayload, 'lan
  * The key a building's owner of record would link through, or null when it must not link.
  * `residentialParcels` is how many residential parcels in our data carry the same key,
  * this one included; a caller that has not counted passes 0, which links entities only.
+ * The list endpoint and landlord search apply this to a typed key too, not only the panel
+ * link: a key normalizes to itself, so `{ owner: key, condominium: false }` gates it.
  */
 export function linkableOwnerKey(
   assessment: Pick<AssessmentPayload, 'owner' | 'condominium'>,

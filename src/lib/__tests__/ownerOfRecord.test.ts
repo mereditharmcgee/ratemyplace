@@ -128,4 +128,15 @@ describe('linkableOwnerKey', () => {
     expect(linkableOwnerKey({ owner: null, condominium: false }, 5)).toBeNull();
     expect(linkableOwnerKey({ owner: '  ', condominium: false }, 5)).toBeNull();
   });
+
+  it('gates a typed key the same way, since a key normalizes to itself', () => {
+    for (const name of ['Sample Holdings, L.L.C.', 'Example Realty, L.P.', 'Doe, Jane']) {
+      const key = ownerKey(name);
+      expect(ownerKey(key)).toBe(key);
+    }
+    const typedPerson = { owner: 'doe jane', condominium: false };
+    expect(linkableOwnerKey(typedPerson, 1)).toBeNull();
+    expect(linkableOwnerKey(typedPerson, 2)).toBe('DOE JANE');
+    expect(linkableOwnerKey({ owner: 'sample holdings llc', condominium: false }, 0)).toBe('SAMPLE HOLDINGS LLC');
+  });
 });

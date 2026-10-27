@@ -16,7 +16,9 @@ In the records panel, the assessor's owner of record becomes a link to a list of
 
 ## Why it is not built
 
-The owner name is stored in one place: the JSON `payload` of `building_records` rows with `kind = 'assessment'`, one row per fiscal year (up to six) per pulled building. There is no owner column and no index that can find a name.
+The owner name is stored in one place: the JSON `payload` of `building_records` rows with `kind = 'assessment'`, one row per fiscal year (up to six) per pulled building. No column holds the assessor's owner of record, and no index can find a name.
+
+`buildings.owner_name` (migration 0009) is not that column. It is an admin-entered field, set through the enrich and edit flow on 2 of 38,301 production buildings, and admins can edit it by hand, so it cannot carry an as-recorded value. Repurposing it would still need a production backfill and a Worker deploy, and with no index each lookup would scan about 38,000 full `buildings` rows.
 
 Measured against production on 2026-10-27, read-only:
 
@@ -52,12 +54,13 @@ Both statements are idempotent, so unlike an `ALTER TABLE ... ADD COLUMN` the fi
 - **Write path.** `pull.ts` deletes and inserts the building's row in the same batch as its assessor rows. `pull.ts` also runs in `workers/records-scheduler`, so this needs `npm run records:worker:deploy` after the site deploy.
 - **Backfill.** `owner_key` must equal `ownerKey()` exactly, which SQL cannot express, so a script reads the stored payloads (one 5 to 10 second read, run off-hours) and emits SQL through `lit()`, applied by hand with `wrangler d1 execute --remote --file`, the seed's pattern. This is a production write and needs the owner's approval.
 - **Reads.** The list is an index seek on `owner_key` joined to `buildings`, with record counts from the covering index `idx_building_records_building_kind`, paginated. The person rule on a building page is one index-seek `COUNT`. Landlord search adds a `LIKE` over `building_owners.owner`: about 38,000 short rows stored together, the same order of cost as today's address scan.
+- **The person rule is enforced on the server, not only when drawing the link.** `/search?owner=...` is a public URL anyone can type, and landlord search takes any name, so hiding the link alone would still let a typed name return a person's one property, often their home. The list endpoint runs the key it is given through `linkableOwnerKey`, with that key's residential parcel count, and returns an empty result or a 404 for a key that is neither an entity nor at `MIN_PARCELS_FOR_PERSON`. Landlord search matches only rows with `is_entity = 1`, or rows whose `owner_key` has at least `MIN_PARCELS_FOR_PERSON` residential rows (the same index-seek `COUNT`, per matched key).
 
 Verified with `EXPLAIN QUERY PLAN` on a local copy of the schema: the list, the count and the record counts are all index searches; today's payload match is a full scan.
 
 ## Open questions for the owner
 
-1. The person rule. A person with two or more residential parcels gets a list, and one of those addresses may be their home. The panel already hides a person's tax mailing address for that reason. Keep the rule, or link entities only?
+1. The person rule. A person with two or more residential parcels gets a list, and one of those addresses may be their home. The panel already hides a person's tax mailing address for that reason. Keep the rule, or link entities only? Either way, confirm the server-side gate under **Reads**: the list URL and landlord search refuse a person's name below the parcel count, so typing a private person's name never returns their one property.
 2. Which counts each list row shows. They should match the panel, which is changing to three record groups.
 3. Fiscal-year rollover. The table holds the newest year pulled per building, so for a while after a new assessor year some rows lag. Show the fiscal year on each row, or wait until the refresh has caught up?
 4. Whether to approve the migration, the backfill and the Worker deploy as one change after the call.
