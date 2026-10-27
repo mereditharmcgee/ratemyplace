@@ -1,12 +1,14 @@
 import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../lib/db';
-import { getEnv, fireAndForget } from '../../lib/runtime';
+import { getEnv } from '../../lib/runtime';
 import { extractReviewIdFromUrl, DISPUTE_REASONS } from '../../lib/disputes';
 import { sanitizeText, validateDisputeForm } from '../../lib/validation';
 import { sendDisputeConfirmationEmail } from '../../lib/email';
 import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../lib/rateLimit';
 import { createNotification } from '../../lib/notifications';
 import { verifyTurnstile } from '../../lib/turnstile';
+import { queueOwnerNotice } from '../../lib/ownerNotify';
+import { trackSend } from '../../lib/trackSend';
 
 export const POST: APIRoute = async (context: APIContext) => {
   // Content-type guard — MUST come before request.json() (which throws SyntaxError on non-JSON)
@@ -180,22 +182,22 @@ export const POST: APIRoute = async (context: APIContext) => {
       });
     }
 
-    // Send confirmation email — Phase 18 PERF-04: fire-and-forgot.
-    // DB dispute INSERT already committed above — DB-then-email ordering preserved.
-    const resendApiKey = getEnv(context).RESEND_API_KEY;
-    if (resendApiKey) {
-      fireAndForget(
-        context,
-        sendDisputeConfirmationEmail(resendApiKey, siteUrl, landlordEmail, {
-          landlordName,
-          buildingAddress,
-          disputeReasons,
-          disputeExplanation,
-        }),
-      );
-    } else {
-      console.warn('RESEND_API_KEY not configured - skipping confirmation email');
-    }
+    queueOwnerNotice(context, { kind: 'dispute', buildingId: review.building_id });
+
+    // Send the landlord's receipt in the background. The dispute INSERT already committed
+    // above, so DB-then-email ordering is preserved. A missing key or a refused send is
+    // recorded on /admin rather than skipped silently.
+    trackSend(
+      context,
+      'dispute_confirmation',
+      landlordEmail,
+      sendDisputeConfirmationEmail(getEnv(context).RESEND_API_KEY, siteUrl, landlordEmail, {
+        landlordName,
+        buildingAddress,
+        disputeReasons,
+        disputeExplanation,
+      }),
+    );
 
     // Return success
     return new Response(

@@ -1,5 +1,5 @@
 import type { APIContext } from 'astro';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 
@@ -12,7 +12,14 @@ vi.mock('../turnstile', () => ({
   }),
 }));
 
+// The owner notice is asserted by its exact argument, so nothing beyond kind and building id
+// can ride along into an email.
+vi.mock('../ownerNotify', () => ({ queueOwnerNotice: vi.fn() }));
+
 import { POST } from '../../pages/api/records/corrections';
+import { queueOwnerNotice } from '../ownerNotify';
+
+const queued = vi.mocked(queueOwnerNotice);
 
 const suite = sqliteAvailable ? describe : describe.skip;
 
@@ -70,6 +77,8 @@ const validBody = {
 };
 
 suite('POST /api/records/corrections', () => {
+  beforeEach(() => vi.mocked(queueOwnerNotice).mockClear());
+
   it('415s for a form content type, before reading the body', async () => {
     const db = createRecordsTestDb();
     const context = createContext(db, { contentType: 'application/x-www-form-urlencoded', body: 'a=1' });
@@ -77,6 +86,7 @@ suite('POST /api/records/corrections', () => {
     const response = await POST(context);
 
     expect(response.status).toBe(415);
+    expect(queued).not.toHaveBeenCalled();
     expect(await response.json()).toEqual({ error: 'Unsupported Media Type' });
   });
 
@@ -91,6 +101,7 @@ suite('POST /api/records/corrections', () => {
     const response = await POST(context);
 
     expect(response.status).toBe(415);
+    expect(queued).not.toHaveBeenCalled();
     expect(await response.json()).toEqual({ error: 'Unsupported Media Type' });
   });
 
@@ -101,6 +112,7 @@ suite('POST /api/records/corrections', () => {
     const response = await POST(context);
 
     expect(response.status).toBe(400);
+    expect(queued).not.toHaveBeenCalled();
     expect(await response.json()).toEqual({
       error: 'Validation failed',
       details: [{ field: 'buildingId', message: 'Building is required.' }],
@@ -114,6 +126,7 @@ suite('POST /api/records/corrections', () => {
     const response = await POST(context);
 
     expect(response.status).toBe(400);
+    expect(queued).not.toHaveBeenCalled();
     expect(await response.json()).toEqual({
       error: 'Validation failed',
       details: [{ field: 'buildingId', message: 'Building is required.' }],
@@ -131,6 +144,7 @@ suite('POST /api/records/corrections', () => {
       const response = await POST(context);
 
       expect(response.status).toBe(400);
+      expect(queued).not.toHaveBeenCalled();
       expect(await response.json()).toEqual({
         error: 'Validation failed',
         details: [{ field: 'body', message: 'Request body must be JSON.' }],
@@ -156,6 +170,7 @@ suite('POST /api/records/corrections', () => {
     expect(fourth.status).toBe(429);
     expect(await fourth.json()).toEqual({ error: 'Too many reports. Please try again later.' });
     expect(fourth.headers.get('Retry-After')).not.toBeNull();
+    expect(queued).toHaveBeenCalledTimes(3);
   });
 
   it('400s on a bad Turnstile token', async () => {
@@ -166,6 +181,7 @@ suite('POST /api/records/corrections', () => {
     const response = await POST(context);
 
     expect(response.status).toBe(400);
+    expect(queued).not.toHaveBeenCalled();
     expect(await response.json()).toEqual({ error: 'Bot verification failed. Please try again.' });
   });
 
@@ -178,6 +194,7 @@ suite('POST /api/records/corrections', () => {
     const payload = (await response.json()) as { error: string; details: Array<{ field: string }> };
 
     expect(response.status).toBe(400);
+    expect(queued).not.toHaveBeenCalled();
     expect(payload.error).toBe('Validation failed');
     expect(payload.details[0].field).toBe('claim');
   });
@@ -189,6 +206,7 @@ suite('POST /api/records/corrections', () => {
     const response = await POST(context);
 
     expect(response.status).toBe(404);
+    expect(queued).not.toHaveBeenCalled();
     expect(await response.json()).toEqual({ error: 'Building not found' });
   });
 
@@ -200,6 +218,7 @@ suite('POST /api/records/corrections', () => {
     const response = await POST(context);
 
     expect(response.status).toBe(404);
+    expect(queued).not.toHaveBeenCalled();
     expect(await response.json()).toEqual({ error: 'Building not found' });
 
     const stored = await db
@@ -251,6 +270,8 @@ suite('POST /api/records/corrections', () => {
     const payload = (await response.json()) as { data: { id: string } };
 
     expect(response.status).toBe(201);
+    expect(queued).toHaveBeenCalledOnce();
+    expect(queued.mock.calls[0][1]).toEqual({ kind: 'record_correction', buildingId: 'bldg-lanark' });
 
     const row = await db
       .prepare('SELECT record_kind FROM record_corrections WHERE id = ?')
@@ -272,6 +293,7 @@ suite('POST /api/records/corrections', () => {
     const payload = (await response.json()) as { error: string; details: Array<{ field: string }> };
 
     expect(response.status).toBe(400);
+    expect(queued).not.toHaveBeenCalled();
     expect(payload.error).toBe('Validation failed');
     expect(payload.details[0].field).toBe('claim');
   });

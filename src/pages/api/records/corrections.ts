@@ -5,6 +5,7 @@ import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib
 import { verifyTurnstile } from '../../../lib/turnstile';
 import { sanitizeMultilineText } from '../../../lib/validation';
 import { logError } from '../../../lib/logger';
+import { queueOwnerNotice } from '../../../lib/ownerNotify';
 import {
   validateCorrectionBody,
   toStoredKind,
@@ -169,6 +170,8 @@ export const POST: APIRoute = async (context: APIContext) => {
       )
       .bind(id, buildingId, toStoredKind(recordKind), cleanedClaim, normalizedContactEmail)
       .run();
+
+    queueOwnerNotice(context, { kind: 'record_correction', buildingId });
 
     return new Response(JSON.stringify({ data: { id } }), {
       status: 201,
