@@ -1,6 +1,9 @@
 ---
 import BaseLayout from '../../components/layout/BaseLayout.astro';
+import ReviewSigninNote from '../../components/auth/ReviewSigninNote.astro';
 import { redirectQuery, safeRedirectPath } from '../../lib/authRedirect';
+import { loadReviewSigninContext, REVIEW_SIGNIN_COPY } from '../../lib/reviewSignin';
+import { maybeEnv } from '../../lib/runtime';
 
 // Where to go after signing in. Validated here and again in the page script before it
 // navigates; an unsafe or missing value is '/', which also keeps every link below bare.
@@ -10,19 +13,38 @@ const redirectTo = safeRedirectPath(Astro.url.searchParams.get('redirect'));
 if (Astro.locals.user) {
   return Astro.redirect(redirectTo);
 }
+
+// Sent here by "Write a review": name the building and say who sees the reviewer's name,
+// and make creating an account as easy to find as signing in. Null on any other path.
+const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, redirectTo);
+const signupHref = '/auth/signup' + redirectQuery(redirectTo);
 ---
 
 <BaseLayout title="Sign in" noindex>
-  <div class="min-h-[80vh] flex items-center justify-center px-4">
+  <div class="min-h-[80vh] flex items-center justify-center px-4 py-12">
     <div class="max-w-md w-full space-y-8">
       <div>
-        <h1 class="text-center text-3xl font-bold text-gray-900">Sign in to your account</h1>
-        <p class="mt-2 text-center text-sm text-gray-600">
-          Or{' '}
-          <a href={'/auth/signup' + redirectQuery(redirectTo)} class="font-medium text-teal-700 hover:text-teal-500">
-            create a new account
-          </a>
-        </p>
+        <h1 class="text-center text-3xl font-bold text-gray-900">
+          {reviewContext ? REVIEW_SIGNIN_COPY.heading : 'Sign in to your account'}
+        </h1>
+        {reviewContext ? (
+          <>
+            <ReviewSigninNote place={reviewContext.place} />
+            <a
+              href={signupHref}
+              class="mt-4 w-full h-11 flex items-center justify-center px-4 border-2 border-teal-700 rounded-[4px] bg-white text-sm font-semibold text-teal-700 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
+            >
+              {REVIEW_SIGNIN_COPY.createAccount}
+            </a>
+          </>
+        ) : (
+          <p class="mt-2 text-center text-sm text-gray-600">
+            Or{' '}
+            <a href={signupHref} class="font-medium text-teal-700 hover:text-teal-500">
+              create a new account
+            </a>
+          </p>
+        )}
       </div>
 
       <div class="mt-8">
@@ -45,7 +67,9 @@ if (Astro.locals.user) {
           <div class="w-full border-t border-gray-300"></div>
         </div>
         <div class="relative flex justify-center text-sm">
-          <span class="px-2 bg-white text-gray-500">Or continue with email</span>
+          <span class="px-2 bg-white text-gray-500">
+            {reviewContext ? REVIEW_SIGNIN_COPY.emailDivider : 'Or continue with email'}
+          </span>
         </div>
       </div>
 

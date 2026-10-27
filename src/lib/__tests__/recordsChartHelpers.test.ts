@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { countByYear, countByKey, observedYears, assessmentSeries, sparklinePoints } from '../records/charts';
+import { categoryKey, countByYear, countByKey, observedYears, assessmentSeries, sparklinePoints } from '../records/charts';
 import { NOT_RECORDED } from '../records/display';
 import type { AssessmentPayload } from '../records/types';
 
@@ -166,6 +166,71 @@ describe('countByKey', () => {
   it('trims surrounding whitespace so one type is not counted twice', () => {
     const result = countByKey([row(null, 'Heat '), row(null, ' Heat')], (r) => r.key, 6);
     expect(result.top).toEqual([{ key: 'Heat', count: 2 }]);
+  });
+
+  it('counts two spellings that differ only by trailing punctuation as one type', () => {
+    // The city files one ticket type both with and without a trailing colon.
+    const rows = [
+      row(null, 'Example ticket type - snow'),
+      row(null, 'Example ticket type - snow'),
+      row(null, 'Example ticket type - snow:'),
+    ];
+    const result = countByKey(rows, (r) => r.key, 6);
+    expect(result.top).toEqual([{ key: 'Example ticket type - snow', count: 3 }]);
+    expect(result.restTypes).toBe(0);
+  });
+
+  it('labels a merged type with the spelling the city used most, so the label is one it recorded', () => {
+    const rows = [
+      row(null, 'Example dumping 1-5 cubic yd.:'),
+      row(null, 'Example dumping 1-5 cubic yd.:'),
+      row(null, 'Example dumping 1-5 cubic yd.'),
+    ];
+    expect(countByKey(rows, (r) => r.key, 6).top).toEqual([{ key: 'Example dumping 1-5 cubic yd.:', count: 3 }]);
+  });
+
+  it('breaks a tie between spellings toward the shorter one, the same way every time', () => {
+    const forward = [row(null, 'Heat:'), row(null, 'Heat')];
+    const reversed = [row(null, 'Heat'), row(null, 'Heat:')];
+    expect(countByKey(forward, (r) => r.key, 6).top).toEqual([{ key: 'Heat', count: 2 }]);
+    expect(countByKey(reversed, (r) => r.key, 6).top).toEqual([{ key: 'Heat', count: 2 }]);
+  });
+
+  it('collapses runs of inner whitespace but keeps case and inner punctuation as recorded', () => {
+    const rows = [row(null, 'Example  dumping vehicle'), row(null, 'Example dumping vehicle'), row(null, 'example dumping vehicle')];
+    const result = countByKey(rows, (r) => r.key, 6);
+    // Case is not folded: a different capitalisation stays its own line.
+    expect(result.top).toHaveLength(2);
+    expect(result.top.reduce((sum, entry) => sum + entry.count, 0)).toBe(3);
+    expect(result.top.find((entry) => entry.count === 2)).toBeTruthy();
+  });
+
+  it('keeps every row in the counts when spellings merge, top and leftover together', () => {
+    const rows = [
+      row(null, 'A'), row(null, 'A.'), row(null, 'A:'),
+      row(null, 'B'), row(null, 'B;'),
+      row(null, 'C'), row(null, 'D -'),
+    ];
+    const result = countByKey(rows, (r) => r.key, 2);
+    expect(result.top).toEqual([
+      { key: 'A', count: 3 },
+      { key: 'B', count: 2 },
+    ]);
+    expect(result.restTypes).toBe(2);
+    expect(result.restCount).toBe(2);
+  });
+
+  it('keeps a value made only of punctuation as its own recorded type', () => {
+    expect(countByKey([row(null, '-')], (r) => r.key, 6).top).toEqual([{ key: '-', count: 1 }]);
+  });
+});
+
+describe('categoryKey', () => {
+  it('drops trailing punctuation and whitespace and collapses inner whitespace', () => {
+    expect(categoryKey('Example type - snow:')).toBe('Example type - snow');
+    expect(categoryKey('  Example  type.  ')).toBe('Example type');
+    expect(categoryKey('Example type -')).toBe('Example type');
+    expect(categoryKey('Example (type)')).toBe('Example (type)');
   });
 });
 

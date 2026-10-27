@@ -98,26 +98,57 @@ export interface KeyBreakdown {
   restCount: number;
 }
 
+/** Plain code-unit order, so the same strings sort the same way on every runtime. */
+function compareText(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * The key a category is counted under. The city's feeds spell some types more than one way at
+ * the end (`... - snow` and `... - snow:` are one Public Works ticket type), and two lines for
+ * one type read as two different things. So trailing punctuation and whitespace, and runs of
+ * whitespace inside, do not split a category. Nothing else is folded: case and inner
+ * punctuation stay as recorded. A value that is nothing but punctuation keeps its own key.
+ */
+export function categoryKey(raw: string): string {
+  const collapsed = raw.trim().replace(/\s+/g, ' ');
+  const stripped = collapsed.replace(/[\s.,:;\-–—]+$/u, '');
+  return stripped === '' ? collapsed : stripped;
+}
+
 /**
  * Rows grouped by `getKey`, largest group first. Ties break on the key ascending so the
  * same data always renders in the same order — an unstable list would look like the records
  * changed when only the sort did.
+ *
+ * Spellings that share a `categoryKey` are one category, and every row still counts once. The
+ * label is the spelling the city used most in the group (the shorter on a tie, then code-unit
+ * order), so what the chart prints is always a string the city recorded.
  */
 export function countByKey<T>(
   rows: readonly T[],
   getKey: (row: T) => string | null | undefined,
   topN: number,
 ): KeyBreakdown {
-  const counts = new Map<string, number>();
+  const groups = new Map<string, { count: number; spellings: Map<string, number> }>();
   for (const row of rows) {
     const raw = getKey(row);
-    const key = raw === null || raw === undefined || raw.trim() === '' ? NOT_RECORDED : raw.trim();
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+    const spelling = raw === null || raw === undefined || raw.trim() === '' ? NOT_RECORDED : raw.trim();
+    const groupKey = categoryKey(spelling);
+    const group = groups.get(groupKey) ?? { count: 0, spellings: new Map<string, number>() };
+    group.count += 1;
+    group.spellings.set(spelling, (group.spellings.get(spelling) ?? 0) + 1);
+    groups.set(groupKey, group);
   }
 
-  const ordered = Array.from(counts.entries())
-    .map(([key, count]) => ({ key, count }))
-    .sort((a, b) => (b.count !== a.count ? b.count - a.count : a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  const ordered = Array.from(groups.values())
+    .map(({ count, spellings }) => {
+      const [label] = Array.from(spellings.entries()).sort(
+        ([a, aCount], [b, bCount]) => bCount - aCount || a.length - b.length || compareText(a, b),
+      )[0];
+      return { key: label, count };
+    })
+    .sort((a, b) => (b.count !== a.count ? b.count - a.count : compareText(a.key, b.key)));
 
   const limit = Math.max(0, topN);
   const top = ordered.slice(0, limit);

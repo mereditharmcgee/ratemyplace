@@ -13,8 +13,13 @@ import {
   formatPullDate,
   formatRecordDate,
   permitSummary,
-  splitServiceRequests,
   rentSmartDisagreement,
+  otherRequestsLine,
+  showAllLabel,
+  categoryRestLine,
+  caseLinesNote,
+  ticketLinesNote,
+  GROUPING_NOTE,
   isOpenStatus,
   openSubCount,
   yearSpanLabel,
@@ -28,8 +33,9 @@ import {
 } from '../records/display';
 // Namespace import purely so the guard below can reflect over every export of the module.
 import * as displayModule from '../records/display';
+import { RECORD_GROUPS } from '../records/recordGroups';
 import { RECORD_KINDS } from '../records/types';
-import type { AssessmentPayload, PermitPayload, RentSmartPayload, ServiceRequestPayload } from '../records/types';
+import type { AssessmentPayload, PermitPayload, RentSmartPayload } from '../records/types';
 
 function assessment(overrides: Partial<AssessmentPayload> = {}): AssessmentPayload {
   return {
@@ -72,25 +78,6 @@ function permit(overrides: Partial<PermitPayload> = {}): PermitPayload {
     status: null,
     occupancyType: null,
     address: null,
-    ...overrides,
-  };
-}
-
-function serviceRequest(overrides: Partial<ServiceRequestPayload> = {}): ServiceRequestPayload {
-  return {
-    caseId: 'C1',
-    system: 'legacy',
-    openedAt: null,
-    closedAt: null,
-    status: null,
-    closureReason: null,
-    title: null,
-    subject: null,
-    reason: null,
-    type: null,
-    location: null,
-    source: null,
-    classification: 'other',
     ...overrides,
   };
 }
@@ -340,24 +327,64 @@ describe('ZERO_PERMITS_COPY', () => {
   });
 });
 
-describe('splitServiceRequests', () => {
-  it('sorts housing requests newest first and counts the rest', () => {
-    const rows = [
-      serviceRequest({ caseId: 'H1', classification: 'housing', openedAt: '2020-01-01' }),
-      serviceRequest({ caseId: 'H2', classification: 'housing', openedAt: '2022-01-01' }),
-      serviceRequest({ caseId: 'H3', classification: 'housing', openedAt: null }),
-      serviceRequest({ caseId: 'O1', classification: 'other' }),
-      serviceRequest({ caseId: 'O2', classification: 'other' }),
-    ];
-
-    const { housing, otherCount } = splitServiceRequests(rows);
-
-    expect(housing.map((r) => r.caseId)).toEqual(['H2', 'H1', 'H3']);
-    expect(otherCount).toBe(2);
+describe('otherRequestsLine', () => {
+  it('counts the requests outside the groups in one sentence, singular and plural', () => {
+    expect(otherRequestsLine(1)).toBe(
+      '1 other 311 request at or near this address, about something like parking, trash pickup or streetlights, falls outside these groups. It is counted here, not listed.',
+    );
+    expect(otherRequestsLine(4)).toBe(
+      '4 other 311 requests at or near this address, such as parking, trash pickup and streetlights, fall outside these groups. They are counted here, not listed.',
+    );
   });
 
-  it('handles an empty list', () => {
-    expect(splitServiceRequests([])).toEqual({ housing: [], otherCount: 0 });
+  it('says nothing when there are none', () => {
+    expect(otherRequestsLine(0)).toBeNull();
+  });
+
+  it('never words the count as requests not shown, which read against a Show all link as a contradiction', () => {
+    expect(otherRequestsLine(4)).not.toContain('not shown');
+  });
+});
+
+describe('showAllLabel', () => {
+  const noun = { one: 'request', many: 'requests' };
+
+  it('reads naturally for one record', () => {
+    expect(showAllLabel(1, noun)).toBe('Show 1 request');
+  });
+
+  it('says all for more than one', () => {
+    expect(showAllLabel(3, noun)).toBe('Show all 3 requests');
+  });
+});
+
+describe('categoryRestLine', () => {
+  it('keeps the space between every count and its noun', () => {
+    expect(categoryRestLine(5, 8, { one: 'request', many: 'requests' })).toBe('5 more types · 8 requests');
+    expect(categoryRestLine(10, 42, { one: 'permit', many: 'permits' })).toBe('10 more types · 42 permits');
+  });
+
+  it('uses the singular for one', () => {
+    expect(categoryRestLine(1, 1, { one: 'ticket', many: 'tickets' })).toBe('1 more type · 1 ticket');
+  });
+});
+
+describe('caseLinesNote and ticketLinesNote', () => {
+  it('names the lines behind a count of cases only when they differ', () => {
+    expect(caseLinesNote(6, 1)).toBe('6 code lines in 1 case');
+    expect(caseLinesNote(3, 3)).toBeNull();
+  });
+
+  it('names the lines behind a count of tickets only when they differ', () => {
+    expect(ticketLinesNote(12, 9)).toBe('12 violation lines on 9 tickets');
+    expect(ticketLinesNote(1, 1)).toBeNull();
+  });
+});
+
+describe('GROUPING_NOTE', () => {
+  it('says the grouping comes from the type the city recorded, not from a severity call', () => {
+    expect(GROUPING_NOTE).toContain('request type the city recorded');
+    expect(GROUPING_NOTE).not.toMatch(/sever|serious|worst|[—!]/i);
   });
 });
 
@@ -370,20 +397,30 @@ describe('rentSmartDisagreement', () => {
   it('returns the disagreement sentence when RentSmart reports more complaints than 311 shows', () => {
     const rows = [rentSmartRow({ violationType: 'Housing Complaints' }), rentSmartRow({ violationType: 'Housing Complaints' })];
     expect(rentSmartDisagreement(rows, 1)).toBe(
-      "The city's RentSmart summary reports 2 housing complaints for this address; the 311 records above show 1.",
+      "The city's RentSmart summary reports 2 housing complaints for this parcel; the 311 records above show 1. A parcel can include more than one address.",
     );
   });
 
   it('writes the singular noun for a single complaint', () => {
     const rows = [rentSmartRow({ violationType: 'Housing Complaints' })];
     expect(rentSmartDisagreement(rows, 0)).toBe(
-      "The city's RentSmart summary reports 1 housing complaint for this address; the 311 records above show 0.",
+      "The city's RentSmart summary reports 1 housing complaint for this parcel; the 311 records above show 0. A parcel can include more than one address.",
     );
   });
 
   it('matches the violation type regardless of case and surrounding whitespace', () => {
     const rows = [rentSmartRow({ violationType: '  housing complaints ' })];
     expect(rentSmartDisagreement(rows, 0)).toContain('reports 1 housing complaint ');
+  });
+
+  it('names the parcel, not the address, because RentSmart is matched by parcel', () => {
+    // A parcel can hold several addresses, so a complaint at a neighbouring number on the same
+    // parcel is in the roll-up but not in this address's 311 list. "This address" claimed a gap
+    // that was really a difference in what the two counts cover.
+    const sentence = rentSmartDisagreement([rentSmartRow({ violationType: 'Housing Complaints' })], 0) ?? '';
+    expect(sentence).toContain('for this parcel');
+    expect(sentence).not.toContain('this address');
+    expect(sentence).not.toMatch(/[—!]/);
   });
 
   it('stays silent when the RentSmart roll-up lags the 311 records', () => {
@@ -414,6 +451,16 @@ describe('panel copy stays free of banned words', () => {
 
     expect(stringConstants.length).toBeGreaterThan(0);
     expect(Object.keys(PANEL_COPY)).toEqual(expect.arrayContaining(stringConstants));
+  });
+
+  // The group headings live beside the 311 type table in recordGroups.ts, outside this module,
+  // so the reflection above cannot see them. They render on the panel, so the scan must.
+  it('scans every record group title and description', () => {
+    const copy = Object.values(PANEL_COPY);
+    for (const group of RECORD_GROUPS) {
+      expect(copy).toContain(group.title);
+      expect(copy).toContain(group.description);
+    }
   });
 });
 
