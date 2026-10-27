@@ -403,6 +403,17 @@ export const REQUEST_PARKED_COPY =
 export const REQUEST_ALREADY_PULLED_COPY = 'These records have already been retrieved. Reload to see them.';
 export const REQUEST_FAILED_COPY = 'The request did not go through. Please try again.';
 /**
+ * The same button on a building whose records are in and more than 30 days old (`stale` in
+ * `coverage.ts`). It sits under the pull date and its note, which already say why, so it has
+ * no help line. The queued line is said by the button after a press and by the panel on a
+ * later load, while the row is pending, whoever queued it. It does not promise new records:
+ * the city may have added none, and then the pull date is the only thing that changes.
+ */
+export const REFRESH_BUTTON_LABEL = 'Ask for newer records';
+export const REFRESH_REQUESTED_COPY = 'A new pull from the city is queued. It usually finishes within a few minutes; reload to check.';
+/** A refresh press that met a pull newer than the page: someone else's request finished first. */
+export const REFRESH_ALREADY_DONE_COPY = 'These records were pulled again since this page loaded. Reload to see them.';
+/**
  * Turnstile's own `error-callback` / `timeout-callback` — the widget could not reach
  * Cloudflare, or the challenge expired before it was solved. Shown by the correction form,
  * which stores the token rather than submitting on it, so there is nothing to undo beyond
@@ -626,6 +637,9 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   REQUEST_PARKED_COPY,
   REQUEST_ALREADY_PULLED_COPY,
   REQUEST_FAILED_COPY,
+  REFRESH_BUTTON_LABEL,
+  REFRESH_REQUESTED_COPY,
+  REFRESH_ALREADY_DONE_COPY,
   TURNSTILE_FAILED_COPY,
   SEARCH_SEEDED_COPY,
   STILL_OPEN_LABEL,

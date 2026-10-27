@@ -347,14 +347,21 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   or the number alone would match every building with that number. A query that leaves no
   street word and no number but names a place or ZIP is an area search (`isAreaSearch`).
 - **`coverage.ts` is the page-state table, read-only.** `recordsRequestState` answers
-  `ineligible` / `pulled` / `fill_queued` / `parked` / `requested` / `never_pulled` in that
-  precedence, in **one** statement (indexed `building_id` seeks as correlated subqueries),
-  because the public endpoint calls it once per request; `hasDeeperPull` and
-  `pendingQueueReason` stay exported for callers that need one answer without the other.
+  `ineligible`, then for a building with any deeper pull `refresh_requested` / `stale` /
+  `pulled`, then `fill_queued` / `parked` / `requested` / `never_pulled`, in **one** statement
+  (indexed `building_id` seeks as correlated subqueries), because the public endpoint calls it
+  once per request; `hasDeeperPull` and `pendingQueueReason` stay exported for callers that
+  need one answer without the other. `stale` is `planRefresh`'s own predicate (newest deeper
+  pull, any status, older than `REFRESH_AFTER_SECONDS`) with no pending row but a `fill` one;
+  it is where the panel offers "Ask for newer records". `pulled` (30 days or less, or a parked
+  non-fill row) is the 409 and the per-building debounce. `isPulledState` groups the three.
   **Three callers enqueue off this state:** the reader button (`request.ts`), which enqueues
-  from every state but `ineligible` and `pulled`, and the follower enqueue on save and on
-  review approval (`PATCH /api/admin/reviews/[id]`, a `follower` row), both only from
-  `never_pulled`.
+  a `button` row from every state but `ineligible`, `pulled` and `refresh_requested` (that
+  one answers `already_queued` with no write, so a press can never turn a planner `refresh`
+  row into a cap-counted `button` row), and the follower enqueue on save and on review
+  approval (`PATCH /api/admin/reviews/[id]`, a `follower` row), both only from
+  `never_pulled`. A finished `button` row is interest to `planRefresh` forever, so a refresh
+  press keeps the building on the monthly cycle with no Worker change.
   Eligibility is `jurisdictionForCity` from the leaf `records/jurisdiction.ts`, not a string
   compare on 'Boston'. A **parked `fill` row
   still reads `fill_queued`**, so the button stays offered: a press replaces it with a fresh

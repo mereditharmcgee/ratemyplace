@@ -29,7 +29,7 @@ import {
 } from './sources/boston/serviceRequests';
 import { VIOLATIONS_PAGE_URL, VIOLATIONS_RESOURCE_ID } from './sources/boston/violations';
 import { REFRESH_AFTER_SECONDS } from './queue';
-import type { RecordsRequestState } from './coverage';
+import { isPulledState, type RecordsRequestState } from './coverage';
 
 /** The City of Boston's open data site, which publishes every dataset the panel reads. */
 export const ANALYZE_BOSTON_URL = 'https://data.boston.gov/';
@@ -137,7 +137,8 @@ export function recordsCitations(pulledSourceIds: Iterable<string>): DatasetCita
  * It is the queue's own refresh interval (30 days): a building with a review, a saved follower
  * or a reader's request is re-pulled once its newest pull is older than this, so on those
  * buildings the note usually shows for a day or less. A building the city-wide pass pulled
- * once and nobody has asked about since keeps it.
+ * once and nobody has asked about since keeps it, with the "Ask for newer records" button
+ * under it; a press puts the building on the monthly cycle too.
  */
 export const STALE_PULL_AFTER_SECONDS = REFRESH_AFTER_SECONDS;
 
@@ -154,10 +155,23 @@ export function isPullStale(pulledAt: number, nowSeconds: number): boolean {
 
 /**
  * Whether the panel shows the stale-pull note beside its pull date. Only on a building whose
- * deeper records are in (`pulled`): every other page state already has its own line about
- * what is happening to the records (the request button, "requested", "set aside"), and a
- * seeded building with only its assessor row has nothing deeper to have gone stale.
+ * deeper records are in (`pulled`, `stale`, `refresh_requested`): every other page state
+ * already has its own line about what is happening to the records (the request button,
+ * "requested", "set aside"), and a seeded building with only its assessor row has nothing
+ * deeper to have gone stale. A queued refresh keeps the note: the records shown are still the
+ * old pull until the new one lands.
  */
 export function showStalePullNote(state: RecordsRequestState, pulledAt: number, nowSeconds: number): boolean {
-  return state === 'pulled' && isPullStale(pulledAt, nowSeconds);
+  return isPulledState(state) && isPullStale(pulledAt, nowSeconds);
+}
+
+/**
+ * Whether the panel offers "Ask for newer records" under the note. The state says the newest
+ * deeper pull is old and nothing is queued (`stale`); the date the panel prints must say so
+ * too, so the button never sits under a recent date. The printed date is the newest pull of
+ * any source, the assessor included, so it can only be newer than the deeper pull `stale` is
+ * read from: the button shows exactly when the note does on a `stale` building.
+ */
+export function showRefreshButton(state: RecordsRequestState, pulledAt: number, nowSeconds: number): boolean {
+  return state === 'stale' && isPullStale(pulledAt, nowSeconds);
 }

@@ -17,7 +17,10 @@ import {
   PERMIT_COVERAGE_NOTE,
   GROUPING_LINK_TEXT,
   GROUPING_NOTE,
+  REFRESH_BUTTON_LABEL,
+  REFRESH_REQUESTED_COPY,
   REQUESTED_COPY,
+  REQUEST_BUTTON_HELP,
   REQUEST_BUTTON_LABEL,
   REQUEST_PARKED_COPY,
   SHOW_LESS_LABEL,
@@ -1031,14 +1034,63 @@ suite('BuildingRecords.astro request button states', () => {
       .run();
   }
 
-  it('notes an old pull beside its date once the deeper records are in', async () => {
+  it('notes an old pull beside its date once the deeper records are in, and offers newer records under it', async () => {
     const db = await seededBuilding('bldg-state-6');
     await insertPull(db, 'bldg-state-6', PERMITS_RESOURCE_ID);
     await agePulls(db, 'bldg-state-6', 45);
 
-    const text = panelText(await renderPanel(db, 'bldg-state-6'));
+    const html = await renderPanel(db, 'bldg-state-6');
+    const text = panelText(html);
 
     expect(text).toContain(STALE_PULL_NOTE);
+    expect(text).toContain(REFRESH_BUTTON_LABEL);
+    expect(text).not.toContain(REQUEST_BUTTON_LABEL);
+    expect(text).not.toContain(REFRESH_REQUESTED_COPY);
+
+    // Where it sits: in the panel header, right after the pull-date line that carries the
+    // note, and before the facts strip and the ledger.
+    const panel = parse(html);
+    const line = panel.querySelector('#public-records h2')?.nextElementSibling;
+    expect(line?.textContent ?? '').toContain(STALE_PULL_NOTE);
+    const header = line?.parentElement;
+    expect(header?.textContent ?? '').toContain(REFRESH_BUTTON_LABEL);
+    expect(text.indexOf(REFRESH_BUTTON_LABEL)).toBeLessThan(text.indexOf('311 living conditions requests'));
+    // No help line on the refresh button: the note above it already says why.
+    expect(text).not.toContain(REQUEST_BUTTON_HELP);
+  });
+
+  it('says a new pull is queued, with no button, once a refresh row is pending', async () => {
+    const db = await seededBuilding('bldg-state-9');
+    await insertPull(db, 'bldg-state-9', PERMITS_RESOURCE_ID);
+    await agePulls(db, 'bldg-state-9', 45);
+    await enqueue(db, { buildingId: 'bldg-state-9', reason: 'button', now: Math.floor(Date.now() / 1000) });
+
+    const html = await renderPanel(db, 'bldg-state-9');
+    const text = panelText(html);
+
+    expect(text).toContain(REFRESH_REQUESTED_COPY);
+    // The records shown are still the old pull until the new one lands.
+    expect(text).toContain(STALE_PULL_NOTE);
+    expect(text).not.toContain(REFRESH_BUTTON_LABEL);
+    expect(text).not.toContain(REQUEST_BUTTON_LABEL);
+    // Not the never-pulled wording: these records are on the page.
+    expect(text).not.toContain(REQUESTED_COPY);
+    const header = parse(html).querySelector('#public-records h2')?.parentElement;
+    expect(header?.textContent ?? '').toContain(REFRESH_REQUESTED_COPY);
+  });
+
+  it('offers no refresh on a pull 30 days old or less', async () => {
+    const db = await seededBuilding('bldg-state-10');
+    await insertPull(db, 'bldg-state-10', PERMITS_RESOURCE_ID);
+    await agePulls(db, 'bldg-state-10', 29);
+
+    const html = await renderPanel(db, 'bldg-state-10');
+    const text = panelText(html);
+
+    expect(html).toContain('id="public-records"');
+    expect(text).not.toContain(REFRESH_BUTTON_LABEL);
+    expect(text).not.toContain(STALE_PULL_NOTE);
+    expect(text).not.toContain(REFRESH_REQUESTED_COPY);
   });
 
   it('leaves the stale note off a page that still offers the button', async () => {
@@ -1050,6 +1102,7 @@ suite('BuildingRecords.astro request button states', () => {
     // The button already says what this page can do about its records.
     expect(text).toContain(REQUEST_BUTTON_LABEL);
     expect(text).not.toContain(STALE_PULL_NOTE);
+    expect(text).not.toContain(REFRESH_BUTTON_LABEL);
   });
 
   it('cites only the assessor year on a seeded building', async () => {

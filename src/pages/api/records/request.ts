@@ -25,6 +25,13 @@ import {
  * validation -> coverage (one statement answers building, eligibility, and pull state) ->
  * enqueue. Nothing about the presser is stored: the queue row carries the building and the
  * time, and the rate limiter keeps the IP for an hour as it does for every public form.
+ *
+ * The same route serves the "Ask for newer records" button, which the panel offers once a
+ * building's newest deeper pull is more than 30 days old (`stale` in `coverage.ts`). That
+ * press is an ordinary `button` row: it counts against the same daily cap, `enqueue` keeps
+ * one pending row per building, and the finished row puts the building on the monthly
+ * refresh cycle (`planRefresh` reads finished `button` rows as interest). A pull 30 days old
+ * or less is still a 409, which is the per-building debounce.
  */
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
@@ -118,10 +125,16 @@ export const POST: APIRoute = async (context: APIContext) => {
 
     // Unknown building, a city no jurisdiction pulls for, and a building with no parcel id
     // are one answer on purpose: there is nothing to offer and nothing to tell a prober.
-    const state = await recordsRequestState(db, parsed.buildingId);
+    const state = await recordsRequestState(db, parsed.buildingId, now);
     if (state === 'ineligible') return json(404, { error: 'Building not found' });
     if (state === 'pulled') {
       return json(409, { error: 'City records for this building have already been retrieved.' });
+    }
+    // A new pull of a building whose records are in is already queued. Answered here rather
+    // than by `enqueue`, which would replace a pending planner `refresh` row with a `button`
+    // row: no sooner in practice, and it would spend a slot of the daily cap.
+    if (state === 'refresh_requested') {
+      return json(202, { data: { status: 'already_queued' } }, limitHeaders);
     }
 
     const result = await enqueue(db, { buildingId: parsed.buildingId, reason: 'button', now });

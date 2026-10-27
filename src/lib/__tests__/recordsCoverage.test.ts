@@ -3,11 +3,18 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { sqliteAvailable } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding, insertPull } from './helpers/recordsDb';
-import { DEEPER_SOURCE_IDS, hasDeeperPull, pendingQueueReason, recordsRequestState } from '../records/coverage';
+import {
+  DEEPER_SOURCE_IDS,
+  PULLED_STATES,
+  hasDeeperPull,
+  isPulledState,
+  pendingQueueReason,
+  recordsRequestState,
+} from '../records/coverage';
 import { DEEPER_SOURCE_IDS as SCHEDULER_DEEPER } from '../records/scheduler';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
-import { MAX_ATTEMPTS, enqueue, requireDeeperSourceIds } from '../records/queue';
+import { MAX_ATTEMPTS, REFRESH_AFTER_SECONDS, enqueue, requireDeeperSourceIds } from '../records/queue';
 
 const suite = sqliteAvailable ? describe : describe.skip;
 
@@ -60,7 +67,12 @@ suite('coverage', () => {
     await enqueue(db, { buildingId: id, reason: 'button', now: 1_001 });
     expect(await recordsRequestState(db, id)).toBe('requested');
 
+    // The pull lands while its row is still pending (the Worker writes the records, then
+    // completes the row): a deeper pull with a live pending row reads as a pull in flight.
     await insertPull(db, id, PERMITS_RESOURCE_ID);
+    expect(await recordsRequestState(db, id)).toBe('refresh_requested');
+
+    await db.prepare('UPDATE records_queue SET done_at = unixepoch() WHERE building_id = ?').bind(id).run();
     expect(await recordsRequestState(db, id)).toBe('pulled');
   });
 
@@ -121,8 +133,93 @@ suite('coverage', () => {
     expect(pending).toEqual({ reason: 'button', attempts: 0 });
     expect(await recordsRequestState(db, id)).toBe('requested');
 
+    // A deeper pull outranks all four no-pull states; the button row is still pending.
     await insertPull(db, id, PERMITS_RESOURCE_ID);
-    expect(await recordsRequestState(db, id)).toBe('pulled');
+    expect(await recordsRequestState(db, id)).toBe('refresh_requested');
+  });
+
+  describe('a building whose deeper records are in', () => {
+    const NOW = 1_800_000_000;
+    const DAY = 86_400;
+
+    /** An eligible building with the seed's assessor row and one deeper pull `ageDays` old. */
+    async function pulledBuilding(ageDays: number) {
+      const db = createRecordsTestDb();
+      const id = await insertBuilding(db, { parcel_id: '2102396000' });
+      await insertPull(db, id, FY2026_RESOURCE_ID, 'ok', NOW);
+      await insertPull(db, id, PERMITS_RESOURCE_ID, 'ok', NOW - ageDays * DAY);
+      return { db, id };
+    }
+
+    it('reads stale only once the newest deeper pull is more than 30 days old, at the planner boundary', async () => {
+      const { db, id } = await pulledBuilding(30);
+      // Exactly 30 days is not due for `planRefresh` either.
+      expect(await recordsRequestState(db, id, NOW)).toBe('pulled');
+      expect(await recordsRequestState(db, id, NOW + 1)).toBe('stale');
+      expect(REFRESH_AFTER_SECONDS).toBe(30 * DAY);
+    });
+
+    it('goes by the newest deeper pull, not the assessor and not the oldest source', async () => {
+      const { db, id } = await pulledBuilding(45);
+      // The assessor row above is fresh, and it does not count: the seed wrote one for every building.
+      expect(await recordsRequestState(db, id, NOW)).toBe('stale');
+      // One fresh deeper source makes the building fresh, as it does for the planner.
+      await insertPull(db, id, DEEPER_SOURCE_IDS.find((s) => s !== PERMITS_RESOURCE_ID)!, 'error', NOW - DAY);
+      expect(await recordsRequestState(db, id, NOW)).toBe('pulled');
+    });
+
+    it('reads a live pending button, follower or refresh row as refresh_requested, fresh or old', async () => {
+      for (const reason of ['button', 'follower', 'refresh'] as const) {
+        for (const age of [1, 45]) {
+          const { db, id } = await pulledBuilding(age);
+          await enqueue(db, { buildingId: id, reason, now: NOW });
+          expect(await recordsRequestState(db, id, NOW)).toBe('refresh_requested');
+        }
+      }
+    });
+
+    it('does not let a pending fill row hide the refresh: it reads stale, and the button replaces it', async () => {
+      const { db, id } = await pulledBuilding(45);
+      await enqueue(db, { buildingId: id, reason: 'fill', now: NOW });
+      expect(await recordsRequestState(db, id, NOW)).toBe('stale');
+      expect(await enqueue(db, { buildingId: id, reason: 'button', now: NOW })).toEqual({ status: 'queued' });
+      expect(await recordsRequestState(db, id, NOW)).toBe('refresh_requested');
+
+      // A fresh pull with a pending fill row behind it offers nothing: the 30 days still hold.
+      const fresh = await pulledBuilding(1);
+      await enqueue(fresh.db, { buildingId: fresh.id, reason: 'fill', now: NOW });
+      expect(await recordsRequestState(fresh.db, fresh.id, NOW)).toBe('pulled');
+    });
+
+    it('reads a parked non-fill row as pulled: nothing to offer and nothing in flight', async () => {
+      const { db, id } = await pulledBuilding(45);
+      await enqueue(db, { buildingId: id, reason: 'refresh', now: NOW });
+      await db
+        .prepare('UPDATE records_queue SET attempts = ? WHERE building_id = ? AND done_at IS NULL')
+        .bind(MAX_ATTEMPTS, id)
+        .run();
+      expect(await recordsRequestState(db, id, NOW)).toBe('pulled');
+    });
+
+    it('groups the three with isPulledState and no other state', () => {
+      expect([...PULLED_STATES].sort()).toEqual(['pulled', 'refresh_requested', 'stale']);
+      for (const state of ['ineligible', 'fill_queued', 'parked', 'requested', 'never_pulled'] as const) {
+        expect(isPulledState(state)).toBe(false);
+      }
+      for (const state of PULLED_STATES) expect(isPulledState(state)).toBe(true);
+    });
+
+    it('defaults the clock to now', async () => {
+      const db = createRecordsTestDb();
+      const id = await insertBuilding(db, { parcel_id: '2102396000' });
+      await insertPull(db, id, PERMITS_RESOURCE_ID);
+      expect(await recordsRequestState(db, id)).toBe('pulled');
+      await db
+        .prepare('UPDATE record_pulls SET retrieved_at = retrieved_at - ? WHERE building_id = ?')
+        .bind(31 * DAY, id)
+        .run();
+      expect(await recordsRequestState(db, id)).toBe('stale');
+    });
   });
 
   // The empty-list guard `queue.ts` already applies to both planners: an empty
