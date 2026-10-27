@@ -55,6 +55,28 @@ Use the helpers — never hardcode a threshold or a color:
 - `getScoreTextColor(score)` → Tailwind class for a colored score number
 - `getScoreBgTint(score)` → soft-tinted background for score detail tiles
 - `getScoreHex(score)` / `SCORE_HEX` → hex for non-Tailwind contexts (Maps markers, OG images)
+- `getEarlyScoreTextColor(score)` → the same band for an early rating, one shade lighter
+  where that still reads on Paper (emerald-600, red-600); Mixed stays amber-700 because
+  amber-600 is about 2.9:1 on Paper. Large text (24px and up) only, since these clear 3:1
+  on Paper, white and the score tints, not 4.5:1
+
+### `earlyRating.ts` is how a thin score is displayed, not computed
+
+A building score shows from its first approved review. Below `NAMED_PARTY_MIN_REVIEWS` it is
+an **early rating** everywhere a building score appears (building page, search cards,
+landlord and property manager building lists, map info window): the count sits beside the
+score ("from 1 review"), `scoreNumberClass` draws it lighter, and issue and recommend rates
+are counts ("1 of 1 review") instead of percentages. Import the constant; never type 3.
+
+The percentages it still prints use the formulas in `calculateAggregatedScores` /
+`calculateBuildingAverages`, and `earlyRating.test.ts` holds them equal. It changes no score.
+A "Maybe / It depends" answer is never a no: the recommend percentage counts yes and no only
+(as it always has), a maybe is shown on its own as a count, and a lone maybe produces no
+recommend figure at all rather than "0%". The methodology paragraph `#early-ratings` says so
+and its test pins the wording that matters.
+
+The search and map islands import it, so its only runtime imports are `./scoring` and
+`./scoring-colors`, which import nothing; its test fails if that changes.
 
 ### `surveyItems.ts` is the canonical survey definition
 
@@ -91,7 +113,8 @@ const apiKey = getEnv(context).RESEND_API_KEY;
 
 `maybeEnv(locals)` is the exception, and only for render paths that must never throw and
 have a safe default for every value they read — today, BaseLayout's head, which reads
-`SITE_URL` and falls back to `https://ratemyplace.org`. It returns `undefined` when there is
+`SITE_URL` and falls back to `https://ratemyplace.org`, and the sign-in and sign-up pages'
+review note (`reviewSignin.ts`), which reads `DB` and drops the address without it. It returns `undefined` when there is
 no runtime (the Astro container in unit tests) and when the Astro 6+ Cloudflare adapter's
 `locals.runtime.env` getter throws its migration error, and logs that once per isolate.
 Everything else keeps using `getEnv`, which throws on purpose.
@@ -155,7 +178,7 @@ precision here — the imprecision is the point.
 ### `validation.ts` — use the shared primitives
 
 `isValidEmail`, `isSafeHttpUrl`, `validateReviewText`, `enforceMaxLength`,
-`escapeLikePattern`, `sanitizeText`, plus per-form validators (`validateReviewForm`,
+`escapeLikePattern`, `fitsLikePattern`, `sanitizeText`, plus per-form validators (`validateReviewForm`,
 `validateDisputeForm`, `validateBugReport`, `validateContactForm`, `validateSearch`).
 
 `isSafeHttpUrl` exists because a `javascript:` URL in a bug report could take over an admin
@@ -309,7 +332,10 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   the next word in the same comma segment is a street suffix in any `SUFFIX_SPELLINGS`
   spelling ("Brighton Ave", "Allston St", "Boston St"), or when it follows "the" ("The
   Fenway"). The first number is the house number; later numbers, "apt"/"unit" plus the next
-  word, and anything after "#" are unit numbers and are dropped. A query that leaves no
+  word, and anything after "#" are unit numbers and are dropped. A hyphenated word with no
+  digit is split ("Allston-Brighton" is two places); "14-18" and a ZIP+4 stay whole. A house
+  number with only a place beside it ("7 Allston") keeps the place as its street word too,
+  or the number alone would match every building with that number. A query that leaves no
   street word and no number but names a place or ZIP is an area search (`isAreaSearch`).
 - **`coverage.ts` is the page-state table, read-only.** `recordsRequestState` answers
   `ineligible` / `pulled` / `fill_queued` / `parked` / `requested` / `never_pulled` in that
@@ -357,6 +383,15 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   `streetKey`.** It removes a comma-less trailing "Boston" / neighborhood / "MA" / ZIP tail
   that `normalizeStreet`'s comma rule cannot see. `streetKey` takes a street it has already
   been handed, so adding the stripper there would change seed keys.
+- **`recordGroups.ts` sorts 311 into the panel's three groups at render time** (living
+  conditions, building safety and code, property upkeep, in that order), by the request type
+  the city recorded. It never changes the pull-time `classification` in
+  `sources/boston/serviceRequests.ts`, which the daily fixture check and the breaker read, so
+  editing the table needs no Worker deploy and cannot pause the fill. A request the pull
+  calls `housing` always lands in a group; a type in no group is counted, never listed. The
+  methodology page renders the same table, so add a type there and nowhere else. ISD
+  violations are counted by case number and Public Works tickets by ticket number
+  (`ledger.ts`), not by code line.
 - **`display.ts` holds a privacy gate.** `showMailingAddress` publishes a tax mailing
   address only for an owner that reads as an entity, and `mailingAddressLine` holds the
   addressee to the same test — an entity can list a person as its `C/O ATT`. It errs
@@ -384,6 +419,13 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   must be bound after the WHERE's. Keep a full query (where + order + LIMIT/OFFSET) under
   D1's 100 bound parameters: `__tests__/searchFullAddress.test.ts` checks the widest query
   the parser allows, which is why places and ZIPs are capped.
+- **D1 refuses a LIKE pattern over 50 bytes** (UTF-8, wildcards and escapes included) and
+  fails the whole statement, which the search page then shows as no match. A full address
+  typed with its neighborhood, "Boston, MA" and ZIP is over that easily. `fitsLikePattern`
+  (`validation.ts`) is the check: `searchSql.ts` writes a pattern that does not fit as `0`
+  (no address word, neighborhood or landlord name is that long), and the landlord queries
+  on the search page and the results endpoint skip it. `searchFullAddress.test.ts` measures
+  every bind of a long query.
 - **Browse mode is Boston first, most recently reviewed.** Its query stays in the two call
   sites, but its ORDER BY is `BROWSE_BUILDINGS_ORDER` in `searchSql.ts`: Boston buildings
   (`BOSTON_CITY_SQL`, the same city test `has_records` uses, without the parcel check), then
@@ -441,6 +483,16 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   and `shouldPanToUser` pans to the reader only when they are inside the fitted box.
   `BuildingMap.tsx` fits once (`didFitRef`) and never again on refetch, and skips viewport
   refetches until the first unbounded load lands so that one fit sees every building.
+- **The homepage dropdown has its own Places scope.** `GET /api/places/autocomplete` serves
+  two islands. The review form's `AddressAutocomplete` sends no scope and gets any US
+  address (people review buildings outside Boston). `HomeSearch` alone sends `scope=boston`:
+  `autocompleteRequestBody` (`places.ts`) adds a location bias to `BOSTON_BOX`,
+  `bostonScopePredictions` drops every suggestion not in Massachusetts and puts Boston
+  first, and `matchPredictionsToBuildings` (`homeSearchMatch.ts`) resolves each suggestion
+  read-only through `findExistingBuilding`, refusing an address-key match when Google and
+  the building name different neighborhoods. `homeSearchItems.ts` (a leaf) orders the rows:
+  buildings we have ("See this building", with "Write a review" beside it), landlords, then
+  "Other addresses". Never add the scope to the review form without the owner's say.
 - **`mapCluster.ts` decides how a marker cluster looks.** The badge is filled with
   `getScoreHex` of the plain mean of the clustered buildings' scores (unscored ones left
   out; none scored → the no-score grey). It is a map colour only — never shown as a number,

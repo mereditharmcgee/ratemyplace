@@ -201,6 +201,19 @@ export function escapeLikePattern(input: string): string {
     .replace(/_/g, '\\_');
 }
 
+/** The longest LIKE pattern D1 accepts, in UTF-8 bytes. */
+export const D1_MAX_LIKE_PATTERN_BYTES = 50;
+
+/**
+ * Whether D1 will run a LIKE with this pattern (wildcards and escapes included). D1 refuses
+ * a longer one and fails the whole statement, and a full address typed with its
+ * neighborhood, "Boston, MA" and ZIP passes 48 characters easily. A pattern that does not
+ * fit is left out of the query rather than sent.
+ */
+export function fitsLikePattern(pattern: string): boolean {
+  return new TextEncoder().encode(pattern).length <= D1_MAX_LIKE_PATTERN_BYTES;
+}
+
 // ═══════════════════════════════════════════════════
 // Form validators (VAL-01, VAL-02, VAL-03, VAL-04)
 // ═══════════════════════════════════════════════════

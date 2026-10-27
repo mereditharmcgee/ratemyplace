@@ -45,6 +45,14 @@ function tokens(text: string): string[] {
     .filter((term) => term.length > 0 && !/^[a-z]$/.test(term));
 }
 
+/**
+ * `tokens`, with a hyphenated word split into its words: "Allston-Brighton" is two places.
+ * A token with a digit stays whole, since "14-18" is a range and "02135-1234" a ZIP+4.
+ */
+function addressWords(text: string): string[] {
+  return tokens(text).flatMap((word) => (/\d/.test(word) ? [word] : tokens(word.replace(/-/g, ' '))));
+}
+
 function expand(terms: readonly string[]): string[][] {
   // Dedupe before the cap: a repeated term is a redundant clause, and letting it consume
   // one of the eight slots would drop a term that actually narrows the search.
@@ -60,7 +68,11 @@ export interface HouseNumber {
 }
 
 export interface ParsedSearch {
-  /** Street words, with place names, state, ZIP and unit taken out. Same shape as `normalizeSearchQuery`. */
+  /**
+   * Street words, with place names, state, ZIP and unit taken out. Same shape as
+   * `normalizeSearchQuery`. When a house number and a place are all that was typed
+   * ("7 Allston"), the place words are the street words.
+   */
   terms: string[][];
   /** The first number typed, matched against the building's house number or range. */
   houseNumber: HouseNumber | null;
@@ -135,6 +147,9 @@ function placeLengthAt(words: readonly string[], i: number): number {
  *
  * The first number is the house number. Later numbers are unit numbers and are dropped, as
  * are "apt", "apartment" and "unit" with the word after them and anything after a "#".
+ *
+ * A hyphenated word with no digit is split ("Allston-Brighton" is two places). When a house
+ * number and a place are all that is left ("7 Allston"), the place is also the street word.
  */
 export function parseSearchQuery(query: string): ParsedSearch {
   const kept: string[] = [];
@@ -144,7 +159,7 @@ export function parseSearchQuery(query: string): ParsedSearch {
 
   const withoutUnits = query.replace(/#\s*[a-z0-9-]*/gi, ' ');
   for (const segment of withoutUnits.split(',')) {
-    const words = tokens(segment);
+    const words = addressWords(segment);
     let previous: string | null = null;
     for (let i = 0; i < words.length; ) {
       const word = words[i];
@@ -187,12 +202,17 @@ export function parseSearchQuery(query: string): ParsedSearch {
     const parent = PARENT_PLACE.get(place);
     return parent ? [place, parent] : [place];
   });
+  const placeTerms = normalizeSearchQuery(typedPlaces.join(' '));
+  // A house number with only a place beside it ("7 Allston") is a number on a street named
+  // after the place. Without the place as a street word the number alone would be the
+  // whole match: every building in the city with that number.
+  const placeIsStreet = kept.length === 0 && houseNumber !== null && typedPlaces.length > 0;
   return {
-    terms: expand(kept),
+    terms: placeIsStreet ? placeTerms : expand(kept),
     houseNumber,
     places: [...new Set(withParents)],
     zips: [...zips].slice(0, MAX_ZIPS),
-    placeTerms: normalizeSearchQuery(typedPlaces.join(' ')),
+    placeTerms,
     rawTerms: normalizeSearchQuery(query),
   };
 }

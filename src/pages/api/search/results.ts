@@ -1,7 +1,7 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../../lib/rateLimit';
-import { validateSearch, escapeLikePattern } from '../../../lib/validation';
+import { validateSearch, escapeLikePattern, fitsLikePattern } from '../../../lib/validation';
 import { buildingSearchOrder, buildingSearchSelect, buildingSearchWhere } from '../../../lib/searchSql';
 import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../../../lib/scoring-sql';
 import type { SearchResultsResponse } from '../../../lib/api-types';
@@ -127,6 +127,14 @@ export async function GET(context: APIContext): Promise<Response> {
       const escaped = query ? escapeLikePattern(query) : '';
       const pattern = `%${escaped}%`;
       const binds = query ? [pattern] : [];
+
+      // D1 fails the statement on a LIKE pattern over 50 bytes. No landlord name is that
+      // long, so a query too long for the pattern matches no landlord.
+      if (query && !fitsLikePattern(pattern)) {
+        return new Response(JSON.stringify({ results: [], total: 0 } satisfies SearchResultsResponse), {
+          headers: { 'Content-Type': 'application/json', ...buildRateLimitHeaders(rateLimit, 60) }
+        });
+      }
 
       const countResult = await db.prepare(
         `SELECT COUNT(*) as total FROM (SELECT l.id ${baseQuery})`

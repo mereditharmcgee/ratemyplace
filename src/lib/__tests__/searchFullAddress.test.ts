@@ -192,6 +192,26 @@ suite('search by full address', () => {
     expect(await search(db, '300 Hyde Park Ave')).toEqual(['hp-ave']);
   });
 
+  it('a house number and a place with no street reads the place as the street', async () => {
+    // Taking the place out would leave the number alone, which every building numbered 7 matches.
+    const db = createRecordsTestDb();
+    await seeded(db, { id: 'allston-st', address: '7 Allston Street', neighborhood: 'Dorchester', zip: '02124', lo: 7 });
+    await seeded(db, { id: 'away', address: '7 Sample Road', neighborhood: 'Roxbury', zip: '02119', lo: 7 });
+    const rows = await search(db, '7 Allston');
+    expect(rows[0]).toBe('allston-st');
+    expect(rows).not.toContain('away');
+  });
+
+  it('reads a hyphenated neighborhood pair as two places', async () => {
+    const db = createRecordsTestDb();
+    await seeded(db, { id: 'wood', address: '12 Wood Street', neighborhood: 'Brighton', zip: '02135', lo: 12 });
+    await seeded(db, { id: 'allston', address: '20 Sample Road', neighborhood: 'Allston', zip: '02134', lo: 20 });
+    await seeded(db, { id: 'away', address: '3 Sample Road', neighborhood: 'Roxbury', zip: '02119', lo: 3 });
+    expect((await search(db, '12 Wood St, Allston-Brighton'))[0]).toBe('wood');
+    expect((await search(db, '12 Wood St, Allston-Brighton, MA 02135'))[0]).toBe('wood');
+    expect((await search(db, 'Allston-Brighton')).sort()).toEqual(['allston', 'wood']);
+  });
+
   it('a street plus a neighborhood lists that street, the neighborhood first', async () => {
     const db = createRecordsTestDb();
     await seeded(db, { id: 'allston', address: '100 Example Avenue', neighborhood: 'Allston', zip: '02134', lo: 100 });
@@ -279,14 +299,63 @@ suite('search order and paging', () => {
   });
 
   it('stays under the D1 parameter limit for the widest query the parser allows', () => {
-    // Eight distinct suffix words (the term cap), the longest suffix rows, a range, three
-    // places and two ZIPs: the most binds one search can produce.
-    const widest = '14-18 te ter terr terrace ave la pw hw Allston Brighton Roxbury Fenway 02134 02135 02136';
-    for (const query of [widest, `${widest} apt 2`, 'Allston Brighton Roxbury 02134 02135']) {
+    // Eight distinct suffix words (the term cap) from the longest suffix rows, a range, three
+    // postal names (each adds the neighborhood it sits in, so six places) and two ZIPs: the
+    // most binds one search can produce. That is 94 with LIMIT and OFFSET. The whole-query
+    // neighborhood and landlord match would add 2 (96, 4 under the limit), but a query this
+    // long is over the D1 LIKE pattern limit and leaves them out.
+    const widest = '14-18 te ter terr terrace ave la pw hw Dorchester Center Roxbury Crossing Readville 02134 02135 02136';
+    const placesAsStreet = '14-18 Dorchester Center, Roxbury Crossing, Readville, 02134 02135';
+    for (const query of [widest, `${widest} apt 2`, 'Allston Brighton Roxbury 02134 02135', placesAsStreet]) {
       const where = buildingSearchWhere(query);
       const order = buildingSearchOrder(query);
       // + LIMIT and OFFSET
       expect(where.binds.length + order.binds.length + 2, query).toBeLessThanOrEqual(D1_MAX_PARAMETERS);
+    }
+  });
+});
+
+/** D1 refuses a LIKE pattern over 50 bytes and fails the whole statement. SQLite here does not, so the binds are measured. */
+const D1_MAX_LIKE_PATTERN_BYTES = 50;
+const FULL_ADDRESS = '1200 Example Boulevard, Allston, Boston, Massachusetts 02134-1234';
+
+suite('search with a long query', () => {
+  it('keeps every bound pattern within the D1 LIKE limit', () => {
+    const queries = [
+      FULL_ADDRESS,
+      '1200 Example Boulevard, Allston, Boston, MA 02134',
+      `${'x'.repeat(60)} Rd`,
+      'x'.repeat(200),
+      '%_'.repeat(40),
+      'Église Sainte-Thérèse, Bâtiment Numéro Douze, Québec',
+      '# '.repeat(40),
+    ];
+    for (const query of queries) {
+      const where = buildingSearchWhere(query);
+      const order = buildingSearchOrder(query);
+      for (const bind of [...where.binds, ...order.binds]) {
+        if (typeof bind !== 'string') continue;
+        expect(new TextEncoder().encode(bind).length, `${query}: ${bind}`).toBeLessThanOrEqual(D1_MAX_LIKE_PATTERN_BYTES);
+      }
+    }
+  });
+
+  it('finds the building from a full address of 49 characters or more', async () => {
+    const db = createRecordsTestDb();
+    await seeded(db, { id: 'exact', address: '1200 Example Boulevard', neighborhood: 'Allston', zip: '02134', lo: 1200 });
+    await seeded(db, { id: 'other', address: '1240 Example Boulevard', neighborhood: 'Allston', zip: '02134', lo: 1240 });
+    for (const query of [FULL_ADDRESS, '1200 Example Boulevard, Allston, Boston, MA 02134']) {
+      expect(query.length, query).toBeGreaterThanOrEqual(49);
+      expect((await search(db, query))[0], query).toBe('exact');
+      expect(await count(db, query), query).toBeGreaterThan(0);
+    }
+  });
+
+  it('matches nothing, rather than everything, when a word is too long for any address', async () => {
+    const db = createRecordsTestDb();
+    await seeded(db, { id: 'exact', address: '1200 Example Boulevard', neighborhood: 'Allston', zip: '02134', lo: 1200 });
+    for (const query of ['x'.repeat(60), '# '.repeat(40)]) {
+      expect(await count(db, query), query).toBe(0);
     }
   });
 });

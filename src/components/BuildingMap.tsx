@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { MarkerClusterer, SuperClusterAlgorithm, type Marker, type Renderer } from '@googlemaps/markerclusterer';
 import { getScoreColor, getScoreHex } from '../lib/scoring-colors';
 import { displayLocality } from '../lib/locality';
+import { isEarlyRating, mapReviewLine } from '../lib/earlyRating';
 import { initialMapView, shouldPanToUser, type InitialMapView, type LatLngBox, type LatLngPoint } from '../lib/mapView';
 import { clusterAppearance, clusterBadgeSize, clusterTitle } from '../lib/mapCluster';
 
@@ -453,7 +454,8 @@ export default function BuildingMap({
         scoreRow.appendChild(scoreBadge);
         if (building.avgScore !== null) {
           const scoreNumber = document.createElement('span');
-          scoreNumber.style.cssText = 'font-size: 14px; font-weight: 600;';
+          // An early rating (lib/earlyRating.ts) is set lighter, as on the building page.
+          scoreNumber.style.cssText = `font-size: 14px; font-weight: ${isEarlyRating(building.reviewCount) ? 400 : 600};`;
           scoreNumber.textContent = `${building.avgScore.toFixed(1)}/5`;
           scoreRow.appendChild(scoreNumber);
         }
@@ -461,7 +463,7 @@ export default function BuildingMap({
 
         const reviewCountLine = document.createElement('p');
         reviewCountLine.style.cssText = 'margin: 0 0 8px 0; font-size: 12px; color: #666;';
-        reviewCountLine.textContent = `${building.reviewCount} ${building.reviewCount === 1 ? 'review' : 'reviews'}`;
+        reviewCountLine.textContent = mapReviewLine(building.reviewCount);
         container.appendChild(reviewCountLine);
 
         const detailsLink = document.createElement('a');
