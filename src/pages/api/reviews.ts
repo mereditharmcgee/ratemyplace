@@ -5,7 +5,7 @@ import { calculateDomainScores, ALL_SCORE_FIELDS } from '../../lib/scoring';
 import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
 import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
-import { getSeasonFromMonth } from '../../lib/privacy';
+import { moveInFromAnswer } from '../../lib/moveIn';
 import { unitTypeFromBedrooms } from '../../lib/reviewDisplay';
 import { validateReviewText } from '../../lib/validation';
 import { queueOwnerNotice } from '../../lib/ownerNotify';
@@ -84,12 +84,9 @@ export async function POST(context: APIContext): Promise<Response> {
     const laundryCostPerLoad = formData.get('laundry_cost_per_load') ? parseFloat(formData.get('laundry_cost_per_load') as string) : null;
     const estimatedMonthlyUtilities = formData.get('estimated_monthly_utilities') ? parseInt(formData.get('estimated_monthly_utilities') as string) : null;
 
-    // Move-in date: parse user-provided month (1-12) and year, compute season
-    const moveInMonthRaw = formData.get('move_in_month');
-    const moveInYearRaw = formData.get('move_in_year');
-    const moveInMonth = moveInMonthRaw ? parseInt(moveInMonthRaw as string) : null;
-    const moveInYear = moveInYearRaw ? parseInt(moveInYearRaw as string) : new Date().getFullYear();
-    const moveInSeason = moveInMonth ? getSeasonFromMonth(moveInMonth) : 'winter';
+    // Move-in date is optional. Only the season of the month is stored, and move_in_given
+    // records which parts the reviewer gave, so a skipped move-in is shown as blank.
+    const moveIn = moveInFromAnswer(formData.get('move_in_month'), formData.get('move_in_year'), new Date());
 
     // Parking, pets, pest types
     const parkingType = formData.get('parking_type') as string || null;
@@ -195,7 +192,7 @@ export async function POST(context: APIContext): Promise<Response> {
         had_pest_issues, had_heat_issues, had_water_issues,
         had_security_deposit_issues, had_eviction_threat,
         status,
-        move_in_year, move_in_season,
+        move_in_year, move_in_season, move_in_given,
         accepts_housing_vouchers, safely_lit_at_night
       ) VALUES (
         ?, ?, ?,
@@ -217,7 +214,7 @@ export async function POST(context: APIContext): Promise<Response> {
         ?, ?, ?,
         ?, ?,
         ?,
-        ?, ?,
+        ?, ?, ?,
         ?, ?
       )
     `).bind(
@@ -284,9 +281,10 @@ export async function POST(context: APIContext): Promise<Response> {
       hadSecurityDepositIssues,
       hadEvictionThreat,
       'pending',
-      // Move-in date: use user-provided month/year, compute season from month
-      moveInYear,
-      moveInSeason,
+      // Move-in date: placeholders where skipped, and which parts were given
+      moveIn.year,
+      moveIn.season,
+      moveIn.given,
       // New survey fields
       acceptsHousingVouchers,
       safelyLitAtNight

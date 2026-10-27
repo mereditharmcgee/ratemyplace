@@ -40,6 +40,7 @@ type ReviewSeed = {
   status?: 'approved' | 'pending' | 'rejected';
   move_in_season: string;
   move_in_year: number;
+  move_in_given?: 'season_and_year' | 'year_only' | 'none' | null;
   move_out_year_new: string;
   is_current_tenant?: number;
   review_title?: string | null;
@@ -59,17 +60,18 @@ async function disputesDb(reviews: ReviewSeed[]): Promise<TestD1Database> {
     ALTER TABLE reviews ADD COLUMN review_text TEXT;
     ALTER TABLE reviews ADD COLUMN comments TEXT;
   `);
+  db.exec(readFileSync(join(process.cwd(), 'migrations', '0034_review_move_in_given.sql'), 'utf8'));
   await db.prepare("INSERT INTO users (id, email) VALUES ('tenant-1', 'tenant@example.com')").run();
   await insertBuilding(db, { id: BUILDING_ID, slug: SLUG, address: '12 Example Rd, Boston, MA 02135' });
   for (const r of reviews) {
     await db
       .prepare(
-        'INSERT INTO reviews (id, user_id, building_id, status, move_in_season, move_in_year, move_out_year_new, is_current_tenant, review_title, review_text, comments) ' +
-          "VALUES (?, 'tenant-1', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        'INSERT INTO reviews (id, user_id, building_id, status, move_in_season, move_in_year, move_in_given, move_out_year_new, is_current_tenant, review_title, review_text, comments) ' +
+          "VALUES (?, 'tenant-1', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       )
       .bind(
-        r.id, BUILDING_ID, r.status ?? 'approved', r.move_in_season, r.move_in_year, r.move_out_year_new,
-        r.is_current_tenant ?? 0, r.review_title ?? null, r.review_text ?? null, r.comments ?? null,
+        r.id, BUILDING_ID, r.status ?? 'approved', r.move_in_season, r.move_in_year, r.move_in_given ?? null,
+        r.move_out_year_new, r.is_current_tenant ?? 0, r.review_title ?? null, r.review_text ?? null, r.comments ?? null,
       )
       .run();
   }
@@ -149,6 +151,46 @@ describe.skipIf(!sqliteAvailable)('POST /api/disputes with a building page link'
     expect((await response.json()).error).toBe(DISPUTE_TARGET_ERRORS.noMatch);
   });
 
+  // The card of a review whose move-in was skipped shows only the move-out; the placeholder
+  // in the NOT NULL columns is never shown, so it never matches.
+  const skippedMoveIn: ReviewSeed = {
+    id: 'rev-skipped', move_in_season: 'winter', move_in_year: 2026, move_in_given: 'none', move_out_year_new: '2025',
+  };
+  const yearOnlyMoveIn: ReviewSeed = {
+    id: 'rev-year-only', move_in_season: 'winter', move_in_year: 2022, move_in_given: 'year_only', move_out_year_new: '2024',
+  };
+
+  it('matches a skipped move-in by the dates its card shows', async () => {
+    const db = await disputesDb([pastTenant, skippedMoveIn]);
+    const response = await POST(context(db, { ...base, reviewUrl: PAGE, reviewDates: '2025' }));
+    expect(response.status).toBe(201);
+    expect(await disputedReviewIds(db)).toEqual(['rev-skipped']);
+    await flushBackground();
+  });
+
+  it('never matches the placeholder of a skipped move-in', async () => {
+    const db = await disputesDb([pastTenant, skippedMoveIn]);
+    const response = await POST(context(db, { ...base, reviewUrl: PAGE, reviewDates: 'Winter 2026 · 2025' }));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe(DISPUTE_TARGET_ERRORS.noMatch);
+  });
+
+  it('matches a year-only move-in by the year its card shows', async () => {
+    const db = await disputesDb([pastTenant, yearOnlyMoveIn]);
+    const response = await POST(context(db, { ...base, reviewUrl: PAGE, reviewDates: '2022 · 2024' }));
+    expect(response.status).toBe(201);
+    expect(await disputedReviewIds(db)).toEqual(['rev-year-only']);
+    await flushBackground();
+  });
+
+  it('matches a review written before migration 0034 by its dates as stored', async () => {
+    const db = await disputesDb([pastTenant, { ...currentTenant, id: 'rev-old', move_in_season: 'winter', move_in_year: 2026 }]);
+    const response = await POST(context(db, { ...base, reviewUrl: PAGE, reviewDates: 'Winter 2026 · Current' }));
+    expect(response.status).toBe(201);
+    expect(await disputedReviewIds(db)).toEqual(['rev-old']);
+    await flushBackground();
+  });
+
   it('never guesses between two reviews that show the same dates', async () => {
     const db = await disputesDb([currentTenant, { ...currentTenant, id: 'rev-now-2' }]);
     const response = await POST(context(db, { ...base, reviewUrl: PAGE, reviewDates: 'Fall 2023 · Current' }));
@@ -157,8 +199,9 @@ describe.skipIf(!sqliteAvailable)('POST /api/disputes with a building page link'
     expect(await disputedReviewIds(db)).toEqual([]);
   });
 
-  // A skipped move-in is stored as winter of the current year, so many current tenants share
-  // one range. The title, or the first words of the review, picks between them.
+  // A skipped move-in shows no move-in (and before migration 0034 it was stored as winter of
+  // the current year), so many current tenants share one range. The title, or the first words
+  // of the review, picks between them.
   const titled: ReviewSeed = { ...currentTenant, id: 'rev-titled', review_title: 'Quiet street, slow repairs', comments: 'The heat took a week.' };
   const untitled: ReviewSeed = { ...currentTenant, id: 'rev-untitled', comments: "Heat's fine. The mail room is a mess." };
 

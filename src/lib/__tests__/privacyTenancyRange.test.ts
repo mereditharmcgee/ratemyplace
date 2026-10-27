@@ -3,10 +3,10 @@ import { formatTenancyRange } from '../privacy';
 
 /**
  * The season chip on a review card shows a fuzzy tenancy range: move-in season and year,
- * then the move-out year (or "Current"). When a reviewer skips the optional move-in
- * question, the submit route stores winter of the current year (the columns are NOT NULL),
- * so a stored move-in can fall after the move-out year. A range that runs backwards is
- * never shown.
+ * then the move-out year (or "Current"). Reviews written before migration 0034 stored winter
+ * of the current year when the reviewer skipped the optional move-in question (the columns
+ * are NOT NULL), so a stored move-in can fall after the move-out year. A range that runs
+ * backwards is never shown. Since 0034 the caller passes only the parts the reviewer gave.
  */
 describe('formatTenancyRange', () => {
   it('shows move-in season and year with the move-out year', () => {
@@ -39,9 +39,19 @@ describe('formatTenancyRange', () => {
     expect(formatTenancyRange({ moveInSeason: 'spring', moveInYear: 2023 })).toBe('Spring 2023');
   });
 
-  it('shows only the move-out when the move-in is incomplete', () => {
-    expect(formatTenancyRange({ moveInSeason: null, moveInYear: 2023, moveOutYear: '2024' })).toBe('2024');
+  it('shows a move-in year without a season as the year alone', () => {
+    expect(formatTenancyRange({ moveInSeason: null, moveInYear: 2023, moveOutYear: '2024' })).toBe('2023 · 2024');
+    expect(formatTenancyRange({ moveInSeason: null, moveInYear: '2023', moveOutYear: 'current' })).toBe('2023 · Current');
+    expect(formatTenancyRange({ moveInSeason: null, moveInYear: 2023 })).toBe('2023');
+  });
+
+  it('drops a move-in year without a season that falls after the move-out year', () => {
+    expect(formatTenancyRange({ moveInSeason: null, moveInYear: 2025, moveOutYear: '2024' })).toBe('2024');
+  });
+
+  it('shows only the move-out when the move-in has no year', () => {
     expect(formatTenancyRange({ moveInSeason: 'spring', moveInYear: null, moveOutYear: '2024' })).toBe('2024');
+    expect(formatTenancyRange({ moveInSeason: 'spring', moveInYear: '', moveOutYear: 'current' })).toBe('Current');
   });
 
   it('accepts a capitalized season', () => {

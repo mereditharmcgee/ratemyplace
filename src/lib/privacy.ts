@@ -1,3 +1,5 @@
+import type { MoveInGiven } from './types';
+
 /**
  * Converts a calendar month (1-12) to a season string.
  * December uses the user-provided year (e.g., December 2025 = Winter 2025, not Winter 2026).
@@ -30,13 +32,17 @@ const MOVE_OUT_2020_OR_EARLIER = '2020_or_earlier';
 
 /**
  * The fuzzy tenancy range on a review card's season chip: "Summer 2024 · 2025",
- * "Fall 2025 · Current", or one end alone. Only seasons and years, never a month or day.
+ * "Fall 2025 · Current", "2024 · Current" when the reviewer gave a move-in year but no month,
+ * or one end alone. Only seasons and years, never a month or day. A move-in season without
+ * a year is not a date, so it is left out.
  *
- * When a reviewer skips the optional move-in question, the submit route stores winter of the
- * current year (the columns are NOT NULL), so a stored move-in can fall after the move-out
- * year. A range that runs backwards is impossible, so the move-in is left out and only the
- * move-out shows. A placeholder move-in on a range that runs forward is still shown; it
- * can't be told apart from a real December-February move-in.
+ * Callers pass only the move-in parts the reviewer gave (`givenMoveIn`). Reviews written
+ * before `move_in_given` existed (migration 0034) say nothing about that: when the move-in
+ * was skipped, the submit route stored winter of the current year (the columns are NOT
+ * NULL), so a stored move-in can fall after the move-out year. A range that runs backwards
+ * is impossible, so the move-in is left out and only the move-out shows. A placeholder
+ * move-in on an old review whose range runs forward is still shown; it can't be told apart
+ * from a real December-February move-in, and those reviews stay as stored.
  */
 export function formatTenancyRange(input: {
   moveInSeason?: string | null;
@@ -48,8 +54,9 @@ export function formatTenancyRange(input: {
   const { moveInSeason, moveInYear, moveOutSeason, moveOutYear } = input;
   const isCurrent = input.isCurrentTenant === true || moveOutYear === 'current';
 
-  let moveIn = moveInSeason && moveInYear
-    ? formatFuzzyDate(Number(moveInYear), moveInSeason.toLowerCase())
+  const inYear = moveInYear ? Number(moveInYear) : NaN;
+  let moveIn = Number.isFinite(inYear)
+    ? (moveInSeason ? formatFuzzyDate(inYear, moveInSeason.toLowerCase()) : String(inYear))
     : null;
 
   let moveOut: string | null = null;
@@ -68,7 +75,7 @@ export function formatTenancyRange(input: {
     if (Number.isFinite(year)) latestMoveOutYear = year;
   }
 
-  if (moveIn && latestMoveOutYear !== null && Number(moveInYear) > latestMoveOutYear) {
+  if (moveIn && latestMoveOutYear !== null && inYear > latestMoveOutYear) {
     moveIn = null;
   }
 
@@ -76,12 +83,47 @@ export function formatTenancyRange(input: {
   return moveIn ?? moveOut ?? null;
 }
 
-/** The review columns a review card's season chip reads. */
-export interface ReviewTenancyFields {
+/** The stored move-in columns, plus the record of which of them the reviewer gave. */
+export interface StoredMoveInFields {
   move_in_season?: string | null;
   move_in_year?: number | string | null;
+  move_in_given?: MoveInGiven | null;
+}
+
+/** The review columns a review card's season chip reads. */
+export interface ReviewTenancyFields extends StoredMoveInFields {
   move_out_year_new?: string | null;
   is_current_tenant?: number | null;
+}
+
+/**
+ * The move-in parts a reviewer gave, with skipped parts as null. `move_in_season` and
+ * `move_in_year` are NOT NULL, so a skipped part holds a placeholder that is never shown.
+ * A review written before `move_in_given` existed (NULL) is shown as stored.
+ */
+export function givenMoveIn(review: StoredMoveInFields): {
+  season: string | null;
+  year: number | string | null;
+} {
+  const season = review.move_in_season ?? null;
+  const year = review.move_in_year ?? null;
+  if (review.move_in_given === 'none') return { season: null, year: null };
+  if (review.move_in_given === 'year_only') return { season: null, year };
+  return { season, year };
+}
+
+/** Shown on the reviewer's edit page and the admin queue when the move-in was skipped. */
+export const MOVE_IN_NOT_GIVEN = 'Not given';
+
+/**
+ * The reviewer's move-in in words, "Fall 2023" or "2023", or null when it was skipped.
+ * For the reviewer's own edit page and the admin queue; public cards use the season chip.
+ */
+export function formatMoveIn(review: StoredMoveInFields): string | null {
+  const { season, year } = givenMoveIn(review);
+  const inYear = year ? Number(year) : NaN;
+  if (!Number.isFinite(inYear)) return null;
+  return season ? formatFuzzyDate(inYear, season.toLowerCase()) : String(inYear);
 }
 
 /**
@@ -94,9 +136,10 @@ export function reviewSeasonChipProps(review: ReviewTenancyFields): {
   moveOutYear: string | null | undefined;
   isCurrentTenant: boolean;
 } {
+  const moveIn = givenMoveIn(review);
   return {
-    moveInSeason: review.move_in_season,
-    moveInYear: review.move_in_year,
+    moveInSeason: moveIn.season,
+    moveInYear: moveIn.year,
     moveOutYear: review.move_out_year_new,
     isCurrentTenant: review.is_current_tenant === 1 || review.move_out_year_new === 'current',
   };

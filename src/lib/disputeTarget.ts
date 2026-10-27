@@ -96,8 +96,8 @@ export async function resolveDisputedReview(
   // Only approved reviews appear on the page, so only they can be the one the landlord saw.
   const rows = await db
     .prepare(
-      `SELECT id, building_id, user_id, move_in_season, move_in_year, move_out_year_new, is_current_tenant,
-              review_title, review_text, comments
+      `SELECT id, building_id, user_id, move_in_season, move_in_year, move_in_given, move_out_year_new,
+              is_current_tenant, review_title, review_text, comments
        FROM reviews
        WHERE building_id = ? AND status = 'approved'
        ORDER BY created_at DESC

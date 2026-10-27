@@ -78,4 +78,42 @@ describe('ReviewCard tenancy dates', () => {
     expect(out).toContain('Summer 2015 · 2020 or earlier');
     expect(out).not.toContain('2020_or_earlier');
   });
+
+  it('shows no move-in when the reviewer skipped it', async () => {
+    const out = text(await render({
+      ...baseReview,
+      move_in_season: 'winter',
+      move_in_year: year,
+      move_in_given: 'none',
+      move_out_year_new: 'current',
+      is_current_tenant: 1,
+    }));
+    expect(out).not.toContain(`Winter ${year}`);
+    expect(out).toContain('Current');
+  });
+
+  it('shows a move-in year alone when the reviewer gave no month', async () => {
+    const out = text(await render({
+      ...baseReview,
+      move_in_season: 'winter',
+      move_in_year: year - 2,
+      move_in_given: 'year_only',
+      move_out_year_new: String(year - 1),
+      is_current_tenant: 0,
+    }));
+    expect(out).toContain(`${year - 2} · ${year - 1}`);
+    expect(out).not.toContain(`Winter ${year - 2}`);
+  });
+
+  it('shows a review written before move_in_given existed as stored', async () => {
+    const out = text(await render({
+      ...baseReview,
+      move_in_season: 'winter',
+      move_in_year: year,
+      move_in_given: null,
+      move_out_year_new: 'current',
+      is_current_tenant: 1,
+    }));
+    expect(out).toContain(`Winter ${year} · Current`);
+  });
 });
