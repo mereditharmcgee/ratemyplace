@@ -425,7 +425,11 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   first, the typed neighborhood or ZIP deciding between twins. That is the only tier allowed
   above reviewed buildings; everywhere else a reviewed building never sorts below an
   unreviewed one. Then whole-word street matches, then the typed place, review count, score,
-  and the house number as a number (not text). The house number comes from `st_num_lo` /
+  and the house number as a number (not text). An area search (`isAreaSearch`: only a place
+  and/or ZIP, such as "Brighton" or "02135") puts the newest approved review
+  (`NEWEST_REVIEW_FIRST`, the browse rule) between the typed place and review count, so its
+  reviewed buildings read most recently reviewed first; unreviewed ones tie on it and keep
+  the order above. An address search never reads that key. The house number comes from `st_num_lo` /
   `st_num_hi` when set, else from the front of `b.address`. The ORDER BY carries binds and
   must be bound after the WHERE's. Keep a full query (where + order + LIMIT/OFFSET) under
   D1's 100 bound parameters: `__tests__/searchFullAddress.test.ts` checks the widest query
