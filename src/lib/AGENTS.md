@@ -298,6 +298,14 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   in the emitted SQL goes through `lit()`; the file is applied with
   `wrangler d1 execute --file`, which binds nothing. Seeded rows have `source = 'seed'` and
   deterministic ids (`seed-<parcel>`), so re-running is an upsert.
+- **`seed/impliedUnits.ts` is the seed's land-use unit estimate (R2 is 2, R3 is 3), with two
+  readers.** The seed writes it into `buildings.unit_count` when the assessor leaves the count
+  blank, which the FY2026 file does for every residential parcel, and a seed match writes it
+  over a user row's count too. No column records who wrote a count, so `unitCountLabel` in
+  `buildingDetails.ts` labels a stored count "Units (estimated from land use)" when it equals
+  the estimate and the building's current assessor record (`getCurrentAssessment` in
+  `query.ts`, the row the facts strip shows) has no count. The facts strip prints the
+  assessor's own count only when there is one. Change the table here and both follow.
 - **`addressKey` / `streetKey` in `identity.ts`** are the lookup keys for seed matching and
   reviewer dedupe: base street name plus the assessor spelling of the suffix, and a
   house-number range. A change to the suffix table changes both, on purpose. Both return

@@ -34,6 +34,7 @@ import {
   showAllLabel,
   statusText,
   stillOpenLabel,
+  stillOpenSubCount,
   ticketLinesNote,
   yearSpanLabel,
   type PermitSummary,
@@ -254,7 +255,7 @@ function requestsSection(
     status,
     hasRows,
     count: countable ? String(rows.length) : NO_COUNT,
-    subCount: countable ? openSubCount(open.length, rows.length) : '',
+    subCount: countable ? stillOpenSubCount(open.length, rows.length) : '',
     span: countable ? yearSpanLabel(observedYears(years)) : null,
     note: null,
     // 311's cap applies before grouping, so every group carries the note when it bites.
@@ -369,6 +370,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
     status: permitStatus,
     hasRows: view.permits.length > 0,
     count: permitsCountable ? String(summary.count) : NO_COUNT,
+    // "N open", not "N still open": an open permit is an active permit.
     subCount: permitsCountable
       ? openSubCount(openPermits.length, summary.count) +
         (summary.declaredTotal === null ? '' : ` · ${formatDollarsCompact(summary.declaredTotal)} declared`)
@@ -408,7 +410,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
     status: enforcementStatus,
     hasRows: view.enforcement.length > 0,
     count: enforcementCountable ? String(tickets.length) : NO_COUNT,
-    subCount: enforcementCountable ? openSubCount(openTickets, tickets.length) : '',
+    subCount: enforcementCountable ? stillOpenSubCount(openTickets, tickets.length) : '',
     span: enforcementCountable ? yearSpanLabel(observedYears(enforcementYears)) : null,
     note: enforcementCountable ? ticketLinesNote(view.enforcement.length, tickets.length) : null,
     // The cap counts violation lines, not tickets, so the note names lines.
@@ -438,7 +440,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
     status: violationStatus,
     hasRows: view.violations.length > 0,
     count: violationsCountable ? String(cases.length) : NO_COUNT,
-    subCount: violationsCountable ? openSubCount(openCases, cases.length) : '',
+    subCount: violationsCountable ? stillOpenSubCount(openCases, cases.length) : '',
     span: violationsCountable ? yearSpanLabel(observedYears(violationYears)) : null,
     note: violationsCountable ? caseLinesNote(view.violations.length, cases.length) : null,
     // The cap counts code lines, not cases, so the note names lines.
