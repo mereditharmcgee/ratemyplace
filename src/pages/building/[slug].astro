@@ -6,7 +6,6 @@ import ScoreCard from '../../components/ratings/ScoreCard.astro';
 import UGCDisclaimer from '../../components/reviews/UGCDisclaimer.astro';
 import BookmarkButton from '../../components/ui/BookmarkButton';
 import PostSubmitVerification from '../../components/profile/PostSubmitVerification';
-import EmptyState from '../../components/ui/EmptyState.astro';
 import BuildingRecords from '../../components/BuildingRecords.astro';
 import { calculateBuildingAverages, getRecencyWeight, getReviewYear } from '../../lib/scoring';
 import { currentReviewYear } from '../../lib/scoring-sql';
@@ -15,7 +14,6 @@ import { humanize } from '../../lib/format';
 import { BUILDING_DETAIL_FIELDS, hasBuildingDetails, type BuildingDetailFields } from '../../lib/buildingDetails';
 import { localityLine } from '../../lib/locality';
 import { buildingPageMeta } from '../../lib/buildingMeta';
-import { NO_REVIEWS_CARD_TITLE, NO_REVIEWS_CARD_BODY, NO_REVIEWS_BREAKDOWN_COPY } from '../../lib/records/display';
 
 // Label and formatter for each field in BUILDING_DETAIL_FIELDS, in display order —
 // keeps the <dl> rows and the hasBuildingDetails check from drifting.
@@ -189,6 +187,14 @@ const sortedUnits = Array.from(reviewsByUnit.values())
   .sort((a, b) => unitTypeOrder.indexOf(a.unitType) - unitTypeOrder.indexOf(b.unitType));
 
 const showBuildingDetails = hasBuildingDetails(building);
+// With no approved review the city records are the page's content, so they come straight
+// after the header and the header's "No reviews yet" line and button are the whole empty
+// state. With reviews, the reviews come first and the records follow them.
+const hasReviews = reviews.length > 0;
+// The records card sits in a row laid out like the main grid, so it is exactly as wide as
+// the main column's cards at every breakpoint.
+const recordsRowClass = 'grid lg:grid-cols-3 gap-8';
+const recordsColumnClass = 'lg:col-span-2';
 // A seeded Boston page with no review yet is a city-records page and its metadata says so.
 // The fields are picked out one by one rather than cast: the building row is loosely typed
 // here, and a cast would hide a column this ever stops selecting.
@@ -302,24 +308,21 @@ const meta = buildingPageMeta(
       </div>
     </div>
 
+    {/* No approved review: the public records are the answer, so they come first. */}
+    {!hasReviews && (
+      <div class={recordsRowClass}>
+        <div class={recordsColumnClass}>
+          <BuildingRecords buildingId={building.id} />
+        </div>
+      </div>
+    )}
+
     <div class="grid lg:grid-cols-3 gap-8">
       <!-- Sidebar -->
-      <div class="lg:col-start-3 lg:row-start-1 lg:col-span-1 lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
+      {/* Rating cards only, so it is hidden when there is no review: an empty grid item
+          would still add a row gap on a phone. */}
+      <div class:list={['lg:col-start-3 lg:row-start-1 lg:col-span-1 lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto', { hidden: !hasReviews }]}>
         {scores && <ScoreCard scores={scores} type="building" />}
-
-        {!scores && (
-          <div class="bg-white rounded-[6px] border border-gray-200 p-6">
-            <h3 class="font-semibold text-gray-900">{NO_REVIEWS_CARD_TITLE}</h3>
-            <p class="mt-1 text-sm text-gray-600">{NO_REVIEWS_CARD_BODY}</p>
-            <a
-              href={`/review/new?building=${building.id}`}
-              class="mt-4 inline-block bg-teal-700 text-white font-semibold px-6 py-2 rounded-[4px] hover:bg-teal-800 transition-colors"
-            >
-              Write a review
-            </a>
-            <p class="mt-4 text-xs text-gray-500">{NO_REVIEWS_BREAKDOWN_COPY}</p>
-          </div>
-        )}
 
         {scores && scores.review_count > 0 && (
           <div class="bg-white rounded-[6px] border border-gray-200 p-6 mt-6">
@@ -450,28 +453,20 @@ const meta = buildingPageMeta(
           </div>
         )}
 
-        <!-- No Reviews State -->
-        {reviews.length === 0 && (
-          <EmptyState
-            title="No reviews yet for this building."
-            description="Be the first to share your experience with this property."
-            action={{ label: 'Be the first to write a review', href: `/review/new?building=${building.id}` }}
-          >
-            <svg slot="icon" class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-            </svg>
-          </EmptyState>
-        )}
-
-        <UGCDisclaimer />
+        {/* The line about tenant-written reviews describes reviews, so it shows only with some. */}
+        {hasReviews && <UGCDisclaimer />}
       </div>
     </div>
 
-    <!-- Public records sit below the reviews and the rating sidebar: reviews and
-         the sidebar are the judgment layer, records are the reference. -->
-    <div class="max-w-3xl mt-8">
-      <BuildingRecords buildingId={building.id} />
-    </div>
+    {/* With reviews, public records sit below the reviews and the rating sidebar: reviews and
+        the sidebar are the judgment layer, records are the reference. */}
+    {hasReviews && (
+      <div class:list={[recordsRowClass, 'mt-8']}>
+        <div class={recordsColumnClass}>
+          <BuildingRecords buildingId={building.id} />
+        </div>
+      </div>
+    )}
   </div>
 </BaseLayout>
 
