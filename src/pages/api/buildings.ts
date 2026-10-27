@@ -2,9 +2,9 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../lib/db';
 import { generateIdFromEntropySize } from 'lucia';
 import { checkRateLimit, buildRateLimitHeaders, getClientIP } from '../../lib/rateLimit';
-import { escapeLikePattern, sanitizeText, isValidZipCode } from '../../lib/validation';
-import { findBuildingByAddress } from '../../lib/records/dedupe';
+import { escapeLikePattern, sanitizeText } from '../../lib/validation';
 import { addressKey } from '../../lib/records/identity';
+import { findExistingBuilding, resolveInputFrom } from '../../lib/buildingResolve';
 
 export async function GET(context: APIContext): Promise<Response> {
   const query = (context.url.searchParams.get('q') || '').trim();
@@ -153,27 +153,25 @@ export async function POST(context: APIContext): Promise<Response> {
     // Type/length validation + sanitization. These fields are user-supplied on
     // manual entry and flow to the public map/search (where address/neighborhood
     // are rendered), so strip markup, cap lengths, and reject non-numeric
-    // coordinates before anything reaches the DB.
-    const cleanAddress = sanitizeText(streetAddress).slice(0, 500);
-    const cleanCity = sanitizeText(city).slice(0, 120);
+    // coordinates before anything reaches the DB. Street, city, ZIP and place id are
+    // cleaned by resolveInputFrom, the same cleaning the /review/new handoff uses; a
+    // place id that is not in Google's format is treated as absent.
+    //
+    // sanitizeText can empty out an all-markup input (e.g. "<b></b>") that passed
+    // the truthy check above, so a null here is the same 400.
+    const input = resolveInputFrom({ placeId, streetAddress, city, zipCode });
+    if (!input) {
+      return new Response(JSON.stringify({ error: 'Street address and city are required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
     const cleanNeighborhood = typeof neighborhood === 'string' && neighborhood.trim()
       ? sanitizeText(neighborhood).slice(0, 120)
       : null;
     const cleanState = typeof state === 'string' && state.trim()
       ? state.trim().slice(0, 2).toUpperCase()
       : null;
-    const cleanZip = typeof zipCode === 'string' && isValidZipCode(zipCode.trim())
-      ? zipCode.trim()
-      : null;
-
-    // sanitizeText can empty out an all-markup input (e.g. "<b></b>") that passed
-    // the truthy check above — re-verify after cleaning.
-    if (!cleanAddress || !cleanCity) {
-      return new Response(JSON.stringify({ error: 'Street address and city are required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
 
     // Coordinates: accept only finite numbers within valid lat/lng ranges; a bad
     // coordinate becomes null (building simply won't appear on the map) rather
@@ -191,54 +189,39 @@ export async function POST(context: APIContext): Promise<Response> {
         headers: { 'Content-Type': 'application/json' }
       });
 
-    // Google-sourced: the place id is exact.
-    if (placeId) {
-      const existing = await db.prepare(
-        'SELECT id, slug FROM buildings WHERE google_place_id = ?'
-      ).bind(placeId).first<{ id: string; slug: string }>();
-
-      if (existing) return found(existing);
-    }
-
-    // Boston, any source: land on the seeded (or earlier user) page for this address so one
-    // building never gets two pages. Writes the place id and coordinates the seeded row lacks.
-    const seeded = await findBuildingByAddress(db, { address: cleanAddress, city: cleanCity, zip: cleanZip });
-    if (seeded) {
-      // Only stamp when there is something to stamp, and only onto a row still missing one of
-      // the three. COALESCE never overwrites: the first place id wins, and a later different
-      // place id lands on this same row through the address tier, so the outcome is
-      // idempotent. The extra WHERE clause is about the clock rather than the columns —
-      // `updated_at` feeds the sitemap's `lastmod`, so an abandoned form (or a repeat visit
-      // to an already-stamped row) must not republish the page as freshly changed.
-      const hasSomethingToStamp = Boolean(placeId) || cleanLatitude !== null || cleanLongitude !== null;
-      if (hasSomethingToStamp) {
-        await db.prepare(
-          'UPDATE buildings SET google_place_id = COALESCE(google_place_id, ?), latitude = COALESCE(latitude, ?), ' +
-          'longitude = COALESCE(longitude, ?), updated_at = unixepoch() WHERE id = ? ' +
-          'AND (google_place_id IS NULL OR latitude IS NULL OR longitude IS NULL)'
-        ).bind(placeId || null, cleanLatitude, cleanLongitude, seeded.id).run();
+    // The three read-only tiers (place id, Boston address key, exact manual entry) live in
+    // lib/buildingResolve.ts, shared with the /review/new?placeId= handoff.
+    const existing = await findExistingBuilding(db, input);
+    if (existing) {
+      if (existing.tier === 'address_key') {
+        // Only stamp when there is something to stamp, and only onto a row still missing one of
+        // the three. COALESCE never overwrites: the first place id wins, and a later different
+        // place id lands on this same row through the address tier, so the outcome is
+        // idempotent. The extra WHERE clause is about the clock rather than the columns —
+        // `updated_at` feeds the sitemap's `lastmod`, so an abandoned form (or a repeat visit
+        // to an already-stamped row) must not republish the page as freshly changed.
+        const hasSomethingToStamp = Boolean(input.placeId) || cleanLatitude !== null || cleanLongitude !== null;
+        if (hasSomethingToStamp) {
+          await db.prepare(
+            'UPDATE buildings SET google_place_id = COALESCE(google_place_id, ?), latitude = COALESCE(latitude, ?), ' +
+            'longitude = COALESCE(longitude, ?), updated_at = unixepoch() WHERE id = ? ' +
+            'AND (google_place_id IS NULL OR latitude IS NULL OR longitude IS NULL)'
+          ).bind(input.placeId, cleanLatitude, cleanLongitude, existing.id).run();
+        }
       }
 
-      return found(seeded);
-    }
-
-    // Manual entry anywhere: exact (address, city), case-insensitive, as before.
-    if (!placeId) {
-      const existing = await db.prepare(
-        'SELECT id, slug FROM buildings WHERE LOWER(address) = LOWER(?) AND LOWER(city) = LOWER(?) LIMIT 1'
-      ).bind(cleanAddress, cleanCity).first<{ id: string; slug: string }>();
-
-      if (existing) return found(existing);
+      // The tier is internal; the response stays { id, slug }.
+      return found({ id: existing.id, slug: existing.slug });
     }
 
     // Already sanitized + length-capped above.
-    const safeAddress = cleanAddress;
+    const safeAddress = input.address;
 
     // Generate slug from address plus city. `[^a-z0-9]+` is greedy, so each part can only
     // carry a single leading or trailing hyphen for the second replace to peel.
     const slugPart = (value: string): string =>
       value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const baseSlug = `${slugPart(safeAddress)}-${slugPart(cleanCity)}`;
+    const baseSlug = `${slugPart(safeAddress)}-${slugPart(input.city)}`;
 
     // Collision suffix counts up (`-2`, `-3`, …) rather than appending a timestamp: slugs
     // are the public URL, and "9-pine-st-cambridge-2" is a readable second building at that
@@ -273,12 +256,12 @@ export async function POST(context: APIContext): Promise<Response> {
       safeAddress,
       withSlug,
       cleanNeighborhood,
-      cleanCity,
+      input.city,
       cleanState,
-      cleanZip,
+      input.zip,
       cleanLatitude,
       cleanLongitude,
-      placeId || null,
+      input.placeId,
       key?.streetKey ?? null,
       key?.numLo ?? null,
       key?.numHi ?? null

@@ -86,6 +86,7 @@ npm run db:setup   # db:fresh then db:seed (local D1 only)
 npm run ops:metrics   # regenerate ops/METRICS.md from production (read-only)
 npm run records:check   # live Lanark fixture check (hits data.boston.gov), run by hand
 npm run records:seed -- --dry-run   # Boston bulk seed; --write / --apply --local / --apply --remote
+npm run records:suffix-backfill -- --remote   # after a SUFFIX_SPELLINGS change: generates re-key/respell/refresh SQL, applies nothing
 npm run records:worker        # run the records-scheduler Worker locally (stop `npm run dev` first)
 npm run records:worker:deploy # deploy the records-scheduler Worker — separate from the site deploy
 ```
@@ -240,8 +241,15 @@ corrections, and the public records request (`/api/records/request`). It cannot 
 preview or locally; verify on production.
 
 Email templates live in `lib/email.ts`, never in route handlers, and every interpolated
-user value goes through that module's local `escapeHtml`. Send with
-`fireAndForget(context, promise)`, never a bare `await`.
+user value goes through that module's local `escapeHtml`. Every send goes
+`trackSend(context, kind, to, sendX(…))` (`lib/trackSend.ts`), which wraps
+`fireAndForget` — never a bare `await`, and never a bare `fireAndForget(context, sendX(…))`.
+A failed or unconfigured send is recorded in `app_settings` as
+`email_last_failure_{owner,records,public}` plus counters, and shows on `/admin` under
+"Email delivery"; `emailTrackingContract.test.ts` fails on an untracked send. An intake that
+needs the owner's action calls `queueOwnerNotice(context, { kind, buildingId })`
+(`lib/ownerNotify.ts`) after its write commits. The owner inbox is `OWNER_NOTIFY_EMAIL` in
+`lib/email.ts`; there is no env var for it.
 
 ## Traps
 
@@ -259,6 +267,10 @@ Things that have already cost time. Read before debugging.
   else, so a change to `src/lib/records/scheduler.ts` or `queue.ts` is live in the admin
   routes but not in the cron until someone runs `npm run records:worker:deploy`. Its secrets
   (`RESEND_API_KEY`, `RECORDS_ALERT_EMAIL`) are Worker secrets, separate from the site's.
+  An unset or blank `RECORDS_ALERT_EMAIL` falls back to `OWNER_NOTIFY_EMAIL` and logs
+  `records_alert_recipient_default`; a failed alert shows on `/admin` under "Records-fill
+  alerts". The alert code is `src/lib/records/schedulerAlert.ts`, so a change there or in
+  `email.ts` / `emailHealth.ts` also needs a Worker deploy.
   After a deploy, zero cron invocations for more than fifteen minutes has so far meant a
   Cloudflare Cron Triggers incident rather than a broken Worker — check the status page
   first. See [`docs/runbooks/records-scheduler.md`](docs/runbooks/records-scheduler.md).
@@ -286,6 +298,11 @@ Things that have already cost time. Read before debugging.
   showed an unfiltered list. The list SELECT must keep returning `admin_notes` and the
   `owner_*` columns, and the edit form sends only changed fields (`buildingEditPatch`):
   the old full-row PUT nulled whatever the list had not loaded.
+- **"Sent" means Resend accepted it, nothing more.** Bounces and spam filtering happen after
+  that and are invisible to the app: the `/admin` "Email delivery" card only knows about sends
+  Resend refused, sends that threw, sends with no API key, and owner notices held back by the
+  cap. Check the Resend dashboard and the inbox (including spam) for the rest. The "Waiting on
+  you" card reads the queues directly, so it shows the backlog whether or not a notice arrived.
 - **Preview deploys cannot exercise Turnstile or the map.** The Turnstile sitekey is not
   allowlisted for `pages.dev`, and preview has no Maps key. Verify those widgets on
   production only — a failure in preview is expected, not a bug.
@@ -353,7 +370,9 @@ Things that have already cost time. Read before debugging.
   cannot appear on one and not the other. Browse mode (no query), the landlord queries and
   `src/pages/api/buildings/map.ts` keep their `HAVING COUNT(r.id) > 0`.
   `recordsSearchParity.test.ts` fails if either call site stops using the fragments or if
-  the browse-mode and landlord counts change.
+  the browse-mode and landlord counts change. The typed spelling of each term matches
+  anywhere in the address; every other spelling of its suffix row matches only as a whole
+  word (`ADDRESS_WORDS` in `searchSql.ts`).
 - **`/sitemap.xml`, `/sitemaps/*.xml`, and `/robots.txt` are D1-backed routes** in
   `src/pages/`, not files in `public/`. The static-page allowlist is `STATIC_SITEMAP_PATHS`
   in `src/lib/sitemap.ts`; a new public page is not in the sitemap until it is added there.
@@ -380,6 +399,25 @@ Things that have already cost time. Read before debugging.
   a failed POST only where the callback merely stores the token —
   `src/components/records/RecordCorrectionForm.tsx` is that shape. Either way, gate a
   submitting callback on a press flag so an auto-solve cannot post on its own.
+- **`GET /review/new` never writes a `buildings` row.** The `?placeId=` handoff from the
+  homepage resolves read-only through `findExistingBuilding` (`src/lib/buildingResolve.ts`,
+  via `resolveReviewHandoff` in `src/lib/reviewHandoff.ts`). It either 302s to the existing
+  building (`?building=`, plus `&partOf=1` when the city's parcel spans a different number
+  range) or pre-fills the address step, whose Continue POSTs `/api/buildings`. Before
+  October 2026 it inserted on page load, with no address tier and no key columns, and 11
+  zero-review rows came from it. Island props on that page come only from
+  `loadReviewFormBuilding`'s four columns.
+- **Sign-in return paths go through `safeRedirectPath` (`src/lib/authRedirect.ts`).** That
+  covers `?redirect=` on `/auth/signin` and `/auth/signup`, and the `oauth_return_to`
+  cookie the Google flow carries (scoped to `/api/auth/google`, beside an unchanged
+  `oauth_state`). Any other reader of a return path must use it, or it is an open redirect.
+  A naive "resolve with `new URL` and take the pathname" turns `/.//evil.example` into
+  `//evil.example`, which a browser reads as another host.
+- **React islands import only leaf modules from `src/lib`.** `reviewPaths`,
+  `reviewSubmitOutcome` and `authRedirect` have no runtime imports, which
+  `clientLeafModules.test.ts` enforces. Importing a server module such as `reviewHandoff`,
+  `buildingResolve`, `places` or `records/*` into an island ships its module-level code to
+  every browser.
 - **`buildings.updated_at` feeds sitemap `lastmod`.** Do not bump it on a no-op write; a
   write-through that stamps nothing new would move a page's date for every crawler with no
   content change behind it. `POST /api/buildings` only stamps a matched row when it has

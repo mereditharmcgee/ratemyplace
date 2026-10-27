@@ -101,7 +101,50 @@ stays alive after the response is sent, and swallows rejections into structured 
 unhandled rejection inside `waitUntil` crashes the isolate in production, so the internal
 `.catch` is not optional. It returns `void` specifically so callers cannot `await` it.
 
-Use it for every outbound email.
+Outbound email does not call it directly: it goes through `trackSend`, which wraps it (below).
+
+### Email delivery and owner notices
+
+- **`email.ts`** holds every template and exactly one Resend call, the private `deliver`.
+  A send never logs and never throws: a missing key, a Resend error and a thrown call come back
+  as `{ success: false, reason, code, httpStatus }` (`not_configured` / `provider_error` /
+  `exception`). `error` can carry Resend's message, which can echo the recipient, so it is
+  never stored or logged. `__tests__/emailPayloads.test.ts` snapshots every existing payload;
+  a diff there is a change a recipient would see, not something to update with `-u`.
+  `OWNER_NOTIFY_EMAIL` is the owner inbox.
+- **`siteSettings.ts`** is a leaf, like `records/settings.ts`: it imports only types. It owns
+  the site-level `app_settings` keys (`SITE_SETTING_KEYS`); site keys and `records_*` keys
+  never mix, and a test enforces it.
+- **`emailHealth.ts`** is the trace a failed send leaves. Kinds belong to one of three
+  channels — `owner` (notices and the contact notification), `records` (the Worker's alerts)
+  and `public` (everyone else) — and each channel keeps its own last-failure key, so a bounced
+  landlord receipt cannot hide a failed owner notice. A record holds kind, reason, a sanitized
+  code, the HTTP status, an 8-hex recipient hash and the request host; never an address and
+  never Resend's message. `trackEmail` and `recordEmailProblem` never reject. Their writes are
+  two sequential `.run()` calls, **never `db.batch`**: they run in the background after a
+  route has answered, and a batch would open a transaction that can collide with the
+  request's own. Imports from `email.ts` are type-only, so a partial `vi.mock('../email')` in a
+  route test cannot break it. Worker-safe (no `node:`, no runtime `astro`).
+- **`trackSend.ts`** is the one call shape for a route send:
+  `trackSend(context, kind, to, sendX(…))`. It never throws after a route's write; the
+  source host it records comes from `request.url`, so a preview deploy's failure — preview
+  writes to the production D1 — is labelled "from <host>" on `/admin`.
+- **`ownerNotify.ts`** emails the owner when an intake needs action. A notice carries only a
+  kind and a building id (`OwnerNotice`), so a route cannot pass PII into one; the email
+  shows the building address, the time and a link to the queue. Caps: 6 per hour and 15 per
+  day per kind, 40 per day site-wide, on the `rate_limits` table. A denied notice is recorded
+  as `capped` (its own counter, its own log event). If the limiter itself errors the notice
+  **fails open** — every intake except review edit has already run its own fail-closed
+  limiter on the same table and answered 503 before inserting, so in practice only review
+  edits reach that path. It is not a relaxation of fail-closed request limiting; do not copy
+  it into a request path.
+- **`records/schedulerAlert.ts`** is the Worker's `alert` dependency, moved out of
+  `workers/records-scheduler/src/index.ts` so it is tested. It sends through `trackEmail`
+  with source `records-scheduler`, falls back to `OWNER_NOTIFY_EMAIL` when
+  `RECORDS_ALERT_EMAIL` is unset or blank, and never throws.
+- **`admin/inbox.ts`** is the dashboard's "Waiting on you" counts, one statement of scalar
+  subqueries. It is the safety net for a notice that was capped or filtered. Contact messages
+  are excluded: they have no resolve action, so the count could never clear.
 
 ### `privacy.ts` — fuzzing is a safety control
 
@@ -221,7 +264,10 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
 - **`identity.ts`** turns a `buildings` row into every address form worth querying
   (short and long, range and split, directional stripped) plus both parcel forms. The
   feeds disagree about how an address is stored; normalization lives here, not in the
-  sources.
+  sources. `addressLikeClauses` in `ckan.ts` then tries every street spelling on the
+  identity that the short and long forms do not already prefix-cover, because the feeds
+  spell suffixes differently (permits write `RADFORD LN` where the assessor writes
+  `RADFORD LA`; legacy 311 writes `VFW PKWY` for the assessor's `VFW PW`).
 - **`seed/` is the bulk pipeline, not a request path.** `scripts/records-seed-boston.ts`
   downloads the assessor and SAM resources once (`fetchAllRows` in `ckan.ts`), and the pure
   modules under `records/seed/` filter, collapse, format, match, and emit SQL. Every string
@@ -235,6 +281,13 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   key that silently collides. That rule is `isDegenerateStreet`, defined once in
   `identity.ts` and called from four places (`buildIdentity`, `streetKey`, `addressKey`, and
   `seed/format.ts`); change the rule there, not at a call site.
+  The first spelling of each `SUFFIX_SPELLINGS` row is the key spelling and must stay the
+  assessor's; `recordsAddressKey.test.ts` pins it. The October 2026 additions put
+  `WY`/`HW`/`PW`/`CI`/`LA`/`RO`/`AL`/`CR` ahead of `WAY`/`HWY`/`PKWY`/`CIR`/`LN`/`ROW`, so
+  374 of the 375 affected stored keys did not move. After any change to the table, run
+  `npm run records:suffix-backfill -- --remote --pulled-since <T_live>` (it only reads, via
+  `seed/suffixBackfill.ts`) and apply its files by hand, in the order its `summary.txt` gives:
+  the re-key is mandatory, the respell is optional, and the refresh waits for a live pilot.
 - **Matching is parcel id first, then address.** `seed/match.ts` trusts an existing row's own
   `parcel_id` outright, and only falls back to street key plus number-range containment. It
   breaks a two-parcel tie with the ZIP, because street keys repeat across neighborhoods
@@ -276,10 +329,14 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   `Retry-After` on the cap branch is computed from the oldest counted row, so the number it
   gives is the real wait rather than a fixed guess. The numbers live here so the route, its
   tests, and the privacy-page copy cannot fork.
-- **`dedupe.ts` refuses rather than guesses — and the tier order is the route's, not the
-  module's.** `POST /api/buildings` runs three tiers: an exact Google **place id**, then
+- **`dedupe.ts` refuses rather than guesses — and the tier order lives in
+  `buildingResolve.ts`, not here.** `findExistingBuilding` runs three read-only tiers: an
+  exact Google **place id** (`findBuildingByPlaceId`, the one spelling of tier 1), then
   `findBuildingByAddress`, then an exact case-insensitive **(address, city)** for a manual
-  entry with no place id. Only the middle tier is in `dedupe.ts`, and inside it the order is
+  entry with no place id. `POST /api/buildings` and the `/review/new?placeId=` handoff both
+  call it, so the handoff and Continue cannot disagree about which page an address belongs
+  on; only POST writes (it stamps a matched address-tier row, and creates otherwise). Only
+  the middle tier is in `dedupe.ts`, and inside it the order is
   Boston address key plus range containment under the parity rule → ZIP tiebreak → survivor
   ranking: a user row before its seeded twin, then the narrower span, then the oldest.
   `findBuildingByAddress` itself returns **null** (the route creates a page) whenever it

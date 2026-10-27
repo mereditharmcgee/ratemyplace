@@ -150,3 +150,34 @@ describe('violationsSource', () => {
     expect(result.query).not.toContain('"ticket_no"');
   });
 });
+
+// The feeds store the bare street ('GRAMPIAN') and the suffix apart (WY, HW, PW, CI, RO, AL, CR,
+// LN). Before the October 2026 suffixes, an unknown suffix stayed glued to the street name, so
+// `violation_street = 'GRAMPIAN WY'` matched nothing for every one of these buildings.
+describe('violation feeds on the assessor suffixes added in October 2026', () => {
+  function identityFor(address: string) {
+    return buildIdentity({ id: 'n', address, city: 'Boston', state: 'MA', zip_code: '02125', parcel_id: null, sam_id: null });
+  }
+
+  it('splits GRAMPIAN off WY and offers both spellings of the suffix', async () => {
+    const grampian = identityFor('9 Grampian Wy');
+    expect(bareStreetName(grampian)).toBe('GRAMPIAN');
+    expect(suffixSpellings(grampian)).toEqual(['WY', 'WAY']);
+    const result = await violationsSource.run(grampian, fixtureFetch([{ resourceId: VIOLATIONS_RESOURCE_ID, records: [] }]));
+    expect(result.query).toContain(`upper("violation_street") = 'GRAMPIAN'`);
+    expect(result.query).toContain(`upper("violation_suffix") IN ('WY','WAY')`);
+  });
+
+  it('offers LA, LN and LANE for an assessor La street', () => {
+    expect(suffixSpellings(identityFor('11 Radford La'))).toEqual(['LA', 'LN', 'LANE']);
+  });
+
+  it('strips the directional and splits the new suffix off together', async () => {
+    const roxbury = identityFor('566 W Roxbury Pw');
+    expect(bareStreetName(roxbury)).toBe('ROXBURY');
+    expect(suffixSpellings(roxbury)).toEqual(['PW', 'PKWY', 'PARKWAY']);
+    const result = await enforcementSource.run(roxbury, fixtureFetch([]));
+    expect(result.query).toContain(`upper("violation_street") = 'ROXBURY'`);
+    expect(result.query).toContain(`upper("violation_suffix") IN ('PW','PKWY','PARKWAY')`);
+  });
+});

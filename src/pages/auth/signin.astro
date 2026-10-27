@@ -1,9 +1,14 @@
 ---
 import BaseLayout from '../../components/layout/BaseLayout.astro';
+import { redirectQuery, safeRedirectPath } from '../../lib/authRedirect';
+
+// Where to go after signing in. Validated here and again in the page script before it
+// navigates; an unsafe or missing value is '/', which also keeps every link below bare.
+const redirectTo = safeRedirectPath(Astro.url.searchParams.get('redirect'));
 
 // Redirect if already logged in
 if (Astro.locals.user) {
-  return Astro.redirect('/');
+  return Astro.redirect(redirectTo);
 }
 ---
 
@@ -14,7 +19,7 @@ if (Astro.locals.user) {
         <h1 class="text-center text-3xl font-bold text-gray-900">Sign in to your account</h1>
         <p class="mt-2 text-center text-sm text-gray-600">
           Or{' '}
-          <a href="/auth/signup" class="font-medium text-teal-700 hover:text-teal-500">
+          <a href={'/auth/signup' + redirectQuery(redirectTo)} class="font-medium text-teal-700 hover:text-teal-500">
             create a new account
           </a>
         </p>
@@ -22,7 +27,7 @@ if (Astro.locals.user) {
 
       <div class="mt-8">
         <a
-          href="/api/auth/google"
+          href={'/api/auth/google' + redirectQuery(redirectTo)}
           class="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-slate-200 rounded-[4px] bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
         >
           <svg class="w-5 h-5" viewBox="0 0 24 24">
@@ -44,7 +49,7 @@ if (Astro.locals.user) {
         </div>
       </div>
 
-      <form id="signin-form" class="space-y-6">
+      <form id="signin-form" class="space-y-6" data-redirect={redirectTo}>
         <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"></div>
 
         <div class="space-y-4">
@@ -113,6 +118,8 @@ if (Astro.locals.user) {
 
 <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script>
+  import { safeRedirectPath } from '../../lib/authRedirect';
+
   // Password visibility toggle
   document.querySelectorAll('.toggle-password').forEach((button) => {
     button.addEventListener('click', () => {
@@ -146,7 +153,7 @@ if (Astro.locals.user) {
 
   function renderTurnstile() {
     const container = document.getElementById('turnstile-container');
-    const turnstile = (window as any).turnstile;
+    const turnstile = window.turnstile;
     if (!container || !turnstile || turnstileWidgetId) return;
     turnstileWidgetId = turnstile.render(container, {
       sitekey: '0x4AAAAAACo4KpkxsacPhM2r',
@@ -154,7 +161,7 @@ if (Astro.locals.user) {
     });
   }
 
-  if ((window as any).turnstile) {
+  if (window.turnstile) {
     renderTurnstile();
   } else {
     // Bound the poll so a blocked/failed script load doesn't spin forever:
@@ -168,7 +175,7 @@ if (Astro.locals.user) {
         return;
       }
       turnstilePollAttempts++;
-      if ((window as any).turnstile) {
+      if (window.turnstile) {
         clearInterval(turnstileInterval);
         renderTurnstile();
       } else if (turnstilePollAttempts >= 100) {
@@ -196,7 +203,9 @@ if (Astro.locals.user) {
       const result = await response.json();
 
       if (response.ok) {
-        window.location.href = '/';
+        // data-redirect was validated server-side; validate again, since the DOM is not
+        // the server and this is the line that navigates.
+        window.location.href = safeRedirectPath(form.dataset.redirect);
       } else {
         errorMessage.textContent = result.error || 'An error occurred';
         errorMessage.classList.remove('hidden');
@@ -209,8 +218,8 @@ if (Astro.locals.user) {
       button.textContent = 'Sign in';
       // A Turnstile token is single-use — reset the widget after every
       // attempt so a retry gets a fresh token instead of a spent one.
-      if (turnstileWidgetId && (window as any).turnstile) {
-        (window as any).turnstile.reset(turnstileWidgetId);
+      if (turnstileWidgetId && window.turnstile) {
+        window.turnstile.reset(turnstileWidgetId);
       }
     }
   });

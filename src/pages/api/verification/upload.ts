@@ -4,6 +4,7 @@ import { getEnv } from '../../../lib/runtime';
 import { uploadVerificationImage } from '../../../lib/storage';
 import { checkRateLimit, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { generateIdFromEntropySize } from 'lucia';
+import { queueOwnerNotice } from '../../../lib/ownerNotify';
 
 export async function POST(context: APIContext): Promise<Response> {
   // Require authentication
@@ -53,9 +54,9 @@ export async function POST(context: APIContext): Promise<Response> {
     }
 
     // Verify user owns this review
-    const review = await db.prepare('SELECT user_id, is_verified FROM reviews WHERE id = ?')
+    const review = await db.prepare('SELECT user_id, is_verified, building_id FROM reviews WHERE id = ?')
       .bind(reviewId)
-      .first<{ user_id: string; is_verified: number }>();
+      .first<{ user_id: string; is_verified: number; building_id: string }>();
 
     if (!review) {
       return new Response(JSON.stringify({ error: 'Review not found' }), {
@@ -133,6 +134,8 @@ export async function POST(context: APIContext): Promise<Response> {
       uploadResult.contentType,
       uploadResult.sizeBytes
     ).run();
+
+    queueOwnerNotice(context, { kind: 'verification_upload', buildingId: review.building_id });
 
     return new Response(JSON.stringify({
       success: true,

@@ -120,13 +120,29 @@ npx wrangler d1 execute ratemyplace-db --remote --command \
 ```
 
 **`app_settings` keys in use.** The table is a key/value store for operator switches; the
-records pipeline owns three, defined once in `SETTING_KEYS` in `src/lib/records/settings.ts`:
+records pipeline owns four, defined once in `SETTING_KEYS` in `src/lib/records/settings.ts`:
 
 | Key | Value |
 |-----|-------|
 | `records_fill_paused` | `'1'` or `'0'`. The city-wide fill brake. Set by the circuit breaker, cleared only by a human from `/admin/records` |
+| `records_breaker_pause_cause` | `fixture` or `errors`, present only while the breaker owns the pause. Written in the same batch as the pause, deleted by any other write of the flag |
 | `records_breaker_last_alert` | Unix seconds of the last breaker email, so a paused fill does not alert again |
 | `records_fixture_last` | JSON: what the daily Lanark fixture saw. Rendered by the admin queue panel |
+
+The site owns six more, defined once in `SITE_SETTING_KEYS` in `src/lib/siteSettings.ts` and
+created by the code on first use (no migration). None starts with `records_`:
+
+| Key | Value |
+|-----|-------|
+| `email_last_failure_owner` | JSON `EmailFailureRecord`: the last owner-notice or contact-notification problem |
+| `email_last_failure_records` | JSON `EmailFailureRecord`: the last records-scheduler alert problem |
+| `email_last_failure_public` | JSON `EmailFailureRecord`: the last problem sending to a member of the public |
+| `email_failure_count` | Integer as text: attempted sends that failed |
+| `owner_notice_capped_count` | Integer as text: owner notices held back by the cap |
+| `owner_notice_last_sent` | JSON `{ at, kind }`: the last owner notice Resend accepted |
+
+An `EmailFailureRecord` is `{ at, kind, reason, code, httpStatus, recipientHash, source }` —
+never an address or Resend's message text.
 
 `updated_at` defaults on insert and does not self-update, so every writer sets it explicitly
 (`writeSetting` does).

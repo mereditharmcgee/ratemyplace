@@ -29,6 +29,7 @@ import { seedStatements } from '../src/lib/records/seed/sql';
 import type { AssessorRow, ExistingBuilding, SamRow, SeedBuilding } from '../src/lib/records/seed/types';
 import { FY2026_RESOURCE_ID } from '../src/lib/records/sources/boston/assessor';
 import type { FetchLike } from '../src/lib/records/types';
+import { D1_DATABASE, shellArg, wranglerJson } from './lib/wranglerD1';
 
 const argv = process.argv.slice(2);
 const args = new Set(argv);
@@ -72,7 +73,7 @@ const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
  * the middle of one.
  */
 const STATEMENTS_PER_FILE = 999;
-const DB_NAME = 'ratemyplace-db';
+const DB_NAME = D1_DATABASE;
 /** How many rejected 'A' descriptions the summary names, so a renamed housing code is visible. */
 const TOP_SKIPPED_DESCRIPTIONS = 10;
 const LONGEST_ADDRESSES = 5;
@@ -96,51 +97,6 @@ async function cached<T>(name: string, load: () => Promise<T>): Promise<T> {
   writeFileSync(path, JSON.stringify(value));
   log(`  downloaded ${name} in ${Math.round((Date.now() - started) / 1000)}s`);
   return value;
-}
-
-/**
- * `execFileSync` with `shell: true` joins argv with single spaces and quotes nothing, on
- * every platform. Windows also cannot spawn `npx.cmd` without a shell (Node refuses to
- * exec a .cmd directly since the 2024 argument-injection fix), so the shell is not
- * optional here and each argument carries its own quotes. No value below contains a
- * double quote; the SQL's single quotes survive `cmd /s /c "..."` unchanged.
- */
-function shellArg(value: string): string {
-  return /\s/.test(value) ? `"${value}"` : value;
-}
-
-/**
- * Wrangler prints its banner and any config warnings before the `--json` payload, and a
- * warning line contains a `[` of its own (`▲ [WARNING] ...`). The payload is the first
- * line that *starts* with `[`.
- */
-function parseWranglerJson<T>(out: string): Array<{ results: T[] }> {
-  const start = /^\[/m.exec(out);
-  if (!start) throw new Error(`wrangler --json produced no JSON array:\n${out}`);
-  return JSON.parse(out.slice(start.index)) as Array<{ results: T[] }>;
-}
-
-/**
- * `wrangler d1 execute --json` renders a SQL NULL as the JSON *string* `"null"` (verified
- * against the local D1 on 2026-09-09: `SELECT NULL AS a` comes back as `{"a":"null"}`).
- * Left alone it makes every existing row's empty `parcel_id` read as a real, disagreeing
- * parcel, so `matchExistingBuildings` files a clean match as a conflict and the seed then
- * creates a duplicate row for that parcel. None of the columns this script selects — id,
- * address, slug, parcel_id, latitude, longitude, zip_code — can legitimately hold "null",
- * so the string folds back to null here. A wrangler release that emits real JSON nulls
- * makes this a no-op.
- */
-function foldNullStrings<T>(row: T): T {
-  const folded = Object.entries(row as Record<string, unknown>).map(([key, value]) => [key, value === 'null' ? null : value] as const);
-  return Object.fromEntries(folded) as T;
-}
-
-function wranglerJson<T>(commandArgs: string[]): T[] {
-  const argv = ['wrangler', 'd1', 'execute', DB_NAME, '--json', ...commandArgs].map(shellArg);
-  const out = execFileSync('npx', argv, { encoding: 'utf8', shell: true, maxBuffer: 64 * 1024 * 1024 });
-  return parseWranglerJson<T>(out)
-    .flatMap((r) => r.results)
-    .map(foldNullStrings);
 }
 
 function target(): '--local' | '--remote' {

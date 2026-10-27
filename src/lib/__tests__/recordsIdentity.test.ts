@@ -131,6 +131,46 @@ describe('buildIdentity', () => {
   });
 });
 
+describe('buildIdentity on the assessor suffixes added in October 2026', () => {
+  // One real address per new suffix row (production D1, 2026-10-26). The short form keeps the
+  // assessor spelling the stored key ends in; streetForms carries the whole row so 311's
+  // GRAMPIAN WAY / CUMMINS HWY / VFW PKWY and the permits feed's RADFORD LN all match.
+  const cases: Array<[address: string, streetBase: string, streetShort: string, streetLong: string, streetForms: string[]]> = [
+    ['9 Grampian Wy', 'GRAMPIAN', 'GRAMPIAN WY', 'GRAMPIAN WAY', ['GRAMPIAN WY', 'GRAMPIAN WAY']],
+    ['9 Cummins Hw', 'CUMMINS', 'CUMMINS HW', 'CUMMINS HIGHWAY', ['CUMMINS HW', 'CUMMINS HWY', 'CUMMINS HIGHWAY']],
+    ['530 Vfw Pw', 'VFW', 'VFW PW', 'VFW PARKWAY', ['VFW PW', 'VFW PKWY', 'VFW PARKWAY']],
+    ['3 Mamelon Ci', 'MAMELON', 'MAMELON CI', 'MAMELON CIRCLE', ['MAMELON CI', 'MAMELON CIR', 'MAMELON CIRCLE']],
+    ['11 Radford La', 'RADFORD', 'RADFORD LA', 'RADFORD LANE', ['RADFORD LA', 'RADFORD LN', 'RADFORD LANE']],
+    ['2 Holden Ro', 'HOLDEN', 'HOLDEN RO', 'HOLDEN ROW', ['HOLDEN RO', 'HOLDEN ROW']],
+    ['11 Board Al', 'BOARD', 'BOARD AL', 'BOARD ALLEY', ['BOARD AL', 'BOARD ALY', 'BOARD ALLEY']],
+    ['10-12 Conry Cr', 'CONRY', 'CONRY CR', 'CONRY CRESCENT', ['CONRY CR', 'CONRY CRES', 'CONRY CRESCENT']],
+  ];
+
+  it.each(cases)('%s splits onto its assessor row', (address, streetBase, streetShort, streetLong, streetForms) => {
+    const id = buildIdentity({ ...base, address });
+    expect(id.streetBase).toBe(streetBase);
+    expect(id.streetShort).toBe(streetShort);
+    expect(id.streetLong).toBe(streetLong);
+    expect(id.streetForms).toEqual(streetForms);
+  });
+
+  it('gives a typed Way the same street fields as the assessor Wy', () => {
+    const typed = buildIdentity({ ...base, address: '9 Grampian Way' });
+    const assessor = buildIdentity({ ...base, address: '9 Grampian Wy' });
+    for (const field of ['streetBase', 'streetShort', 'streetLong', 'streetForms'] as const) {
+      expect(typed[field]).toEqual(assessor[field]);
+    }
+  });
+
+  it('abbreviates the directional once the new suffix is split off', () => {
+    expect(buildIdentity({ ...base, address: '566 W Roxbury Pw' }).streetBase).toBe('W ROXBURY');
+  });
+
+  it('throws on a bare new suffix word', () => {
+    expect(() => buildIdentity({ ...base, address: '5 Wy' })).toThrow(/degenerate/i);
+  });
+});
+
 describe('parcel helpers', () => {
   it('canonical form keeps ten digits with a leading zero; numeric strips it', () => {
     expect(toCanonicalParcel('100001000')).toBe('0100001000');

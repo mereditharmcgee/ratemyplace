@@ -11,7 +11,8 @@ const WRANGLER_ENTRY = path.join(PROJECT_ROOT, 'node_modules', 'wrangler', 'bin'
 const WRANGLER_CONFIG = path.join(PROJECT_ROOT, 'wrangler.jsonc');
 const WRANGLER_PERSISTENCE = path.join(PROJECT_ROOT, '.wrangler', 'state');
 
-const TURNSTILE_SCRIPT = /^https:\/\/challenges\.cloudflare\.com\/turnstile\/v0\/api\.js(?:\?.*)?$/;
+/** Exported so a spec can unroute the stub and make the script fail to load. */
+export const TURNSTILE_SCRIPT = /^https:\/\/challenges\.cloudflare\.com\/turnstile\/v0\/api\.js(?:\?.*)?$/;
 export const TURNSTILE_TEST_TOKEN = 'XXXX.DUMMY.TOKEN.XXXX';
 const LOCAL_E2E_ORIGIN = 'http://localhost:8788';
 
@@ -87,6 +88,11 @@ const TURNSTILE_STUB = `
   };
 
   let widgetSequence = 0;
+  // Callbacks by widget id, so reset(id) can re-solve the way a real non-interactive widget
+  // does. Every callback in the repo either only stores a token or is gated on a press, so
+  // calling it again on reset cannot submit on its own.
+  const callbacks = new Map();
+  window.__e2eTurnstileResets = 0;
   window.turnstile = {
     render(container, options = {}) {
       const element = typeof container === 'string'
@@ -95,10 +101,19 @@ const TURNSTILE_STUB = `
       addToken(element);
       queueMicrotask(() => options.callback?.(token));
       widgetSequence += 1;
-      return 'e2e-turnstile-' + widgetSequence;
+      const id = 'e2e-turnstile-' + widgetSequence;
+      callbacks.set(id, options.callback);
+      return id;
     },
-    reset() {},
-    remove() {},
+    reset(id) {
+      window.__e2eTurnstileResets += 1;
+      // reset() with no id (forgot-password, bug-report) only counts, as before.
+      if (id === undefined) return;
+      queueMicrotask(() => callbacks.get(id)?.(token));
+    },
+    remove(id) {
+      callbacks.delete(id);
+    },
   };
 
   if (document.readyState === 'loading') {

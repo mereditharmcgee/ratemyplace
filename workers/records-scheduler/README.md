@@ -41,10 +41,12 @@ a second earlier — which is the intended behaviour anyway.
 
 Both handlers write one structured JSON line per run (`records_drain` / `records_plan`),
 plus `records_scheduler_error` if the run throws, `records_breaker_email_failed` if a
-pause or resume email does not send, `records_breaker_email_skipped` if `RECORDS_ALERT_EMAIL` was
-never set, and `records_scheduler_unknown_cron` if a cron fires that `src/index.ts` does not
-recognise. Those four go to `console.error`, so they surface as errors in the dashboard
-rather than as one more line to scroll past.
+pause or resume email does not send, `records_alert_recipient_default` if `RECORDS_ALERT_EMAIL`
+is unset or blank and the alert went to the owner inbox instead, and
+`records_scheduler_unknown_cron` if a cron fires that `src/index.ts` does not recognise. Those
+four go to `console.error`, so they surface as errors in the dashboard rather than as one more
+line to scroll past. A failed alert is also recorded in D1 and shows on the site's `/admin`
+under "Email delivery", in "Records-fill alerts".
 
 `"observability": { "enabled": true }` in `wrangler.jsonc` turns on Workers Logs, which
 retains those lines for the account plan's retention window (days, not weeks — check the
@@ -111,9 +113,9 @@ the pause flag has to be on production *before* the Worker is.
    npx wrangler secret put RECORDS_ALERT_EMAIL --config workers/records-scheduler/wrangler.jsonc
    ```
    `RECORDS_ALERT_EMAIL` is the address the breaker alert goes to. It is a secret rather
-   than a `vars` entry so a personal address is not committed to git. Miss it and the
-   breaker still pauses the fill — it just logs `records_breaker_email_skipped` at error
-   level instead of emailing anyone, which is a silence you would only notice too late.
+   than a `vars` entry so a personal address is not committed to git. Miss it (or leave it
+   blank) and the alert goes to the owner inbox, `OWNER_NOTIFY_EMAIL` in `src/lib/email.ts`,
+   with a `records_alert_recipient_default` line at error level.
 3. **Deploy:**
    ```bash
    npm run records:worker:deploy

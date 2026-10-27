@@ -11,6 +11,8 @@ import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
 import lanark2026 from './helpers/records/assessor-fy2026-lanark.json';
 import permits from './helpers/records/permits-positive.json';
 import { sendRecordCorrectionOutcomeEmail } from '../email';
+import { parseEmailFailure } from '../emailHealth';
+import { recipientHash } from '../runtime';
 
 // The route sends through lib/email; the mock keeps Resend out of the test and
 // lets us assert on the recipient and outcome the route chose.
@@ -447,6 +449,43 @@ suite('admin record correction routes', () => {
       );
       expect(second.status).toBe(409);
       expect(await second.json()).toEqual({ error: 'Correction has already been resolved' });
+    });
+
+    it('records a refused outcome email to the filer on the public channel', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      sendOutcomeEmail.mockResolvedValueOnce({
+        success: false,
+        error: 'x',
+        reason: 'provider_error',
+        code: 'validation_error',
+        httpStatus: 422,
+      });
+      const db = await createDbWithAdmin();
+      await insertBuilding(db, { parcel_id: '2102098000' });
+      await insertCorrection(db);
+      vi.stubGlobal('fetch', fixtureFetch([]));
+
+      expect((await REPULL(createContext(db))).status).toBe(200);
+      const response = await PATCH(createContext(db, { method: 'PATCH', body: { resolution: 'repulled_unchanged' } }));
+
+      expect(response.status).toBe(200);
+      expect(sendOutcomeEmail).toHaveBeenCalledWith(
+        'test-key',
+        'filer@example.com',
+        BUILDING_ADDRESS,
+        `https://ratemyplace.org/building/${BUILDING_ID}#public-records`,
+        'repulled_unchanged',
+      );
+      await vi.waitFor(async () => {
+        const row = await db
+          .prepare("SELECT value FROM app_settings WHERE key = 'email_last_failure_public'")
+          .first<{ value: string }>();
+        expect(parseEmailFailure(row?.value)).toMatchObject({
+          kind: 'record_correction_outcome',
+          reason: 'provider_error',
+          recipientHash: recipientHash('filer@example.com'),
+        });
+      });
     });
 
     it('does not email when the filer left no contact address', async () => {

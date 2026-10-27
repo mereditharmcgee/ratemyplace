@@ -1,11 +1,12 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../lib/db';
-import { getEnv, fireAndForget } from '../../lib/runtime';
+import { getEnv } from '../../lib/runtime';
 import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
 import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
 import { validateContactForm } from '../../lib/validation';
-import { sendContactConfirmationEmail, sendContactNotificationEmail } from '../../lib/email';
+import { OWNER_NOTIFY_EMAIL, sendContactConfirmationEmail, sendContactNotificationEmail } from '../../lib/email';
+import { trackSend } from '../../lib/trackSend';
 
 export async function POST(context: APIContext): Promise<Response> {
   // 1. Content-type guard
@@ -80,13 +81,19 @@ export async function POST(context: APIContext): Promise<Response> {
       VALUES (?, ?, ?, ?, ?)
     `).bind(id, name, email, safeCategory, message).run();
 
-    // Phase 18 PERF-03: emails are fire-and-forgot — response returns before Resend resolves.
+    // Phase 18 PERF-03: emails run in the background — response returns before Resend resolves.
     // DB write (contact_messages INSERT) already committed above — DB-then-email ordering preserved.
+    // trackSend records a failed send on /admin.
     const resendApiKey = getEnv(context).RESEND_API_KEY;
-    fireAndForget(context, sendContactConfirmationEmail(resendApiKey, email, name, safeCategory));
+    trackSend(context, 'contact_confirmation', email, sendContactConfirmationEmail(resendApiKey, email, name, safeCategory));
 
     const messagePreview = message.length > 200 ? message.slice(0, 200) + '...' : message;
-    fireAndForget(context, sendContactNotificationEmail(resendApiKey, name, email, safeCategory, messagePreview));
+    trackSend(
+      context,
+      'contact_notification',
+      OWNER_NOTIFY_EMAIL,
+      sendContactNotificationEmail(resendApiKey, name, email, safeCategory, messagePreview),
+    );
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

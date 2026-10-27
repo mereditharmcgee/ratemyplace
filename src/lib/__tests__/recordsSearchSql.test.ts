@@ -94,4 +94,60 @@ suite('building search SQL', () => {
       expect(inner.replace(/\\[%_\\]/g, '')).not.toMatch(/[%_]/);
     }
   });
+
+  async function slugs(db: TestD1Database, query: string): Promise<string[]> {
+    return (await search(db, query)).map((r) => r.slug);
+  }
+
+  it('finds an assessor Wy or Hw street under its spelled-out name, and the other way round', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'a', address: '120 Grampian Wy', source: 'seed' });
+    await insertBuilding(db, { id: 'b', address: '121 Grampian Way', source: 'seed' });
+    await insertBuilding(db, { id: 'c', address: '5 Grampian St', source: 'seed' });
+    await insertBuilding(db, { id: 'h', address: '9 Cummins Hw', source: 'seed' });
+    expect(await slugs(db, 'grampian way')).toEqual(['a', 'b']);
+    expect(await slugs(db, 'grampian wy')).toEqual(['a', 'b']);
+    expect(await slugs(db, 'cummins highway')).toEqual(['h']);
+    expect(await slugs(db, 'cummins hwy')).toEqual(['h']);
+  });
+
+  it('matches an alternative spelling only as a whole word', async () => {
+    // As a substring, 'la' finds Oakland and Place and 'ln' finds Lincoln: 'lane' went from 245
+    // results to 2,411 over the production addresses before alternatives were whole-word.
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'oakland', address: '12 Oakland Street', source: 'seed' });
+    await insertBuilding(db, { id: 'l1', address: '4 Centre Lane', source: 'seed' });
+    await insertBuilding(db, { id: 'l2', address: '6 Centre La', source: 'seed' });
+    await insertBuilding(db, { id: 'place', address: '8 Centre Place', source: 'seed' });
+    await insertBuilding(db, { id: 'lincoln', address: '10 Lincoln Street', source: 'seed' });
+    expect(await slugs(db, 'oak lane')).toEqual([]);
+    expect(await slugs(db, 'centre lane')).toEqual(['l1', 'l2']);
+    expect(await slugs(db, 'lane')).toEqual(['l1', 'l2']);
+  });
+
+  it('narrows an existing suffix too: dorchester street no longer finds Dorchester Avenue', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'avenue', address: '5 Dorchester Avenue', source: 'seed' });
+    await insertBuilding(db, { id: 'street', address: '7 Dorchester Street', source: 'seed' });
+    await insertBuilding(db, { id: 'st', address: '9 Dorchester St', source: 'seed' });
+    expect(await slugs(db, 'dorchester street')).toEqual(['street', 'st']);
+  });
+
+  it('reads a comma or a period beside a suffix as a word break', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'ln', address: '14 Centre Ln.' });
+    await insertBuilding(db, { id: 'main', address: '3 Main St, Boston' });
+    expect(await slugs(db, 'centre lane')).toEqual(['ln']);
+    expect(await slugs(db, 'main street')).toEqual(['main']);
+  });
+
+  it('binds the typed spelling as a substring and the other spellings as whole words', () => {
+    expect(buildingSearchWhere('radford lane').binds).toEqual(['%radford%', '%lane%', '% la %', '% ln %', '%radford lane%', '%radford lane%']);
+  });
+
+  it('keeps the typed spelling a substring match: st still finds St James', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'james', address: '1 St James Avenue', source: 'seed' });
+    expect(await slugs(db, 'st james')).toEqual(['james']);
+  });
 });

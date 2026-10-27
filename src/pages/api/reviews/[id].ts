@@ -2,6 +2,7 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import { calculateOverallScore, ALL_SCORE_FIELDS } from '../../../lib/scoring';
 import { validateReviewText } from '../../../lib/validation';
+import { queueOwnerNotice } from '../../../lib/ownerNotify';
 
 export interface ReviewDetail {
   id: string;
@@ -153,9 +154,9 @@ export async function PATCH(context: APIContext): Promise<Response> {
     const db = getDB(context);
 
     // Verify ownership
-    const existing = await db.prepare('SELECT user_id, building_id, unit_type FROM reviews WHERE id = ?')
+    const existing = await db.prepare('SELECT user_id, building_id, unit_type, status FROM reviews WHERE id = ?')
       .bind(id)
-      .first<{ user_id: string; building_id: string; unit_type: string | null }>();
+      .first<{ user_id: string; building_id: string; unit_type: string | null; status: string }>();
 
     if (!existing) {
       return new Response(JSON.stringify({ error: 'Review not found' }), {
@@ -377,6 +378,13 @@ export async function PATCH(context: APIContext): Promise<Response> {
       body.safely_lit_at_night || null,
       id
     ).run();
+
+    // Editing sends a moderated review back to pending, which hides an approved one until it
+    // is approved again. Tell the owner — but only on the transition, so repeated edits of a
+    // review that is already pending send nothing more.
+    if (existing.status !== 'pending') {
+      queueOwnerNotice(context, { kind: 'review_edited', buildingId: existing.building_id });
+    }
 
     // Get building slug for redirect
     const building = await db.prepare('SELECT slug FROM buildings WHERE id = ?')

@@ -66,9 +66,11 @@ npx wrangler secret put RECORDS_ALERT_EMAIL --config workers/records-scheduler/w
 ```
 
 `RECORDS_ALERT_EMAIL` is the address the breaker alert goes to. It is a secret rather than a
-`vars` entry so a personal address is not committed to git. Miss it and the breaker still
-pauses the fill — it just logs `records_breaker_email_skipped` at error level instead of
-emailing anyone, which is a silence you would only notice too late.
+`vars` entry so a personal address is not committed to git. Miss it (or leave it blank) and
+the alert goes to the owner inbox, `OWNER_NOTIFY_EMAIL` in `src/lib/email.ts`, with a
+`records_alert_recipient_default` line at error level so the missing secret is still visible.
+An alert that fails to send — refused by Resend, no `RESEND_API_KEY`, or a thrown call — is
+recorded and shows on `/admin` under "Email delivery", in "Records-fill alerts".
 
 **3. Deploy:**
 

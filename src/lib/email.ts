@@ -1,9 +1,68 @@
 import { Resend } from 'resend';
+import type { CreateEmailOptions } from 'resend';
+import { formatEasternDateTime } from './format';
 
-interface EmailResult {
+/**
+ * Why a send did not go out, in a form the email tracker can store and the admin dashboard
+ * can label. `not_configured`: no RESEND_API_KEY. `provider_error`: Resend answered with an
+ * error. `exception`: the call threw before Resend answered (network, runtime).
+ */
+export type EmailFailureReason = 'not_configured' | 'provider_error' | 'exception';
+
+export interface EmailResult {
   success: boolean;
+  /** Human-readable detail. For a provider error it is Resend's message, which can echo the recipient: never store or log it. */
   error?: string;
   messageId?: string;
+  /** Set on every failure built by `deliver`. */
+  reason?: EmailFailureReason;
+  /** provider_error: Resend's error name (an enum). exception: the thrown error's class name. */
+  code?: string;
+  /** provider_error: Resend's HTTP status, or null when it gave none. */
+  httpStatus?: number | null;
+}
+
+/**
+ * The inbox that owner notices and the contact-form notification go to. A real Google
+ * Workspace mailbox; there is deliberately no env var for it.
+ */
+export const OWNER_NOTIFY_EMAIL = 'meredith@ratemyplace.org';
+
+/**
+ * The one Resend call in this module. Every send builds its message and hands it here, so a
+ * missing key, a Resend error and a thrown call each come back as a typed failure instead of
+ * a console line. Nothing is logged here: callers wrap the send in `trackEmail` /
+ * `trackSend` (`emailHealth.ts`, `trackSend.ts`), which log without the address and record
+ * the failure for /admin.
+ */
+async function deliver(apiKey: string, message: CreateEmailOptions): Promise<EmailResult> {
+  if (!apiKey) {
+    return { success: false, error: 'Email service not configured', reason: 'not_configured' };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const { data, error } = await resend.emails.send(message);
+
+    if (error) {
+      return {
+        success: false,
+        error: error.message,
+        reason: 'provider_error',
+        code: error.name,
+        httpStatus: error.statusCode ?? null,
+      };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err) {
+    return {
+      success: false,
+      error: 'Failed to send email',
+      reason: 'exception',
+      code: err instanceof Error ? err.name : typeof err,
+    };
+  }
 }
 
 /**
@@ -40,20 +99,13 @@ export async function sendVerificationEmail(
   toEmail: string,
   token: string
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
   const verificationUrl = `${siteUrl}/api/auth/verify-email?token=${token}`;
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
-      to: toEmail,
-      subject: 'Verify your email',
-      html: `
+  return deliver(apiKey, {
+    from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+    to: toEmail,
+    subject: 'Verify your email',
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -87,18 +139,7 @@ export async function sendVerificationEmail(
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 /**
@@ -115,20 +156,13 @@ export async function sendPasswordResetEmail(
   toEmail: string,
   token: string
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
   const resetUrl = `${siteUrl}/auth/reset-password?token=${token}`;
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
-      to: toEmail,
-      subject: 'Reset your password',
-      html: `
+  return deliver(apiKey, {
+    from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+    to: toEmail,
+    subject: 'Reset your password',
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -162,18 +196,7 @@ export async function sendPasswordResetEmail(
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 /**
@@ -195,25 +218,17 @@ export async function sendDisputeConfirmationEmail(
     disputeExplanation?: string;
   }
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
-
   const reasonsList = disputeDetails.disputeReasons
     .map(reason => `<li>${escapeHtml(reason)}</li>`)
     .join('');
 
-  try {
-    const { data, error } = await resend.emails.send({
-      // Sent from meredith@ so landlord replies (questions, supplementary
-      // evidence, follow-ups) land in the Workspace inbox.
-      from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
-      to: toEmail,
-      subject: 'We received your dispute',
-      html: `
+  return deliver(apiKey, {
+    // Sent from meredith@ so landlord replies (questions, supplementary
+    // evidence, follow-ups) land in the Workspace inbox.
+    from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
+    to: toEmail,
+    subject: 'We received your dispute',
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -248,18 +263,7 @@ export async function sendDisputeConfirmationEmail(
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 /**
@@ -276,13 +280,6 @@ export async function sendContactConfirmationEmail(
   toName: string,
   category: string
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
-
   const categoryLabels: Record<string, string> = {
     general: 'general inquiry',
     privacy: 'privacy concern',
@@ -291,15 +288,14 @@ export async function sendContactConfirmationEmail(
   };
   const categoryLabel = categoryLabels[category] || 'inquiry';
 
-  try {
-    const { data, error } = await resend.emails.send({
-      // Sent from meredith@ (Google Workspace inbox) so replies land in a real
-      // person's inbox. This makes the "reply or use the form" footer below honest.
-      from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
-      to: toEmail,
-      replyTo: 'meredith@ratemyplace.org',
-      subject: 'We received your message',
-      html: `
+  return deliver(apiKey, {
+    // Sent from meredith@ (Google Workspace inbox) so replies land in a real
+    // person's inbox. This makes the "reply or use the form" footer below honest.
+    from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
+    to: toEmail,
+    replyTo: 'meredith@ratemyplace.org',
+    subject: 'We received your message',
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -321,18 +317,7 @@ export async function sendContactConfirmationEmail(
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 /**
@@ -351,22 +336,14 @@ export async function sendContactNotificationEmail(
   category: string,
   messagePreview: string
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
-
-  try {
-    const { data, error } = await resend.emails.send({
-      // System-to-admin alert: keep noreply@ as sender (avoids meredith@→meredith@
-      // self-email pattern that Gmail sometimes filters as noise). Recipient is
-      // meredith@ (Workspace inbox).
-      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
-      to: 'meredith@ratemyplace.org',
-      subject: `New contact: ${category} from ${submitterName}`,
-      html: `
+  return deliver(apiKey, {
+    // System-to-admin alert: keep noreply@ as sender (avoids meredith@→meredith@
+    // self-email pattern that Gmail sometimes filters as noise). Recipient is
+    // meredith@ (Workspace inbox).
+    from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+    to: OWNER_NOTIFY_EMAIL,
+    subject: `New contact: ${category} from ${submitterName}`,
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -394,18 +371,7 @@ export async function sendContactNotificationEmail(
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 /**
@@ -452,22 +418,15 @@ export async function sendDisputeResolutionEmail(
   outcome: DisputeResolutionOutcome,
   resolutionNotes: string
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
   const copy = DISPUTE_OUTCOME_COPY[outcome];
 
-  try {
-    const { data, error } = await resend.emails.send({
-      // Sent from meredith@ so landlord replies (questions about the outcome,
-      // appeals, follow-ups) land in the Workspace inbox.
-      from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
-      to: toEmail,
-      subject: copy.subject,
-      html: `
+  return deliver(apiKey, {
+    // Sent from meredith@ so landlord replies (questions about the outcome,
+    // appeals, follow-ups) land in the Workspace inbox.
+    from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
+    to: toEmail,
+    subject: copy.subject,
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -494,18 +453,7 @@ export async function sendDisputeResolutionEmail(
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 
@@ -529,12 +477,6 @@ export async function sendReviewRejectedEmail(
   buildingAddress: string,
   rejectionReason: string | null
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
   const profileUrl = `${siteUrl}/profile`;
   const guidelinesUrl = `${siteUrl}/guidelines`;
 
@@ -550,15 +492,14 @@ export async function sendReviewRejectedEmail(
 `
     : '';
 
-  try {
-    const { data, error } = await resend.emails.send({
-      // Sent from meredith@ so reviewers can reply with questions about why their
-      // review was rejected (the most relationship-sensitive email surface). Replies
-      // land in the Workspace inbox.
-      from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
-      to: toEmail,
-      subject: 'Your review wasn\'t published',
-      html: `
+  return deliver(apiKey, {
+    // Sent from meredith@ so reviewers can reply with questions about why their
+    // review was rejected (the most relationship-sensitive email surface). Replies
+    // land in the Workspace inbox.
+    from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
+    to: toEmail,
+    subject: 'Your review wasn\'t published',
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -580,18 +521,7 @@ ${reasonBlock}
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 
@@ -645,20 +575,13 @@ export async function sendRecordCorrectionOutcomeEmail(
   buildingUrl: string,
   outcome: RecordCorrectionOutcome
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
   const copy = RECORD_CORRECTION_OUTCOME_COPY[outcome];
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
-      to: toEmail,
-      subject: copy.subject,
-      html: `
+  return deliver(apiKey, {
+    from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+    to: toEmail,
+    subject: copy.subject,
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -682,18 +605,7 @@ export async function sendRecordCorrectionOutcomeEmail(
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 /**
@@ -745,29 +657,125 @@ async function sendRecordsSchedulerEmail(
   subject: string,
   body: string
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
+  return deliver(apiKey, {
+    from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+    to: toEmail,
+    subject,
+    text: body,
+  });
+}
 
-  const resend = new Resend(apiKey);
+/** Every intake that needs the owner's action and gets a notice. */
+export const OWNER_NOTICE_KINDS = [
+  'review_submitted',
+  'review_edited',
+  'bug_report',
+  'record_correction',
+  'dispute',
+  'verification_upload',
+] as const;
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
-      to: toEmail,
-      subject,
-      text: body,
-    });
+export type OwnerNoticeKind = (typeof OWNER_NOTICE_KINDS)[number];
 
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
+/** A building address longer than this is cut, so one odd row cannot balloon a notice. */
+export const OWNER_NOTICE_MAX_ADDRESS = 200;
 
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+/** Trusted copy constants — interpolated raw, never through escapeHtml. */
+const OWNER_NOTICE_COPY: Record<OwnerNoticeKind, { subject: string; lede: string; cta: string }> = {
+  review_submitted: {
+    subject: 'New review to moderate',
+    lede: 'A new review is waiting in the moderation queue. It stays hidden until you approve it.',
+    cta: 'Open pending reviews',
+  },
+  review_edited: {
+    subject: 'Edited review to re-moderate',
+    lede: 'A reviewer edited a review you had already moderated. Editing sends it back to pending, so it is hidden until you approve it again.',
+    cta: 'Open pending reviews',
+  },
+  bug_report: {
+    subject: 'New bug report',
+    lede: 'Someone filed a bug report.',
+    cta: 'Open bug reports',
+  },
+  record_correction: {
+    subject: 'New public record correction',
+    lede: "Someone reported an error in a building's public records.",
+    cta: 'Open record corrections',
+  },
+  dispute: {
+    subject: 'New landlord dispute',
+    lede: 'A landlord filed a dispute about a review.',
+    cta: 'Open disputes',
+  },
+  verification_upload: {
+    subject: 'New tenancy document to verify',
+    lede: 'A reviewer uploaded a document to verify their tenancy.',
+    cta: 'Open verification requests',
+  },
+};
+
+function truncateAddress(address: string): string {
+  return address.length > OWNER_NOTICE_MAX_ADDRESS ? `${address.slice(0, OWNER_NOTICE_MAX_ADDRESS)}\u2026` : address;
+}
+
+/**
+ * Tell the owner that an intake is waiting on them.
+ *
+ * Carries no PII by construction: a kind, a building address (public on the building page
+ * anyway), the time it arrived, and a link to the admin queue. No review text, no names, no
+ * tenant or landlord email — the admin page holds those behind sign-in.
+ *
+ * The subject is system text plus an Eastern time suffix (no user input, so no header
+ * injection); the suffix also stops Gmail threading every notice into one conversation.
+ *
+ * @param apiKey - Resend API key
+ * @param toEmail - The owner inbox (OWNER_NOTIFY_EMAIL)
+ * @param notice.adminUrl - System-generated admin link (NOT escaped)
+ */
+export async function sendOwnerNoticeEmail(
+  apiKey: string,
+  toEmail: string,
+  notice: { kind: OwnerNoticeKind; buildingAddress: string | null; receivedAt: number; adminUrl: string }
+): Promise<EmailResult> {
+  const copy = OWNER_NOTICE_COPY[notice.kind];
+  const received = formatEasternDateTime(notice.receivedAt);
+  const buildingLine = notice.buildingAddress
+    ? `
+    <p style="margin: 0 0 8px 0;">Building: ${escapeHtml(truncateAddress(notice.buildingAddress))}</p>`
+    : '';
+
+  return deliver(apiKey, {
+    from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+    to: toEmail,
+    subject: `${copy.subject} (${received})`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">${copy.subject}</h2>
+
+  <p>${copy.lede}</p>
+
+  <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">${buildingLine}
+    <p style="margin: 0;">Received: ${received}</p>
+  </div>
+
+  <p style="margin: 30px 0;">
+    <a href="${notice.adminUrl}"
+       style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+      ${copy.cta}
+    </a>
+  </p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">This is an automated admin notification from RateMyPlace Boston.</p>
+</body>
+</html>
+      `,
+  });
 }

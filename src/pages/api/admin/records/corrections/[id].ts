@@ -1,11 +1,12 @@
 import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../../../../lib/db';
-import { getEnv, fireAndForget } from '../../../../../lib/runtime';
+import { getEnv } from '../../../../../lib/runtime';
 import { createAuditLog } from '../../../../../lib/audit';
 import { getClientIP } from '../../../../../lib/rateLimit';
 import { logError } from '../../../../../lib/logger';
 import { sanitizeMultilineText } from '../../../../../lib/validation';
 import { sendRecordCorrectionOutcomeEmail } from '../../../../../lib/email';
+import { trackSend } from '../../../../../lib/trackSend';
 import { CORRECTION_RESOLUTIONS, type CorrectionResolution } from '../../../../../lib/records/corrections';
 
 function json(body: unknown, status: number): Response {
@@ -186,22 +187,19 @@ export const PATCH: APIRoute = async (context: APIContext) => {
     // otherwise, and that is the point.
     if (correction.contact_email) {
       const env = getEnv(context);
-      const apiKey = env.RESEND_API_KEY;
-      if (apiKey) {
-        const siteUrl = env.SITE_URL || context.url.origin;
-        fireAndForget(
-          context,
-          sendRecordCorrectionOutcomeEmail(
-            apiKey,
-            correction.contact_email,
-            correction.building_address,
-            `${siteUrl}/building/${encodeURIComponent(correction.building_slug)}#public-records`,
-            resolution,
-          ),
-        );
-      } else {
-        console.warn('RESEND_API_KEY not configured - skipping record correction outcome email');
-      }
+      const siteUrl = env.SITE_URL || context.url.origin;
+      trackSend(
+        context,
+        'record_correction_outcome',
+        correction.contact_email,
+        sendRecordCorrectionOutcomeEmail(
+          env.RESEND_API_KEY,
+          correction.contact_email,
+          correction.building_address,
+          `${siteUrl}/building/${encodeURIComponent(correction.building_slug)}#public-records`,
+          resolution,
+        ),
+      );
     }
 
     return json({ data: { id: correctionId, status: 'resolved', resolution } }, 200);
