@@ -110,12 +110,13 @@ test.describe('Review Form', () => {
     await scoreButtons.nth(0).click();
     await scoreButtons.nth(1).click();
 
-    // Navigate back to unit-details
+    // Navigate back to unit-details. The step's own field is the indicator: a 'Unit Details'
+    // text locator resolves first to StepIndicator's compact mobile label, hidden at desktop width.
     await authedPage.locator('button[type="button"]', { hasText: 'Back' }).click();
-    await expect(authedPage.locator('text=Unit Details').first()).toBeVisible({ timeout: 10000 });
+    const unitInput = authedPage.locator('input[placeholder*="2A"]');
+    await expect(unitInput).toBeVisible({ timeout: 10000 });
 
     // Assert unit number field still contains the previously entered value (data persists)
-    const unitInput = authedPage.locator('input[placeholder*="2A"]');
     await expect(unitInput).toHaveValue('7A');
 
     // Advance again to unit-rating
