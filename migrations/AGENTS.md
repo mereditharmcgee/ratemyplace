@@ -1,6 +1,6 @@
 # `migrations/` — D1 Schema Changes
 
-Cloudflare D1 (SQLite). 33 migrations, `0001` through `0033`.
+Cloudflare D1 (SQLite). 34 migrations, `0001` through `0034`.
 
 ---
 
@@ -119,6 +119,27 @@ npx wrangler d1 execute ratemyplace-db --remote --command \
   "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_records_queue_reason_requested'"
 ```
 
+**`0034` (owner of record) is idempotent too, and was APPLIED TO PRODUCTION 2026-10-27**
+by hand, before the site deploy, with the command below. One `CREATE TABLE IF NOT EXISTS building_owners` and one
+`CREATE INDEX IF NOT EXISTS idx_building_owners_key`: no `ALTER TABLE`, nothing on
+`buildings`, so it cannot half-apply, re-running it is harmless, and `buildings.updated_at`
+(the sitemap's lastmod) does not move. Apply it by hand like `0033`:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --file migrations/0034_building_owners.sql
+npx wrangler d1 execute ratemyplace-db --remote --command "SELECT name FROM sqlite_master WHERE name IN ('building_owners', 'idx_building_owners_key')"
+```
+
+The table starts empty. The site and the records Worker both read and write it defensively,
+so either can deploy before the file runs: until it has, the owner of record stays plain
+text, landlord search finds no owner names, and a pull writes no owner row and fails nothing.
+Rows then come from two places: every records pull (`src/lib/records/owners.ts`, so the
+Worker needs `npm run records:worker:deploy`), and a one-time
+`npm run records:owners-backfill -- --remote` for buildings pulled before that, which only
+reads and writes SQL files under `.cache/owners-backfill/` for a human to apply. The seed
+(`records:seed`) writes assessor rows without owner rows: after a re-seed, run the owners
+backfill again (it is an upsert and safe to repeat).
+
 **`app_settings` keys in use.** The table is a key/value store for operator switches; the
 records pipeline owns four, defined once in `SETTING_KEYS` in `src/lib/records/settings.ts`:
 
@@ -209,6 +230,7 @@ Dropping a column that deployed code still reads takes the site down.
 | `saved_buildings` | Bookmarks |
 | `record_pulls`, `building_records` | Public building records from city open data. `record_pulls` is insert-only provenance, one row per source run; `building_records` holds the typed JSON payloads, unique on `(building_id, kind, source_key)` |
 | `record_corrections` | Public "report a record error" claims and their resolutions. Stores the claim and an optional email, nothing else about the filer |
+| `building_owners` | The assessor's owner of record, one row per building (newest fiscal year), with its normalized key and entity/residential flags; read by the owner of record list and landlord search (0034) |
 | `records_queue` | Pending record pulls, one pending row per building, with reason and priority; drained by the records-scheduler Worker (sub-project C) |
 | `app_settings` | Operator switches, e.g. `records_fill_paused` |
 | `rate_limits` | Fail-closed rate limiting, keyed and windowed |

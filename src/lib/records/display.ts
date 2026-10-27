@@ -588,6 +588,59 @@ export function yearSpanLabel(series: readonly YearCount[]): string | null {
   return first === last ? String(first) : `${first}–${last}`;
 }
 
+// --- Owner of record list --------------------------------------------------
+// The list of buildings recorded under one owner name (`/owner-of-record`), the owner link in
+// the facts strip, and the owner section of landlord search. Same rule as the panel: city
+// records as recorded, counted, never scored.
+
+/** The list page's label and the search section's heading. */
+export const OWNER_OF_RECORD_LABEL = 'Owner of record (City of Boston assessor)';
+
+export const OWNER_LIST_INTRO =
+  'Every building on RateMyPlace that the City of Boston assessor lists under this exact owner name. A landlord or manager named in a review is listed separately.';
+
+export const OWNER_LIST_RECORDS_NOTE = 'Counts are city records as recorded, in the same groups as each building page. Nothing on this list is scored.';
+
+/** A building on the list whose city feeds have not been pulled yet, only its assessor row. */
+export const OWNER_LIST_NOT_PULLED_COPY = 'City records not retrieved yet.';
+
+export const OWNER_SEARCH_NOTE = 'Names as the City of Boston assessor records them. Not the same as a landlord named in a review.';
+
+export const OWNER_LIST_PREVIOUS_LABEL = 'Previous page';
+export const OWNER_LIST_NEXT_LABEL = 'Next page';
+
+/** The count labels inside each group on a list row, beside the panel's own counts. */
+export const OWNER_COUNT_LABELS = {
+  requests: '311 requests',
+  isdCases: 'ISD cases',
+  permits: 'Permits',
+  publicWorksTickets: 'Public Works tickets',
+} as const;
+
+/** "1 building on RateMyPlace", "12 buildings on RateMyPlace". */
+export function ownerBuildingCountText(count: number): string {
+  return `${count} ${count === 1 ? 'building' : 'buildings'} on RateMyPlace`;
+}
+
+export function ownerListPageText(page: number, pageCount: number): string {
+  return `Page ${page} of ${pageCount}`;
+}
+
+/** Under a list row whose recorded spelling differs from the heading's (punctuation, spacing). */
+export function recordedAsText(owner: string): string {
+  return `Recorded as ${owner}`;
+}
+
+/** The fiscal year a list row's owner was read from. */
+export function assessorYearText(fiscalYear: string): string {
+  return `Assessor ${fiscalYear}`;
+}
+
+/** Under the search section when more names match than it shows. */
+export function ownerSearchMoreText(shown: number, total: number): string {
+  return `Showing ${shown} of ${total}. Type more of the name to narrow the list.`;
+}
+
 /**
  * A fixed instant for the sampled copy below. Any unix second would do — the guard cares
  * about the sentence around the date, not the date.
@@ -685,4 +738,18 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   'missingYearsNote() — one': missingYearsNote([2014]) ?? '',
   'missingYearsNote() — two': missingYearsNote([2011, 2014]) ?? '',
   'yearChartLabel()': yearChartLabel('Requests by year opened', 1, { one: 'request', many: 'requests' }, 2013, 2026, [2014]),
+  OWNER_OF_RECORD_LABEL,
+  OWNER_LIST_INTRO,
+  OWNER_LIST_RECORDS_NOTE,
+  OWNER_LIST_NOT_PULLED_COPY,
+  OWNER_SEARCH_NOTE,
+  OWNER_LIST_PREVIOUS_LABEL,
+  OWNER_LIST_NEXT_LABEL,
+  ...Object.fromEntries(Object.entries(OWNER_COUNT_LABELS).map(([key, label]) => [`OWNER_COUNT_LABELS.${key}`, label])),
+  'ownerBuildingCountText() - one': ownerBuildingCountText(1),
+  'ownerBuildingCountText() - many': ownerBuildingCountText(12),
+  'ownerListPageText()': ownerListPageText(2, 3),
+  'recordedAsText()': recordedAsText('EXAMPLE HOLDINGS, L.L.C.'),
+  'assessorYearText()': assessorYearText('FY2026'),
+  'ownerSearchMoreText()': ownerSearchMoreText(10, 14),
 };

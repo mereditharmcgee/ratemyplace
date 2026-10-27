@@ -61,6 +61,16 @@ describe('page indexing', () => {
     }
   });
 
+  // A view of assessor data under one owner name, reached by a link or a typed name: noindex
+  // and out of the sitemap, as the owner of record brief set it.
+  it('keeps the owner of record list noindex and out of the sitemap', () => {
+    const page = pages.find((p) => p.route === '/owner-of-record');
+    expect(page, '/owner-of-record has no page').toBeDefined();
+    expect(STATIC_SITEMAP_PATHS).not.toContain('/owner-of-record');
+    expect(INDEXABLE_DYNAMIC).not.toContain('/owner-of-record');
+    expect(layoutTag(page!.src)?.tag).toMatch(/\bnoindex\b/);
+  });
+
   it('noindexes every admin page through AdminLayout', () => {
     const src = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'AdminLayout.astro'), 'utf8');
     const tag = src.match(/<BaseLayout\b[^>]*>/)?.[0] ?? '';

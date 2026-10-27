@@ -1,10 +1,12 @@
 /**
  * What /search says when a search finds nothing.
  *
- * The message follows what was searched. The Landlords filter matches landlord names only,
- * and only landlords with at least one approved review on one of their buildings (the
- * `HAVING COUNT(r.id) > 0` in both landlord queries), so it gets its own message: the
- * buildings hint ("a partial street name") is no help to someone looking for a landlord.
+ * The message follows what was searched. The Landlords filter matches two kinds of name: the
+ * landlords reviewers named, only once one of their buildings has an approved review (the
+ * `HAVING COUNT(r.id) > 0` in both landlord queries), and owners of record from the assessor,
+ * only when the owner is an entity or holds two or more residential parcels here
+ * (`searchOwnerNames` in `records/ownerList.ts`). So it gets its own message: the buildings
+ * hint ("a partial street name") is no help to someone looking for a landlord.
  *
  * Every other type gets the buildings messages. A neighborhood or ZIP on its own ("Brighton",
  * "02135") gets a message in those terms, since the street-name hint is no help to someone
@@ -35,7 +37,8 @@ export interface SearchEmptyState {
 }
 
 export const LANDLORD_EMPTY_TITLE = 'No landlords match that search';
-export const LANDLORD_EMPTY_DESCRIPTION = 'Only landlords with a reviewed building are listed. Try part of the name.';
+export const LANDLORD_EMPTY_DESCRIPTION =
+  'Landlords named in reviews are listed once one of their buildings has a review. Owners of record are listed when they own two or more buildings here. Try part of the name.';
 export const LANDLORD_EMPTY_NEXT_LABEL = 'Search buildings instead';
 
 export const BUILDINGS_EMPTY_TITLE = 'No buildings match that search';
