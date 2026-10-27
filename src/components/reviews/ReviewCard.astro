@@ -2,7 +2,7 @@
 import StarRating from '../ratings/StarRating.astro';
 import VerifiedBadge from '../ui/VerifiedBadge.astro';
 import SeasonChip from '../ui/SeasonChip.astro';
-import { formatRecency } from '../../lib/privacy';
+import { formatRecency, reviewSeasonChipProps } from '../../lib/privacy';
 import { bedroomsLabel, resolveUnitType, unitTypeLabel } from '../../lib/reviewDisplay';
 import { calculateDomainScores, ITEM_WEIGHTS } from '../../lib/scoring';
 import { getScoreTextColor, getScoreColor, getScoreBgTint } from '../../lib/scoring-colors';
@@ -168,7 +168,7 @@ const pestLabels: Record<string, string> = {
   <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4 gap-4">
     <div class="min-w-0 flex-1">
-      <div class="flex items-center gap-2 mb-1">
+      <div class="relative flex items-center gap-2 mb-1">
         {review.review_title && (
           <h3 class="text-lg font-semibold text-gray-900 break-words">{review.review_title}</h3>
         )}
@@ -204,13 +204,8 @@ const pestLabels: Record<string, string> = {
     </div>
     <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 sm:block sm:text-right sm:min-w-0 sm:max-w-[45%]">
       <p class="font-medium text-gray-700">{unitDisplay}</p>
-      <SeasonChip
-        moveInSeason={review.move_in_season}
-        moveInYear={review.move_in_year}
-        moveOutYear={review.move_out_year_new}
-        isCurrentTenant={review.is_current_tenant === 1 || review.move_out_year_new === 'current'}
-        class="sm:my-1"
-      />
+      {/* The dispute form matches a review by this range; reviewTenancyLabel reads the same props. */}
+      <SeasonChip {...reviewSeasonChipProps(review)} class="sm:my-1" />
       <p>{recencyLabel}</p>
       {review.rent_amount && (
         <p class="text-teal-700 font-medium">${review.rent_amount.toLocaleString()}/mo</p>
@@ -498,7 +493,7 @@ const pestLabels: Record<string, string> = {
   )}
 
   <!-- Footer -->
-  <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm">
+  <div class="relative mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm">
     <div class="flex items-center gap-3">
       <span class={`px-2 py-1 rounded-full text-xs ${
         review.would_recommend_new === 'yes'

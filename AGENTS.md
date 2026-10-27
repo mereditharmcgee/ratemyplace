@@ -364,7 +364,7 @@ Things that have already cost time. Read before debugging.
   "I clicked it and nothing happened" is expected for up to a minute on anything queued — but
   not on those two admin buttons, which either return a summary or fail in front of you.
 - **Search is not reviewed-only any more, but browse and the map are.**
-  `buildingSearchWhere` / `buildingSearchSelect` / `BUILDING_SEARCH_ORDER` in
+  `buildingSearchWhere` / `buildingSearchSelect` / `buildingSearchOrder` in
   `src/lib/searchSql.ts` are the only spelling of the query-mode buildings query, shared by
   `src/pages/search.astro` and `src/pages/api/search/results.ts` so a seeded Boston page
   cannot appear on one and not the other. Browse mode (no query), the landlord queries and
@@ -372,7 +372,10 @@ Things that have already cost time. Read before debugging.
   `recordsSearchParity.test.ts` fails if either call site stops using the fragments or if
   the browse-mode and landlord counts change. The typed spelling of each term matches
   anywhere in the address; every other spelling of its suffix row matches only as a whole
-  word (`ADDRESS_WORDS` in `searchSql.ts`).
+  word (`ADDRESS_WORDS` in `searchSql.ts`). Neighborhood, "Boston", "MA" and ZIP are taken
+  out before matching (`parseSearchQuery` in `searchQuery.ts`) and only rank; the house
+  number matches as a number or inside a range. The ORDER BY is built from the query and
+  carries binds, so both call sites bind `...where.binds, ...order.binds` in that order.
 - **`/sitemap.xml`, `/sitemaps/*.xml`, and `/robots.txt` are D1-backed routes** in
   `src/pages/`, not files in `public/`. The static-page allowlist is `STATIC_SITEMAP_PATHS`
   in `src/lib/sitemap.ts`; a new public page is not in the sitemap until it is added there.

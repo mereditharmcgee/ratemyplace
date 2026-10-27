@@ -28,9 +28,13 @@ describe('search page and results endpoint stay aligned', () => {
     it(`${name} builds the query-mode buildings query from searchSql`, () => {
       expect(source).toMatch(/buildingSearchWhere\(/);
       expect(source).toMatch(/buildingSearchSelect\(/);
-      // Interpolated into the SQL, not merely imported — a bare-name match would be
-      // satisfied by an unused import left behind after someone inlined the ORDER BY.
-      expect(source).toMatch(/\$\{BUILDING_SEARCH_ORDER\}/);
+      // The ORDER BY is built from the query (an exact address ranks first), so it carries
+      // binds. Interpolated into the SQL and its binds passed after the WHERE's, not merely
+      // imported — a bare-name match would be satisfied by an unused import left behind
+      // after someone inlined the ORDER BY.
+      expect(source).toMatch(/buildingSearchOrder\(\s*query\s*\)/);
+      expect(source).toMatch(/\$\{order\.sql\}/);
+      expect(source).toMatch(/\.\.\.where\.binds,\s*\.\.\.order\.binds/);
     });
   }
 
@@ -45,6 +49,15 @@ describe('search page and results endpoint stay aligned', () => {
     // two gates that make a rejected query reach neither the search branch nor browse mode:
     expect(page, 'the search branch must be gated on the length verdict').toMatch(/query\s*&&\s*!searchRejected/);
     expect(page, 'browse mode must not catch a rejected query').toMatch(/else\s+if\s*\(\s*!query\s*\)/);
+  });
+
+  // D1 refuses a LIKE pattern over 50 bytes and fails the statement. The buildings query
+  // checks inside `searchSql.ts`; the landlord queries build their own pattern from the whole
+  // query, so a full address typed with its neighborhood, state and ZIP must skip them.
+  it('both surfaces skip the landlord match when the pattern is too long for D1', () => {
+    for (const [name, source] of [['search.astro', page], ['results.ts', endpoint]] as const) {
+      expect(source, `${name} must check the landlord pattern length`).toMatch(/fitsLikePattern\(/);
+    }
   });
 
   // The page held eight: buildings and landlords, count and rows, in each of search and

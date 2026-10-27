@@ -76,6 +76,37 @@ export function formatTenancyRange(input: {
   return moveIn ?? moveOut ?? null;
 }
 
+/** The review columns a review card's season chip reads. */
+export interface ReviewTenancyFields {
+  move_in_season?: string | null;
+  move_in_year?: number | string | null;
+  move_out_year_new?: string | null;
+  is_current_tenant?: number | null;
+}
+
+/**
+ * What a review card hands its season chip. One spelling, so the dispute route's date match
+ * (`reviewTenancyLabel`) reads exactly the range the card shows.
+ */
+export function reviewSeasonChipProps(review: ReviewTenancyFields): {
+  moveInSeason: string | null | undefined;
+  moveInYear: number | string | null | undefined;
+  moveOutYear: string | null | undefined;
+  isCurrentTenant: boolean;
+} {
+  return {
+    moveInSeason: review.move_in_season,
+    moveInYear: review.move_in_year,
+    moveOutYear: review.move_out_year_new,
+    isCurrentTenant: review.is_current_tenant === 1 || review.move_out_year_new === 'current',
+  };
+}
+
+/** The dates a review card shows in its season chip, or null when it shows none. */
+export function reviewTenancyLabel(review: ReviewTenancyFields): string | null {
+  return formatTenancyRange(reviewSeasonChipProps(review));
+}
+
 export function getCurrentSeason(): string {
   const month = new Date().getMonth();
   if (month >= 2 && month <= 4) return 'spring';

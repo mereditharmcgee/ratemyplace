@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getScoreBgTint, getScoreTextColor } from '../lib/scoring-colors';
 import { getNamedPartyScoreState, NAMED_PARTY_MIN_REVIEWS } from '../lib/scoring';
+import { earlyScoreMarkerClass, isEarlyRating, scoreNumberClass } from '../lib/earlyRating';
 import { existingBuildingReviewPath } from '../lib/reviewPaths';
 import {
   homeDropdownItems,
@@ -224,7 +225,17 @@ export default function HomeSearch() {
                           </div>
                           <div className="flex-shrink-0 flex items-center gap-2">
                             {score !== null && (
-                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getScoreBgTint(score)} ${getScoreTextColor(score)}`}>
+                              // Under the threshold the number is muted gray with a band dot,
+                              // as on the building page it opens (lib/earlyRating.ts).
+                              <span
+                                data-home-score
+                                className={`text-xs px-1.5 py-0.5 rounded ${getScoreBgTint(score)} ${
+                                  isEarlyRating(item.reviewCount) ? 'inline-flex items-center gap-1 ' : ''
+                                }${scoreNumberClass(score, item.reviewCount)}`}
+                              >
+                                {isEarlyRating(item.reviewCount) && (
+                                  <span aria-hidden="true" data-early-score-marker className={earlyScoreMarkerClass(score)} />
+                                )}
                                 {score.toFixed(1)}
                               </span>
                             )}

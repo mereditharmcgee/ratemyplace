@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { MarkerClusterer, SuperClusterAlgorithm, type Renderer } from '@googlemaps/markerclusterer';
-import { getScoreColor, getScoreHex } from '../lib/scoring-colors';
+import { getEarlyScoreStyle, getScoreColor, getScoreHex } from '../lib/scoring-colors';
 import { displayLocality } from '../lib/locality';
+import { isEarlyRating, mapReviewLine } from '../lib/earlyRating';
 import { initialMapView, shouldPanToUser, type InitialMapView, type LatLngBox, type LatLngPoint } from '../lib/mapView';
 import { clusterBadgeSize, clusterBadgeStyle, clusterTitle } from '../lib/mapCluster';
 
@@ -423,13 +424,29 @@ export default function BuildingMap({
 
         const scoreRow = document.createElement('div');
         scoreRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 8px;';
+        // An early rating (lib/earlyRating.ts) is muted, as on the building page: the label
+        // and number turn gray and a dot keeps the band colour. Both are scoring-colors hexes.
+        const earlyStyle = building.avgScore !== null && isEarlyRating(building.reviewCount)
+          ? getEarlyScoreStyle(building.avgScore)
+          : null;
         const scoreBadge = document.createElement('span');
-        scoreBadge.style.cssText = `display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; background: ${scoreColor}20; color: ${scoreColor};`;
-        scoreBadge.textContent = scoreLabel;
+        if (earlyStyle) {
+          scoreBadge.style.cssText = `display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; background: ${scoreColor}20; color: ${earlyStyle.textHex};`;
+          const dot = document.createElement('span');
+          dot.setAttribute('aria-hidden', 'true');
+          dot.style.cssText = `display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: ${earlyStyle.markerHex};`;
+          scoreBadge.appendChild(dot);
+          scoreBadge.appendChild(document.createTextNode(scoreLabel));
+        } else {
+          scoreBadge.style.cssText = `display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; background: ${scoreColor}20; color: ${scoreColor};`;
+          scoreBadge.textContent = scoreLabel;
+        }
         scoreRow.appendChild(scoreBadge);
         if (building.avgScore !== null) {
           const scoreNumber = document.createElement('span');
-          scoreNumber.style.cssText = 'font-size: 14px; font-weight: 600;';
+          scoreNumber.style.cssText = earlyStyle
+            ? `font-size: 14px; font-weight: 400; color: ${earlyStyle.textHex};`
+            : 'font-size: 14px; font-weight: 600;';
           scoreNumber.textContent = `${building.avgScore.toFixed(1)}/5`;
           scoreRow.appendChild(scoreNumber);
         }
@@ -437,7 +454,7 @@ export default function BuildingMap({
 
         const reviewCountLine = document.createElement('p');
         reviewCountLine.style.cssText = 'margin: 0 0 8px 0; font-size: 12px; color: #666;';
-        reviewCountLine.textContent = `${building.reviewCount} ${building.reviewCount === 1 ? 'review' : 'reviews'}`;
+        reviewCountLine.textContent = mapReviewLine(building.reviewCount);
         container.appendChild(reviewCountLine);
 
         const detailsLink = document.createElement('a');
