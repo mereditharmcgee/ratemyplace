@@ -41,7 +41,7 @@ export interface Change {
   to: string;
 }
 
-export type RefusalReason = 'respell_changes_key' | 'lone_directional_base' | 'rekey_degenerate';
+export type RefusalReason = 'respell_changes_key' | 'lone_directional_base' | 'rekey_degenerate' | 'address_key_disagrees';
 
 export interface Refusal {
   id: string;
@@ -103,6 +103,9 @@ export function respelledSeedAddress(address: string): string | null {
  * - `respell_changes_key` — the respelled address would key differently from the stored row
  *   (a different street key, or a different number range), so the page would stop matching
  *   the reviewer dedupe it matches today.
+ * - `address_key_disagrees` — a user row's address now keys differently from its re-split stored
+ *   key ('7 North Wy' was keyed N WY; it now keys NORTH WY), so re-splitting the key alone
+ *   would leave it stale. The row keeps its key and is listed for a human.
  *
  * User rows are never respelled: their address is what a person typed.
  */
@@ -113,6 +116,12 @@ export function planSuffixBackfill(rows: readonly KeyedBuildingRow[]): SuffixBac
     const key = streetKey(row.street_key);
     if (key === null) {
       plan.refused.push({ id: row.id, address: row.address, reason: 'rekey_degenerate' });
+      plan.before.push(row);
+      continue;
+    }
+    const fromAddress = row.source === 'user' ? addressKey(row.address) : null;
+    if (fromAddress && fromAddress.streetKey !== key) {
+      plan.refused.push({ id: row.id, address: row.address, reason: 'address_key_disagrees' });
       plan.before.push(row);
       continue;
     }

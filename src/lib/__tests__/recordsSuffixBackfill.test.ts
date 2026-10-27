@@ -105,6 +105,16 @@ describe('planSuffixBackfill', () => {
     expect(rekeyStatements(plan).join('\n')).not.toContain('NULL');
   });
 
+  it('refuses a user row whose address now keys differently from its re-split stored key', () => {
+    // The old table abbreviated NORTH while WY was still glued to the base; the new one splits
+    // WY off first and keeps NORTH, so re-splitting the stored key alone would leave it stale.
+    const userNorth = row({ id: 'u-north', source: 'user', address: '7 North Wy', street_key: 'N WY', st_num_lo: 7, st_num_hi: 7 });
+    const plan = planSuffixBackfill([userNorth, userWay]);
+    expect(plan.refused).toEqual([{ id: 'u-north', address: '7 North Wy', reason: 'address_key_disagrees' }]);
+    expect(plan.rekeys).toEqual([{ id: 'u-way', source: 'user', from: 'APPIAN WAY', to: 'APPIAN WY' }]);
+    expect(plan.before.map((r) => r.id)).toEqual(['u-north', 'u-way']);
+  });
+
   it('snapshots exactly the rows it touches or refuses', () => {
     const bare = row({ id: 'seed-bare', address: '5 Wy', street_key: 'WY', st_num_lo: 5, st_num_hi: 5 });
     const plan = planSuffixBackfill([grampian, neponset, lanark, userWy, userWay, bare]);

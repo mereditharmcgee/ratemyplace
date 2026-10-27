@@ -3,8 +3,8 @@
 Branch `fix/street-suffix-search` from `main` @ `1b8ca2b`.
 
 Evidence lives in two scratch folders:
-- **Revision 1 harnesses:** `C:/Users/mmcge/AppData/Local/Temp/claude/C--Users-mmcge-ratemyplace-boston/e4bed66b-7eb9-44e3-aa17-a1ef131b648b/scratchpad/plan-oct26/street-suffix/`. It holds `analyse.ts`, `rekey.ts`, `likeforms.ts`, `expect.ts`, their `*.out.txt` outputs and `identity.new.ts`.
-- **Revision 2 harnesses:** `C:/Users/mmcge/AppData/Local/Temp/claude/C--Users-mmcge-ratemyplace-boston/e4bed66b-7eb9-44e3-aa17-a1ef131b648b/scratchpad/plan-oct26/suffix-rev/`. It holds `sim.mjs`, `table.mjs`, `lost.mjs`, `genuine.mjs` and `sqlcheck.mjs`.
+- **Revision 1 harnesses:** local scratch harnesses (not committed), which held `analyse.ts`, `rekey.ts`, `likeforms.ts`, `expect.ts`, their `*.out.txt` outputs and `identity.new.ts`.
+- **Revision 2 harnesses:** local scratch harnesses (not committed), which held `sim.mjs`, `table.mjs`, `lost.mjs`, `genuine.mjs` and `sqlcheck.mjs`.
 
 Both sets ran against the 38,301 production `buildings` rows exported read-only on 2026-10-26. Production was re-checked read-only on the evening of 2026-10-26 (D1 `unixepoch()` = 1793067655).
 
