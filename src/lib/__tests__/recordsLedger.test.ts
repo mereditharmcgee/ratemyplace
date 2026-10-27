@@ -89,9 +89,9 @@ function request(overrides: Partial<ServiceRequestPayload> = {}): ServiceRequest
     status: null,
     closureReason: null,
     title: null,
-    subject: null,
-    reason: null,
-    type: null,
+    subject: 'Inspectional Services',
+    reason: 'Housing',
+    type: 'Unsatisfactory Living Conditions',
     location: null,
     source: null,
     classification: 'housing',
@@ -138,7 +138,7 @@ describe('ledgerModel counts', () => {
         serviceRequests: [
           request({ caseId: 'a', openedAt: '2024-02-01', status: 'Open' }),
           request({ caseId: 'b', openedAt: '2025-02-01', status: 'Closed' }),
-          request({ caseId: 'c', classification: 'other' }),
+          request({ caseId: 'c', reason: 'Street Cleaning', type: 'Requests for Street Cleaning', classification: 'other' }),
         ],
         permits: [
           permit({ permitNumber: 'p1', issuedDate: '2019-04-01', status: 'Open', declaredValuation: 36_500 }),
@@ -150,10 +150,12 @@ describe('ledgerModel counts', () => {
       NOW,
     );
 
-    expect(model.requests.count).toBe('2');
-    expect(model.requests.subCount).toBe('1 open');
-    expect(model.requests.otherCount).toBe(1);
-    expect(model.requests.note).toBe('1 other request not shown');
+    expect(model.living.count).toBe('2');
+    expect(model.living.subCount).toBe('1 open');
+    expect(model.other.count).toBe(1);
+    expect(model.other.line).toBe(
+      '1 other 311 request at or near this address, about something like parking, trash pickup or streetlights, falls outside these groups. It is counted here, not listed.',
+    );
 
     expect(model.permits.count).toBe('2');
     expect(model.permits.subCount).toBe('1 open · $37.7K declared');
@@ -166,13 +168,28 @@ describe('ledgerModel counts', () => {
     expect(model.violations.subCount).toBe('none on record');
   });
 
-  it('pluralises the other-requests note and drops it when there are none', () => {
-    const rows = [request({ caseId: 'x', classification: 'other' }), request({ caseId: 'y', classification: 'other' })];
+  it('pluralises the other-requests line and drops it when there are none', () => {
+    const other = { reason: 'Street Lights', type: 'Street Light Outages', classification: 'other' as const };
+    const rows = [request({ caseId: 'x', ...other }), request({ caseId: 'y', ...other })];
     const model = ledgerModel(view({ sources: allPulled(), serviceRequests: rows }), NOW);
-    expect(model.requests.note).toBe('2 other requests not shown');
+    expect(model.other.line).toBe(
+      '2 other 311 requests at or near this address, such as parking, trash pickup and streetlights, fall outside these groups. They are counted here, not listed.',
+    );
+    // The line no longer sits on a group's row, where it read as a second figure for that row's list.
+    expect(model.living.note).toBeNull();
 
     const none = ledgerModel(view({ sources: allPulled() }), NOW);
-    expect(none.requests.note).toBeNull();
+    expect(none.other.line).toBeNull();
+  });
+
+  it('states no other-requests line when 311 was never retrieved', () => {
+    const sources = allPulled();
+    delete sources[NEW_311_RESOURCE_ID];
+    const model = ledgerModel(view({ sources }), NOW);
+    expect(model.other.line).toBeNull();
+    expect(model.living.count).toBe('—');
+    expect(model.buildingRequests.count).toBe('—');
+    expect(model.upkeepRequests.count).toBe('—');
   });
 
   it('breaks the rows down by year and by category', () => {
@@ -180,19 +197,19 @@ describe('ledgerModel counts', () => {
       view({
         sources: allPulled(),
         serviceRequests: [
-          request({ caseId: 'a', openedAt: '2024-02-01', type: 'Heat' }),
-          request({ caseId: 'b', openedAt: '2024-05-01', type: 'Heat' }),
-          request({ caseId: 'c', openedAt: '2026-05-01', type: 'Pests' }),
+          request({ caseId: 'a', openedAt: '2024-02-01', type: 'Heat - Excessive  Insufficient' }),
+          request({ caseId: 'b', openedAt: '2024-05-01', type: 'Heat - Excessive  Insufficient' }),
+          request({ caseId: 'c', openedAt: '2026-05-01', type: 'Bed Bugs' }),
         ],
       }),
       NOW,
     );
 
-    expect(model.requests.years.map((entry) => entry.year)).toEqual([2024, 2025, 2026]);
-    expect(model.requests.years[1].count).toBe(0);
-    expect(model.requests.types.top).toEqual([
-      { key: 'Heat', count: 2 },
-      { key: 'Pests', count: 1 },
+    expect(model.living.years.map((entry) => entry.year)).toEqual([2024, 2025, 2026]);
+    expect(model.living.years[1].count).toBe(0);
+    expect(model.living.types.top).toEqual([
+      { key: 'Heat - Excessive  Insufficient', count: 2 },
+      { key: 'Bed Bugs', count: 1 },
     ]);
   });
 });
@@ -208,7 +225,7 @@ describe('ledgerModel spans', () => {
     );
     // The one request is filed in 2024; the chart's axis runs on to the current year, but the
     // coverage label must not claim 2025 and 2026 as years the records reach into.
-    expect(model.requests.span).toBe('2024');
+    expect(model.living.span).toBe('2024');
   });
 
   it('ignores a garbage year and a 1900 sentinel rather than widening the permit span', () => {
@@ -320,8 +337,11 @@ describe('ledgerModel provenance', () => {
     const model = ledgerModel(view({ sources: allPulled(), permits, serviceRequests: requests }), NOW);
 
     expect(model.permits.cappedNote).toBe(CAPPED_ROWS_COPY);
-    // 311's cap bites before the housing filter, so its note says "considered", not "shown".
-    expect(model.requests.cappedNote).toBe(CAPPED_REQUESTS_COPY);
+    // 311's cap bites before the grouping, so its note says "considered", not "shown", and every
+    // group carries it.
+    expect(model.living.cappedNote).toBe(CAPPED_REQUESTS_COPY);
+    expect(model.buildingRequests.cappedNote).toBe(CAPPED_REQUESTS_COPY);
+    expect(model.upkeepRequests.cappedNote).toBe(CAPPED_REQUESTS_COPY);
     expect(ledgerModel(view({ sources: allPulled() }), NOW).permits.cappedNote).toBeNull();
   });
 });
@@ -371,9 +391,9 @@ describe('ledgerModel rows', () => {
       NOW,
     );
 
-    expect(model.requests.rows[0].trailing).toBe(' · closed Dec 20, 2024');
-    expect(model.requests.openRows).toHaveLength(1);
-    expect(model.requests.openRows[0].trailing).toBeNull();
+    expect(model.living.rows[0].trailing).toBe(' · closed Dec 20, 2024');
+    expect(model.living.openRows).toHaveLength(1);
+    expect(model.living.openRows[0].trailing).toBeNull();
   });
 
   it('notes a RentSmart roll-up that claims more complaints than the 311 rows show', () => {
@@ -387,7 +407,7 @@ describe('ledgerModel rows', () => {
       }),
       NOW,
     );
-    expect(model.requests.rentSmartNote).toContain('2 housing complaints');
+    expect(model.other.rentSmartNote).toContain('2 housing complaints');
   });
 });
 
@@ -411,16 +431,16 @@ describe('ledgerModel open-case wording', () => {
       NOW,
     );
 
-    expect(model.requests.openRows.map((row) => row.statusLabel)).toEqual([
+    expect(model.living.openRows.map((row) => row.statusLabel)).toEqual([
       'Still open in city records, filed 2013',
     ]);
     // The full list says the same thing about the same row, and leaves closed rows as recorded.
-    expect(model.requests.rows.map((row) => row.statusLabel)).toEqual([
+    expect(model.living.rows.map((row) => row.statusLabel)).toEqual([
       'Closed',
       'Still open in city records, filed 2013',
     ]);
     // The city's own word is still on the row for anything that needs it.
-    expect(model.requests.openRows[0].status).toBe('Open');
+    expect(model.living.openRows[0].status).toBe('Open');
   });
 
   it('keeps every open request rather than dropping old ones', () => {
@@ -436,8 +456,8 @@ describe('ledgerModel open-case wording', () => {
       NOW,
     );
 
-    expect(model.requests.openRows).toHaveLength(3);
-    expect(model.requests.count).toBe('3');
+    expect(model.living.openRows).toHaveLength(3);
+    expect(model.living.count).toBe('3');
   });
 
   it('explains what open means only where a section lists an open case', () => {
@@ -451,7 +471,7 @@ describe('ledgerModel open-case wording', () => {
       }),
       NOW,
     );
-    expect(open.requests.openNote).toBe(STILL_OPEN_NOTE);
+    expect(open.living.openNote).toBe(STILL_OPEN_NOTE);
     expect(open.violations.openNote).toBe(STILL_OPEN_NOTE);
     expect(open.enforcement.openNote).toBe(STILL_OPEN_NOTE);
     // An open permit is an active permit. Nothing to explain away.
@@ -466,7 +486,7 @@ describe('ledgerModel open-case wording', () => {
       }),
       NOW,
     );
-    expect(closed.requests.openNote).toBeNull();
+    expect(closed.living.openNote).toBeNull();
     expect(closed.violations.openNote).toBeNull();
     expect(closed.enforcement.openNote).toBeNull();
   });
@@ -513,5 +533,201 @@ describe('ledgerModel open-case wording', () => {
     );
     expect(model.violations.rows[0].statusLabel).toBe(NOT_RECORDED);
     expect(model.enforcement.rows[0].statusLabel).toBe(NOT_RECORDED);
+  });
+});
+
+/**
+ * The three groups the panel shows, in the owner's order: living conditions, building safety and
+ * code, property upkeep. 311 requests are split across them by the type the city recorded; ISD
+ * violations are counted by case and Public Works tickets by ticket number, never by line.
+ */
+describe('ledgerModel groups', () => {
+  it('splits 311 requests across the three groups and counts the rest once', () => {
+    const model = ledgerModel(
+      view({
+        sources: allPulled(),
+        serviceRequests: [
+          request({ caseId: 'heat', reason: 'Housing', type: 'Heat - Excessive  Insufficient', openedAt: '2024-01-02' }),
+          request({
+            caseId: 'rodent',
+            reason: 'Environmental Services',
+            type: 'Rodent Activity',
+            classification: 'other',
+            openedAt: '2023-07-01',
+          }),
+          request({ caseId: 'permit', reason: 'Building', type: 'Work w/out Permit', openedAt: '2022-03-04' }),
+          request({
+            caseId: 'snow',
+            reason: 'Code Enforcement',
+            type: 'Unshoveled Sidewalk',
+            status: 'Open',
+            openedAt: '2021-02-01',
+          }),
+          request({
+            caseId: 'park',
+            reason: 'Enforcement & Abandoned Vehicles',
+            type: 'Parking Enforcement',
+            classification: 'other',
+          }),
+        ],
+      }),
+      NOW,
+    );
+
+    expect(model.living.count).toBe('2');
+    expect(model.living.rows.map((row) => row.label)).toEqual(['Heat - Excessive  Insufficient', 'Rodent Activity']);
+    expect(model.buildingRequests.count).toBe('1');
+    expect(model.upkeepRequests.count).toBe('1');
+    // The open sidewalk request is listed under upkeep, not under living conditions.
+    expect(model.living.openRows).toHaveLength(0);
+    expect(model.upkeepRequests.openRows.map((row) => row.label)).toEqual(['Unshoveled Sidewalk']);
+    expect(model.other.count).toBe(1);
+  });
+
+  it('says none on record for a group the source answered with nothing', () => {
+    const model = ledgerModel(
+      view({ sources: allPulled(), serviceRequests: [request({ reason: 'Housing', type: 'Bed Bugs' })] }),
+      NOW,
+    );
+    expect(model.living.count).toBe('1');
+    expect(model.buildingRequests.count).toBe('0');
+    expect(model.buildingRequests.subCount).toBe('none on record');
+    expect(model.upkeepRequests.subCount).toBe('none on record');
+  });
+
+  it('labels each full list in the right number', () => {
+    const one = ledgerModel(view({ sources: allPulled(), serviceRequests: [request()] }), NOW);
+    expect(one.living.showAll).toBe('Show 1 request');
+
+    const two = ledgerModel(
+      view({ sources: allPulled(), serviceRequests: [request({ caseId: 'a' }), request({ caseId: 'b' })] }),
+      NOW,
+    );
+    expect(two.living.showAll).toBe('Show all 2 requests');
+  });
+
+  it('compares the RentSmart roll-up against every listed 311 request, not one group', () => {
+    const model = ledgerModel(
+      view({
+        sources: allPulled(),
+        serviceRequests: [
+          request({ caseId: 'a', reason: 'Housing', type: 'Bed Bugs' }),
+          request({ caseId: 'b', reason: 'Building', type: 'Work w/out Permit' }),
+        ],
+        rentsmart: [rentsmart({ violationType: 'Housing Complaints' }), rentsmart({ violationType: 'Housing Complaints' })],
+      }),
+      NOW,
+    );
+    // Two complaints in the roll-up, two requests listed across the groups: nothing to note.
+    expect(model.other.rentSmartNote).toBeNull();
+  });
+});
+
+describe('ledgerModel ISD cases', () => {
+  it('counts ISD violations by case and keeps every code line under its case number', () => {
+    const line = (caseNumber: string, code: string, description: string, statusWord: string, statusDate: string) =>
+      violation({ caseNumber, code, description, status: statusWord, statusDate });
+    const model = ledgerModel(
+      view({
+        sources: allPulled(),
+        violations: [
+          line('V900001', '1', 'Line one', 'Closed', '2013-04-02 09:00:00'),
+          line('V900001', '2', 'Line two', 'Closed', '2013-04-02 09:00:00'),
+          line('V900001', '3', 'Line three', 'Closed', '2013-04-02 09:00:00'),
+          line('V900002', '4', 'Line four', 'Open', '2012-01-05 09:00:00'),
+        ],
+      }),
+      NOW,
+    );
+
+    expect(model.violations.count).toBe('2');
+    expect(model.violations.subCount).toBe('1 open');
+    expect(model.violations.note).toBe('4 code lines in 2 cases');
+    // The open case is listed first, under its own number; every line is still there.
+    expect(model.violations.cases.map((entry) => entry.label)).toEqual(['Case V900002', 'Case V900001']);
+    expect(model.violations.cases[1].lines.map((entry) => entry.label)).toEqual([
+      '1 · Line one',
+      '2 · Line two',
+      '3 · Line three',
+    ]);
+    expect(model.violations.rows).toHaveLength(4);
+    expect(model.violations.showAll).toBe('Show all 2 cases');
+  });
+
+  it('dates a case by its latest line and dates a line only where it differs', () => {
+    const model = ledgerModel(
+      view({
+        sources: allPulled(),
+        violations: [
+          violation({ caseNumber: 'V1', code: 'a', status: 'Closed', statusDate: '2020-03-01 10:00:00' }),
+          violation({ caseNumber: 'V1', code: 'b', status: 'Closed', statusDate: '2019-01-15 10:00:00' }),
+        ],
+      }),
+      NOW,
+    );
+    const [entry] = model.violations.cases;
+    expect(entry.date).toBe('2020-03-01 10:00:00');
+    expect(entry.lines.map((row) => row.trailing)).toEqual([null, ' · Jan 15, 2019']);
+  });
+
+  it('adds no lines note when every case has one line', () => {
+    const model = ledgerModel(
+      view({ sources: allPulled(), violations: [violation({ caseNumber: 'V1' }), violation({ caseNumber: 'V2' })] }),
+      NOW,
+    );
+    expect(model.violations.count).toBe('2');
+    expect(model.violations.note).toBeNull();
+  });
+});
+
+describe('ledgerModel Public Works tickets', () => {
+  it('counts distinct tickets, not violation lines', () => {
+    const line = (caseNumber: string, ticketNumber: string, code: string, description: string, statusWord: string, statusDate: string) =>
+      ticket({ caseNumber, ticketNumber, code, description, status: statusWord, statusDate });
+    const model = ledgerModel(
+      view({
+        sources: allPulled(),
+        enforcement: [
+          line('CE1', 'T-A', '1', 'Improper storage trash: res', 'Closed', '2018-05-01 09:00:00'),
+          line('CE1', 'T-A', '24', 'Overgrown Weeds On Property', 'Closed', '2018-05-01 09:00:00'),
+          line('CE2', 'T-B', '1', 'Improper storage trash: res', 'Open', '2024-06-03 09:00:00'),
+        ],
+      }),
+      NOW,
+    );
+
+    expect(model.enforcement.count).toBe('2');
+    expect(model.enforcement.subCount).toBe('1 open');
+    expect(model.enforcement.note).toBe('3 violation lines on 2 tickets');
+    expect(model.enforcement.cases.map((entry) => entry.label)).toEqual(['Ticket T-B', 'Ticket T-A']);
+    expect(model.enforcement.showAll).toBe('Show all 2 tickets');
+    // What was ticketed still counts each line the city recorded.
+    expect(model.enforcement.types.top).toEqual([
+      { key: 'Improper storage trash: res', count: 2 },
+      { key: 'Overgrown Weeds On Property', count: 1 },
+    ]);
+  });
+
+  it('falls back to the case number for a ticket the feed left unnumbered', () => {
+    const model = ledgerModel(
+      view({
+        sources: allPulled(),
+        enforcement: [
+          ticket({ caseNumber: 'CE7', ticketNumber: null, code: '1' }),
+          ticket({ caseNumber: 'CE7', ticketNumber: '  ', code: '2' }),
+          ticket({ caseNumber: 'CE8', ticketNumber: null, code: '1' }),
+        ],
+      }),
+      NOW,
+    );
+    expect(model.enforcement.count).toBe('2');
+    expect(model.enforcement.cases.map((entry) => entry.label)).toEqual(['Case CE7', 'Case CE8']);
+    expect(model.enforcement.showAll).toBe('Show all 2 tickets');
+  });
+
+  it('says one ticket in the singular', () => {
+    const model = ledgerModel(view({ sources: allPulled(), enforcement: [ticket()] }), NOW);
+    expect(model.enforcement.showAll).toBe('Show 1 ticket');
+    expect(model.enforcement.note).toBeNull();
   });
 });
