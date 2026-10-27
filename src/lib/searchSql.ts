@@ -37,6 +37,16 @@ const ADDRESS_FIRST_WORD = "substr(TRIM(b.address), 1, instr(TRIM(b.address) || 
 const HOUSE_LO = 'COALESCE(b.st_num_lo, CAST(TRIM(b.address) AS INTEGER))';
 const HOUSE_HI = `COALESCE(b.st_num_hi, CASE WHEN ${ADDRESS_FIRST_WORD} GLOB '[0-9]*-[0-9]*' THEN CAST(substr(${ADDRESS_FIRST_WORD}, instr(${ADDRESS_FIRST_WORD}, '-') + 1) AS INTEGER) ELSE CAST(TRIM(b.address) AS INTEGER) END)`;
 
+/**
+ * The building with the newest approved review first, as an ORDER BY key. Both call sites
+ * join reviews `ON ... AND r.status = 'approved'`, so a pending or rejected review never
+ * moves a building. A building with no approved review reads NULL, which sorts after every
+ * date under DESC. Browse (`BROWSE_BUILDINGS_ORDER`) and an area search
+ * (`buildingSearchOrder`) share it, so "most recently reviewed" means one thing on /search.
+ * Why submission time and not approval time: see `BROWSE_BUILDINGS_ORDER`.
+ */
+const NEWEST_REVIEW_FIRST = 'MAX(r.created_at) DESC';
+
 function contains(value: string): string {
   return `%${escapeLikePattern(value)}%`;
 }
@@ -190,12 +200,17 @@ export function buildingSearchWhere(query: string): SqlFragment {
  *    contains them ("Lexample St").
  * 3. A building in the place or ZIP the search named ("Allston" lists Allston buildings
  *    before an Allston St address elsewhere).
- * 4. More reviews, then the higher score.
- * 5. House number as a number (98, 100, 103, 1008, not 100, 1008, 103, 98), then the
+ * 4. An area search only ("Brighton", "02135", "Allston, MA": `isAreaSearch`): the newest
+ *    approved review first, the browse list's rule (`NEWEST_REVIEW_FIRST`). An unreviewed
+ *    building has no review, so this key ties them all and they keep the order below. An
+ *    address search skips this key and keeps the order it has always had.
+ * 5. More reviews, then the higher score.
+ * 6. House number as a number (98, 100, 103, 1008, not 100, 1008, 103, 98), then the
  *    address, then the unique id, so Load more pages never repeat or skip a row.
  */
 export function buildingSearchOrder(query: string): SqlFragment {
   const parsed = parseSearchQuery(query);
+  const area = isAreaSearch(parsed);
   const words = wholeWordsClause(parsed.terms);
   const place = placeClause(parsed);
   const reviewed = 'COUNT(r.id) > 0';
@@ -223,6 +238,7 @@ export function buildingSearchOrder(query: string): SqlFragment {
 
   const keys: SqlFragment[] = [{ sql: `${tier.sql} DESC`, binds: tier.binds }];
   if (place) keys.push({ sql: `${inPlace.sql} DESC`, binds: inPlace.binds });
+  if (area) keys.push({ sql: NEWEST_REVIEW_FIRST, binds: [] });
   for (const key of ['COUNT(r.id) DESC', 'avg_overall DESC', `${HOUSE_LO} ASC`, 'b.address ASC', 'b.id ASC']) {
     keys.push({ sql: key, binds: [] });
   }
@@ -275,7 +291,8 @@ export function buildingSearchSelect(currentYear: number): string {
  * - Boston is `BOSTON_CITY_SQL`, the city half of `has_records`, not the whole flag: a Boston
  *   building with no parcel id is still a Boston building. `COALESCE` puts a NULL city with
  *   everything else rather than in a third group.
- * - "Newest review" is `MAX(r.created_at)` over the joined rows, and both call sites join
+ * - "Newest review" is `MAX(r.created_at)` over the joined rows (`NEWEST_REVIEW_FIRST`, which
+ *   an area search also orders by), and both call sites join
  *   reviews `ON ... AND r.status = 'approved'`, so a pending or rejected review never moves a
  *   building. `created_at` (submission) rather than approval time because the reviews row
  *   has no approval time: `moderated_at` is never written, and `updated_at` moves again on
@@ -289,4 +306,4 @@ export function buildingSearchSelect(currentYear: number): string {
  * Shared by `search.astro` (first page) and `api/search/results.ts` (Load more); the
  * review alias is fixed at `r` and the buildings alias at `b`, as in both.
  */
-export const BROWSE_BUILDINGS_ORDER = `ORDER BY COALESCE(${BOSTON_CITY_SQL}, 0) DESC, MAX(r.created_at) DESC, b.id ASC`;
+export const BROWSE_BUILDINGS_ORDER = `ORDER BY COALESCE(${BOSTON_CITY_SQL}, 0) DESC, ${NEWEST_REVIEW_FIRST}, b.id ASC`;

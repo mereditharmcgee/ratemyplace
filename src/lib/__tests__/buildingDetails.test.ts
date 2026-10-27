@@ -1,6 +1,77 @@
 import { describe, expect, it } from 'vitest';
-import { hasBuildingDetails } from '../buildingDetails';
+import {
+  ESTIMATED_UNITS_LABEL,
+  UNITS_LABEL,
+  hasBuildingDetails,
+  isLandUseUnitEstimate,
+  unitCountLabel,
+  type UnitCountEvidence,
+} from '../buildingDetails';
+import { IMPLIED_UNITS, impliedUnitsFor } from '../records/seed/impliedUnits';
 import type { Building } from '../types';
+
+describe('impliedUnitsFor', () => {
+  it('gives the seed estimate for the land uses it estimates for, and null otherwise', () => {
+    expect(impliedUnitsFor('R2')).toBe(2);
+    expect(impliedUnitsFor('R3')).toBe(3);
+    expect(impliedUnitsFor('A')).toBeNull();
+    expect(impliedUnitsFor('R4')).toBeNull();
+    expect(impliedUnitsFor('RC')).toBeNull();
+    expect(impliedUnitsFor(null)).toBeNull();
+    expect(impliedUnitsFor('')).toBeNull();
+  });
+
+  it('reads a raw stored code the way the seed normalized it', () => {
+    expect(impliedUnitsFor(' r3 ')).toBe(3);
+  });
+
+  it('does not read inherited object keys as land-use codes', () => {
+    expect(impliedUnitsFor('constructor')).toBeNull();
+    expect(impliedUnitsFor('toString')).toBeNull();
+  });
+
+  it('is the table the seed writes from', () => {
+    expect(IMPLIED_UNITS).toEqual({ R2: 2, R3: 3 });
+  });
+});
+
+describe('unit count label', () => {
+  const blank = (landUse: string | null): UnitCountEvidence => ({ landUse, residentialUnits: null });
+
+  it("labels the seed's estimate on a parcel the assessor left blank", () => {
+    expect(isLandUseUnitEstimate(3, blank('R3'))).toBe(true);
+    expect(isLandUseUnitEstimate(2, blank('R2'))).toBe(true);
+    expect(unitCountLabel(3, blank('R3'))).toBe(ESTIMATED_UNITS_LABEL);
+    expect(ESTIMATED_UNITS_LABEL).toBe('Units (estimated from land use)');
+  });
+
+  it('keeps "Units" for a count a person entered on a land use the seed does not estimate for', () => {
+    // An apartment parcel: the seed implies nothing for A, so any stored count came from a person.
+    expect(isLandUseUnitEstimate(18, blank('A'))).toBe(false);
+    expect(unitCountLabel(18, blank('A'))).toBe(UNITS_LABEL);
+    expect(UNITS_LABEL).toBe('Units');
+  });
+
+  it('keeps "Units" for a count that is not the estimate', () => {
+    expect(isLandUseUnitEstimate(4, blank('R3'))).toBe(false);
+    expect(isLandUseUnitEstimate(3, blank('R2'))).toBe(false);
+  });
+
+  it('keeps "Units" when the assessor recorded a count, zero included', () => {
+    expect(isLandUseUnitEstimate(3, { landUse: 'R3', residentialUnits: 3 })).toBe(false);
+    expect(isLandUseUnitEstimate(3, { landUse: 'R3', residentialUnits: 0 })).toBe(false);
+  });
+
+  it('keeps "Units" with no assessor record or no count', () => {
+    expect(unitCountLabel(3, null)).toBe(UNITS_LABEL);
+    expect(isLandUseUnitEstimate(null, blank('R3'))).toBe(false);
+    expect(isLandUseUnitEstimate(0, blank('R3'))).toBe(false);
+  });
+
+  it('stays plain: no dash, no exclamation point', () => {
+    expect(ESTIMATED_UNITS_LABEL).not.toMatch(/[—!]/);
+  });
+});
 
 describe('hasBuildingDetails', () => {
   it('is false when type, year built, and unit count are all missing', () => {

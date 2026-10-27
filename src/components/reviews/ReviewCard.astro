@@ -168,10 +168,13 @@ const pestLabels: Record<string, string> = {
   <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4 gap-4">
     <div class="min-w-0 flex-1">
-      <div class="relative flex items-center gap-2 mb-1">
+      {/* flex-wrap: on a phone a long title takes the full width and the badge drops under
+          it, instead of the title squeezing into a narrow column beside the badge. */}
+      <div class="relative flex flex-wrap items-center gap-2 mb-1">
         {review.review_title && (
-          <h3 class="text-lg font-semibold text-gray-900 break-words">{review.review_title}</h3>
+          <h3 class="min-w-0 text-lg font-semibold text-gray-900 break-words">{review.review_title}</h3>
         )}
+        {/* The card's one trust badge. The footer used to repeat it. */}
         {review.is_verified === 1 && <VerifiedBadge size="sm" />}
       </div>
       <div class="flex items-center gap-2 mb-2 min-w-0">
@@ -335,7 +338,7 @@ const pestLabels: Record<string, string> = {
         </div>
       </div>
     </div>
-    <p class="text-xs text-gray-400 mt-3"><span class="text-red-400">*</span> Health and safety weighted. These factors count more in the overall score. <a href="/methodology" class="text-teal-500 hover:text-teal-700">Learn more</a></p>
+    <p class="text-xs text-gray-400 mt-3"><span class="text-red-400">*</span> Health and safety weighted. These factors count more in the overall score. <a href="/methodology" class="-my-1.5 inline-block py-1.5 text-teal-500 hover:text-teal-700">Learn more</a></p>
   </div>
 
   <!-- Security Deposit Highlight -->
@@ -493,7 +496,7 @@ const pestLabels: Record<string, string> = {
   )}
 
   <!-- Footer -->
-  <div class="relative mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm">
+  <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm">
     <div class="flex items-center gap-3">
       <span class={`px-2 py-1 rounded-full text-xs ${
         review.would_recommend_new === 'yes'
@@ -508,7 +511,6 @@ const pestLabels: Record<string, string> = {
             ? 'Maybe / It depends'
             : 'Would not recommend'}
       </span>
-      {review.is_verified === 1 && <VerifiedBadge size="sm" />}
     </div>
   </div>
 </article>

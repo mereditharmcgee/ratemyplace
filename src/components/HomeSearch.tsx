@@ -46,8 +46,9 @@ export default function HomeSearch() {
     }
     setIsLoadingGoogle(true);
     try {
-      // scope=boston: biased to Boston, Massachusetts only, matched to our buildings. The
-      // review form's address search does not send it and keeps any US address.
+      // scope=boston: biased to Boston, matched to our buildings, Massachusetts only except a
+      // building we already have. The review form's address search does not send it and
+      // keeps any US address.
       const params = new URLSearchParams({ input, sessionToken, scope: 'boston' });
       const response = await fetch(`/api/places/autocomplete?${params}`);
       const data = await response.json();

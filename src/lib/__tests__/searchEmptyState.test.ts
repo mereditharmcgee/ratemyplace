@@ -41,12 +41,23 @@ describe('searchEmptyState', () => {
     expect(state.next?.href).toBe('/search?q=A%20%26%20B%20%232&type=buildings');
   });
 
-  it.each(['all', 'buildings'])('keeps the buildings messages for type=%s', (type) => {
-    expect(searchEmptyState({ query: 'zzqx', type, ...none })).toEqual({
+  it('names buildings and landlords for the All filter, which searched both', () => {
+    expect(searchEmptyState({ query: 'zzqx', type: 'all', ...none })).toEqual({
+      title: 'No buildings or landlords match that search',
+      description: 'Try a wider neighborhood or a partial street name.',
+      next: null,
+    });
+  });
+
+  it('keeps the buildings title for the Buildings filter', () => {
+    expect(searchEmptyState({ query: 'zzqx', type: 'buildings', ...none })).toEqual({
       title: 'No buildings match that search',
       description: 'Try a wider neighborhood or a partial street name.',
       next: null,
     });
+  });
+
+  it.each(['all', 'buildings'])('keeps the area and address messages for type=%s', (type) => {
     expect(searchEmptyState({ query: 'Brighton', type, areaSearch: true, streetQuery: null })).toEqual({
       title: 'No buildings listed under that neighborhood or ZIP code',
       description: 'Some buildings have no neighborhood on file. Try the street name or the full address.',
@@ -165,6 +176,31 @@ suite('search page empty states, rendered', () => {
       expect(text).toContain('No buildings match that search');
       expect(text).not.toContain('No landlords match');
       expect(text).not.toContain('Search buildings instead');
+      expect(text).not.toContain('or landlords');
+    } finally {
+      database.close();
+    }
+  });
+
+  it('an All search with no match names buildings and landlords, with or without the type parameter', async () => {
+    const database = makeDatabase();
+    try {
+      for (const type of ['all', '']) {
+        const text = mainText(await renderSearch(database, 'zzqx', type));
+        expect(text, `type=${type}`).toContain('No buildings or landlords match that search');
+        expect(text, `type=${type}`).not.toContain('No landlords match');
+      }
+    } finally {
+      database.close();
+    }
+  });
+
+  it('an All search that matches a landlord lists it, with no empty state', async () => {
+    const database = makeDatabase();
+    try {
+      const text = mainText(await renderSearch(database, 'Example Realty', 'all'));
+      expect(text).toContain('Example Realty');
+      expect(text).not.toContain('match that search');
     } finally {
       database.close();
     }

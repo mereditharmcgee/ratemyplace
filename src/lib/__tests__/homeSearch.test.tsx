@@ -138,6 +138,34 @@ describe('HomeSearch dropdown', () => {
     expect(container.textContent).toContain('Address suggestions powered by Google');
   });
 
+  it('shows a building we have in another state as our building, with the early-rating chip', async () => {
+    // The server keeps an out-of-state suggestion only when it is one of our buildings.
+    const elsewhere = {
+      placeId: 'gp-ct',
+      description: '40 Sample Street, Elsewhere, CT, USA',
+      mainText: '40 Sample Street',
+      secondaryText: 'Elsewhere, CT, USA',
+      existing: { slug: '40-sample-street-elsewhere', title: '40 Sample Street', subtitle: 'Elsewhere, CT', reviewCount: 1, avgScore: 3.7 },
+    };
+    stubFetch([], [elsewhere]);
+    const { getByRole, container } = render(<HomeSearch />);
+    type(getByRole, '40 Sample Street, Elsewhere, CT');
+    await waitFor(() => expect(container.textContent).toContain('40 Sample Street'));
+
+    expect(container.textContent).toContain('On RateMyPlace');
+    expect(container.textContent).not.toContain('Other addresses');
+    const row = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('See this building'));
+    expect(row?.textContent).toContain('Elsewhere, CT');
+    const reviewLink = Array.from(container.querySelectorAll('a')).find((a) => a.textContent === 'Write a review');
+    expect(reviewLink?.getAttribute('href')).toBe('/review/new?placeId=gp-ct');
+
+    const chip = container.querySelector('[data-home-score]');
+    expect(chip?.textContent).toBe('3.7');
+    expect(chip?.className).toContain(getEarlyScoreStyle(3.7).text);
+    expect(chip?.className).not.toContain(getScoreTextColor(3.7));
+    expect(chip?.querySelector('[data-early-score-marker]')?.className).toContain(getScoreColor(3.7).bg);
+  });
+
   it('uses a placeholder short enough for a phone, with the full label for screen readers', () => {
     stubFetch([], []);
     const { getByRole } = render(<HomeSearch />);

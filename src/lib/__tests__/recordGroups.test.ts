@@ -83,8 +83,15 @@ describe('serviceRequestGroup', () => {
     ['Housing', 'Unsatisfactory Living Conditions'],
     ['Housing', 'Maintenance Complaint - Residential'],
     ['Building', 'Unsafe Dangerous Conditions'],
+    ['Building', 'Maintenance - Homeowner'],
   ])('puts a %s request for %s in living conditions', (reason, type) => {
     expect(serviceRequestGroup(legacy(reason, type))).toBe('living');
+  });
+
+  it('lists Maintenance - Homeowner under living conditions only, so the methodology list moves with it', () => {
+    // The methodology page renders SERVICE_REQUEST_TYPE_GROUPS, so the table is the list it shows.
+    expect(SERVICE_REQUEST_TYPE_GROUPS.living).toContain('Maintenance - Homeowner');
+    expect(SERVICE_REQUEST_TYPE_GROUPS.building).not.toContain('Maintenance - Homeowner');
   });
 
   it('counts Inspectional Services rodent activity under living conditions, though the pull files it as other', () => {

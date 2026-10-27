@@ -394,12 +394,25 @@ suite('BuildingRecords.astro ledger', () => {
     expect(html).toContain('Assessor FY2026 · parcel 2102098000');
     expect(html).toContain('Built');
     expect(html).toContain('1920');
-    // Says whose field is blank, so it does not read against a unit count in Building details.
-    expect(html).toContain('Last remodel 1980 · units not recorded by the assessor');
+    // The assessor left the unit count blank, so the sub-line says nothing about units.
+    expect(html).toContain('Last remodel 1980</span>');
+    expect(html).not.toContain('units not recorded');
     expect(html).toContain('Land use');
     expect(html).toContain('APT 7-30 UNITS');
     // Compact, not the long form, so the four cells fit across a phone.
     expect(html).toContain('$6.72M');
+  });
+
+  it('adds the unit count to the built sub-line when the assessor recorded one', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+    await db
+      .prepare("UPDATE building_records SET payload = json_set(payload, '$.residentialUnits', 12) WHERE kind = 'assessment'")
+      .run();
+
+    const html = await renderPanel(db);
+
+    expect(html).toContain('Last remodel 1980 · units 12');
   });
 
   it('draws a sparkline across the fiscal years and states the range under it', async () => {
@@ -421,11 +434,11 @@ suite('BuildingRecords.astro ledger', () => {
     // Two living-conditions requests, one still open. The two trash-storage requests are
     // property upkeep, and the four requests in no group are counted once, under the groups.
     const living = summaryText(html, '311 living conditions requests');
-    expect(living).toContain('1 open');
+    expect(living).toContain('1 still open');
     expect(living).toContain('2024–2026');
     expect(living).not.toContain('not shown');
     const upkeep = summaryText(html, '311 property upkeep requests');
-    expect(upkeep).toContain('2 open');
+    expect(upkeep).toContain('2 still open');
     expect(upkeep).toContain('2024');
     expect(summaryText(html, '311 building and code requests')).toContain('none on record');
     expect(parse(html).textContent).toContain('4 other 311 requests at or near this address');
@@ -436,7 +449,9 @@ suite('BuildingRecords.astro ledger', () => {
 
     // Two permits after the duplicate row is deduped, one open, $36,500 + $1,200 declared.
     const permits = summaryText(html, 'Building permits');
+    // An open permit is an active permit, so permits keep "open" rather than "still open".
     expect(permits).toContain('1 open · $37.7K declared');
+    expect(permits).not.toContain('still open');
     // The coverage label is the years the permits actually fall in (2019 and 2021) — not the
     // feed's documented coverage window the bars are drawn across, which runs 2006 to 2026.
     expect(permits).toContain('2019–2021');
@@ -767,7 +782,7 @@ suite('BuildingRecords.astro ledger', () => {
     const violations = sectionText(html, 'ISD violation cases');
     expect(violations).toContain('Case V100001');
     expect(violations).toContain('Case V100002');
-    expect(summaryText(html, 'ISD violation cases')).toContain('1 open');
+    expect(summaryText(html, 'ISD violation cases')).toContain('1 still open');
     const tickets = sectionText(html, 'Public Works code enforcement tickets');
     expect(tickets).toContain('Ticket T1');
     expect(tickets).toContain('Ticket T2');

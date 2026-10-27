@@ -279,6 +279,129 @@ suite('search by neighborhood or ZIP alone', () => {
   });
 });
 
+/** A review submitted at midday UTC on `date`, in the given status. */
+async function reviewOn(
+  db: TestD1Database,
+  buildingId: string,
+  id: string,
+  date: string,
+  status: 'approved' | 'pending' | 'rejected' = 'approved',
+): Promise<void> {
+  const createdAt = Math.floor(Date.parse(`${date}T12:00:00Z`) / 1000);
+  await db
+    .prepare('INSERT INTO reviews (id, building_id, status, created_at, overall_score) VALUES (?, ?, ?, ?, 3.5)')
+    .bind(id, buildingId, status, createdAt)
+    .run();
+}
+
+/**
+ * An area search (a neighborhood or ZIP on its own) lists reviewed buildings most recently
+ * reviewed first, the browse list's rule, not most reviewed first. Every building here is in
+ * Brighton, 02135, unless it says otherwise; the street words differ so an address search
+ * over the same rows can show its order did not change.
+ */
+async function seedArea(db: TestD1Database): Promise<void> {
+  // Most reviews, all older than the newest review below.
+  await userRow(db, { id: 'most-reviews', address: '32 Sample Road', neighborhood: 'Brighton' });
+  await reviewOn(db, 'most-reviews', 'mr-1', '2026-03-01');
+  await reviewOn(db, 'most-reviews', 'mr-2', '2026-04-01');
+  await reviewOn(db, 'most-reviews', 'mr-3', '2026-05-01');
+  // One review, the newest in Brighton.
+  await userRow(db, { id: 'newest', address: '30 Sample Road', neighborhood: 'Brighton' });
+  await reviewOn(db, 'newest', 'n-1', '2026-09-01');
+  // Its newest approved review is the oldest here. A newer review waiting for moderation, and
+  // a newer rejected one, do not count.
+  await userRow(db, { id: 'pending-newer', address: '34 Sample Road', neighborhood: 'Brighton' });
+  await reviewOn(db, 'pending-newer', 'pn-1', '2026-02-01');
+  await reviewOn(db, 'pending-newer', 'pn-2', '2026-10-20', 'pending');
+  await reviewOn(db, 'pending-newer', 'pn-3', '2026-10-21', 'rejected');
+  // Two reviewed in the same second: review count, then the house number decide, as before.
+  await userRow(db, { id: 'same-second-b', address: '38 Sample Road', neighborhood: 'Brighton' });
+  await reviewOn(db, 'same-second-b', 'sb-1', '2026-07-01');
+  await userRow(db, { id: 'same-second-a', address: '36 Sample Road', neighborhood: 'Brighton' });
+  await reviewOn(db, 'same-second-a', 'sa-1', '2026-07-01');
+  // Unreviewed parcels in Brighton: after every reviewed one, by house number.
+  await seeded(db, { id: 'seeded-40', address: '40 Sample Road', neighborhood: 'Brighton', lo: 40 });
+  await seeded(db, { id: 'seeded-2', address: '2 Sample Road', neighborhood: 'Brighton', lo: 2 });
+  // Reviewed most recently of all, but on a street named after the place, in another
+  // neighborhood and ZIP: the typed place still ranks first, as it did before.
+  await userRow(db, { id: 'street-elsewhere', address: '9 Brighton Street', neighborhood: 'Dorchester', zip: '02124' });
+  await reviewOn(db, 'street-elsewhere', 'se-1', '2026-10-01');
+}
+
+const BRIGHTON_ORDER = [
+  'newest',
+  'same-second-a',
+  'same-second-b',
+  'most-reviews',
+  'pending-newer',
+  'street-elsewhere',
+  'seeded-2',
+  'seeded-40',
+];
+
+suite('area search order: most recently reviewed first', () => {
+  it('lists reviewed buildings in a neighborhood by newest approved review, then unreviewed by house number', async () => {
+    const db = createRecordsTestDb();
+    await seedArea(db);
+    expect(await search(db, 'Brighton')).toEqual(BRIGHTON_ORDER);
+    expect(await search(db, 'Brighton, MA')).toEqual(BRIGHTON_ORDER);
+  });
+
+  it('orders a ZIP search the same way', async () => {
+    const db = createRecordsTestDb();
+    await seedArea(db);
+    expect(await search(db, '02135')).toEqual(BRIGHTON_ORDER.filter((id) => id !== 'street-elsewhere'));
+  });
+
+  it('pages through an area search with no repeat or gap, and counts what it lists', async () => {
+    const db = createRecordsTestDb();
+    await seedArea(db);
+    for (const query of ['Brighton', '02135', 'Brighton, MA 02135']) {
+      const all = await search(db, query, 50, 0);
+      expect(new Set(all).size, query).toBe(all.length);
+      expect(await count(db, query), query).toBe(all.length);
+      for (const size of [1, 2, 3]) {
+        const paged: string[] = [];
+        for (let offset = 0; offset < all.length + size; offset += size) {
+          paged.push(...(await search(db, query, size, offset)));
+        }
+        expect(paged, `${query}, pages of ${size}`).toEqual(all);
+      }
+    }
+  });
+
+  it('leaves address searches ordered by review count, as before', async () => {
+    const db = createRecordsTestDb();
+    await seedArea(db);
+    // A street, not an area: whole-word matches, then review count, then the house number.
+    expect(await search(db, 'Sample Rd')).toEqual([
+      'most-reviews',
+      'newest',
+      'pending-newer',
+      'same-second-a',
+      'same-second-b',
+      'seeded-2',
+      'seeded-40',
+    ]);
+    // A street plus the neighborhood is still an address search.
+    expect((await search(db, 'Sample Rd, Brighton'))[0]).toBe('most-reviews');
+    // An exact address still leads, reviewed or not.
+    expect((await search(db, '40 Sample Rd Brighton'))[0]).toBe('seeded-40');
+  });
+
+  it('adds the newest-review key to area searches only', () => {
+    for (const query of ['Brighton', '02135', 'Allston, MA', 'Boston']) {
+      expect(isAreaSearch(parseSearchQuery(query)), query).toBe(true);
+      expect(buildingSearchOrder(query).sql, query).toContain('MAX(r.created_at) DESC');
+    }
+    for (const query of ['Sample Rd', '30 Sample Rd, Brighton', '7 Allston', 'Brighton Ave', 'zzqx']) {
+      expect(isAreaSearch(parseSearchQuery(query)), query).toBe(false);
+      expect(buildingSearchOrder(query).sql, query).not.toContain('MAX(r.created_at)');
+    }
+  });
+});
+
 suite('search order and paging', () => {
   it('pages through the full order with no repeat or gap', async () => {
     const db = createRecordsTestDb();

@@ -23,19 +23,33 @@ import {
   type RecommendTally,
 } from '../../lib/earlyRating';
 import { humanize } from '../../lib/format';
-import { BUILDING_DETAIL_FIELDS, hasBuildingDetails, type BuildingDetailFields } from '../../lib/buildingDetails';
+import {
+  BUILDING_DETAIL_FIELDS,
+  UNITS_LABEL,
+  hasBuildingDetails,
+  unitCountLabel,
+  type BuildingDetailFields,
+} from '../../lib/buildingDetails';
+import { getCurrentAssessment } from '../../lib/records/query';
 import { localityLine } from '../../lib/locality';
+import { logError } from '../../lib/logger';
 import { NO_CHECKLIST_ISSUES_COPY, resolveUnitType } from '../../lib/reviewDisplay';
 import { buildingPageMeta } from '../../lib/buildingMeta';
 
+type BuildingDetailRows = Record<
+  (typeof BUILDING_DETAIL_FIELDS)[number],
+  { label: string; format: (building: BuildingDetailFields) => unknown }
+>;
+
 // Label and formatter for each field in BUILDING_DETAIL_FIELDS, in display order —
 // keeps the <dl> rows and the hasBuildingDetails check from drifting.
-const buildingDetailRows: Record<(typeof BUILDING_DETAIL_FIELDS)[number], { label: string; format: (building: BuildingDetailFields) => unknown }> = {
+const buildingDetailRows: BuildingDetailRows = {
   // `?? ''` only satisfies the type: the row is guarded by `Boolean(building[field])` below,
   // so a blank building_type never reaches a formatter.
   building_type: { label: 'Type', format: (b) => humanize(b.building_type ?? '') },
   year_built: { label: 'Year built', format: (b) => b.year_built },
-  unit_count: { label: 'Units', format: (b) => b.unit_count },
+  // Relabelled below when the count is the seed's land-use estimate.
+  unit_count: { label: UNITS_LABEL, format: (b) => b.unit_count },
 };
 
 const { slug } = Astro.params;
@@ -190,6 +204,27 @@ const sortedUnits = Array.from(reviewsByUnit.values())
   .sort((a, b) => unitTypeOrder.indexOf(a.unitType) - unitTypeOrder.indexOf(b.unitType));
 
 const showBuildingDetails = hasBuildingDetails(building);
+
+// "Units (estimated from land use)" when the stored count is the Boston seed's estimate, read
+// off the same assessor record the facts strip shows (lib/buildingDetails.ts). A failed read
+// costs only the label: the row keeps the plain "Units".
+let unitsLabel = UNITS_LABEL;
+if (building.unit_count) {
+  try {
+    const assessment = await getCurrentAssessment(Astro.locals.runtime.env.DB, building.id);
+    unitsLabel = unitCountLabel(building.unit_count, assessment);
+  } catch (error) {
+    logError('building_units_assessment_failed', {
+      buildingId: building.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+const detailRows: BuildingDetailRows = {
+  ...buildingDetailRows,
+  unit_count: { ...buildingDetailRows.unit_count, label: unitsLabel },
+};
+
 // With no approved review the city records are the page's content, so they come straight
 // after the header and the header's "No reviews yet" line and button are the whole empty
 // state. With reviews, the reviews come first and the records follow them.
@@ -269,10 +304,12 @@ const meta = buildingPageMeta(
           </p>
           {(building.landlord_name || building.property_manager_name) && (
             <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
+              {/* Each name link is padded to a 28px-tall hit area (bare text measured 17px
+                  tall), with a matching negative margin so the row keeps its height. */}
               {building.landlord_name && (
                 <span>
                   Landlord:{' '}
-                  <a href={`/landlord/${building.landlord_slug}`} class="text-teal-700 hover:text-teal-800 font-medium">
+                  <a href={`/landlord/${building.landlord_slug}`} class="-my-1 inline-block py-1 text-teal-700 hover:text-teal-800 font-medium">
                     {building.landlord_name}
                   </a>
                 </span>
@@ -280,7 +317,7 @@ const meta = buildingPageMeta(
               {building.property_manager_name && (
                 <span>
                   Managed by:{' '}
-                  <a href={`/property-manager/${building.property_manager_slug}`} class="text-purple-600 hover:text-purple-800 font-medium">
+                  <a href={`/property-manager/${building.property_manager_slug}`} class="-my-1 inline-block py-1 text-purple-600 hover:text-purple-800 font-medium">
                     {building.property_manager_name}
                   </a>
                 </span>
@@ -290,6 +327,8 @@ const meta = buildingPageMeta(
         </div>
 
         <div class="flex flex-col items-end">
+          {/* "No reviews yet" is gray-600, 6.87:1 on the paper background. gray-400 was
+              2.37:1 and gray-500 is 4.40:1, both under WCAG AA's 4.5:1 for body text. */}
           {scores?.avg_overall && earlyRating ? (
             <div class="text-right" data-early-rating>
               <div class="flex items-baseline justify-end gap-2">
@@ -313,7 +352,7 @@ const meta = buildingPageMeta(
               </p>
             </div>
           ) : (
-            <p class="text-gray-400">No reviews yet</p>
+            <p class="text-gray-600">No reviews yet</p>
           )}
 
           <div class="mt-4 flex items-center gap-2">
@@ -394,8 +433,8 @@ const meta = buildingPageMeta(
             <dl class="grid grid-cols-2 gap-4">
               {BUILDING_DETAIL_FIELDS.map((field) => Boolean(building[field]) && (
                 <>
-                  <dt class="text-gray-500">{buildingDetailRows[field].label}</dt>
-                  <dd class="text-gray-900">{buildingDetailRows[field].format(building)}</dd>
+                  <dt class="text-gray-500">{detailRows[field].label}</dt>
+                  <dd class="text-gray-900">{detailRows[field].format(building)}</dd>
                 </>
               ))}
             </dl>
