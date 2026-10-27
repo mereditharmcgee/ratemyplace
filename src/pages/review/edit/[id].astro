@@ -7,7 +7,8 @@ const user = Astro.locals.user;
 
 // Redirect if not logged in
 if (!user) {
-  return Astro.redirect('/auth/signin?redirect=/profile');
+  // Come back to this edit page, not the profile, after signing in.
+  return Astro.redirect('/auth/signin?redirect=' + encodeURIComponent(Astro.url.pathname));
 }
 
 // Fetch review
