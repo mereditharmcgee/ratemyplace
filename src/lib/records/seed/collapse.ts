@@ -3,6 +3,7 @@ import { addressKey, toCanonicalParcel } from '../identity';
 import { ASSESSOR_FIXED_COLUMNS, ASSESSOR_YEARS, MODERN_COLUMNS, assessmentFromRow } from '../sources/boston/assessor';
 import { isSeedParcelRow, normalizeLandUse } from './filters';
 import { buildingTypeFor, formatSeedAddress, titleCaseNeighborhood } from './format';
+import { IMPLIED_UNITS } from './impliedUnits';
 import { zip5 } from './sam';
 import type { AssessorRow, SamPoint, SeedBuilding } from './types';
 
@@ -21,15 +22,6 @@ export interface CollapseResult {
   buildings: SeedBuilding[];
   skipped: Array<{ pid: string | null; reason: SkipReason }>;
 }
-
-/**
- * Units a land-use code implies for one building when the assessor leaves RES_UNITS blank.
- * LU describes the *parcel*, so on a multi-building lot applying it per building is a
- * stated guess, not a fact: a second, blank R3 row is credited three units on the theory
- * that a three-family lot's second structure is also a three-family. Rows the assessor did
- * count are always preferred; nothing is implied for A, R4, or RC.
- */
-const IMPLIED_UNITS: Record<string, number> = { R2: 2, R3: 3 };
 
 function seq(row: AssessorRow): number {
   return parseIntOrNull(textOrNull(row.BLDG_SEQ)) ?? 1;

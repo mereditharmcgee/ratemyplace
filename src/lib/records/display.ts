@@ -157,14 +157,14 @@ export function ticketLinesNote(lines: number, tickets: number): string | null {
 }
 
 /**
- * The assessor's residential unit count, as the facts strip words it. A blank says whose field
- * is blank. The building's own details can carry a unit count from elsewhere (the Boston seed
- * gives a three-family parcel 3 units from its land use when the assessor left the count
- * empty), and "units not recorded" printed beside "Units: 3" read as the site contradicting
- * itself. Zero is a recorded value and prints as one.
+ * The assessor's residential unit count, as the facts strip words it, or null when the assessor
+ * left it blank. The FY2026 file leaves it blank on every residential parcel, so a "units not
+ * recorded by the assessor" line sat on every Boston page and said nothing a reader could use;
+ * a blank now prints nothing. Building details carries its own count, labelled where it is the
+ * seed's land-use estimate (`buildingDetails.ts`). Zero is a recorded value and prints as one.
  */
-export function assessorUnitsText(units: number | null | undefined): string {
-  return units === null || units === undefined ? 'units not recorded by the assessor' : `units ${units}`;
+export function assessorUnitsText(units: number | null | undefined): string | null {
+  return units === null || units === undefined ? null : `units ${units}`;
 }
 
 export const CONDOMINIUM_COPY =
@@ -415,12 +415,8 @@ export const REQUEST_FAILED_COPY = 'The request did not go through. Please try a
  */
 export const TURNSTILE_FAILED_COPY = 'Bot verification failed. Please try again.';
 
-// The building page's no-reviews card and the search result line for a seeded building.
-// Registered in PANEL_COPY for the banned-words scan; rendered by the building page and
-// search, not the panel.
-export const NO_REVIEWS_CARD_TITLE = 'No reviews yet.';
-export const NO_REVIEWS_CARD_BODY = 'Lived here? Rate this place.';
-export const NO_REVIEWS_BREAKDOWN_COPY = 'Rating breakdown appears after the first review.';
+// The search result line for a seeded building. Registered in PANEL_COPY for the banned-words
+// scan; rendered by search, not the panel.
 export const SEARCH_SEEDED_COPY = 'No reviews yet · city records';
 
 const COMPACT_UNITS: Array<{ threshold: number; suffix: string }> = [
@@ -523,6 +519,18 @@ export function openSubCount(openCount: number, total: number): string {
   return `${openCount} open`;
 }
 
+/**
+ * The same line for 311, ISD and Public Works, worded like `STILL_OPEN_LABEL`: an open case
+ * there is one the city has not recorded closing, and "3 open" under the count read as three
+ * problems in the building today. "Still open" takes the same form for one case or many, so
+ * "1 still open" and "3 still open" both read correctly. Permits keep `openSubCount`, because
+ * an open permit is an active one.
+ */
+export function stillOpenSubCount(openCount: number, total: number): string {
+  if (total === 0 || openCount === 0) return openSubCount(openCount, total);
+  return `${openCount} still open`;
+}
+
 /** `2014`, `2011 and 2014`, `2011, 2012 and 2014`. */
 function joinYears(years: readonly number[]): string {
   if (years.length <= 1) return years.map(String).join('');
@@ -619,9 +627,6 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   REQUEST_ALREADY_PULLED_COPY,
   REQUEST_FAILED_COPY,
   TURNSTILE_FAILED_COPY,
-  NO_REVIEWS_CARD_TITLE,
-  NO_REVIEWS_CARD_BODY,
-  NO_REVIEWS_BREAKDOWN_COPY,
   SEARCH_SEEDED_COPY,
   STILL_OPEN_LABEL,
   STILL_OPEN_NOTE,
@@ -648,6 +653,8 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   'openSubCount() — empty': openSubCount(0, 0),
   'openSubCount() — all closed': openSubCount(0, 3),
   'openSubCount() — some open': openSubCount(2, 3),
+  'stillOpenSubCount() — one': stillOpenSubCount(1, 3),
+  'stillOpenSubCount() — many': stillOpenSubCount(2, 3),
   'stillOpenHeading()': stillOpenHeading(2),
   'stillOpenLabel() — filed year': stillOpenLabel('2013-04-02'),
   'formatRecordDate() — no date': formatRecordDate(null),
@@ -660,7 +667,7 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   'categoryRestLine()': categoryRestLine(5, 8, { one: 'request', many: 'requests' }),
   'caseLinesNote()': caseLinesNote(6, 1) ?? '',
   'ticketLinesNote()': ticketLinesNote(12, 9) ?? '',
-  'assessorUnitsText() — blank': assessorUnitsText(null),
+  'assessorUnitsText() — recorded': assessorUnitsText(3) ?? '',
   'missingYearsNote() — one': missingYearsNote([2014]) ?? '',
   'missingYearsNote() — two': missingYearsNote([2011, 2014]) ?? '',
   'yearChartLabel()': yearChartLabel('Requests by year opened', 1, { one: 'request', many: 'requests' }, 2013, 2026, [2014]),

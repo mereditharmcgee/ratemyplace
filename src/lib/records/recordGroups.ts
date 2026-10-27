@@ -83,8 +83,10 @@ export const SERVICE_REQUEST_TYPE_GROUPS: Readonly<Record<RecordGroupId, readonl
     'Rodent Activity',
     'Rat Bite',
     'Pigeon Infestation',
-    // Legacy reason "Building": a danger inside the building is a living condition.
+    // Legacy reason "Building": a danger inside the building, or a maintenance complaint about
+    // a home, is a living condition.
     'Unsafe Dangerous Conditions',
+    'Maintenance - Homeowner',
   ],
   building: [
     // Legacy reason "Building", routed to Inspectional Services.
@@ -98,7 +100,6 @@ export const SERVICE_REQUEST_TYPE_GROUPS: Readonly<Record<RecordGroupId, readonl
     'Plumbing',
     'Mechanical',
     'Egress',
-    'Maintenance - Homeowner',
     'Illegal Occupancy',
     'Illegal Rooming House',
     'Occupying W/Out A Valid CO/CI',

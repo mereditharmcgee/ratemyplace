@@ -29,6 +29,7 @@ import {
   STILL_OPEN_NOTE,
   stillOpenHeading,
   stillOpenLabel,
+  stillOpenSubCount,
   statusText,
 } from '../records/display';
 // Namespace import purely so the guard below can reflect over every export of the module.
@@ -628,6 +629,23 @@ describe('openSubCount', () => {
   it('counts the open rows when there are any', () => {
     expect(openSubCount(3, 7)).toBe('3 open');
     expect(openSubCount(1, 1)).toBe('1 open');
+  });
+});
+
+describe('stillOpenSubCount', () => {
+  it('says "still open" for one case and for many', () => {
+    expect(stillOpenSubCount(1, 1)).toBe('1 still open');
+    expect(stillOpenSubCount(1, 7)).toBe('1 still open');
+    expect(stillOpenSubCount(3, 7)).toBe('3 still open');
+  });
+
+  it('keeps the empty and all-closed readings', () => {
+    expect(stillOpenSubCount(0, 0)).toBe('none on record');
+    expect(stillOpenSubCount(0, 7)).toBe('all closed');
+  });
+
+  it('stays plain: no dash, no exclamation point', () => {
+    expect(stillOpenSubCount(2, 3)).not.toMatch(/[—!]/);
   });
 });
 

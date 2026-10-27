@@ -154,6 +154,14 @@ function byDateDesc<T>(dateOf: (row: T) => string | null, keyOf: (row: T) => str
   };
 }
 
+/**
+ * Newest fiscal year first. Two assessor rows can share a fiscal year (a condo parcel and its
+ * master parcel); the parcel id breaks that tie so the panel's 'current' row is not
+ * engine-order luck. Shared with `getCurrentAssessment`, so the building page reads the same
+ * row the facts strip shows.
+ */
+const byAssessmentOrder = byDateDesc<AssessmentPayload>((r) => r.fiscalYear, (r) => r.parcelId ?? '');
+
 interface PullRow {
   source_id: string;
   source_label: string;
@@ -276,9 +284,7 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
     logError('building_record_invalid_payload', { buildingId, kind });
   }
 
-  // Two assessor rows can share a fiscal year (a condo parcel and its master parcel);
-  // the parcel id breaks that tie so the panel's 'current' row is not engine-order luck.
-  assessments.sort(byDateDesc((r) => r.fiscalYear, (r) => r.parcelId ?? ''));
+  assessments.sort(byAssessmentOrder);
   permits.sort(byDateDesc((r) => r.issuedDate, (r) => r.permitNumber));
   violations.sort(byDateDesc((r) => r.statusDate, (r) => r.caseNumber));
   enforcement.sort(byDateDesc((r) => r.statusDate, (r) => r.caseNumber));
@@ -312,4 +318,31 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
     invalidKinds: invalid,
     corrections,
   };
+}
+
+/**
+ * The building's current assessor record, the row the facts strip shows, or null when none is
+ * stored or none validates. For the building page's own details, which sit outside the panel:
+ * it reads only the assessment rows, and an unreadable payload is skipped here (the panel's
+ * own read logs it).
+ */
+export async function getCurrentAssessment(db: RecordsDb, buildingId: string): Promise<AssessmentPayload | null> {
+  const rows = await db
+    .prepare("SELECT payload FROM building_records WHERE building_id = ? AND kind = 'assessment'")
+    .bind(buildingId)
+    .all<{ payload: string }>();
+
+  const assessments: AssessmentPayload[] = [];
+  for (const row of rows.results) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(row.payload);
+    } catch {
+      continue;
+    }
+    const payload = validatePayload('assessment', parsed);
+    if (payload !== null) assessments.push(payload);
+  }
+  assessments.sort(byAssessmentOrder);
+  return assessments[0] ?? null;
 }
