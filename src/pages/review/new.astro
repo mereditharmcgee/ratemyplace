@@ -104,4 +104,15 @@ if (buildingIdParam) {
   </div>
 </BaseLayout>
 
+<script is:inline data-rmp-turnstile-guard>
+  // A Turnstile script that fails to load removes itself, so ConfirmStep's "Try again" can tell a
+  // failed load (no tag left) from a slow one (tag still pending) and never runs api.js twice.
+  window.addEventListener('error', function (e) {
+    var t = e.target;
+    if (t && t.tagName === 'SCRIPT' && typeof t.src === 'string' &&
+        t.src.indexOf('https://challenges.cloudflare.com/turnstile/') === 0 && t.parentNode) {
+      t.parentNode.removeChild(t);
+    }
+  }, true);
+</script>
 <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>

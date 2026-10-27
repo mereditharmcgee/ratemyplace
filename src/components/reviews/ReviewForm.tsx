@@ -1,6 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { unitItems, buildingItems, landlordItems } from '../../lib/surveyItems';
 import { browserNav, existingBuildingReviewPath } from '../../lib/reviewPaths';
+import {
+  needsFreshToken,
+  submitOutcome,
+  SUBMIT_NETWORK_COPY,
+  SUBMITTED_NO_LINK_COPY,
+  type ReviewSubmitResponse,
+  type SubmitOutcome,
+} from '../../lib/reviewSubmitOutcome';
 import type { PlaceDetails } from '../AddressAutocomplete';
 import {
   StepIndicator,
@@ -99,6 +107,14 @@ export default function ReviewForm({ building, initialPlace }: Props) {
 
   // Turnstile token
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  // Bumped after a failed POST; ConfirmStep resets its widget once per bump.
+  const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
+  // The last POST answered 401: offer sign-in in a new tab so the answers survive.
+  const [authExpired, setAuthExpired] = useState(false);
+  // A 2xx whose body carried no usable link: the review exists, say so instead of navigating.
+  const [submittedNoLink, setSubmittedNoLink] = useState(false);
+  // Synchronous double-press guard; state alone updates a render too late.
+  const submittingRef = useRef(false);
 
   // Handle place selection from Google autocomplete
   const handlePlaceSelect = async (place: PlaceDetails) => {
@@ -241,7 +257,7 @@ export default function ReviewForm({ building, initialPlace }: Props) {
   };
 
   const handleSubmit = async () => {
-    if (!selectedBuilding) return;
+    if (!selectedBuilding || submittingRef.current) return;
 
     // A review with no rating items answered has no score — block it here so the
     // reviewer gets clear feedback instead of the server's 400 (the API enforces
@@ -252,9 +268,12 @@ export default function ReviewForm({ building, initialPlace }: Props) {
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
     setError(null);
+    setAuthExpired(false);
 
+    let outcome: SubmitOutcome | null = null; // null = network failure
     try {
       const formData = new FormData();
       formData.append('building_id', selectedBuilding.id);
@@ -316,24 +335,50 @@ export default function ReviewForm({ building, initialPlace }: Props) {
         method: 'POST',
         body: formData,
       });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        window.location.href = `/building/${result.buildingSlug}?submitted=true&reviewId=${result.reviewId}`;
-      } else {
-        setError(result.error || 'Failed to submit review');
-      }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
-    } finally {
-      setLoading(false);
+      const body: ReviewSubmitResponse | null = await response.json().catch(() => null);
+      outcome = submitOutcome(response.status, response.ok, body);
+    } catch {
+      outcome = null;
     }
+
+    if (outcome?.kind === 'navigate') {
+      // Keep loading and submittingRef set: no second press while the page is leaving.
+      browserNav.go(outcome.url);
+      return;
+    }
+    if (outcome?.kind === 'submitted') {
+      // The review exists. No reset and no re-enable, so it cannot be sent twice.
+      setSubmittedNoLink(true);
+      return;
+    }
+    if (outcome?.kind === 'auth-expired') setAuthExpired(true);
+    else setError(outcome?.kind === 'error' ? outcome.message : SUBMIT_NETWORK_COPY);
+    // The token went out with that POST and is spent. The ConfirmStep callback only stores
+    // tokens, so resetting here is the RecordCorrectionForm shape and cannot loop (AGENTS.md
+    // Traps). Clear first, then reset, so the fresh token the reset produces is never
+    // overwritten.
+    if (needsFreshToken(outcome)) {
+      setTurnstileToken(null);
+      setTurnstileResetSignal((n) => n + 1);
+    }
+    setLoading(false);
+    submittingRef.current = false;
   };
 
   const handleScoreChange = (key: string, value: number | null) => {
     setScores({ ...scores, [key]: value });
   };
+
+  if (submittedNoLink) {
+    return (
+      <div role="status" className="bg-teal-50 border border-teal-200 rounded-[6px] p-6 text-teal-800">
+        {SUBMITTED_NO_LINK_COPY}{' '}
+        <a href="/profile" className="underline font-medium">
+          Go to your profile
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -428,6 +473,8 @@ export default function ReviewForm({ building, initialPlace }: Props) {
           error={error}
           onBack={() => setStep('additional')}
           onSubmit={handleSubmit}
+          turnstileResetSignal={turnstileResetSignal}
+          authExpired={authExpired}
         />
       )}
     </div>

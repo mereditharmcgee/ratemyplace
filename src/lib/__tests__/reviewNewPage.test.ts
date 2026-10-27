@@ -110,6 +110,16 @@ suite('/review/new island props', () => {
     expectNoPrivateColumns(await response.text());
   });
 
+  it('puts the Turnstile load guard before the Turnstile script tag', async () => {
+    // The guard removes a Turnstile <script> that fails to load, so the form's "Try again"
+    // can tell failed (no tag) from pending (tag present) and never runs api.js twice.
+    const html = await render('?building=b-leak');
+    const guard = html.indexOf('data-rmp-turnstile-guard');
+    const tag = html.indexOf('turnstile/v0/api.js?render=explicit');
+    expect(guard).toBeGreaterThan(-1);
+    expect(tag).toBeGreaterThan(guard);
+  });
+
   it('still sends a signed-out visitor to sign in with the full return path', async () => {
     const container = await createContainer();
     const response = await container.renderToResponse(ReviewNewPage, {
