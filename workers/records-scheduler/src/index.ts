@@ -2,16 +2,19 @@
 // scheduler actually does lives in `src/lib/records/scheduler.ts`, where it is unit-tested
 // against the node:sqlite D1 double. This file only wires bindings to those dependencies.
 import type { D1Database, ScheduledEvent } from '@cloudflare/workers-types';
-import { sendRecordsBreakerEmail, sendRecordsResumedEmail } from '../../../src/lib/email';
 import { errorMessage } from '../../../src/lib/records/errors';
 import { runLanarkFixture } from '../../../src/lib/records/fixture';
-import { RECORDS_RESUMED_SUBJECT, drain, liveDeps, plan, type SchedulerDeps } from '../../../src/lib/records/scheduler';
+import { drain, liveDeps, plan, type SchedulerDeps } from '../../../src/lib/records/scheduler';
+import { schedulerAlert } from '../../../src/lib/records/schedulerAlert';
 import type { FetchLike, RecordsDb } from '../../../src/lib/records/types';
 
 interface Env {
   DB: D1Database;
   RESEND_API_KEY: string;
-  /** A secret, not a var, so the address is not in git. Unset is handled, not assumed away. */
+  /**
+   * A secret, not a var, so the address is not in git. Unset or blank falls back to the owner
+   * inbox (OWNER_NOTIFY_EMAIL) and logs `records_alert_recipient_default`.
+   */
   RECORDS_ALERT_EMAIL: string | undefined;
   SITE_URL: string;
 }
@@ -44,24 +47,9 @@ function depsFor(env: Env): SchedulerDeps {
   const db: RecordsDb = env.DB;
   return liveDeps(db, {
     fixture: () => runLanarkFixture(fetchImpl, { timeoutMs: FIXTURE_TIMEOUT_MS }),
-    alert: async (subject, body) => {
-      const to = env.RECORDS_ALERT_EMAIL;
-      if (!to) {
-        // No address is a deployment mistake, not a reason to fail the breaker: the pause
-        // has already been written to D1 and holds. Say so loudly and carry on.
-        log('records_breaker_email_skipped', { subject, reason: 'RECORDS_ALERT_EMAIL is not set' }, 'error');
-        return;
-      }
-      // The alert is plain text, so the admin panel has to arrive as an absolute URL —
-      // there is no document for a relative one to be relative to.
-      const withLink = `${body}\n\n${env.SITE_URL}/admin/records`;
-      // `alert` stays one (subject, body) dependency; the scheduler's two subjects are
-      // constants, so the resume email is told apart by its subject and anything else is
-      // the breaker's.
-      const send = subject === RECORDS_RESUMED_SUBJECT ? sendRecordsResumedEmail : sendRecordsBreakerEmail;
-      const result = await send(env.RESEND_API_KEY, to, subject, withLink);
-      if (!result.success) log('records_breaker_email_failed', { subject, error: result.error }, 'error');
-    },
+    // Sends the pause/resume email and records a failure on /admin; never throws. See
+    // src/lib/records/schedulerAlert.ts.
+    alert: schedulerAlert({ db, apiKey: env.RESEND_API_KEY, alertEmail: env.RECORDS_ALERT_EMAIL, siteUrl: env.SITE_URL, log }),
     log,
   });
 }

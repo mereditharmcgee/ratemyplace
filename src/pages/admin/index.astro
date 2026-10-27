@@ -1,5 +1,16 @@
 ---
 import AdminLayout from '../../components/admin/AdminLayout.astro';
+import {
+  EMAIL_CHANNELS,
+  EMAIL_CHANNEL_LABELS,
+  describeEmailFailure,
+  emailFailureIsRecent,
+  emailKindLabel,
+  emailSourceNote,
+  readEmailHealth,
+} from '../../lib/emailHealth';
+import { ADMIN_INBOX_ROWS, readAdminInbox } from '../../lib/admin/inbox';
+import { formatEasternDateTime } from '../../lib/format';
 
 const user = Astro.locals.user;
 if (!user) {
@@ -20,6 +31,8 @@ const [
   managerStats,
   verificationStats,
   recentReviews,
+  emailHealth,
+  inbox,
 ] = await Promise.all([
   // User stats
   db.prepare(`
@@ -82,7 +95,17 @@ const [
     ORDER BY r.created_at DESC
     LIMIT 5
   `).all(),
+
+  // Email delivery problems and owner-notice state (never rejects)
+  readEmailHealth(db),
+
+  // "Waiting on you": the intake queues (never rejects; null on failure)
+  readAdminInbox(db),
 ]);
+
+const nowSec = Math.floor(Date.now() / 1000);
+const host = Astro.url.host;
+const inboxTotal = inbox ? ADMIN_INBOX_ROWS.reduce((sum, row) => sum + inbox[row.key], 0) : 0;
 
 const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleDateString('en-US', {
@@ -193,6 +216,73 @@ const getStatusColor = (status: string) => {
           )}
         </div>
       </div>
+    </div>
+
+    <!-- Email delivery and intake backlog -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <section aria-labelledby="email-delivery-heading" class="bg-white rounded-[6px] border border-gray-200 p-6">
+        <h2 id="email-delivery-heading" class="text-lg font-semibold text-gray-900 mb-4">Email delivery</h2>
+        {emailHealth.unavailable ? (
+          <p class="text-sm text-gray-700">Could not read email status.</p>
+        ) : (
+          <div class="space-y-4">
+            {EMAIL_CHANNELS.map((channel) => {
+              const record = emailHealth.lastFailure[channel];
+              const sourceNote = record ? emailSourceNote(record, host) : null;
+              return (
+                <div>
+                  <h3 class="text-sm font-medium text-gray-900">{EMAIL_CHANNEL_LABELS[channel]}</h3>
+                  {record ? (
+                    <div class={`mt-2 rounded-[6px] border p-3 text-sm break-words ${emailFailureIsRecent(record, nowSec) ? 'border-red-200 bg-red-50 text-red-800' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>
+                      <p class="font-medium">Last problem: {formatEasternDateTime(record.at)}</p>
+                      <p class="mt-1">{describeEmailFailure(record)}</p>
+                      {sourceNote && <p class="mt-1 text-xs">{sourceNote}</p>}
+                    </div>
+                  ) : (
+                    <p class="mt-1 text-sm text-green-700">No problems recorded</p>
+                  )}
+                </div>
+              );
+            })}
+            <div class="border-t border-gray-100 pt-4 text-sm text-gray-700 space-y-1">
+              <p>{emailHealth.failureCount} failed {emailHealth.failureCount === 1 ? 'send' : 'sends'} recorded</p>
+              {emailHealth.cappedCount > 0 && (
+                <p>{emailHealth.cappedCount} {emailHealth.cappedCount === 1 ? 'notice' : 'notices'} held back by the cap</p>
+              )}
+              <p>
+                {emailHealth.ownerNoticeLastSent
+                  ? `Last notice sent to you: ${formatEasternDateTime(emailHealth.ownerNoticeLastSent.at)}, ${emailKindLabel(emailHealth.ownerNoticeLastSent.kind)}`
+                  : 'No notice sent to you yet.'}
+              </p>
+            </div>
+          </div>
+        )}
+        <p class="mt-4 text-xs text-gray-500">
+          Sent means Resend accepted it. Bounces and spam filtering show only in the Resend dashboard and your inbox.
+        </p>
+      </section>
+
+      <section aria-labelledby="waiting-heading" class="bg-white rounded-[6px] border border-gray-200 p-6">
+        <h2 id="waiting-heading" class="text-lg font-semibold text-gray-900 mb-4">Waiting on you</h2>
+        {inbox === null ? (
+          <p class="text-sm text-gray-700">Could not load counts</p>
+        ) : (
+          <div>
+            {inboxTotal === 0 && <p class="mb-3 text-sm text-green-700">All caught up</p>}
+            <ul class="divide-y divide-gray-100">
+              {ADMIN_INBOX_ROWS.map((row) => (
+                <li class="flex items-center justify-between gap-3 py-2">
+                  <span class="text-sm text-gray-700">{row.label}</span>
+                  <span class="flex items-center gap-3">
+                    <span class={`text-sm font-semibold ${inbox[row.key] > 0 ? 'text-amber-700' : 'text-gray-900'}`}>{inbox[row.key]}</span>
+                    <a href={row.href} class="text-sm font-medium text-teal-700 hover:underline">Open<span class="sr-only"> {row.label.toLowerCase()}</span></a>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
     </div>
 
     <!-- Review Status Breakdown -->

@@ -5,6 +5,7 @@ import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
 import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
 import { validateBugReport, isSafeHttpUrl } from '../../lib/validation';
+import { queueOwnerNotice } from '../../lib/ownerNotify';
 
 export async function POST(context: APIContext): Promise<Response> {
   // 1. Content-type guard — MUST come before any body parse (formData throws TypeError on wrong type)
@@ -96,6 +97,8 @@ export async function POST(context: APIContext): Promise<Response> {
       (description || '').trim(),
       safeUrl
     ).run();
+
+    queueOwnerNotice(context, { kind: 'bug_report', buildingId: null });
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

@@ -1,10 +1,11 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
-import { getEnv, fireAndForget } from '../../../../lib/runtime';
+import { getEnv } from '../../../../lib/runtime';
 import { createAuditLog } from '../../../../lib/audit';
 import { getClientIP } from '../../../../lib/rateLimit';
 import { createNotification } from '../../../../lib/notifications';
 import { sendReviewRejectedEmail } from '../../../../lib/email';
+import { trackSend } from '../../../../lib/trackSend';
 import { logError } from '../../../../lib/logger';
 import { errorMessage } from '../../../../lib/records/errors';
 import { recordsRequestState } from '../../../../lib/records/coverage';
@@ -121,25 +122,21 @@ export async function PATCH(context: APIContext): Promise<Response> {
 
           if (status === 'rejected') {
             const env = getEnv(context);
-            const apiKey = env.RESEND_API_KEY;
             const siteUrl = env.SITE_URL || 'https://ratemyplace.org';
-            if (apiKey) {
-              // fireAndForget so the moderator's PATCH returns immediately
-              // instead of blocking on Resend's response time. Errors are
-              // logged structurally inside the helper.
-              fireAndForget(
-                context,
-                sendReviewRejectedEmail(
-                  apiKey,
-                  siteUrl,
-                  reviewWithBuilding.email,
-                  reviewWithBuilding.address,
-                  moderation_notes ?? null
-                )
-              );
-            } else {
-              console.warn('RESEND_API_KEY not configured - skipping review rejected email');
-            }
+            // trackSend runs it in the background so the moderator's PATCH returns
+            // immediately, and records a failed or unconfigured send on /admin.
+            trackSend(
+              context,
+              'review_rejected',
+              reviewWithBuilding.email,
+              sendReviewRejectedEmail(
+                env.RESEND_API_KEY,
+                siteUrl,
+                reviewWithBuilding.email,
+                reviewWithBuilding.address,
+                moderation_notes ?? null
+              )
+            );
           }
         }
       }

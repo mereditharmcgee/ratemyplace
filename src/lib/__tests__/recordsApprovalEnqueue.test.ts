@@ -5,6 +5,8 @@ import { createRecordsTestDb, insertBuilding, insertPull, pendingReasons } from 
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
 import { enqueue } from '../records/queue';
+import { parseEmailFailure } from '../emailHealth';
+import { recipientHash } from '../runtime';
 import { PATCH } from '../../pages/api/admin/reviews/[id]';
 
 const suite = sqliteAvailable ? describe : describe.skip;
@@ -100,6 +102,24 @@ suite('PATCH /api/admin/reviews/[id] enqueues a first records pull on approval',
     expect(res.status).toBe(200);
     expect(await reviewStatus(db, reviewId)).toBe('rejected');
     expect(await pendingReasons(db, buildingId)).toEqual([]);
+  });
+
+  it('records the rejection email as not_configured instead of skipping it silently when RESEND_API_KEY is unset', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await PATCH(createContext(db, reviewId, 'rejected'));
+
+    expect(res.status).toBe(200);
+    await vi.waitFor(async () => {
+      const row = await db
+        .prepare("SELECT value FROM app_settings WHERE key = 'email_last_failure_public'")
+        .first<{ value: string }>();
+      expect(parseEmailFailure(row?.value)).toMatchObject({
+        kind: 'review_rejected',
+        reason: 'not_configured',
+        recipientHash: recipientHash('t@example.com'),
+      });
+    });
   });
 
   it('enqueues nothing when the review is only flagged or sent back to pending', async () => {

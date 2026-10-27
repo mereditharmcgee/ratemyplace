@@ -7,6 +7,7 @@ import { verifyTurnstile } from '../../lib/turnstile';
 import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
 import { getSeasonFromMonth } from '../../lib/privacy';
 import { validateReviewText } from '../../lib/validation';
+import { queueOwnerNotice } from '../../lib/ownerNotify';
 
 export async function POST(context: APIContext): Promise<Response> {
   // Require authentication
@@ -289,6 +290,9 @@ export async function POST(context: APIContext): Promise<Response> {
       acceptsHousingVouchers,
       safelyLitAtNight
     ).run();
+
+    // The review is saved and hidden until moderated: tell the owner it is waiting.
+    queueOwnerNotice(context, { kind: 'review_submitted', buildingId: building.id });
 
     return new Response(JSON.stringify({
       success: true,
