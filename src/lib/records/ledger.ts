@@ -15,6 +15,7 @@ import {
   CAPPED_REQUESTS_COPY,
   CAPPED_ROWS_COPY,
   PERMIT_COVERAGE_YEAR_NUMBER,
+  STILL_OPEN_NOTE,
   formatDollarsCompact,
   formatRecordDate,
   isOpenStatus,
@@ -23,6 +24,8 @@ import {
   permitSummary,
   rentSmartDisagreement,
   splitServiceRequests,
+  statusText,
+  stillOpenLabel,
   yearSpanLabel,
   type PermitSummary,
 } from './display';
@@ -40,7 +43,13 @@ export interface RecordRow {
   /** As stored. `formatRecordDate` runs at render so the raw string stays inspectable here. */
   date: string | null;
   label: string;
+  /** The city's own status word, as stored. */
   status: string | null;
+  /**
+   * The status as the panel prints it. The city's word as recorded, except an open 311, ISD
+   * or Public Works case, which reads "Still open in city records" (see `stillOpenLabel`).
+   */
+  statusLabel: string;
   /** Muted text after the status token, already formatted. Null when there is none. */
   trailing: string | null;
 }
@@ -63,6 +72,11 @@ export interface LedgerSection {
   cappedNote: string | null;
   /** The rows behind the count, in the order the section lists them. */
   rows: RecordRow[];
+  /**
+   * The line that says what an open case means, when this section words one as still open in
+   * city records. Null when it lists none, and always null for permits, whose status is kept.
+   */
+  openNote: string | null;
 }
 
 export interface RequestsSection extends LedgerSection {
@@ -129,6 +143,19 @@ function closedTrailing(closedAt: string | null): string | null {
   return closedAt ? ` · closed ${formatRecordDate(closedAt)}` : null;
 }
 
+/**
+ * The status a 311, ISD or Public Works row prints. Every case is kept; an open one says it is
+ * open in the city's records, with the year it was filed when the feed has one, and every
+ * other status prints as recorded. Building permits do not come through here.
+ */
+function caseStatusLabel(status: string | null, filedAt: string | null): string {
+  return isOpenStatus(status) ? stillOpenLabel(filedAt) : statusText(status);
+}
+
+function openNoteFor(openCount: number): string | null {
+  return openCount > 0 ? STILL_OPEN_NOTE : null;
+}
+
 export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
   const currentYear = now.getFullYear();
 
@@ -144,6 +171,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
     date: row.openedAt,
     label: row.type ?? row.title ?? 'Request',
     status: row.status,
+    statusLabel: caseStatusLabel(row.status, row.openedAt),
     trailing,
   });
 
@@ -159,6 +187,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
         : null,
     cappedNote: cappedNote(view.serviceRequests.length, CAPPED_REQUESTS_COPY),
     rows: housing.map((row) => requestRow(row, closedTrailing(row.closedAt))),
+    openNote: openNoteFor(openRequests.length),
     openRows: openRequests.map((row) => requestRow(row, null)),
     otherCount,
     years: requestYears,
@@ -193,8 +222,11 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
       date: row.issuedDate,
       label: `${row.permitType ?? row.workType ?? 'Permit'}${row.description ? ` · ${row.description}` : ''}`,
       status: row.status,
+      // An open permit is an active permit: the city's word stays as recorded.
+      statusLabel: statusText(row.status),
       trailing: null,
     })),
+    openNote: null,
     summary,
     years: permitYears,
     types: countByKey(view.permits, (row) => row.description ?? row.permitType ?? row.workType, 6),
@@ -218,8 +250,11 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
       date: row.statusDate,
       label: orNotRecorded(row.description),
       status: row.status,
+      // The feed has a status date, not a filing date, so no filing year is claimed.
+      statusLabel: caseStatusLabel(row.status, null),
       trailing: null,
     })),
+    openNote: openNoteFor(openEnforcement.length),
     types: countByKey(view.enforcement, (row) => row.description, 6),
   };
 
@@ -241,8 +276,11 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
       date: row.statusDate,
       label: [row.code, row.description].filter(Boolean).join(' · ') || 'Violation',
       status: row.status,
+      // The feed has a status date, not a filing date, so no filing year is claimed.
+      statusLabel: caseStatusLabel(row.status, null),
       trailing: null,
     })),
+    openNote: openNoteFor(openViolations.length),
     years: violationYears,
   };
 
