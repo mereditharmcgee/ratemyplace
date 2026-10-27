@@ -1,4 +1,14 @@
 ---
+/**
+ * Blue "Verified" badge for a review whose tenant proved residency with a document.
+ *
+ * The explanation is anchored to the nearest positioned ancestor, not to the badge, so
+ * put `relative` on the row the badge sits in. The tooltip starts at that row's left
+ * edge and is never wider than the row. A tooltip centered on the badge with unwrapped
+ * text stuck out past the card and made phone pages scroll sideways, even while hidden.
+ *
+ * The badge takes keyboard focus so the explanation shows on focus as well as hover.
+ */
 interface Props {
   size?: 'sm' | 'md' | 'lg';
   showText?: boolean;
@@ -19,11 +29,15 @@ const textSizeClasses = {
 };
 ---
 
-<span class="relative inline-flex items-center gap-1 text-blue-600 group cursor-help">
+<span
+  class="inline-flex items-center gap-1 text-blue-600 group cursor-help rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+  tabindex="0"
+>
   <svg
     class={sizeClasses[size]}
     fill="currentColor"
     viewBox="0 0 20 20"
+    aria-hidden="true"
   >
     <path
       fill-rule="evenodd"
@@ -32,7 +46,10 @@ const textSizeClasses = {
     />
   </svg>
   {showText && <span class={`font-medium ${textSizeClasses[size]}`}>Verified</span>}
-  <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+  <span
+    class="absolute bottom-full left-0 mb-2 w-max max-w-[min(16rem,100%)] whitespace-normal text-left px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none z-10"
+    data-verified-tooltip
+  >
     This tenant verified their residency with a lease or similar document
   </span>
 </span>
