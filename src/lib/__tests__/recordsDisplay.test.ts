@@ -397,20 +397,30 @@ describe('rentSmartDisagreement', () => {
   it('returns the disagreement sentence when RentSmart reports more complaints than 311 shows', () => {
     const rows = [rentSmartRow({ violationType: 'Housing Complaints' }), rentSmartRow({ violationType: 'Housing Complaints' })];
     expect(rentSmartDisagreement(rows, 1)).toBe(
-      "The city's RentSmart summary reports 2 housing complaints for this address; the 311 records above show 1.",
+      "The city's RentSmart summary reports 2 housing complaints for this parcel; the 311 records above show 1. A parcel can include more than one address.",
     );
   });
 
   it('writes the singular noun for a single complaint', () => {
     const rows = [rentSmartRow({ violationType: 'Housing Complaints' })];
     expect(rentSmartDisagreement(rows, 0)).toBe(
-      "The city's RentSmart summary reports 1 housing complaint for this address; the 311 records above show 0.",
+      "The city's RentSmart summary reports 1 housing complaint for this parcel; the 311 records above show 0. A parcel can include more than one address.",
     );
   });
 
   it('matches the violation type regardless of case and surrounding whitespace', () => {
     const rows = [rentSmartRow({ violationType: '  housing complaints ' })];
     expect(rentSmartDisagreement(rows, 0)).toContain('reports 1 housing complaint ');
+  });
+
+  it('names the parcel, not the address, because RentSmart is matched by parcel', () => {
+    // A parcel can hold several addresses, so a complaint at a neighbouring number on the same
+    // parcel is in the roll-up but not in this address's 311 list. "This address" claimed a gap
+    // that was really a difference in what the two counts cover.
+    const sentence = rentSmartDisagreement([rentSmartRow({ violationType: 'Housing Complaints' })], 0) ?? '';
+    expect(sentence).toContain('for this parcel');
+    expect(sentence).not.toContain('this address');
+    expect(sentence).not.toMatch(/[—!]/);
   });
 
   it('stays silent when the RentSmart roll-up lags the 311 records', () => {

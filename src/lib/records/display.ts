@@ -63,6 +63,14 @@ export const PERMIT_COVERAGE_YEAR_NUMBER: number | null = /^\d{4}$/.test(PERMIT_
 
 export const ZERO_PERMITS_COPY = `No permitted work on record since ${PERMIT_COVERAGE_YEAR}. This means no permits were filed, not that no maintenance was done.`;
 
+/**
+ * Where the city's permit feed starts, said as a fact about the feed. It read "On record from
+ * September 2006" under a row headed with this building's own span ("2010–2026"), and the two
+ * looked like two answers to one question. The row's span is this building's permits; this is
+ * the feed's, which is also why the bars start in 2006.
+ */
+export const PERMIT_COVERAGE_NOTE = `The city's permit records start in ${PERMIT_COVERAGE_START}.`;
+
 export const DECLARED_VALUATION_CAVEAT =
   "Declared valuation is the applicant's own estimate at filing and is a floor, not a cost.";
 
@@ -107,6 +115,24 @@ export function showAllLabel(count: number, noun: CountNoun): string {
 }
 
 /**
+ * What the same disclosure says once it is open. "Show all 31 requests" stayed on the control
+ * after the list unfolded, so it never said how to fold it again.
+ */
+export const SHOW_LESS_LABEL = 'Show less';
+
+/** From this many rows, an open list also gets a "Show less" at its end. */
+const SHOW_LESS_AT_END_FROM = 6;
+
+/**
+ * Whether an open list is long enough to need a second "Show less" after its last row. A reader
+ * who scrolled to the end of a long list should not have to scroll back to its top to fold it;
+ * on a short list the control at the top is already in view.
+ */
+export function showLessAtEnd(rowCount: number): boolean {
+  return rowCount >= SHOW_LESS_AT_END_FROM;
+}
+
+/**
  * The leftover line under a category chart. Built as one string because the template wrote it
  * as two adjacent expressions, and the space between them was lost in the rendered page
  * ("3 more types · 7requests").
@@ -128,6 +154,17 @@ export function caseLinesNote(lines: number, cases: number): string | null {
 export function ticketLinesNote(lines: number, tickets: number): string | null {
   if (lines <= tickets) return null;
   return `${countWithNoun(lines, { one: 'violation line', many: 'violation lines' })} on ${countWithNoun(tickets, { one: 'ticket', many: 'tickets' })}`;
+}
+
+/**
+ * The assessor's residential unit count, as the facts strip words it. A blank says whose field
+ * is blank. The building's own details can carry a unit count from elsewhere (the Boston seed
+ * gives a three-family parcel 3 units from its land use when the assessor left the count
+ * empty), and "units not recorded" printed beside "Units: 3" read as the site contradicting
+ * itself. Zero is a recorded value and prints as one.
+ */
+export function assessorUnitsText(units: number | null | undefined): string {
+  return units === null || units === undefined ? 'units not recorded by the assessor' : `units ${units}`;
 }
 
 export const CONDOMINIUM_COPY =
@@ -271,6 +308,10 @@ export function permitSummary(permits: PermitPayload[]): PermitSummary {
  * One-directional by design. RentSmart is a periodic roll-up of the same city data, so it
  * lagging the raw 311 feed is expected and unremarkable; only an excess — the roll-up
  * claiming more housing complaints than the records above show — is worth a note.
+ *
+ * RentSmart is matched by parcel (`sources/boston/rentsmart.ts`) while the 311 list is matched
+ * by address, and a parcel can hold several addresses. The sentence says "this parcel" and
+ * says why the two counts can differ, rather than claiming a gap at this address.
  */
 export function rentSmartDisagreement(rows: RentSmartPayload[], listedRequestCount: number): string | null {
   const complaintCount = rows.filter(
@@ -278,7 +319,7 @@ export function rentSmartDisagreement(rows: RentSmartPayload[], listedRequestCou
   ).length;
   if (complaintCount <= listedRequestCount) return null;
   const noun = complaintCount === 1 ? 'housing complaint' : 'housing complaints';
-  return `The city's RentSmart summary reports ${complaintCount} ${noun} for this address; the 311 records above show ${listedRequestCount}.`;
+  return `The city's RentSmart summary reports ${complaintCount} ${noun} for this parcel; the 311 records above show ${listedRequestCount}. A parcel can include more than one address.`;
 }
 
 /**
@@ -454,6 +495,41 @@ export function openSubCount(openCount: number, total: number): string {
   return `${openCount} open`;
 }
 
+/** `2014`, `2011 and 2014`, `2011, 2012 and 2014`. */
+function joinYears(years: readonly number[]): string {
+  if (years.length <= 1) return years.map(String).join('');
+  return `${years.slice(0, -1).join(', ')} and ${years[years.length - 1]}`;
+}
+
+/**
+ * Under a 311 year chart whose span crosses a year the city's 311 API returns no rows for (see
+ * `EMPTY_311_YEARS` in `ledger.ts`). The bar for that year is drawn as missing rather than as a
+ * zero, and this says why. Null when the chart crosses no such year.
+ */
+export function missingYearsNote(years: readonly number[]): string | null {
+  if (years.length === 0) return null;
+  return years.length === 1
+    ? `${years[0]} is marked as missing data, not zero. The city's open data API currently returns no 311 records for that year.`
+    : `${joinYears(years)} are marked as missing data, not zero. The city's open data API currently returns no 311 records for those years.`;
+}
+
+/**
+ * The accessible label on a year chart: the total in the right number, the span, and any year
+ * drawn as missing. It read "1 requests across 2026 to 2026" before; one year now reads "in".
+ */
+export function yearChartLabel(
+  title: string,
+  total: number,
+  noun: CountNoun,
+  firstYear: number,
+  lastYear: number,
+  missingYears: readonly number[] = [],
+): string {
+  const span = firstYear === lastYear ? `in ${firstYear}` : `across ${firstYear} to ${lastYear}`;
+  const missing = missingYears.length > 0 ? `, no data for ${joinYears(missingYears)}` : '';
+  return `${title}: ${countWithNoun(total, noun)} ${span}${missing}`;
+}
+
 /**
  * The span a dense year series covers, as the ledger's coverage line writes it. Null when no
  * row carried a readable date — there is no span to state, and "–" alone would suggest one.
@@ -495,6 +571,7 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   NOT_RECORDED,
   PANEL_FRAMING_COPY,
   ZERO_PERMITS_COPY,
+  PERMIT_COVERAGE_NOTE,
   DECLARED_VALUATION_CAVEAT,
   GROUPING_NOTE,
   GROUPING_LINK_TEXT,
@@ -520,6 +597,7 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   SEARCH_SEEDED_COPY,
   STILL_OPEN_LABEL,
   STILL_OPEN_NOTE,
+  SHOW_LESS_LABEL,
   ...Object.fromEntries(
     Object.entries(KIND_LABELS).map(([kind, label]) => [`KIND_LABELS.${kind}`, label]),
   ),
@@ -547,4 +625,8 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   'categoryRestLine()': categoryRestLine(5, 8, { one: 'request', many: 'requests' }),
   'caseLinesNote()': caseLinesNote(6, 1) ?? '',
   'ticketLinesNote()': ticketLinesNote(12, 9) ?? '',
+  'assessorUnitsText() — blank': assessorUnitsText(null),
+  'missingYearsNote() — one': missingYearsNote([2014]) ?? '',
+  'missingYearsNote() — two': missingYearsNote([2011, 2014]) ?? '',
+  'yearChartLabel()': yearChartLabel('Requests by year opened', 1, { one: 'request', many: 'requests' }, 2013, 2026, [2014]),
 };

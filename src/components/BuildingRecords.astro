@@ -19,6 +19,7 @@ import { logError } from '../lib/logger';
 import {
   PANEL_FRAMING_COPY,
   ZERO_PERMITS_COPY,
+  PERMIT_COVERAGE_NOTE,
   DECLARED_VALUATION_CAVEAT,
   GROUPING_NOTE,
   GROUPING_LINK_TEXT,
@@ -33,7 +34,6 @@ import {
 import { ledgerModel } from '../lib/records/ledger';
 import { recordsRequestState, type RecordsRequestState } from '../lib/records/coverage';
 import { FY2026_RESOURCE_ID } from '../lib/records/sources/boston/assessor';
-import { PERMIT_COVERAGE_START } from '../lib/records/sources/boston/permits';
 import { RECORD_GROUPS, type RecordGroup, type RecordGroupId } from '../lib/records/recordGroups';
 import RecordCorrectionForm from './records/RecordCorrectionForm';
 import RecordsRequestButton from './records/RecordsRequestButton';
@@ -43,6 +43,7 @@ import LedgerRow from './records/LedgerRow.astro';
 import CaseList from './records/CaseList.astro';
 import RecordList from './records/RecordList.astro';
 import RequestsBody from './records/RequestsBody.astro';
+import ShowAll from './records/ShowAll.astro';
 import SourceState from './records/SourceState.astro';
 import YearBars from './records/YearBars.astro';
 import CategoryBars from './records/CategoryBars.astro';
@@ -108,8 +109,6 @@ const groupDescriptionClass = 'mt-0.5 text-xs text-gray-500';
 const bodyClass = 'text-sm text-gray-600';
 const noteClass = 'text-xs text-gray-500 mt-2';
 const chartsClass = 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5';
-const disclosureClass =
-  'mt-4 text-sm text-teal-700 cursor-pointer list-none [&::-webkit-details-marker]:hidden underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700';
 ---
 
 {view && ledger && (
@@ -235,11 +234,11 @@ const disclosureClass =
             ) : (
               <>
                 <div class={chartsClass}>
-                  <YearBars title="Permits by year issued" series={ledger.permits.years} noun="permits" />
+                  <YearBars title="Permits by year issued" series={ledger.permits.years} noun={{ one: 'permit', many: 'permits' }} />
                   <CategoryBars title="Type of work" breakdown={ledger.permits.types} noun={{ one: 'permit', many: 'permits' }} />
                 </div>
                 <p class={noteClass}>
-                  On record from {PERMIT_COVERAGE_START}.{' '}
+                  {PERMIT_COVERAGE_NOTE}{' '}
                   {ledger.permits.summary.declaredTotal === null
                     ? 'No declared valuation recorded.'
                     : `Total declared valuation ${formatDollars(ledger.permits.summary.declaredTotal)}${
@@ -249,10 +248,9 @@ const disclosureClass =
                       }.`}{' '}
                   {DECLARED_VALUATION_CAVEAT}
                 </p>
-                <details>
-                  <summary class={disclosureClass}>{ledger.permits.showAll}</summary>
+                <ShowAll label={ledger.permits.showAll} rowCount={ledger.permits.rows.length}>
                   <RecordList rows={ledger.permits.rows} cappedNote={ledger.permits.cappedNote} />
-                </details>
+                </ShowAll>
               </>
             )}
           </SourceState>
@@ -283,11 +281,10 @@ const disclosureClass =
                   breakdown={ledger.enforcement.types}
                   noun={{ one: 'violation line', many: 'violation lines' }}
                 />
-                <details>
-                  <summary class={disclosureClass}>{ledger.enforcement.showAll}</summary>
+                <ShowAll label={ledger.enforcement.showAll} rowCount={ledger.enforcement.cases.length}>
                   {ledger.enforcement.openNote && <p class={noteClass}>{ledger.enforcement.openNote}</p>}
                   <CaseList cases={ledger.enforcement.cases} cappedNote={ledger.enforcement.cappedNote} />
-                </details>
+                </ShowAll>
               </>
             )}
           </SourceState>
