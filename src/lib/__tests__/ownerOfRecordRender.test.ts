@@ -109,6 +109,17 @@ suite('the owner of record on the records panel, rendered', () => {
     expect(cell.querySelector('a')?.getAttribute('href')).toBe('/owner-of-record?name=DOE+JANE');
   });
 
+  it('keeps a family trust with one property as plain text, and links a realty trust', async () => {
+    const db = await createDb();
+    await pulledBuilding(db, 'b-home', '12 Example Rd', '0100000001', 'DOE FAMILY TRUST');
+    await pulledBuilding(db, 'b-realty', '16 Example Rd', '0100000002', 'EXAMPLE REALTY TRUST');
+    const cell = ownerCell(await renderPanel(db, 'b-home'));
+    expect(cell.querySelector('a')).toBeNull();
+    expect(cell.textContent).toContain('DOE FAMILY TRUST');
+    const link = ownerCell(await renderPanel(db, 'b-realty')).querySelector('a');
+    expect(link?.getAttribute('href')).toBe('/owner-of-record?name=EXAMPLE+REALTY+TRUST');
+  });
+
   it('renders the panel with the owner as plain text before migration 0034 has run', async () => {
     const db = await createDb();
     await pulledBuilding(db, 'b-1', '12 Example Rd', '0100000001', 'EXAMPLE HOLDINGS LLC');
@@ -187,12 +198,14 @@ suite('the owner of record list, rendered', () => {
   // page asked for the site's ordinary 404, the same answer for each of these names.
   it.each([
     ['a person who owns one property here', 'DOE JANE', true],
+    ['a family trust that owns one property here', 'DOE FAMILY TRUST', true],
     ['a name with no buildings', 'NOBODY HOLDINGS LLC', true],
     ['any name before migration 0034 has run', 'EXAMPLE HOLDINGS LLC', false],
   ])('answers 404 for %s', async (_label, name, withTable) => {
     const db = await createDb();
     await ownedBuilding(db, 'b-1', '1 Example Rd', '0100000001', 'DOE JANE');
     await ownedBuilding(db, 'b-2', '2 Example Rd', '0100000002', 'EXAMPLE HOLDINGS LLC');
+    await ownedBuilding(db, 'b-3', '3 Example Rd', '0100000003', 'DOE FAMILY TRUST');
     if (!withTable) db.exec('DROP TABLE building_owners');
     await expect(
       (await container()).renderToResponse(OwnerOfRecordPage, {
@@ -231,10 +244,14 @@ suite('owner names on the search page, rendered', () => {
     expect(link?.getAttribute('href')).toBe('/owner-of-record?name=EXAMPLE+HOLDINGS+LLC');
   });
 
-  it('shows the landlord empty state for a person who owns one property here', async () => {
+  it.each([
+    ['a person', 'DOE JANE', 'Doe Jane'],
+    ['a family trust', 'DOE FAMILY TRUST', 'Doe Family'],
+    ['a nominee trust', '1 EXAMPLE RD NOMINEE TRUST', 'nominee trust'],
+  ])('shows the landlord empty state for %s that owns one property here', async (_label, owner, query) => {
     const db = await createDb();
-    await ownedBuilding(db, 'b-1', '1 Example Rd', '0100000001', 'DOE JANE');
-    const root = main(await renderSearch(db, 'Doe Jane', 'landlords'));
+    await ownedBuilding(db, 'b-1', '1 Example Rd', '0100000001', owner);
+    const root = main(await renderSearch(db, query, 'landlords'));
     expect(root.textContent).toContain('No landlords match that search');
     expect(root.textContent).not.toContain(OWNER_OF_RECORD_LABEL);
     expect(root.innerHTML).not.toContain('/owner-of-record');

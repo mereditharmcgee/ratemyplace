@@ -342,6 +342,22 @@ suite('the owner link on the records panel', () => {
     expect(await ownerOfRecordHref(db, 'b-1', person)).toBe('/owner-of-record?name=DOE+JANE');
   });
 
+  it('holds a family or nominee trust to the person rule, and links a business trust', async () => {
+    const db = await createDb();
+    const familyTrust = { owner: 'DOE FAMILY TRUST', condominium: false };
+    const nomineeTrust = { owner: '16 EXAMPLE RD NOMINEE TRUST', condominium: false };
+    const realtyTrust = { owner: 'EXAMPLE REALTY TRUST', condominium: false };
+    await addOwnedBuilding(db, 'b-home', '12 Example Rd', { ...familyTrust, parcelId: '0100000001' });
+    await addOwnedBuilding(db, 'b-nominee', '16 Example Rd', { ...nomineeTrust, parcelId: '0100000002' });
+    await addOwnedBuilding(db, 'b-realty', '18 Example Rd', { ...realtyTrust, parcelId: '0100000003' });
+    expect(await ownerOfRecordHref(db, 'b-home', familyTrust)).toBeNull();
+    expect(await ownerOfRecordHref(db, 'b-nominee', nomineeTrust)).toBeNull();
+    expect(await ownerOfRecordHref(db, 'b-realty', realtyTrust)).toBe('/owner-of-record?name=EXAMPLE+REALTY+TRUST');
+
+    await addOwnedBuilding(db, 'b-second', '14 Example Rd', { ...familyTrust, parcelId: '0100000004' });
+    expect(await ownerOfRecordHref(db, 'b-home', familyTrust)).toBe('/owner-of-record?name=DOE+FAMILY+TRUST');
+  });
+
   it('never links a condominium, a blank owner, or a building without its own owner row', async () => {
     const db = await createDb();
     await addOwnedBuilding(db, 'b-1', '12 Example Rd');
@@ -451,6 +467,19 @@ suite('the owner of record list', () => {
     expect(await loadOwnerList(db, 'Doe, Jane', 1, NOW)).toMatchObject({ found: true, total: 2 });
   });
 
+  it('applies the person rule to a typed family or nominee trust name', async () => {
+    const db = await createDb();
+    await addOwnedBuilding(db, 'b-home', '12 Example Rd', { owner: 'DOE FAMILY TRUST', parcelId: '0100000001' });
+    await addOwnedBuilding(db, 'b-nominee', '16 Example Rd', { owner: '16 EXAMPLE RD NOMINEE TRUST', parcelId: '0100000002' });
+    await addOwnedBuilding(db, 'b-realty', '18 Example Rd', { owner: 'EXAMPLE REALTY TRUST', parcelId: '0100000003' });
+    expect(await loadOwnerList(db, 'Doe Family Trust', 1, NOW)).toEqual({ found: false });
+    expect(await loadOwnerList(db, '16 Example Rd Nominee Trust', 1, NOW)).toEqual({ found: false });
+    expect(await loadOwnerList(db, 'Example Realty Trust', 1, NOW)).toMatchObject({ found: true, total: 1 });
+
+    await addOwnedBuilding(db, 'b-second', '14 Example Rd', { owner: 'DOE FAMILY TRUST', parcelId: '0100000004' });
+    expect(await loadOwnerList(db, 'Doe Family Trust', 1, NOW)).toMatchObject({ found: true, total: 2 });
+  });
+
   it('finds nothing for a blank, overlong or unknown name, before the migration, or with an empty table', async () => {
     const db = await createDb();
     await addOwnedBuilding(db, 'b-1', '12 Example Rd');
@@ -510,6 +539,33 @@ suite('owner names in landlord search', () => {
     await addOwnedBuilding(db, 'b-2', '2 Sample St', { owner: 'ROE RICHARD', parcelId: '0100000003' });
     expect(await searchOwnerNames(db, 'DOE JANE')).toEqual({ matches: [], total: 0 });
     expect((await searchOwnerNames(db, 'roe')).matches).toEqual([{ key: 'ROE RICHARD', owner: 'ROE RICHARD', buildings: 2 }]);
+  });
+
+  it('never returns a family or nominee trust below the parcel count, by part or all of the name', async () => {
+    const db = await createDb();
+    await addOwnedBuilding(db, 'b-home', '12 Example Rd', { owner: 'DOE FAMILY TRUST', parcelId: '0100000001' });
+    await addOwnedBuilding(db, 'b-nominee', '16 Example Rd', { owner: '16 EXAMPLE RD NOMINEE TRUST', parcelId: '0100000002' });
+    await addOwnedBuilding(db, 'b-realty', '18 Example Rd', { owner: 'EXAMPLE REALTY TRUST', parcelId: '0100000003' });
+    expect(await searchOwnerNames(db, 'Doe Family Trust')).toEqual({ matches: [], total: 0 });
+    expect(await searchOwnerNames(db, 'doe')).toEqual({ matches: [], total: 0 });
+    expect(await searchOwnerNames(db, 'nominee')).toEqual({ matches: [], total: 0 });
+    expect(await searchOwnerNames(db, 'trust')).toEqual({
+      matches: [{ key: 'EXAMPLE REALTY TRUST', owner: 'EXAMPLE REALTY TRUST', buildings: 1 }],
+      total: 1,
+    });
+
+    await addOwnedBuilding(db, 'b-second', '14 Example Rd', { owner: 'DOE FAMILY TRUST', parcelId: '0100000004' });
+    expect((await searchOwnerNames(db, 'doe')).matches).toEqual([{ key: 'DOE FAMILY TRUST', owner: 'DOE FAMILY TRUST', buildings: 2 }]);
+  });
+
+  it('holds a row stored as an entity under an earlier rule to the rule as it stands now', async () => {
+    const db = await createDb();
+    await insertBuilding(db, { id: 'b-home', address: '12 Example Rd', parcel_id: '0100000001', zip_code: '02134' });
+    const row = ownerRowFromAssessment('b-home', payload({ owner: 'DOE FAMILY TRUST', parcelId: '0100000001' }))!;
+    await insertOwnerRow(db, { ...row, isEntity: 1 });
+    expect(await searchOwnerNames(db, 'doe')).toEqual({ matches: [], total: 0 });
+    expect(await loadOwnerList(db, 'DOE FAMILY TRUST', 1, NOW)).toEqual({ found: false });
+    expect(await ownerOfRecordHref(db, 'b-home', { owner: 'DOE FAMILY TRUST', condominium: false })).toBeNull();
   });
 
   it('reads LIKE wildcards in the typed name literally', async () => {

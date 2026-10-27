@@ -1,6 +1,6 @@
 # Owner of record list: design
 
-**Date:** 2026-10-27 · **Status:** built on `feat/owner-of-record-list` after the owner approved it "as the brief said" (company owners plus any name with 2 or more residential parcels, an additive table with an index, a scripted backfill and a records Worker deploy). Production steps are listed under **Rollout**.
+**Date:** 2026-10-27 · **Status:** built on `feat/owner-of-record-list` after the owner approved the design as briefed: company owners plus any name with 2 or more residential parcels, an additive table with an index, a scripted backfill and a records Worker deploy. Production steps are listed under **Rollout**.
 
 ## What it is
 
@@ -9,7 +9,8 @@ In the records panel, the assessor's owner of record becomes a link to a list of
 - Label: "Owner of record (City of Boston assessor)". It is a different thing from a landlord or manager a reviewer named, and the two are never merged.
 - No score on the list. Record counts only, the same counts the panel shows, in the panel's three groups (living conditions; building safety and code; property upkeep). Each row also shows the assessor fiscal year its owner was read from.
 - Group by the exact owner name, normalized for case, spacing and punctuation (`ownerKey`). Never by tax mailing address: a shared mailing address suggests who manages a property, it is not a record of who owns it.
-- Link entity owners (LLC, LP, LLP, INC, CORP, TRUST, REALTY, ASSOCIATES, PROPERTIES, MANAGEMENT, COMPANY and similar, `isEntityOwner`), and a person only when two or more distinct residential parcels in our data carry the same name (`linkableOwnerKey`, `MIN_PARCELS_FOR_PERSON`). Parcels, not buildings: a duplicate page for one parcel does not count twice.
+- Link entity owners (LLC, LP, LLP, INC, CORP, REALTY, ASSOCIATES, PROPERTIES, MANAGEMENT, COMPANY and similar, `isEntityOwner`), and a person only when two or more distinct residential parcels in our data carry the same name (`linkableOwnerKey`, `MIN_PARCELS_FOR_PERSON`). Parcels, not buildings: a duplicate page for one parcel does not count twice.
+- A trust is a person for linking when its only entity words are TRUST, FAMILY, NOMINEE or a trustee suffix (`DOE FAMILY TRUST`, `DOE JANE REVOCABLE TRUST`, `12 EXAMPLE RD NOMINEE TRUST`). In Massachusetts many owner-occupied homes are held in family, nominee or revocable trusts, and the person rule exists so that no list, link or search result is built for someone who owns one home. A trust that also names a business (`EXAMPLE REALTY TRUST`, `EXAMPLE HOLDINGS TRUST`) is an entity. This is a linking rule only: the mailing-address gate still treats `DOE FAMILY TRUST` as it did. It is an owner decision; reverting it is one regex in `ownerOfRecord.ts` (`PERSONAL_TRUST_WORDS`) and its tests, with no stored data to rewrite while `building_owners` is empty.
 - A condominium parcel shows no single owner, so it never links and never appears in a list. The mailing-address gate (`showMailingAddress`) is unchanged; a link-only entity token does not publish a mailing address, and the list shows no mailing address at all.
 - The list is a new page, `/owner-of-record?name=<owner key>&page=<n>`: noindex, classified in `pageIndexing.test.ts`, and not in `STATIC_SITEMAP_PATHS`.
 

@@ -9,9 +9,10 @@
 // 1. Group by the exact owner name only, normalized for case, spacing and punctuation.
 //    Never by tax mailing address: a shared mailing address suggests who manages a
 //    property, it is not a record of who owns it.
-// 2. An owner that reads as an entity (LLC, LP, TRUST, REALTY, ...) can be linked. A person
-//    can be linked only when two or more residential parcels in our data carry the same
-//    name, so no list is built for someone who owns one home.
+// 2. An owner that reads as a business (LLC, LP, REALTY, ...) can be linked. A person can be
+//    linked only when two or more residential parcels in our data carry the same name, so no
+//    list is built for someone who owns one home. A family, nominee or other personal trust
+//    (`DOE FAMILY TRUST`) is held to the person rule, because many homes are held that way.
 // 3. A condominium parcel shows no single owner, so it never yields a link or a list row.
 import { showMailingAddress } from './display';
 import { isSeedParcelRow, normalizeLandUse } from './seed/filters';
@@ -28,6 +29,17 @@ export const MIN_PARCELS_FOR_PERSON = 2;
  * longer word and LTD does not match inside a surname.
  */
 const LINK_ONLY_ENTITY_TOKEN = /\b(MANAGEMENT|MGMT|LTD|LIMITED|ENTERPRISES|INVESTMENTS|VENTURES|ESTATES)\b/;
+
+/**
+ * Words that name a trust without naming a business: TRUST, FAMILY, NOMINEE and the trustee
+ * suffixes the mailing-address gate knows. In Massachusetts many owner-occupied homes are held
+ * in a family, nominee or revocable trust (`DOE FAMILY TRUST`, `DOE JANE REVOCABLE TRUST`), so
+ * a name whose only entity words are these is a person for linking: it needs two or more
+ * residential parcels here, like any person. A trust that also names a business
+ * (`EXAMPLE REALTY TRUST`, `EXAMPLE HOLDINGS TRUST`) is still an entity. Linking only: the
+ * mailing-address gate in `display.ts` is unchanged.
+ */
+const PERSONAL_TRUST_WORDS = /\b(TRUST|FAMILY|NOMINEE|TR|TRS|TRUSTEE|TRUSTEES|TRSTEE|TRSTEES)\b/g;
 
 /**
  * The grouping key for an owner name: upper case, periods and commas dropped, runs of
@@ -52,14 +64,19 @@ export function ownerKey(owner: string | null | undefined): string | null {
 }
 
 /**
- * Whether an owner name reads as an entity rather than a person. Every name that clears the
- * mailing-address gate counts, plus the link-only tokens above. A trustee suffix alone
- * (`DOE JANE TR`) stays a person, exactly as it does for the mailing address.
+ * Whether an owner name reads as a business rather than a person, for linking. The personal
+ * trust words above come out first, and what is left has to clear the mailing-address gate or
+ * carry a link-only token. So `DOE JANE TR`, `DOE FAMILY TRUST` and `12 EXAMPLE RD NOMINEE
+ * TRUST` are persons, and `EXAMPLE REALTY TRUST` is an entity. Never true for a name the
+ * gate and the link-only tokens would both refuse.
  */
 export function isEntityOwner(owner: string | null | undefined): boolean {
   const key = ownerKey(owner);
   if (key === null) return false;
-  return showMailingAddress(key) || LINK_ONLY_ENTITY_TOKEN.test(key);
+  // A `-` holds each removed word's place, so the words either side of it cannot join into a
+  // new entity phrase (`CITY TRUST OF` must not become `CITY OF`).
+  const rest = key.replace(PERSONAL_TRUST_WORDS, '-');
+  return showMailingAddress(rest) || LINK_ONLY_ENTITY_TOKEN.test(rest);
 }
 
 /**

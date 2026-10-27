@@ -403,8 +403,10 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   `ownerOfRecord.ts` holds the rules, pure: `ownerKey` (the grouping key: case, spacing and
   punctuation only, never the mailing address), `isEntityOwner` (the mailing-address gate's
   entity words plus link-only words such as MANAGEMENT and LTD, kept apart so linking never
-  publishes a mailing address), `linkableOwnerKey` (an entity always; a person only at
-  `MIN_PARCELS_FOR_PERSON` distinct residential parcels; a condominium never) and
+  publishes a mailing address; a trust whose only entity words are TRUST, FAMILY, NOMINEE or
+  a trustee suffix is a person, since many owner-occupied homes are held that way, while
+  `EXAMPLE REALTY TRUST` stays an entity), `linkableOwnerKey` (an entity always; a person
+  only at `MIN_PARCELS_FOR_PERSON` distinct residential parcels; a condominium never) and
   `ownerRowFromAssessment`, the one row builder both writers use. `owners.ts` is the write
   side, run inside each assessor year's pull batch: the row is the newest stored fiscal year
   (the row the panel shows), so each year writes only when no newer year is stored. It runs

@@ -38,7 +38,11 @@ describe('isEntityOwner', () => {
     'EXAMPLE PARTNERS LLP',
     'EXAMPLE WIDGETS INC',
     'EXAMPLE CORP',
-    'DOE FAMILY TRUST',
+    'EXAMPLE REALTY TRUST',
+    'EXAMPLE REALTY TR',
+    'EXAMPLE HOLDINGS TRUST',
+    'EXAMPLE MANAGEMENT TRUST',
+    'EXAMPLE CONDOMINIUM TRUST',
     'EXAMPLE REALTY',
     'EXAMPLE ASSOCIATES',
     'EXAMPLE PROPERTIES',
@@ -60,16 +64,50 @@ describe('isEntityOwner', () => {
     expect(isEntityOwner(name)).toBe(false);
   });
 
+  // Many owner-occupied homes are held in a family, nominee or revocable trust, so a name
+  // whose only entity words are TRUST, FAMILY, NOMINEE or a trustee suffix is a person here.
+  it.each([
+    'DOE FAMILY TRUST',
+    'DOE FAMILY TR',
+    'Doe Family Trust',
+    'DOE JANE REVOCABLE TRUST',
+    'DOE JANE TRUSTEE OF THE DOE TRUST',
+    'THE DOE 2019 IRREVOCABLE TRUST',
+    '12 EXAMPLE RD NOMINEE TRUST',
+    'DOE NOMINEE TRS',
+    'EXAMPLE TRUST',
+  ])('treats the personal trust %s as a person', (name) => {
+    expect(isEntityOwner(name)).toBe(false);
+  });
+
   it('matches whole words only', () => {
     expect(isEntityOwner('MANAGEMENTSON JANE')).toBe(false);
     expect(isEntityOwner('LTDOVICH JANE')).toBe(false);
   });
 
-  it('never calls a name a person that the mailing-address gate calls an entity', () => {
-    for (const name of ['SAMPLE HOLDINGS LLC', 'EXAMPLE HOUSING AUTHORITY', 'EXAMPLE UNIVERSITY', 'DOE FAMILY TR']) {
+  it('keeps every other name the mailing-address gate calls an entity', () => {
+    for (const name of ['SAMPLE HOLDINGS LLC', 'EXAMPLE HOUSING AUTHORITY', 'EXAMPLE UNIVERSITY', 'CITY OF EXAMPLE', 'EXAMPLE REALTY TRUST']) {
       expect(showMailingAddress(name)).toBe(true);
       expect(isEntityOwner(name)).toBe(true);
     }
+  });
+
+  it('never calls a name an entity that the gate and the link-only words both refuse', () => {
+    for (const name of ['DOE JANE', 'DOE JANE TR', 'PRINCE JOHN', 'CHURCH MARY E']) {
+      expect(showMailingAddress(name)).toBe(false);
+      expect(isEntityOwner(name)).toBe(false);
+    }
+    // Taking a trust word out cannot join the words either side into an entity phrase.
+    expect(showMailingAddress('EXAMPLE CITY TRUST OF DOE')).toBe(true);
+    expect(isEntityOwner('EXAMPLE CITY TRUST OF DOE')).toBe(false);
+  });
+
+  it('leaves the mailing-address gate as it was for a personal trust', () => {
+    // The person rule for trusts is about linking only. Which tax mailing addresses show is
+    // the gate's decision, and this rule does not move it.
+    expect(showMailingAddress('DOE FAMILY TRUST')).toBe(true);
+    expect(showMailingAddress('DOE FAMILY TR')).toBe(true);
+    expect(showMailingAddress('DOE JANE TR')).toBe(false);
   });
 
   it('does not widen the mailing-address gate', () => {
@@ -120,6 +158,15 @@ describe('linkableOwnerKey', () => {
     expect(linkableOwnerKey(person, 2)).toBe('DOE JANE');
   });
 
+  it('holds a personal trust to the person rule, and links a business trust at any count', () => {
+    const familyTrust = { owner: 'Doe Family Trust', condominium: false };
+    expect(linkableOwnerKey(familyTrust, 0)).toBeNull();
+    expect(linkableOwnerKey(familyTrust, 1)).toBeNull();
+    expect(linkableOwnerKey(familyTrust, 2)).toBe('DOE FAMILY TRUST');
+    expect(linkableOwnerKey({ owner: '12 EXAMPLE RD NOMINEE TRUST', condominium: false }, 1)).toBeNull();
+    expect(linkableOwnerKey({ owner: 'EXAMPLE REALTY TRUST', condominium: false }, 0)).toBe('EXAMPLE REALTY TRUST');
+  });
+
   it('never links a condominium parcel, which shows no single owner', () => {
     expect(linkableOwnerKey({ ...entity, condominium: true }, 5)).toBeNull();
     expect(linkableOwnerKey({ ...person, condominium: true }, 5)).toBeNull();
@@ -166,6 +213,11 @@ describe('ownerRowFromAssessment', () => {
       ownerKey: 'DOE JANE',
       isEntity: 0,
       residential: 0,
+    });
+    expect(ownerRowFromAssessment('b-3', { ...assessment, owner: 'DOE FAMILY TRUST' })).toMatchObject({
+      ownerKey: 'DOE FAMILY TRUST',
+      isEntity: 0,
+      residential: 1,
     });
   });
 

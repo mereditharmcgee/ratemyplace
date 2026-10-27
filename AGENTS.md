@@ -369,9 +369,10 @@ Things that have already cost time. Read before debugging.
   took 4.5 to 10 seconds on production. Each assessor year's pull batch writes the building's
   owner row (`src/lib/records/owners.ts`, Worker code too); `/owner-of-record?name=`, the
   panel's owner link and landlord search read it (`ownerList.ts`). The person rule (an
-  individual links only with two or more distinct residential parcels here) is applied on the
-  server to a typed name as well, and a refused name gets the same 404 as an unknown one. All
-  three readers treat a missing or empty table as "no owner names", never as an error.
+  individual, or a family or nominee trust, links only with two or more distinct residential
+  parcels here) is applied on the server to a typed name as well, and a refused name gets the
+  same 404 as an unknown one. All three readers treat a missing or empty table as "no owner
+  names", never as an error.
   `records:seed` writes no owner rows, so run `npm run records:owners-backfill` after a re-seed.
 - **Search is not reviewed-only any more, but browse and the map are.**
   `buildingSearchWhere` / `buildingSearchSelect` / `buildingSearchOrder` in

@@ -238,14 +238,16 @@ describe('ownersBackfillFiles', () => {
     expect(summary).toContain('--file .cache/owners-backfill/remote-1800000000/rollback.sql');
   });
 
-  it('names entity owners in the summary and never a person', () => {
-    const rows = [row(1), row(2), row(3, 'DOE JANE'), row(4, 'DOE JANE'), row(5, 'ROE RICHARD')];
-    const summary = ownersBackfillFiles({ read: 5, rows, skippedCondominium: 0, skippedBlankOwner: 0 }, { readAt: READ_AT, target: '--remote', dir: 'd', database: 'db' }).get('summary.txt')!;
+  it('names entity owners in the summary and never a person or a personal trust', () => {
+    const rows = [row(1), row(2), row(3, 'DOE JANE'), row(4, 'DOE JANE'), row(5, 'ROE RICHARD'), row(6, 'DOE FAMILY TRUST'), row(7, 'EXAMPLE REALTY TRUST')];
+    const summary = ownersBackfillFiles({ read: 7, rows, skippedCondominium: 0, skippedBlankOwner: 0 }, { readAt: READ_AT, target: '--remote', dir: 'd', database: 'db' }).get('summary.txt')!;
     expect(summary).toContain('2  EXAMPLE HOLDINGS LLC');
+    expect(summary).toContain('1  EXAMPLE REALTY TRUST');
     expect(summary).toContain('person names with 2+ residential parcels (link): 1');
-    expect(summary).toContain('person names below that (never link): 1');
+    expect(summary).toContain('person names below that (never link): 2');
     expect(summary).not.toContain('DOE JANE');
     expect(summary).not.toContain('ROE RICHARD');
+    expect(summary).not.toContain('DOE FAMILY TRUST');
   });
 
   it('quotes every value as a literal', () => {
