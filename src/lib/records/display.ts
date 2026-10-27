@@ -130,6 +130,17 @@ export function ticketLinesNote(lines: number, tickets: number): string | null {
   return `${countWithNoun(lines, { one: 'violation line', many: 'violation lines' })} on ${countWithNoun(tickets, { one: 'ticket', many: 'tickets' })}`;
 }
 
+/**
+ * The assessor's residential unit count, as the facts strip words it. A blank says whose field
+ * is blank. The building's own details can carry a unit count from elsewhere (the Boston seed
+ * gives a three-family parcel 3 units from its land use when the assessor left the count
+ * empty), and "units not recorded" printed beside "Units: 3" read as the site contradicting
+ * itself. Zero is a recorded value and prints as one.
+ */
+export function assessorUnitsText(units: number | null | undefined): string {
+  return units === null || units === undefined ? 'units not recorded by the assessor' : `units ${units}`;
+}
+
 export const CONDOMINIUM_COPY =
   'This building is divided into individually owned condominium units. No single owner of record is shown.';
 
@@ -551,4 +562,5 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   'categoryRestLine()': categoryRestLine(5, 8, { one: 'request', many: 'requests' }),
   'caseLinesNote()': caseLinesNote(6, 1) ?? '',
   'ticketLinesNote()': ticketLinesNote(12, 9) ?? '',
+  'assessorUnitsText() — blank': assessorUnitsText(null),
 };

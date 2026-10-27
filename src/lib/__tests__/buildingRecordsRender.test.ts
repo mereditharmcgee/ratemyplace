@@ -323,7 +323,8 @@ suite('BuildingRecords.astro ledger', () => {
     expect(html).toContain('Assessor FY2026 · parcel 2102098000');
     expect(html).toContain('Built');
     expect(html).toContain('1920');
-    expect(html).toContain('Last remodel 1980 · units not recorded');
+    // Says whose field is blank, so it does not read against a unit count in Building details.
+    expect(html).toContain('Last remodel 1980 · units not recorded by the assessor');
     expect(html).toContain('Land use');
     expect(html).toContain('APT 7-30 UNITS');
     // Compact, not the long form, so the four cells fit across a phone.
