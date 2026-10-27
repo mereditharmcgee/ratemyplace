@@ -318,9 +318,12 @@ suite('the owner link on the records panel', () => {
   const entity = { owner: 'EXAMPLE HOLDINGS LLC', condominium: false };
   const person = { owner: 'DOE JANE', condominium: false };
 
-  it('links an entity owner to its list', async () => {
+  it('links an entity owner to its list only when it has another building here', async () => {
     const db = await createDb();
     await addOwnedBuilding(db, 'b-1', '12 Example Rd');
+    // A list of one would only show the building the reader came from.
+    expect(await ownerOfRecordHref(db, 'b-1', entity)).toBeNull();
+    await addOwnedBuilding(db, 'b-2', '14 Example Rd', { parcelId: '0100000009' });
     expect(await ownerOfRecordHref(db, 'b-1', entity)).toBe('/owner-of-record?name=EXAMPLE+HOLDINGS+LLC');
     expect(ownerListHref('EXAMPLE HOLDINGS LLC', 2)).toBe('/owner-of-record?name=EXAMPLE+HOLDINGS+LLC&page=2');
   });
@@ -352,6 +355,9 @@ suite('the owner link on the records panel', () => {
     await addOwnedBuilding(db, 'b-realty', '18 Example Rd', { ...realtyTrust, parcelId: '0100000003' });
     expect(await ownerOfRecordHref(db, 'b-home', familyTrust)).toBeNull();
     expect(await ownerOfRecordHref(db, 'b-nominee', nomineeTrust)).toBeNull();
+    // A business trust links like any company, once it has a second building here.
+    expect(await ownerOfRecordHref(db, 'b-realty', realtyTrust)).toBeNull();
+    await addOwnedBuilding(db, 'b-realty-2', '20 Example Rd', { ...realtyTrust, parcelId: '0100000005' });
     expect(await ownerOfRecordHref(db, 'b-realty', realtyTrust)).toBe('/owner-of-record?name=EXAMPLE+REALTY+TRUST');
 
     await addOwnedBuilding(db, 'b-second', '14 Example Rd', { ...familyTrust, parcelId: '0100000004' });
@@ -521,12 +527,16 @@ suite('owner names in landlord search', () => {
     await addOwnedBuilding(db, 'b-2', '2 Example Rd', { parcelId: '0100000002', owner: 'Example Holdings, L.L.C.' });
     await addOwnedBuilding(db, 'b-3', '3 Example Rd', { parcelId: '0100000003', owner: 'EXAMPLE PROPERTIES TRUST' });
     await addOwnedBuilding(db, 'b-4', '4 Sample St', { parcelId: '0100000004', owner: 'SAMPLE REALTY LP' });
+    // A company with one building here is not listed: its list would hold only that building.
+    expect((await searchOwnerNames(db, 'example')).matches.map((m) => m.key)).toEqual(['EXAMPLE HOLDINGS LLC']);
+    await addOwnedBuilding(db, 'b-5', '5 Example Rd', { parcelId: '0100000005', owner: 'EXAMPLE PROPERTIES TRUST' });
+    await addOwnedBuilding(db, 'b-6', '6 Example Rd', { parcelId: '0100000006', owner: 'EXAMPLE HOLDINGS LLC' });
 
     const result = await searchOwnerNames(db, 'example');
     expect(result.total).toBe(2);
     expect(result.matches).toEqual([
-      { key: 'EXAMPLE HOLDINGS LLC', owner: 'EXAMPLE HOLDINGS LLC', buildings: 2 },
-      { key: 'EXAMPLE PROPERTIES TRUST', owner: 'EXAMPLE PROPERTIES TRUST', buildings: 1 },
+      { key: 'EXAMPLE HOLDINGS LLC', owner: 'EXAMPLE HOLDINGS LLC', buildings: 3 },
+      { key: 'EXAMPLE PROPERTIES TRUST', owner: 'EXAMPLE PROPERTIES TRUST', buildings: 2 },
     ]);
     expect((await searchOwnerNames(db, 'Example Holdings, L.L.C.')).matches.map((m) => m.key)).toEqual(['EXAMPLE HOLDINGS LLC']);
     expect((await searchOwnerNames(db, 'example', 1)).matches).toHaveLength(1);
@@ -546,11 +556,12 @@ suite('owner names in landlord search', () => {
     await addOwnedBuilding(db, 'b-home', '12 Example Rd', { owner: 'DOE FAMILY TRUST', parcelId: '0100000001' });
     await addOwnedBuilding(db, 'b-nominee', '16 Example Rd', { owner: '16 EXAMPLE RD NOMINEE TRUST', parcelId: '0100000002' });
     await addOwnedBuilding(db, 'b-realty', '18 Example Rd', { owner: 'EXAMPLE REALTY TRUST', parcelId: '0100000003' });
+    await addOwnedBuilding(db, 'b-realty-2', '20 Example Rd', { owner: 'EXAMPLE REALTY TRUST', parcelId: '0100000005' });
     expect(await searchOwnerNames(db, 'Doe Family Trust')).toEqual({ matches: [], total: 0 });
     expect(await searchOwnerNames(db, 'doe')).toEqual({ matches: [], total: 0 });
     expect(await searchOwnerNames(db, 'nominee')).toEqual({ matches: [], total: 0 });
     expect(await searchOwnerNames(db, 'trust')).toEqual({
-      matches: [{ key: 'EXAMPLE REALTY TRUST', owner: 'EXAMPLE REALTY TRUST', buildings: 1 }],
+      matches: [{ key: 'EXAMPLE REALTY TRUST', owner: 'EXAMPLE REALTY TRUST', buildings: 2 }],
       total: 1,
     });
 
@@ -579,6 +590,7 @@ suite('owner names in landlord search', () => {
     const db = await createDb();
     const long = 'THE EXAMPLE NEIGHBORHOOD HOUSING DEVELOPMENT CORPORATION OF BOSTON';
     await addOwnedBuilding(db, 'b-1', '1 Example Rd', { owner: long });
+    await addOwnedBuilding(db, 'b-2', '3 Example Rd', { owner: long, parcelId: '0100000009' });
     expect((await searchOwnerNames(db, long)).matches.map((m) => m.key)).toEqual([long]);
   });
 

@@ -34,7 +34,7 @@ export interface SearchEmptyState {
 
 export const LANDLORD_EMPTY_TITLE = 'No landlords match that search';
 export const LANDLORD_EMPTY_DESCRIPTION =
-  'Landlords named in reviews are listed once one of their buildings has a review. Owners of record are listed when the owner is a business or has two or more residential buildings here. Try part of the name.';
+  'Landlords named in reviews are listed once one of their buildings has a review. Owners of record are listed when they own two or more buildings here. Try part of the name.';
 export const LANDLORD_EMPTY_NEXT_LABEL = 'Search buildings instead';
 
 export function searchEmptyState({ query, type, areaSearch, streetQuery }: SearchEmptyInput): SearchEmptyState {

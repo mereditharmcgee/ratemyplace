@@ -4,7 +4,9 @@
 //
 // Privacy rules, each enforced here on the server and not only by hiding a link:
 // - Group by the exact normalized owner name (`owner_key`), never by mailing address.
-// - An entity owner links. A person links only when two or more distinct residential parcels in
+// - An entity owner links only when two or more buildings in our data carry its name, so the list
+//   always shows at least one building besides the one the reader came from. A person links
+//   only when two or more distinct residential parcels in
 //   our data carry the same name, so no list is ever built for someone who owns one home. The
 //   list page and landlord search apply that to a typed name too: `/owner-of-record?name=` is a
 //   public URL, and a person below the count gets the same 404 as a name with no buildings.
@@ -16,12 +18,14 @@ import { escapeLikePattern, fitsLikePattern } from '../validation';
 import { logError } from '../logger';
 import { ledgerModel } from './ledger';
 import { getRecordsViews, type BuildingRecordsView } from './query';
-import { MIN_PARCELS_FOR_PERSON, linkableOwnerKey, ownerKey } from './ownerOfRecord';
+import { MIN_PARCELS_FOR_PERSON, isEntityOwner, linkableOwnerKey, ownerKey } from './ownerOfRecord';
 import type { AssessmentPayload, RecordKind, RecordsDb } from './types';
 
 export const OWNER_LIST_PATH = '/owner-of-record';
 export const OWNER_LIST_PAGE_SIZE = 20;
 export const OWNER_SEARCH_LIMIT = 10;
+/** An entity owner links, and is found by landlord search, only at this many buildings here. */
+export const MIN_BUILDINGS_FOR_ENTITY_LINK = 2;
 /** A typed name longer than this is no owner name; the page answers 404 without a query. */
 export const MAX_OWNER_NAME_LENGTH = 200;
 
@@ -61,7 +65,8 @@ export const OWNER_GATE_SQL =
 
 /** This building's key, with the key's distinct residential parcels. Binds: building id. */
 export const OWNER_LINK_SQL =
-  'SELECT bo.owner_key, (SELECT COUNT(DISTINCT o.parcel_id) FROM building_owners o ' +
+  'SELECT bo.owner_key, (SELECT COUNT(*) FROM building_owners a WHERE a.owner_key = bo.owner_key) AS buildings, ' +
+  '(SELECT COUNT(DISTINCT o.parcel_id) FROM building_owners o ' +
   'WHERE o.owner_key = bo.owner_key AND o.residential = 1) AS residential_parcels ' +
   'FROM building_owners bo WHERE bo.building_id = ?';
 
@@ -95,7 +100,8 @@ export function ownerSearchSql(like: boolean): string {
     'FROM building_owners ' +
     (like ? "WHERE owner_key LIKE ? ESCAPE '\\' " : 'WHERE owner_key = ? ') +
     'GROUP BY owner_key ' +
-    'HAVING MAX(is_entity) = 1 OR COUNT(DISTINCT CASE WHEN residential = 1 THEN parcel_id END) >= ? ' +
+    `HAVING (MAX(is_entity) = 1 AND COUNT(*) >= ${MIN_BUILDINGS_FOR_ENTITY_LINK}) ` +
+    'OR COUNT(DISTINCT CASE WHEN residential = 1 THEN parcel_id END) >= ? ' +
     'ORDER BY buildings DESC, owner_key LIMIT ?'
   );
 }
@@ -118,9 +124,11 @@ export async function ownerOfRecordHref(
     const row = await db
       .prepare(OWNER_LINK_SQL)
       .bind(buildingId)
-      .first<{ owner_key: string; residential_parcels: number }>();
+      .first<{ owner_key: string; buildings: number; residential_parcels: number }>();
     if (!row || row.owner_key !== key) return null;
     const linkable = linkableOwnerKey(current, Number(row.residential_parcels) || 0);
+    // A company with only this building would open a list of one: leave it plain text.
+    if (linkable !== null && isEntityOwner(linkable) && (Number(row.buildings) || 0) < MIN_BUILDINGS_FOR_ENTITY_LINK) return null;
     return linkable === null ? null : ownerListHref(linkable);
   } catch (error) {
     logReadFailure('owner_of_record_link_failed', error, { buildingId });

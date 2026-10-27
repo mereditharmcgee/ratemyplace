@@ -22,7 +22,7 @@ describe('searchEmptyState', () => {
     const state = searchEmptyState({ query: 'Example Realty', type: 'landlords', ...none });
     expect(state.title).toBe('No landlords match that search');
     expect(state.description).toBe(
-      'Landlords named in reviews are listed once one of their buildings has a review. Owners of record are listed when the owner is a business or has two or more residential buildings here. Try part of the name.',
+      'Landlords named in reviews are listed once one of their buildings has a review. Owners of record are listed when they own two or more buildings here. Try part of the name.',
     );
     expect(state.next).toEqual({
       label: 'Search buildings instead',

@@ -89,9 +89,11 @@ suite('the owner of record on the records panel, rendered', () => {
     });
   }
 
-  it('links an entity owner to its list', async () => {
+  it('links an entity owner to its list once it has a second building here', async () => {
     const db = await createDb();
     await pulledBuilding(db, 'b-1', '12 Example Rd', '0100000001', 'EXAMPLE HOLDINGS LLC');
+    expect(ownerCell(await renderPanel(db, 'b-1')).querySelector('a')).toBeNull();
+    await pulledBuilding(db, 'b-2', '14 Example Rd', '0100000003', 'EXAMPLE HOLDINGS LLC');
     const link = ownerCell(await renderPanel(db, 'b-1')).querySelector('a');
     expect(link?.textContent).toBe('EXAMPLE HOLDINGS LLC');
     expect(link?.getAttribute('href')).toBe('/owner-of-record?name=EXAMPLE+HOLDINGS+LLC');
@@ -113,6 +115,7 @@ suite('the owner of record on the records panel, rendered', () => {
     const db = await createDb();
     await pulledBuilding(db, 'b-home', '12 Example Rd', '0100000001', 'DOE FAMILY TRUST');
     await pulledBuilding(db, 'b-realty', '16 Example Rd', '0100000002', 'EXAMPLE REALTY TRUST');
+    await pulledBuilding(db, 'b-realty-2', '18 Example Rd', '0100000003', 'EXAMPLE REALTY TRUST');
     const cell = ownerCell(await renderPanel(db, 'b-home'));
     expect(cell.querySelector('a')).toBeNull();
     expect(cell.textContent).toContain('DOE FAMILY TRUST');
