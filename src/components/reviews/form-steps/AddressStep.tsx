@@ -11,6 +11,8 @@ export interface ManualAddress {
 
 interface Props {
   selectedPlace: PlaceData | null;
+  /** What the search box starts with: the handoff place's street, when there is one. */
+  searchInitialValue?: string;
   loading: boolean;
   error: string | null;
   manualMode: boolean;
@@ -25,6 +27,7 @@ interface Props {
 
 export default function AddressStep({
   selectedPlace,
+  searchInitialValue,
   loading,
   error,
   manualMode,
@@ -138,6 +141,7 @@ export default function AddressStep({
           onPlaceSelect={onPlaceSelect}
           onManualEntry={onEnterManual}
           placeholder="Start typing your address..."
+          initialValue={searchInitialValue}
         />
         <p className="text-sm text-gray-500 mt-2">
           Enter the street address of the building you want to review

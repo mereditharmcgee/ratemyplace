@@ -19,16 +19,23 @@ import {
 
 interface Props {
   building?: Building | null;
+  /**
+   * A Google place from the /review/new?placeId= handoff that matched no building. The
+   * address step opens with it selected; its Continue POSTs /api/buildings as usual.
+   */
+  initialPlace?: PlaceData | null;
 }
 
-export default function ReviewForm({ building }: Props) {
+// Islands import only leaf modules from src/lib (surveyItems, formOptions, reviewPaths,
+// reviewSubmitOutcome), never a server module such as reviewHandoff or records/*.
+export default function ReviewForm({ building, initialPlace }: Props) {
   const [step, setStep] = useState<Step>(building ? 'unit-details' : 'address');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Form state
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(building || null);
-  const [selectedPlace, setSelectedPlace] = useState<PlaceData | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<PlaceData | null>(initialPlace ?? null);
 
   // Manual address entry (fallback when Google Places autocomplete fails or
   // the user's address isn't found)
@@ -327,6 +334,7 @@ export default function ReviewForm({ building }: Props) {
       {step === 'address' && (
         <AddressStep
           selectedPlace={selectedPlace}
+          searchInitialValue={initialPlace?.streetAddress}
           loading={loading}
           error={error}
           manualMode={manualMode}
