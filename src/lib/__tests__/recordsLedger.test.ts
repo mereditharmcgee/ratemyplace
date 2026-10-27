@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { ledgerModel } from '../records/ledger';
-import { CAPPED_REQUESTS_COPY, CAPPED_ROWS_COPY, NOT_RECORDED, STILL_OPEN_NOTE } from '../records/display';
+import {
+  CAPPED_CODE_LINES_COPY,
+  CAPPED_REQUESTS_COPY,
+  CAPPED_ROWS_COPY,
+  CAPPED_VIOLATION_LINES_COPY,
+  NOT_RECORDED,
+  STILL_OPEN_NOTE,
+} from '../records/display';
 import { ROW_CAP } from '../records/ckan';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
 import { VIOLATIONS_RESOURCE_ID } from '../records/sources/boston/violations';
@@ -343,6 +350,33 @@ describe('ledgerModel provenance', () => {
     expect(model.buildingRequests.cappedNote).toBe(CAPPED_REQUESTS_COPY);
     expect(model.upkeepRequests.cappedNote).toBe(CAPPED_REQUESTS_COPY);
     expect(ledgerModel(view({ sources: allPulled() }), NOW).permits.cappedNote).toBeNull();
+  });
+
+  it('names lines, not cases or tickets, when the ISD or Public Works cap bites', () => {
+    // ROW_CAP stored lines, two per case or ticket: the row reads half as many cases or
+    // tickets, so a bare "First 500 shown." would claim 500 of them are listed.
+    const violations = Array.from({ length: ROW_CAP }, (_unused, index) =>
+      violation({ caseNumber: 'V' + Math.floor(index / 2), code: String(index) }),
+    );
+    const tickets = Array.from({ length: ROW_CAP }, (_unused, index) =>
+      ticket({ ticketNumber: 'T' + Math.floor(index / 2), code: String(index) }),
+    );
+
+    const model = ledgerModel(view({ sources: allPulled(), violations, enforcement: tickets }), NOW);
+
+    expect(model.violations.count).toBe(String(ROW_CAP / 2));
+    expect(model.violations.cappedNote).toBe(CAPPED_CODE_LINES_COPY);
+    expect(model.violations.cappedNote).toBe('First ' + ROW_CAP + ' code lines shown.');
+    expect(model.enforcement.count).toBe(String(ROW_CAP / 2));
+    expect(model.enforcement.cappedNote).toBe(CAPPED_VIOLATION_LINES_COPY);
+    expect(model.enforcement.cappedNote).toBe('First ' + ROW_CAP + ' violation lines shown.');
+
+    const under = ledgerModel(
+      view({ sources: allPulled(), violations: violations.slice(1), enforcement: tickets.slice(1) }),
+      NOW,
+    );
+    expect(under.violations.cappedNote).toBeNull();
+    expect(under.enforcement.cappedNote).toBeNull();
   });
 });
 

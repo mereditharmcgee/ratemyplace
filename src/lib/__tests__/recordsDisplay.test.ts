@@ -33,6 +33,7 @@ import {
 } from '../records/display';
 // Namespace import purely so the guard below can reflect over every export of the module.
 import * as displayModule from '../records/display';
+import { RECORD_GROUPS } from '../records/recordGroups';
 import { RECORD_KINDS } from '../records/types';
 import type { AssessmentPayload, PermitPayload, RentSmartPayload } from '../records/types';
 
@@ -440,6 +441,16 @@ describe('panel copy stays free of banned words', () => {
 
     expect(stringConstants.length).toBeGreaterThan(0);
     expect(Object.keys(PANEL_COPY)).toEqual(expect.arrayContaining(stringConstants));
+  });
+
+  // The group headings live beside the 311 type table in recordGroups.ts, outside this module,
+  // so the reflection above cannot see them. They render on the panel, so the scan must.
+  it('scans every record group title and description', () => {
+    const copy = Object.values(PANEL_COPY);
+    for (const group of RECORD_GROUPS) {
+      expect(copy).toContain(group.title);
+      expect(copy).toContain(group.description);
+    }
   });
 });
 

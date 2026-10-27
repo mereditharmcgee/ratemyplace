@@ -17,6 +17,7 @@
 // data in through either door.
 import { ROW_CAP } from './ckan';
 import { PERMIT_COVERAGE_START } from './sources/boston/permits';
+import { RECORD_GROUPS } from './recordGroups';
 import type { YearCount } from './charts';
 import type {
   AssessmentPayload,
@@ -305,6 +306,13 @@ export function unavailableCopy(retrievedAt: number): string {
  */
 export const CAPPED_REQUESTS_COPY = `First ${ROW_CAP} requests considered.`;
 export const CAPPED_ROWS_COPY = `First ${ROW_CAP} shown.`;
+/**
+ * ISD and Public Works are counted by case and by ticket, but the cap counts stored lines. "First
+ * 500 shown." beside "430 tickets" would read as 500 tickets listed, so these name the unit
+ * the cap applies to. When it bites, the last case or ticket in the list may be missing lines.
+ */
+export const CAPPED_CODE_LINES_COPY = `First ${ROW_CAP} code lines shown.`;
+export const CAPPED_VIOLATION_LINES_COPY = `First ${ROW_CAP} violation lines shown.`;
 
 // Reader-facing request button and page states (design spec Section 4). The button asks the
 // companion Worker to fetch; nothing is fetched in the request. Copy stays here so the
@@ -495,6 +503,8 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   NEVER_PULLED_COPY,
   CAPPED_REQUESTS_COPY,
   CAPPED_ROWS_COPY,
+  CAPPED_CODE_LINES_COPY,
+  CAPPED_VIOLATION_LINES_COPY,
   REQUEST_BUTTON_LABEL,
   REQUEST_BUTTON_HELP,
   REQUEST_VERIFYING_COPY,
@@ -512,6 +522,14 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   STILL_OPEN_NOTE,
   ...Object.fromEntries(
     Object.entries(KIND_LABELS).map(([kind, label]) => [`KIND_LABELS.${kind}`, label]),
+  ),
+  // The group headings and their one-line descriptions are defined beside the table that
+  // fills the groups, but they are panel copy and are scanned here with the rest.
+  ...Object.fromEntries(
+    RECORD_GROUPS.flatMap((group) => [
+      [`RECORD_GROUPS.${group.id}.title`, group.title],
+      [`RECORD_GROUPS.${group.id}.description`, group.description],
+    ]),
   ),
   'unavailableCopy()': unavailableCopy(SAMPLE_PULL_DATE),
   'openSubCount() — empty': openSubCount(0, 0),

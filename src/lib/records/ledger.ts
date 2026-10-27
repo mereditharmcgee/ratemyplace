@@ -15,8 +15,10 @@
 import { ROW_CAP } from './ckan';
 import { countByKey, countByYear, observedYears, type KeyBreakdown, type YearCount } from './charts';
 import {
+  CAPPED_CODE_LINES_COPY,
   CAPPED_REQUESTS_COPY,
   CAPPED_ROWS_COPY,
+  CAPPED_VIOLATION_LINES_COPY,
   PERMIT_COVERAGE_YEAR_NUMBER,
   STILL_OPEN_NOTE,
   caseLinesNote,
@@ -379,7 +381,8 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
     subCount: enforcementCountable ? openSubCount(openTickets, tickets.length) : '',
     span: enforcementCountable ? yearSpanLabel(observedYears(enforcementYears)) : null,
     note: enforcementCountable ? ticketLinesNote(view.enforcement.length, tickets.length) : null,
-    cappedNote: cappedNote(view.enforcement.length, CAPPED_ROWS_COPY),
+    // The cap counts violation lines, not tickets, so the note names lines.
+    cappedNote: cappedNote(view.enforcement.length, CAPPED_VIOLATION_LINES_COPY),
     rows: tickets.flatMap((entry) => entry.lines),
     openNote: openNoteFor(openTickets),
     showAll: showAllLabel(tickets.length, { one: 'ticket', many: 'tickets' }),
@@ -408,7 +411,8 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
     subCount: violationsCountable ? openSubCount(openCases, cases.length) : '',
     span: violationsCountable ? yearSpanLabel(observedYears(violationYears)) : null,
     note: violationsCountable ? caseLinesNote(view.violations.length, cases.length) : null,
-    cappedNote: cappedNote(view.violations.length, CAPPED_ROWS_COPY),
+    // The cap counts code lines, not cases, so the note names lines.
+    cappedNote: cappedNote(view.violations.length, CAPPED_CODE_LINES_COPY),
     rows: cases.flatMap((entry) => entry.lines),
     openNote: openNoteFor(openCases),
     showAll: showAllLabel(cases.length, { one: 'case', many: 'cases' }),
