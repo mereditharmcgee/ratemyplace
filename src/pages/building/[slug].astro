@@ -80,9 +80,8 @@ try {
     // would make them undercount buildings with many reviews. 500 far exceeds
     // any realistic building while bounding worst-case render cost.
     const reviewsResult = await db.prepare(`
-      SELECT r.*, u.email_verified as user_email_verified
+      SELECT r.*
       FROM reviews r
-      LEFT JOIN users u ON r.user_id = u.id
       WHERE r.building_id = ? AND r.status = 'approved'
       ORDER BY r.created_at DESC
       LIMIT 500

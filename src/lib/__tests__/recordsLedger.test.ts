@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ledgerModel } from '../records/ledger';
-import { CAPPED_REQUESTS_COPY, CAPPED_ROWS_COPY } from '../records/display';
+import { CAPPED_REQUESTS_COPY, CAPPED_ROWS_COPY, NOT_RECORDED, STILL_OPEN_NOTE } from '../records/display';
 import { ROW_CAP } from '../records/ckan';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
 import { VIOLATIONS_RESOURCE_ID } from '../records/sources/boston/violations';
@@ -388,5 +388,130 @@ describe('ledgerModel rows', () => {
       NOW,
     );
     expect(model.requests.rentSmartNote).toContain('2 housing complaints');
+  });
+});
+
+/**
+ * "Open" is the city's word for a case with no recorded closing action, and a request from a
+ * decade ago that was never closed still reads "Open" today. Every such row is kept; what
+ * changes is the wording, so a reader is told where the status comes from rather than that the
+ * problem is current. Permits are the exception: an open permit is an active one, so its status stays
+ * exactly as the city recorded it.
+ */
+describe('ledgerModel open-case wording', () => {
+  it('labels an open 311 request as still open in city records, with the year it was filed', () => {
+    const model = ledgerModel(
+      view({
+        sources: allPulled(),
+        serviceRequests: [
+          request({ caseId: 'a', openedAt: '2013-04-02 09:30:00', status: 'Open' }),
+          request({ caseId: 'b', openedAt: '2024-12-01', closedAt: '2024-12-20', status: 'Closed' }),
+        ],
+      }),
+      NOW,
+    );
+
+    expect(model.requests.openRows.map((row) => row.statusLabel)).toEqual([
+      'Still open in city records, filed 2013',
+    ]);
+    // The full list says the same thing about the same row, and leaves closed rows as recorded.
+    expect(model.requests.rows.map((row) => row.statusLabel)).toEqual([
+      'Closed',
+      'Still open in city records, filed 2013',
+    ]);
+    // The city's own word is still on the row for anything that needs it.
+    expect(model.requests.openRows[0].status).toBe('Open');
+  });
+
+  it('keeps every open request rather than dropping old ones', () => {
+    const model = ledgerModel(
+      view({
+        sources: allPulled(),
+        serviceRequests: [
+          request({ caseId: 'a', openedAt: '2013-04-02', status: 'Open' }),
+          request({ caseId: 'b', openedAt: '2017-05-09', status: 'Open' }),
+          request({ caseId: 'c', openedAt: '2026-05-01', status: 'Open' }),
+        ],
+      }),
+      NOW,
+    );
+
+    expect(model.requests.openRows).toHaveLength(3);
+    expect(model.requests.count).toBe('3');
+  });
+
+  it('explains what open means only where a section lists an open case', () => {
+    const open = ledgerModel(
+      view({
+        sources: allPulled(),
+        serviceRequests: [request({ openedAt: '2013-04-02', status: 'Open' })],
+        violations: [violation({ status: 'Open', statusDate: '2017-05-09' })],
+        enforcement: [ticket({ status: 'Open', statusDate: '2016-03-02' })],
+        permits: [permit({ status: 'Open', issuedDate: '2019-05-02' })],
+      }),
+      NOW,
+    );
+    expect(open.requests.openNote).toBe(STILL_OPEN_NOTE);
+    expect(open.violations.openNote).toBe(STILL_OPEN_NOTE);
+    expect(open.enforcement.openNote).toBe(STILL_OPEN_NOTE);
+    // An open permit is an active permit. Nothing to explain away.
+    expect(open.permits.openNote).toBeNull();
+
+    const closed = ledgerModel(
+      view({
+        sources: allPulled(),
+        serviceRequests: [request({ openedAt: '2013-04-02', closedAt: '2013-05-01', status: 'Closed' })],
+        violations: [violation({ status: 'Closed', statusDate: '2017-05-09' })],
+        enforcement: [ticket({ status: 'Closed', statusDate: '2016-03-02' })],
+      }),
+      NOW,
+    );
+    expect(closed.requests.openNote).toBeNull();
+    expect(closed.violations.openNote).toBeNull();
+    expect(closed.enforcement.openNote).toBeNull();
+  });
+
+  it('labels open ISD violations and Public Works tickets without a filing year their feeds do not carry', () => {
+    // These feeds carry a status date, which is not the date a case was filed, so no year is
+    // put next to "filed".
+    const model = ledgerModel(
+      view({
+        sources: allPulled(),
+        violations: [
+          violation({ caseNumber: 'V1', status: 'Open', code: '105', statusDate: '2017-05-09' }),
+          violation({ caseNumber: 'V2', status: 'Closed', code: '110', statusDate: '2017-05-09' }),
+        ],
+        enforcement: [ticket({ status: 'Open', statusDate: '2016-03-02' })],
+      }),
+      NOW,
+    );
+
+    expect(model.violations.rows.map((row) => row.statusLabel)).toEqual(['Still open in city records', 'Closed']);
+    expect(model.enforcement.rows[0].statusLabel).toBe('Still open in city records');
+  });
+
+  it("keeps a permit's status exactly as the city recorded it", () => {
+    const model = ledgerModel(
+      view({
+        sources: allPulled(),
+        permits: [
+          permit({ permitNumber: 'P1', status: 'Open', issuedDate: '2019-05-02' }),
+          permit({ permitNumber: 'P2', status: 'Issued', issuedDate: '2020-05-02' }),
+          permit({ permitNumber: 'P3', status: null, issuedDate: '2021-05-02' }),
+        ],
+      }),
+      NOW,
+    );
+
+    expect(model.permits.rows.map((row) => row.statusLabel)).toEqual(['Open', 'Issued', NOT_RECORDED]);
+  });
+
+  it('names a blank status rather than printing nothing', () => {
+    const model = ledgerModel(
+      view({ sources: allPulled(), violations: [violation({ status: '  ' })], enforcement: [ticket()] }),
+      NOW,
+    );
+    expect(model.violations.rows[0].statusLabel).toBe(NOT_RECORDED);
+    expect(model.enforcement.rows[0].statusLabel).toBe(NOT_RECORDED);
   });
 });
