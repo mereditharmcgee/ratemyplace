@@ -27,6 +27,7 @@ import {
   REQUEST_PARKED_COPY,
   formatDollars,
   formatPullDate,
+  stillOpenHeading,
 } from '../lib/records/display';
 import { ledgerModel } from '../lib/records/ledger';
 import { recordsRequestState, type RecordsRequestState } from '../lib/records/coverage';
@@ -171,8 +172,9 @@ const disclosureClass =
           {ledger.requests.openRows.length > 0 && (
             <>
               <h4 class="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Open now ({ledger.requests.openRows.length})
+                {stillOpenHeading(ledger.requests.openRows.length)}
               </h4>
+              {ledger.requests.openNote && <p class="mt-1 text-xs text-gray-500">{ledger.requests.openNote}</p>}
               <RecordList rows={ledger.requests.openRows} />
             </>
           )}
@@ -245,6 +247,7 @@ const disclosureClass =
               <CategoryBars title="What was ticketed" breakdown={ledger.enforcement.types} restNoun="tickets" />
               <details>
                 <summary class={disclosureClass}>Show all {ledger.enforcement.rows.length} tickets</summary>
+                {ledger.enforcement.openNote && <p class={noteClass}>{ledger.enforcement.openNote}</p>}
                 <RecordList rows={ledger.enforcement.rows} cappedNote={ledger.enforcement.cappedNote} />
               </details>
             </>
@@ -269,7 +272,10 @@ const disclosureClass =
               <p class={noteClass}>{NO_VIOLATIONS_CAVEAT}</p>
             </>
           ) : (
-            <RecordList rows={ledger.violations.rows} cappedNote={ledger.violations.cappedNote} />
+            <>
+              {ledger.violations.openNote && <p class={noteClass}>{ledger.violations.openNote}</p>}
+              <RecordList rows={ledger.violations.rows} cappedNote={ledger.violations.cappedNote} />
+            </>
           )}
         </SourceState>
       </LedgerRow>

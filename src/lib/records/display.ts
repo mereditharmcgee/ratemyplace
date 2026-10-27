@@ -374,6 +374,46 @@ export function isOpenStatus(status: string | null | undefined): boolean {
 }
 
 /**
+ * A record's status word as the panel prints it, with one name for a blank. The city's word is
+ * printed as recorded; this only stops an empty field from printing as nothing.
+ */
+export function statusText(status: string | null | undefined): string {
+  return status === null || status === undefined || status.trim() === '' ? NOT_RECORDED : status;
+}
+
+/**
+ * "Open" is the city's status word for a case with no recorded closing action, and a reader
+ * takes it to mean the problem is there today. A 311 request opened years ago and never closed
+ * still reads "Open" in the feed. The panel keeps every such record and words it as what the
+ * record says: open in the city's records, not open in the building. Permits do not use this
+ * wording, because an open permit is an active one and its status stays as recorded.
+ */
+export const STILL_OPEN_LABEL = 'Still open in city records';
+
+/** One line under the open list, so the label is not read as a statement about today. */
+export const STILL_OPEN_NOTE =
+  'Open means the city has not recorded a closing action. It does not confirm the problem exists today.';
+
+/** The heading over a section's open cases, with their count. */
+export function stillOpenHeading(count: number): string {
+  return `${STILL_OPEN_LABEL} (${count})`;
+}
+
+/**
+ * What an open 311, ISD or Public Works row prints in place of the bare word "Open". `filedAt`
+ * is the date the case was opened, when the feed carries one, and only its year is used: the
+ * row's own date column already shows the full date, so the label is never more precise than
+ * the panel. An unreadable or missing date leaves the year off rather than inventing one.
+ * The ISD and Public Works feeds carry a status date only, which is not a filing date, so
+ * their rows pass null.
+ */
+export function stillOpenLabel(filedAt: string | null): string {
+  // formatRecordDate decides what a readable record date is; a value it cannot read has no year.
+  if (!filedAt || formatRecordDate(filedAt) === formatRecordDate(null)) return STILL_OPEN_LABEL;
+  return `${STILL_OPEN_LABEL}, filed ${filedAt.slice(0, 4)}`;
+}
+
+/**
  * The small line under a ledger row's count. Three distinct readings: nothing was recorded,
  * everything recorded has been closed, or this many are still open. "0 open" would read the
  * same for an empty source and a fully closed one, which are not the same fact.
@@ -445,6 +485,8 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   NO_REVIEWS_CARD_BODY,
   NO_REVIEWS_BREAKDOWN_COPY,
   SEARCH_SEEDED_COPY,
+  STILL_OPEN_LABEL,
+  STILL_OPEN_NOTE,
   ...Object.fromEntries(
     Object.entries(KIND_LABELS).map(([kind, label]) => [`KIND_LABELS.${kind}`, label]),
   ),
@@ -452,6 +494,8 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   'openSubCount() — empty': openSubCount(0, 0),
   'openSubCount() — all closed': openSubCount(0, 3),
   'openSubCount() — some open': openSubCount(2, 3),
+  'stillOpenHeading()': stillOpenHeading(2),
+  'stillOpenLabel() — filed year': stillOpenLabel('2013-04-02'),
   'formatRecordDate() — no date': formatRecordDate(null),
   'formatPullDate() — no date': formatPullDate(Number.NaN),
   'rentSmartDisagreement()': rentSmartDisagreement([SAMPLE_RENTSMART_ROW], 0) ?? '',
