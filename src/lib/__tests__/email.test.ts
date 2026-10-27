@@ -24,6 +24,7 @@ import {
   sendContactNotificationEmail,
   sendDisputeResolutionEmail,
   sendReviewRejectedEmail,
+  OWNER_NOTIFY_EMAIL,
 } from '../email';
 
 beforeEach(() => {
@@ -393,5 +394,69 @@ describe('cross-template guarantees', () => {
       const subject: string = mockSend.mock.calls[0][0].subject;
       expect(subject).not.toContain('- RateMyPlace Boston');
     }
+  });
+});
+
+describe('delivery failures are machine-readable', () => {
+  it('a missing key reports not_configured without touching Resend', async () => {
+    const result = await sendVerificationEmail('', 'https://ratemyplace.org', 'user@example.com', 'tok');
+    expect(result).toEqual({ success: false, error: 'Email service not configured', reason: 'not_configured' });
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('a Resend error reports provider_error with its name and status, keeping the message as error', async () => {
+    mockSend.mockResolvedValueOnce({
+      data: null,
+      error: { name: 'rate_limit_exceeded', statusCode: 429, message: 'Too many requests for tenant@example.com' },
+    });
+    const result = await sendVerificationEmail('test_key', 'https://ratemyplace.org', 'tenant@example.com', 'tok');
+    expect(result).toEqual({
+      success: false,
+      error: 'Too many requests for tenant@example.com',
+      reason: 'provider_error',
+      code: 'rate_limit_exceeded',
+      httpStatus: 429,
+    });
+  });
+
+  it('a Resend error with no status reports httpStatus null', async () => {
+    mockSend.mockResolvedValueOnce({ data: null, error: { name: 'application_error', statusCode: null, message: 'm' } });
+    const result = await sendPasswordResetEmail('test_key', 'https://ratemyplace.org', 'u@example.com', 'tok');
+    expect(result.reason).toBe('provider_error');
+    expect(result.httpStatus).toBeNull();
+  });
+
+  it('a thrown send reports exception with the error class as code', async () => {
+    mockSend.mockRejectedValueOnce(new TypeError('fetch failed'));
+    const result = await sendVerificationEmail('test_key', 'https://ratemyplace.org', 'user@example.com', 'tok');
+    expect(result).toEqual({ success: false, error: 'Failed to send email', reason: 'exception', code: 'TypeError' });
+  });
+
+  it('a success carries no reason', async () => {
+    const result = await sendVerificationEmail('test_key', 'https://ratemyplace.org', 'user@example.com', 'tok');
+    expect(result).toEqual({ success: true, messageId: 'msg_test_123' });
+    expect(result.reason).toBeUndefined();
+  });
+
+  it('never writes to console.error on any failure path (the tracker logs instead)', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await sendVerificationEmail('', 'https://ratemyplace.org', 'user@example.com', 'tok');
+      mockSend.mockResolvedValueOnce({ data: null, error: { name: 'validation_error', statusCode: 422, message: 'bad' } });
+      await sendContactConfirmationEmail('k', 'u@example.com', 'X', 'general');
+      mockSend.mockRejectedValueOnce(new Error('boom'));
+      await sendReviewRejectedEmail('k', 'https://r.org', 'r@example.com', 'A', null);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe('OWNER_NOTIFY_EMAIL', () => {
+  it('is the Workspace inbox, and the contact notification goes to it', async () => {
+    expect(OWNER_NOTIFY_EMAIL).toBe('meredith@ratemyplace.org');
+    await sendContactNotificationEmail('k', 'Alice', 'user@example.com', 'support', 'Hi');
+    expect(mockSend.mock.calls[0][0].to).toBe(OWNER_NOTIFY_EMAIL);
   });
 });

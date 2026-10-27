@@ -1,9 +1,67 @@
 import { Resend } from 'resend';
+import type { CreateEmailOptions } from 'resend';
 
-interface EmailResult {
+/**
+ * Why a send did not go out, in a form the email tracker can store and the admin dashboard
+ * can label. `not_configured`: no RESEND_API_KEY. `provider_error`: Resend answered with an
+ * error. `exception`: the call threw before Resend answered (network, runtime).
+ */
+export type EmailFailureReason = 'not_configured' | 'provider_error' | 'exception';
+
+export interface EmailResult {
   success: boolean;
+  /** Human-readable detail. For a provider error it is Resend's message, which can echo the recipient: never store or log it. */
   error?: string;
   messageId?: string;
+  /** Set on every failure built by `deliver`. */
+  reason?: EmailFailureReason;
+  /** provider_error: Resend's error name (an enum). exception: the thrown error's class name. */
+  code?: string;
+  /** provider_error: Resend's HTTP status, or null when it gave none. */
+  httpStatus?: number | null;
+}
+
+/**
+ * The inbox that owner notices and the contact-form notification go to. A real Google
+ * Workspace mailbox; there is deliberately no env var for it.
+ */
+export const OWNER_NOTIFY_EMAIL = 'meredith@ratemyplace.org';
+
+/**
+ * The one Resend call in this module. Every send builds its message and hands it here, so a
+ * missing key, a Resend error and a thrown call each come back as a typed failure instead of
+ * a console line. Nothing is logged here: callers wrap the send in `trackEmail` /
+ * `trackSend` (`emailHealth.ts`, `trackSend.ts`), which log without the address and record
+ * the failure for /admin.
+ */
+async function deliver(apiKey: string, message: CreateEmailOptions): Promise<EmailResult> {
+  if (!apiKey) {
+    return { success: false, error: 'Email service not configured', reason: 'not_configured' };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const { data, error } = await resend.emails.send(message);
+
+    if (error) {
+      return {
+        success: false,
+        error: error.message,
+        reason: 'provider_error',
+        code: error.name,
+        httpStatus: error.statusCode ?? null,
+      };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err) {
+    return {
+      success: false,
+      error: 'Failed to send email',
+      reason: 'exception',
+      code: err instanceof Error ? err.name : typeof err,
+    };
+  }
 }
 
 /**
@@ -40,20 +98,13 @@ export async function sendVerificationEmail(
   toEmail: string,
   token: string
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
   const verificationUrl = `${siteUrl}/api/auth/verify-email?token=${token}`;
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
-      to: toEmail,
-      subject: 'Verify your email',
-      html: `
+  return deliver(apiKey, {
+    from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+    to: toEmail,
+    subject: 'Verify your email',
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -87,18 +138,7 @@ export async function sendVerificationEmail(
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 /**
@@ -115,20 +155,13 @@ export async function sendPasswordResetEmail(
   toEmail: string,
   token: string
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
   const resetUrl = `${siteUrl}/auth/reset-password?token=${token}`;
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
-      to: toEmail,
-      subject: 'Reset your password',
-      html: `
+  return deliver(apiKey, {
+    from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+    to: toEmail,
+    subject: 'Reset your password',
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -162,18 +195,7 @@ export async function sendPasswordResetEmail(
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 /**
@@ -195,25 +217,17 @@ export async function sendDisputeConfirmationEmail(
     disputeExplanation?: string;
   }
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
-
   const reasonsList = disputeDetails.disputeReasons
     .map(reason => `<li>${escapeHtml(reason)}</li>`)
     .join('');
 
-  try {
-    const { data, error } = await resend.emails.send({
-      // Sent from meredith@ so landlord replies (questions, supplementary
-      // evidence, follow-ups) land in the Workspace inbox.
-      from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
-      to: toEmail,
-      subject: 'We received your dispute',
-      html: `
+  return deliver(apiKey, {
+    // Sent from meredith@ so landlord replies (questions, supplementary
+    // evidence, follow-ups) land in the Workspace inbox.
+    from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
+    to: toEmail,
+    subject: 'We received your dispute',
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -248,18 +262,7 @@ export async function sendDisputeConfirmationEmail(
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 /**
@@ -276,13 +279,6 @@ export async function sendContactConfirmationEmail(
   toName: string,
   category: string
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
-
   const categoryLabels: Record<string, string> = {
     general: 'general inquiry',
     privacy: 'privacy concern',
@@ -291,15 +287,14 @@ export async function sendContactConfirmationEmail(
   };
   const categoryLabel = categoryLabels[category] || 'inquiry';
 
-  try {
-    const { data, error } = await resend.emails.send({
-      // Sent from meredith@ (Google Workspace inbox) so replies land in a real
-      // person's inbox. This makes the "reply or use the form" footer below honest.
-      from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
-      to: toEmail,
-      replyTo: 'meredith@ratemyplace.org',
-      subject: 'We received your message',
-      html: `
+  return deliver(apiKey, {
+    // Sent from meredith@ (Google Workspace inbox) so replies land in a real
+    // person's inbox. This makes the "reply or use the form" footer below honest.
+    from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
+    to: toEmail,
+    replyTo: 'meredith@ratemyplace.org',
+    subject: 'We received your message',
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -321,18 +316,7 @@ export async function sendContactConfirmationEmail(
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 /**
@@ -351,22 +335,14 @@ export async function sendContactNotificationEmail(
   category: string,
   messagePreview: string
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
-
-  try {
-    const { data, error } = await resend.emails.send({
-      // System-to-admin alert: keep noreply@ as sender (avoids meredith@→meredith@
-      // self-email pattern that Gmail sometimes filters as noise). Recipient is
-      // meredith@ (Workspace inbox).
-      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
-      to: 'meredith@ratemyplace.org',
-      subject: `New contact: ${category} from ${submitterName}`,
-      html: `
+  return deliver(apiKey, {
+    // System-to-admin alert: keep noreply@ as sender (avoids meredith@→meredith@
+    // self-email pattern that Gmail sometimes filters as noise). Recipient is
+    // meredith@ (Workspace inbox).
+    from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+    to: OWNER_NOTIFY_EMAIL,
+    subject: `New contact: ${category} from ${submitterName}`,
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -394,18 +370,7 @@ export async function sendContactNotificationEmail(
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 /**
@@ -452,22 +417,15 @@ export async function sendDisputeResolutionEmail(
   outcome: DisputeResolutionOutcome,
   resolutionNotes: string
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
   const copy = DISPUTE_OUTCOME_COPY[outcome];
 
-  try {
-    const { data, error } = await resend.emails.send({
-      // Sent from meredith@ so landlord replies (questions about the outcome,
-      // appeals, follow-ups) land in the Workspace inbox.
-      from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
-      to: toEmail,
-      subject: copy.subject,
-      html: `
+  return deliver(apiKey, {
+    // Sent from meredith@ so landlord replies (questions about the outcome,
+    // appeals, follow-ups) land in the Workspace inbox.
+    from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
+    to: toEmail,
+    subject: copy.subject,
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -494,18 +452,7 @@ export async function sendDisputeResolutionEmail(
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 
@@ -529,12 +476,6 @@ export async function sendReviewRejectedEmail(
   buildingAddress: string,
   rejectionReason: string | null
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
   const profileUrl = `${siteUrl}/profile`;
   const guidelinesUrl = `${siteUrl}/guidelines`;
 
@@ -550,15 +491,14 @@ export async function sendReviewRejectedEmail(
 `
     : '';
 
-  try {
-    const { data, error } = await resend.emails.send({
-      // Sent from meredith@ so reviewers can reply with questions about why their
-      // review was rejected (the most relationship-sensitive email surface). Replies
-      // land in the Workspace inbox.
-      from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
-      to: toEmail,
-      subject: 'Your review wasn\'t published',
-      html: `
+  return deliver(apiKey, {
+    // Sent from meredith@ so reviewers can reply with questions about why their
+    // review was rejected (the most relationship-sensitive email surface). Replies
+    // land in the Workspace inbox.
+    from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
+    to: toEmail,
+    subject: 'Your review wasn\'t published',
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -580,18 +520,7 @@ ${reasonBlock}
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 
@@ -645,20 +574,13 @@ export async function sendRecordCorrectionOutcomeEmail(
   buildingUrl: string,
   outcome: RecordCorrectionOutcome
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
   const copy = RECORD_CORRECTION_OUTCOME_COPY[outcome];
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
-      to: toEmail,
-      subject: copy.subject,
-      html: `
+  return deliver(apiKey, {
+    from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+    to: toEmail,
+    subject: copy.subject,
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -682,18 +604,7 @@ export async function sendRecordCorrectionOutcomeEmail(
 </body>
 </html>
       `,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  });
 }
 
 /**
@@ -745,29 +656,10 @@ async function sendRecordsSchedulerEmail(
   subject: string,
   body: string
 ): Promise<EmailResult> {
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
-  }
-
-  const resend = new Resend(apiKey);
-
-  try {
-    const { data, error } = await resend.emails.send({
-      from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
-      to: toEmail,
-      subject,
-      text: body,
-    });
-
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err) {
-    console.error('Email send exception:', err);
-    return { success: false, error: 'Failed to send email' };
-  }
+  return deliver(apiKey, {
+    from: 'RateMyPlace Boston <noreply@ratemyplace.org>',
+    to: toEmail,
+    subject,
+    text: body,
+  });
 }
