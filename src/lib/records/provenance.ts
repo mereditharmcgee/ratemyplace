@@ -10,6 +10,14 @@
 // `license_id` odc-pddl, `license_title` "Open Data Commons Public Domain Dedication and License
 // (PDDL)". If a package ever reports a different license, the panel's one-line credit is no
 // longer true for every link under it, and this file is where that has to be said.
+//
+// SAM (Live Street Address Management, `SAM_RESOURCE_ID` in `seed/sam.ts`) is not cited yet.
+// The pull never queries it, but the city-wide seed takes a new building's ZIP, neighborhood
+// and map point from it, and that ZIP narrows the 311 and permit queries. A building row says
+// whether the seed created it (`source`), but not whether its ZIP came from SAM or the
+// assessor fallback, or was filled into a building a person added; and `sam_id` can also be
+// filled in from a violations feed. So no stored field says which buildings SAM shaped, and
+// citing it on every building would be wrong for buildings people added.
 import { ASSESSOR_PAGE_URL, ASSESSOR_YEARS } from './sources/boston/assessor';
 import { ENFORCEMENT_PAGE_URL, ENFORCEMENT_RESOURCE_ID } from './sources/boston/enforcement';
 import { PERMITS_PAGE_URL, PERMITS_RESOURCE_ID } from './sources/boston/permits';
