@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { unitItems, buildingItems, landlordItems } from '../../lib/surveyItems';
+import { browserNav, existingBuildingReviewPath } from '../../lib/reviewPaths';
 import type { PlaceDetails } from '../AddressAutocomplete';
 import {
   StepIndicator,
@@ -26,8 +27,9 @@ interface Props {
   initialPlace?: PlaceData | null;
 }
 
-// Islands import only leaf modules from src/lib (surveyItems, formOptions, reviewPaths,
-// reviewSubmitOutcome), never a server module such as reviewHandoff or records/*.
+// This island and its steps import only client-safe modules from src/lib (surveyItems,
+// formOptions, locality, reviewPaths, reviewSubmitOutcome), never a server module such as
+// reviewHandoff, buildingResolve, places or records/*: their code would ship to every browser.
 export default function ReviewForm({ building, initialPlace }: Props) {
   const [step, setStep] = useState<Step>(building ? 'unit-details' : 'address');
   const [loading, setLoading] = useState(false);
@@ -125,6 +127,12 @@ export default function ReviewForm({ building, initialPlace }: Props) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // An "Existing properties" row: open that building's form at unit details through the
+  // proven ?building= server path. The writer is still on step 1, so nothing is lost.
+  const handleExistingBuildingSelect = (buildingId: string) => {
+    browserNav.go(existingBuildingReviewPath(buildingId));
   };
 
   const handleEnterManual = () => {
@@ -340,6 +348,7 @@ export default function ReviewForm({ building, initialPlace }: Props) {
           manualMode={manualMode}
           manualAddress={manualAddress}
           onPlaceSelect={handlePlaceSelect}
+          onExistingBuildingSelect={handleExistingBuildingSelect}
           onConfirm={handleAddressConfirm}
           onEnterManual={handleEnterManual}
           onManualAddressChange={setManualAddress}

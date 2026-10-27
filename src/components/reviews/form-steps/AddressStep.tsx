@@ -18,6 +18,8 @@ interface Props {
   manualMode: boolean;
   manualAddress: ManualAddress;
   onPlaceSelect: (place: PlaceDetails) => void;
+  /** An "Existing properties" row was picked: open that building's review form. */
+  onExistingBuildingSelect: (buildingId: string) => void;
   onConfirm: () => void;
   onEnterManual: () => void;
   onManualAddressChange: (addr: ManualAddress) => void;
@@ -33,6 +35,7 @@ export default function AddressStep({
   manualMode,
   manualAddress,
   onPlaceSelect,
+  onExistingBuildingSelect,
   onConfirm,
   onEnterManual,
   onManualAddressChange,
@@ -139,6 +142,7 @@ export default function AddressStep({
         </label>
         <AddressAutocomplete
           onPlaceSelect={onPlaceSelect}
+          onExistingBuildingSelect={(id) => onExistingBuildingSelect(id)}
           onManualEntry={onEnterManual}
           placeholder="Start typing your address..."
           initialValue={searchInitialValue}
