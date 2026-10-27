@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { addressKey } from '../records/identity';
 import { buildingTypeFor, formatSeedAddress, seedSlug, titleCaseNeighborhood } from '../records/seed/format';
 
 describe('formatSeedAddress', () => {
@@ -53,6 +54,30 @@ describe('formatSeedAddress', () => {
   it('renders a comma tail as a parenthesized suffix so a rear lot is not a visible twin', () => {
     expect(formatSeedAddress('23', null, 'LANARK RD, REAR')).toBe('23 Lanark Road (Rear)');
     expect(formatSeedAddress('23', '27', 'Lanark RD, rear')).toBe('23-27 Lanark Road (Rear)');
+  });
+});
+
+describe('formatSeedAddress on the assessor suffixes added in October 2026', () => {
+  it.each([
+    ['120', null, 'GRAMPIAN WY', '120 Grampian Way'],
+    ['9', null, 'CUMMINS HW', '9 Cummins Highway'],
+    ['3', null, 'MAMELON CI', '3 Mamelon Circle'],
+    ['50', null, 'NEPONSET VALLEY PW', '50 Neponset Valley Parkway'],
+    ['11', null, 'RADFORD LA', '11 Radford Lane'],
+    ['2', null, 'HOLDEN RO', '2 Holden Row'],
+    ['11', null, 'BOARD AL', '11 Board Alley'],
+    ['10', '12', 'CONRY CR', '10-12 Conry Crescent'],
+    ['16', null, 'CEDAR LANE WY', '16 Cedar Lane Way'],
+  ])('(%s, %s, %s) spells the suffix out as %s', (stNum, stNum2, stName, expected) => {
+    expect(formatSeedAddress(stNum, stNum2, stName)).toBe(expected);
+  });
+
+  it('still spells out the one assessor LN as Lane', () => {
+    expect(formatSeedAddress('29', null, 'NEPONSET FIELD LN')).toBe('29 Neponset Field Lane');
+  });
+
+  it('formats an address that keys back to the assessor key and range', () => {
+    expect(addressKey(formatSeedAddress('9', '11', 'APPIAN WY')!)).toEqual({ streetKey: 'APPIAN WY', numLo: 9, numHi: 11 });
   });
 });
 

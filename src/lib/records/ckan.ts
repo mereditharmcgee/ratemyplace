@@ -27,8 +27,9 @@ function escapeLikeForCkan(value: string): string {
 
 /**
  * `upper("<column>") LIKE '<form>%' ESCAPE '!'` for every unique short and long address
- * form on `identity`. `column` must be a code constant, never user input — it is
- * interpolated as an identifier and only checked against a conservative shape.
+ * form on `identity`, then every other street spelling not already prefix-covered. `column`
+ * must be a code constant, never user input — it is interpolated as an identifier and only
+ * checked against a conservative shape.
  *
  * The trailing `%` is intentionally loose: `'55 LANARK RD%'` also matches
  * `55 LANARK RD REAR`, which is desired, but it cannot exclude an unrelated address that
@@ -39,6 +40,17 @@ function escapeLikeForCkan(value: string): string {
 export function addressLikeClauses(column: string, identity: BuildingIdentity): string[] {
   if (!/^[a-z_]+$/.test(column)) throw new Error(`Unsafe column name for LIKE clause: ${column}`);
   const forms = Array.from(new Set([...identity.addressFormsShort, ...identity.addressFormsLong]));
+  // Every other spelling the street goes by: the feeds disagree (permits write RADFORD LN where the
+  // assessor writes RADFORD LA; legacy 311 writes VFW PKWY). A form an earlier pattern already
+  // prefixes (AVE behind AV, TER behind TE) adds nothing to LIKE 'x%' and is skipped, so a street
+  // whose short form prefixes its other spellings queries exactly as before.
+  const numberForms = identity.rangeForm ? [...identity.numbers, identity.rangeForm] : identity.numbers;
+  for (const number of numberForms) {
+    for (const street of identity.streetForms) {
+      const form = `${number} ${street}`;
+      if (!forms.some((covered) => form.startsWith(covered))) forms.push(form);
+    }
+  }
   return forms.map((f) => `upper("${column}") LIKE ${sqlLiteral(`${escapeLikeForCkan(f)}%`)} ESCAPE '!'`);
 }
 

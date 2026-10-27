@@ -140,6 +140,15 @@ suite('POST /api/buildings with seeded dedupe', () => {
     expect(res.status).toBe(201);
     expect((await res.json()).building.slug).toBe('9-pine-st-cambridge-2');
   });
+
+  it('a manual "Way" entry lands on the seeded assessor "Wy" parcel instead of creating a twin', async () => {
+    await insertBuilding(db, { id: 'seed-appian', address: '9-11 Appian Wy', slug: '9-11-appian-wy-boston', zip_code: '02134', source: 'seed', street_key: 'APPIAN WY', st_num_lo: 9, st_num_hi: 11, parcel_id: '2201144001' });
+    const before = (await rows(db)).length;
+    const res = await POST(createContext(db, { streetAddress: '9 Appian Way', city: 'Allston', state: 'MA', zipCode: '02134' }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ building: { id: 'seed-appian', slug: '9-11-appian-wy-boston' }, created: false });
+    expect((await rows(db)).length).toBe(before);
+  });
 });
 
 /**

@@ -22,6 +22,7 @@
     "ops:metrics": "tsx scripts/ops-metrics.ts",
     "records:check": "npx tsx scripts/records-fixture-check.ts",
     "records:seed": "npx tsx scripts/records-seed-boston.ts",
+    "records:suffix-backfill": "npx tsx scripts/records-suffix-backfill.ts",
     "records:worker": "npx wrangler dev --config workers/records-scheduler/wrangler.jsonc --test-scheduled --persist-to .wrangler/state",
     "records:worker:deploy": "npx wrangler deploy --config workers/records-scheduler/wrangler.jsonc"
   },
