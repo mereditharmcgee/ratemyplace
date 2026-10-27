@@ -20,7 +20,7 @@ const db = Astro.locals.runtime.env.DB;
 
 if (buildingIdParam) {
   try {
-    building = await db.prepare('SELECT * FROM buildings WHERE id = ?').bind(buildingIdParam).first();
+    building = await db.prepare('SELECT id, address, neighborhood, city FROM buildings WHERE id = ?').bind(buildingIdParam).first();
   } catch (error) {
     console.error('Error loading building:', error);
   }
@@ -30,7 +30,7 @@ if (buildingIdParam) {
   // so the form opens directly at the unit-details step. No retyping.
   try {
     const existing = await db
-      .prepare('SELECT * FROM buildings WHERE google_place_id = ?')
+      .prepare('SELECT id, address, neighborhood, city FROM buildings WHERE google_place_id = ?')
       .bind(placeIdParam)
       .first();
 
