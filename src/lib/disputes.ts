@@ -19,6 +19,10 @@ export interface DisputeFormData {
   disputeReasons: string[];
   disputeExplanation?: string;
   reviewUrl: string;
+  /** The dates shown on the review card; needed with a building page link when the page has several reviews. */
+  reviewDates?: string;
+  /** The review's title or first words; tells apart two reviews on one page that show the same dates. */
+  reviewWords?: string;
 }
 
 export interface ValidationError {
@@ -67,6 +71,55 @@ export function extractReviewIdFromUrl(
     // Malformed URL
     return null;
   }
+}
+
+/**
+ * The slug from a building page link (`https://site.com/building/{slug}`), ignoring any
+ * query or fragment, or null for anything else.
+ *
+ * Public pages never print a review's id, so a landlord cannot copy a review link. The
+ * dispute form takes the building page link instead and names the review by the dates on
+ * its card (see `resolveDisputedReview` in disputeTarget.ts).
+ */
+export function extractBuildingSlugFromUrl(urlString: string, siteUrl: string): string | null {
+  try {
+    const url = new URL(urlString.trim());
+    if (url.origin !== new URL(siteUrl).origin) {
+      return null;
+    }
+    // Slugs are built from `[a-z0-9-]` only (POST /api/buildings), so anything else is not one.
+    const match = url.pathname.match(/^\/building\/([a-z0-9-]+)\/?$/);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The dates on a review card ("Fall 2023 · Current") reduced to lowercase words, so a typed
+ * or pasted copy matches however it is punctuated or capitalised: "FALL 2023 - current" and
+ * "Fall 2023 to Current" both become "fall 2023 current".
+ */
+export function normalizeReviewDates(text: string): string {
+  return text
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word !== '' && word !== 'to')
+    .join(' ');
+}
+
+/**
+ * A review's title or opening words reduced to lowercase words, so a typed or pasted copy
+ * matches however its quotes, dashes or line breaks come out: "Heat's fine." (with a curly or
+ * a straight apostrophe) and "heat s fine" both become "heat s fine". Accented letters stay.
+ * Unlike the dates, every word is kept, "to" included.
+ */
+export function normalizeReviewWords(text: string): string {
+  return text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word !== '')
+    .join(' ');
 }
 
 /**

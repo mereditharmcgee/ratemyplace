@@ -59,4 +59,15 @@ describe('search page and results endpoint stay aligned', () => {
   it('the endpoint keeps browse mode and landlords reviewed-only', () => {
     expect((endpoint.match(HAVING_REVIEWED_ONLY) ?? []).length, REVIEWED_ONLY_HINT).toBe(3);
   });
+
+  // Browse mode is Boston first, most recently reviewed (`BROWSE_BUILDINGS_ORDER`), not
+  // most reviewed. The first page and Load more must read the same ORDER BY, or a row can
+  // appear twice or never as the list pages. `searchBrowseOrder.test.ts` pins the order
+  // itself against SQLite.
+  it('browse mode on both surfaces takes its order from searchSql', () => {
+    for (const [name, source] of [['search.astro', page], ['results.ts', endpoint]] as const) {
+      expect(source, `${name} must interpolate the shared browse order`).toMatch(/\$\{BROWSE_BUILDINGS_ORDER\}/);
+      expect(source, `${name} must not order browse by review count`).not.toMatch(/ORDER\s+BY\s+COUNT\(\s*r\.id\s*\)\s+DESC\s*,\s*avg_overall/);
+    }
+  });
 });
