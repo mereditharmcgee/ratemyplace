@@ -28,9 +28,13 @@ describe('search page and results endpoint stay aligned', () => {
     it(`${name} builds the query-mode buildings query from searchSql`, () => {
       expect(source).toMatch(/buildingSearchWhere\(/);
       expect(source).toMatch(/buildingSearchSelect\(/);
-      // Interpolated into the SQL, not merely imported — a bare-name match would be
-      // satisfied by an unused import left behind after someone inlined the ORDER BY.
-      expect(source).toMatch(/\$\{BUILDING_SEARCH_ORDER\}/);
+      // The ORDER BY is built from the query (an exact address ranks first), so it carries
+      // binds. Interpolated into the SQL and its binds passed after the WHERE's, not merely
+      // imported — a bare-name match would be satisfied by an unused import left behind
+      // after someone inlined the ORDER BY.
+      expect(source).toMatch(/buildingSearchOrder\(\s*query\s*\)/);
+      expect(source).toMatch(/\$\{order\.sql\}/);
+      expect(source).toMatch(/\.\.\.where\.binds,\s*\.\.\.order\.binds/);
     });
   }
 

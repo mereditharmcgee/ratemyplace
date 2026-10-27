@@ -2,7 +2,7 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { validateSearch, escapeLikePattern } from '../../../lib/validation';
-import { BUILDING_SEARCH_ORDER, buildingSearchSelect, buildingSearchWhere } from '../../../lib/searchSql';
+import { buildingSearchOrder, buildingSearchSelect, buildingSearchWhere } from '../../../lib/searchSql';
 import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../../../lib/scoring-sql';
 import type { SearchResultsResponse } from '../../../lib/api-types';
 import { BROWSE_BUILDINGS_ORDER } from '../../../lib/searchSql';
@@ -55,10 +55,12 @@ export async function GET(context: APIContext): Promise<Response> {
       // island's serialized props (visible in view-source).
       let countSql: string;
       let rowsSql: string;
-      let binds: Array<string | number>;
+      let countBinds: Array<string | number>;
+      let rowBinds: Array<string | number>;
 
       if (query) {
         const where = buildingSearchWhere(query);
+        const order = buildingSearchOrder(query);
         const from = `FROM buildings b
            LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
            LEFT JOIN landlords l ON b.landlord_id = l.id
@@ -71,9 +73,10 @@ export async function GET(context: APIContext): Promise<Response> {
         countSql = `SELECT COUNT(*) AS total FROM buildings b LEFT JOIN landlords l ON b.landlord_id = l.id WHERE ${where.sql}`;
         rowsSql = `SELECT ${buildingSearchSelect(currentYear)}
          ${from}
-         ${BUILDING_SEARCH_ORDER}
+         ${order.sql}
          LIMIT ? OFFSET ?`;
-        binds = where.binds;
+        countBinds = where.binds;
+        rowBinds = [...where.binds, ...order.binds];
       } else {
         const from = `FROM buildings b
            LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
@@ -88,7 +91,8 @@ export async function GET(context: APIContext): Promise<Response> {
          ${from}
          ${BROWSE_BUILDINGS_ORDER}
          LIMIT ? OFFSET ?`;
-        binds = [];
+        countBinds = [];
+        rowBinds = [];
       }
 
       // `total` is only consumed for the first page: the search island takes its totals
@@ -96,9 +100,9 @@ export async function GET(context: APIContext): Promise<Response> {
       // append, whose `total` it discards. On a 38,000-row seeded table that count is the
       // expensive half of the request, so skip it whenever the caller is paging.
       const total = offset === 0
-        ? (await db.prepare(countSql).bind(...binds).first<{ total: number }>())?.total || 0
+        ? (await db.prepare(countSql).bind(...countBinds).first<{ total: number }>())?.total || 0
         : 0;
-      const rows = await db.prepare(rowsSql).bind(...binds, limit, offset).all();
+      const rows = await db.prepare(rowsSql).bind(...rowBinds, limit, offset).all();
 
       return new Response(JSON.stringify({
         results: rows.results || [],
