@@ -5,6 +5,7 @@ import EmptyState from '../components/ui/EmptyState.astro';
 import { escapeLikePattern, validateSearch } from '../lib/validation';
 import { BUILDING_SEARCH_ORDER, buildingSearchSelect, buildingSearchWhere } from '../lib/searchSql';
 import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../lib/scoring-sql';
+import { isSearchVariant } from '../lib/seo';
 
 const query = (Astro.url.searchParams.get('q') || '').trim();
 const type = Astro.url.searchParams.get('type') || 'all';
@@ -175,7 +176,7 @@ if (query && !searchRejected) {
 const hasResults = buildings.length > 0 || landlords.length > 0;
 ---
 
-<BaseLayout title={query ? `Search: ${query}` : 'Search'}>
+<BaseLayout title={query ? `Search: ${query}` : 'Search'} noindex={isSearchVariant(Astro.url)}>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <h1 class="text-3xl font-bold text-gray-900 mb-8">Search</h1>
 

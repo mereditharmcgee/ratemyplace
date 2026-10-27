@@ -1,6 +1,8 @@
 import { experimental_AstroContainer as AstroContainer } from 'astro/container';
 import { describe, expect, it } from 'vitest';
 import BaseLayout from '../../components/layout/BaseLayout.astro';
+import ResetPasswordPage from '../../pages/auth/reset-password.astro';
+import SigninPage from '../../pages/auth/signin.astro';
 
 /**
  * The head every page gets from BaseLayout: canonical, Open Graph and Twitter tags. Until
@@ -24,6 +26,16 @@ async function render(
     locals: { user: null, session: null, ...extra } as unknown as App.Locals,
   });
   return new DOMParser().parseFromString(html, 'text/html').head; // happy-dom
+}
+
+async function renderPage(Page: Parameters<AstroContainer['renderToString']>[0], url: string): Promise<HTMLHeadElement> {
+  const container = await AstroContainer.create();
+  const html = await container.renderToString(Page, {
+    request: new Request(url),
+    partial: false,
+    locals: { user: null, session: null } as unknown as App.Locals,
+  });
+  return new DOMParser().parseFromString(html, 'text/html').head;
 }
 
 const content = (head: HTMLHeadElement, key: string): string | null =>
@@ -103,5 +115,18 @@ describe('BaseLayout head', () => {
     expect(head.innerHTML).not.toContain('rev-SECRET-42');
     expect(head.innerHTML).not.toContain('submitted');
     expect(canonical(head)).toBe('https://ratemyplace.org/building/x');
+  });
+
+  it('keeps a password-reset token out of the head', async () => {
+    const head = await renderPage(ResetPasswordPage, 'https://ratemyplace.org/auth/reset-password?token=SECRET123');
+    expect(head.innerHTML).not.toContain('SECRET123');
+    expect(content(head, 'robots')).toBe('noindex, follow');
+    expect(canonical(head)).toBeNull();
+    expect(content(head, 'og:url')).toBeNull();
+  });
+
+  it('noindexes the sign-in page', async () => {
+    const head = await renderPage(SigninPage, 'https://ratemyplace.org/auth/signin');
+    expect(content(head, 'robots')).toBe('noindex, follow');
   });
 });
