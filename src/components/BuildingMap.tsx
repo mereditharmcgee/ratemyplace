@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { MarkerClusterer, SuperClusterAlgorithm, type Marker, type Renderer } from '@googlemaps/markerclusterer';
+import { MarkerClusterer, SuperClusterAlgorithm, type Renderer } from '@googlemaps/markerclusterer';
 import { getEarlyScoreStyle, getScoreColor, getScoreHex } from '../lib/scoring-colors';
 import { displayLocality } from '../lib/locality';
 import { isEarlyRating, mapReviewLine } from '../lib/earlyRating';
 import { initialMapView, shouldPanToUser, type InitialMapView, type LatLngBox, type LatLngPoint } from '../lib/mapView';
-import { clusterAppearance, clusterBadgeSize, clusterTitle } from '../lib/mapCluster';
+import {
+  CLUSTER_LEGEND_LABEL,
+  CLUSTER_LEGEND_SWATCH_STYLE,
+  clusterBadgeSize,
+  clusterBadgeStyle,
+  clusterTitle,
+} from '../lib/mapCluster';
 
 interface Building {
   id: string;
@@ -96,48 +102,25 @@ function getMarkerLabel(score: number | null): string {
 const CLUSTER_RADIUS_PX = 60;
 const CLUSTER_MAX_ZOOM = 16;
 
-// Draws a cluster as a round badge with its count, filled with the band colour of the
-// average score of the buildings inside (see src/lib/mapCluster.ts). DOM nodes and
-// textContent only, no HTML strings: the hex is a SCORE_HEX constant and the count a number.
-// Clicking it zooms in on the cluster (MarkerClusterer's default onClusterClick).
-function clusterRenderer(scoreOf: WeakMap<Marker, number | null>): Renderer {
-  return {
-    render({ count, position, markers }) {
-      const look = clusterAppearance(markers.map((m) => scoreOf.get(m) ?? null));
-      const size = clusterBadgeSize(count);
+// Draws a cluster as a dark neutral round badge with a ring and its count, never in a score
+// band colour, so a count cannot be read as a score (see src/lib/mapCluster.ts). DOM nodes
+// and textContent only, no HTML strings: the style is built from constants and the count is
+// a number. Clicking it zooms in on the cluster (MarkerClusterer's default onClusterClick).
+const clusterRenderer: Renderer = {
+  render({ count, position }) {
+    const badge = document.createElement('div');
+    badge.style.cssText = clusterBadgeStyle(clusterBadgeSize(count));
+    badge.textContent = String(count);
 
-      const badge = document.createElement('div');
-      badge.style.cssText = [
-        `width: ${size}px`,
-        `height: ${size}px`,
-        'border-radius: 9999px',
-        `background: ${look.hex}`,
-        'color: #fff',
-        'border: 2px solid #fff',
-        'box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35)',
-        'display: flex',
-        'align-items: center',
-        'justify-content: center',
-        `font-size: ${size >= 48 ? 14 : 13}px`,
-        'font-weight: 600',
-        'font-variant-numeric: tabular-nums',
-        'cursor: pointer',
-        // AdvancedMarkerElement anchors content at its bottom centre, which suits a pin but
-        // would float a round badge half its height above the cluster. Centre it instead.
-        'transform: translateY(50%)',
-      ].join('; ');
-      badge.textContent = String(count);
-
-      return new google.maps.marker.AdvancedMarkerElement({
-        position,
-        content: badge,
-        title: clusterTitle(count, look.label),
-        // Above the individual pins, larger clusters on top.
-        zIndex: 1000 + count,
-      });
-    },
-  };
-}
+    return new google.maps.marker.AdvancedMarkerElement({
+      position,
+      content: badge,
+      title: clusterTitle(count),
+      // Above the individual pins, larger clusters on top.
+      zIndex: 1000 + count,
+    });
+  },
+};
 
 export default function BuildingMap({
   apiKey,
@@ -147,9 +130,8 @@ export default function BuildingMap({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   // One clusterer per map. It owns which markers are on the map: a marker is added to it,
-  // never given `map` directly. The WeakMap lets its renderer colour a cluster by score.
+  // never given `map` directly.
   const clustererRef = useRef<MarkerClusterer | null>(null);
-  const markerScoresRef = useRef(new WeakMap<Marker, number | null>());
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   // The first view is fitted once, on the first load with markers; the viewport refetches
   // that follow must never re-fit, or every pan would snap back.
@@ -331,7 +313,7 @@ export default function BuildingMap({
     clustererRef.current = new MarkerClusterer({
       map,
       algorithm: new SuperClusterAlgorithm({ radius: CLUSTER_RADIUS_PX, maxZoom: CLUSTER_MAX_ZOOM }),
-      renderer: clusterRenderer(markerScoresRef.current),
+      renderer: clusterRenderer,
     });
 
     // The overlay comes down once the map is interactive: the first idle after construction,
@@ -491,7 +473,6 @@ export default function BuildingMap({
         infoWindowRef.current?.open(mapInstanceRef.current, marker);
       });
 
-      markerScoresRef.current.set(marker, building.avgScore);
       markers.push(marker);
     });
     clusterer.addMarkers(markers);
@@ -574,6 +555,11 @@ export default function BuildingMap({
               <span>{getScoreColor(score).label} ({range})</span>
             </div>
           ))}
+        </div>
+        {/* The cluster badge, below a rule so it does not read as a fifth score band. */}
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200">
+          <span aria-hidden="true" className="w-3 h-3 rounded-full" style={CLUSTER_LEGEND_SWATCH_STYLE}></span>
+          <span>{CLUSTER_LEGEND_LABEL}</span>
         </div>
       </div>
 

@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 const LEAF_MODULES = [
   'src/lib/authRedirect.ts',
   'src/lib/homeSearchItems.ts',
+  'src/lib/mapCluster.ts',
   'src/lib/reviewPaths.ts',
   'src/lib/reviewSubmitOutcome.ts',
 ];
