@@ -31,6 +31,26 @@ export function formatFuzzyDate(year: number, season: string): string {
 const MOVE_OUT_2020_OR_EARLIER = '2020_or_earlier';
 
 /**
+ * A move-out in words: "Current", "2020 or earlier", a year such as "2025", or "Fall 2024"
+ * when a season was stored with the year. Null when no move-out was given. Reviews written
+ * since January 2026 store no move-out season, so most past tenants show the year alone.
+ */
+export function formatMoveOut(input: {
+  moveOutSeason?: string | null;
+  moveOutYear?: number | string | null;
+  isCurrentTenant?: boolean;
+}): string | null {
+  const { moveOutSeason, moveOutYear } = input;
+  if (input.isCurrentTenant === true || moveOutYear === 'current') return 'Current';
+  if (moveOutYear === MOVE_OUT_2020_OR_EARLIER) return '2020 or earlier';
+  if (moveOutYear === null || moveOutYear === undefined || moveOutYear === '') return null;
+  const year = Number(moveOutYear);
+  return moveOutSeason && Number.isFinite(year)
+    ? formatFuzzyDate(year, moveOutSeason.toLowerCase())
+    : String(moveOutYear);
+}
+
+/**
  * The fuzzy tenancy range on a review card's season chip: "Summer 2024 · 2025",
  * "Fall 2025 · Current", "2024 · Current" when the reviewer gave a move-in year but no month,
  * or one end alone. Only seasons and years, never a month or day. A move-in season without
@@ -59,19 +79,11 @@ export function formatTenancyRange(input: {
     ? (moveInSeason ? formatFuzzyDate(inYear, moveInSeason.toLowerCase()) : String(inYear))
     : null;
 
-  let moveOut: string | null = null;
+  const moveOut = formatMoveOut({ moveOutSeason, moveOutYear, isCurrentTenant: isCurrent });
   // The latest year the move-out could be, to check that the range runs forward.
   let latestMoveOutYear: number | null = null;
-  if (isCurrent) {
-    moveOut = 'Current';
-  } else if (moveOutYear === MOVE_OUT_2020_OR_EARLIER) {
-    moveOut = '2020 or earlier';
-    latestMoveOutYear = 2020;
-  } else if (moveOutYear !== null && moveOutYear !== undefined && moveOutYear !== '') {
-    const year = Number(moveOutYear);
-    moveOut = moveOutSeason && Number.isFinite(year)
-      ? formatFuzzyDate(year, moveOutSeason.toLowerCase())
-      : String(moveOutYear);
+  if (moveOut !== null && !isCurrent) {
+    const year = moveOutYear === MOVE_OUT_2020_OR_EARLIER ? 2020 : Number(moveOutYear);
     if (Number.isFinite(year)) latestMoveOutYear = year;
   }
 
@@ -124,6 +136,36 @@ export function formatMoveIn(review: StoredMoveInFields): string | null {
   const inYear = year ? Number(year) : NaN;
   if (!Number.isFinite(inYear)) return null;
   return season ? formatFuzzyDate(inYear, season.toLowerCase()) : String(inYear);
+}
+
+/**
+ * Where the move-out select on the reviewer's edit page starts: the stored answer, so saving
+ * without touching it writes back what was there. A past tenant with no stored move-out
+ * starts blank; starting at "I still live here" would save them as a current tenant.
+ */
+export function moveOutEditValue(review: {
+  move_out_year_new?: string | null;
+  is_current_tenant?: boolean | number | null;
+}): string {
+  if (review.is_current_tenant === true || review.is_current_tenant === 1) return 'current';
+  return review.move_out_year_new || '';
+}
+
+/** The edit page's blank move-out choice, for a past tenant with no stored move-out. */
+const MOVE_OUT_NOT_GIVEN_CHOICE = 'Select...';
+
+/**
+ * The move-out choices on the reviewer's edit page: the form's list, plus the stored answer
+ * when the list does not hold it (a blank move-out, or a year the list no longer offers), so
+ * the select shows what is stored instead of falling back to its first choice.
+ */
+export function moveOutEditChoices(
+  options: ReadonlyArray<{ value: string; label: string }>,
+  stored: string,
+): Array<{ value: string; label: string }> {
+  if (options.some((opt) => opt.value === stored)) return [...options];
+  const label = formatMoveOut({ moveOutYear: stored }) ?? MOVE_OUT_NOT_GIVEN_CHOICE;
+  return [{ value: stored, label }, ...options];
 }
 
 /**
