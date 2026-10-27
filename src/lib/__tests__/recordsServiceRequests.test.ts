@@ -84,6 +84,14 @@ describe('serviceRequestsSource', () => {
     expect(legacy).toContain(`upper("location") LIKE '9 GRAMPIAN WAY%' ESCAPE '!'`);
   });
 
+  it('tries PKWY in legacy 311 for an assessor Pw street', async () => {
+    const vfw = buildIdentity({ id: 'v', address: '530 VFW Pw', city: 'Boston', state: 'MA', zip_code: '02132', parcel_id: null, sam_id: null });
+    const result = await serviceRequestsSource.run(vfw, fixtureFetch([]));
+    const queries: string[] = JSON.parse(result.query);
+    const legacy = queries.find((sql) => sql.includes(year2024.resourceId));
+    expect(legacy).toContain(`upper("location") LIKE '530 VFW PKWY%' ESCAPE '!'`);
+  });
+
   it('maps, classifies, and dedupes rows across legacy years and the new system', async () => {
     const fetchImpl = fixtureFetch([
       { resourceId: year2024.resourceId, records: lanark2024 },

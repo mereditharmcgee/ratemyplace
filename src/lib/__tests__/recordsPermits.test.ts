@@ -66,4 +66,10 @@ describe('permitsSource', () => {
     expect(result.query).toContain(`upper("address") LIKE '9 GRAMPIAN WY%' ESCAPE '!'`);
     expect(result.query).toContain(`upper("address") LIKE '9 GRAMPIAN WAY%' ESCAPE '!'`);
   });
+
+  it('tries LN for an assessor La street, since the permits feed writes RADFORD LN', async () => {
+    const radford = buildIdentity({ id: 'r', address: '11 Radford La', city: 'Boston', state: 'MA', zip_code: '02132', parcel_id: null, sam_id: null });
+    const result = await permitsSource.run(radford, fixtureFetch([]));
+    expect(result.query).toContain(`upper("address") LIKE '11 RADFORD LN%' ESCAPE '!'`);
+  });
 });
