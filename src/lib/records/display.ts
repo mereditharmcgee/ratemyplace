@@ -63,6 +63,14 @@ export const PERMIT_COVERAGE_YEAR_NUMBER: number | null = /^\d{4}$/.test(PERMIT_
 
 export const ZERO_PERMITS_COPY = `No permitted work on record since ${PERMIT_COVERAGE_YEAR}. This means no permits were filed, not that no maintenance was done.`;
 
+/**
+ * Where the city's permit feed starts, said as a fact about the feed. It read "On record from
+ * September 2006" under a row headed with this building's own span ("2010–2026"), and the two
+ * looked like two answers to one question. The row's span is this building's permits; this is
+ * the feed's, which is also why the bars start in 2006.
+ */
+export const PERMIT_COVERAGE_NOTE = `The city's permit records start in ${PERMIT_COVERAGE_START}.`;
+
 export const DECLARED_VALUATION_CAVEAT =
   "Declared valuation is the applicant's own estimate at filing and is a floor, not a cost.";
 
@@ -510,6 +518,7 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   NOT_RECORDED,
   PANEL_FRAMING_COPY,
   ZERO_PERMITS_COPY,
+  PERMIT_COVERAGE_NOTE,
   DECLARED_VALUATION_CAVEAT,
   GROUPING_NOTE,
   GROUPING_LINK_TEXT,

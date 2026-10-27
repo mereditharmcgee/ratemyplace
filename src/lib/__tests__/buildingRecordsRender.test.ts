@@ -14,6 +14,7 @@ import {
   DECLARED_VALUATION_CAVEAT,
   FILL_QUEUED_COPY,
   NO_VIOLATIONS_CAVEAT,
+  PERMIT_COVERAGE_NOTE,
   GROUPING_LINK_TEXT,
   GROUPING_NOTE,
   REQUESTED_COPY,
@@ -369,6 +370,11 @@ suite('BuildingRecords.astro ledger', () => {
     // The coverage label is the years the permits actually fall in (2019 and 2021) — not the
     // feed's documented coverage window the bars are drawn across, which runs 2006 to 2026.
     expect(permits).toContain('2019–2021');
+    // The body names the feed's start as the feed's, so it does not read as a second span for
+    // this building's permits.
+    const permitsBody = sectionText(html, 'Building permits');
+    expect(permitsBody).toContain(PERMIT_COVERAGE_NOTE);
+    expect(permitsBody).not.toContain('On record from');
   });
 
   it('says none on record rather than zero open for a source that came back empty', async () => {

@@ -19,6 +19,7 @@ import { logError } from '../lib/logger';
 import {
   PANEL_FRAMING_COPY,
   ZERO_PERMITS_COPY,
+  PERMIT_COVERAGE_NOTE,
   DECLARED_VALUATION_CAVEAT,
   GROUPING_NOTE,
   GROUPING_LINK_TEXT,
@@ -33,7 +34,6 @@ import {
 import { ledgerModel } from '../lib/records/ledger';
 import { recordsRequestState, type RecordsRequestState } from '../lib/records/coverage';
 import { FY2026_RESOURCE_ID } from '../lib/records/sources/boston/assessor';
-import { PERMIT_COVERAGE_START } from '../lib/records/sources/boston/permits';
 import { RECORD_GROUPS, type RecordGroup, type RecordGroupId } from '../lib/records/recordGroups';
 import RecordCorrectionForm from './records/RecordCorrectionForm';
 import RecordsRequestButton from './records/RecordsRequestButton';
@@ -239,7 +239,7 @@ const disclosureClass =
                   <CategoryBars title="Type of work" breakdown={ledger.permits.types} noun={{ one: 'permit', many: 'permits' }} />
                 </div>
                 <p class={noteClass}>
-                  On record from {PERMIT_COVERAGE_START}.{' '}
+                  {PERMIT_COVERAGE_NOTE}{' '}
                   {ledger.permits.summary.declaredTotal === null
                     ? 'No declared valuation recorded.'
                     : `Total declared valuation ${formatDollars(ledger.permits.summary.declaredTotal)}${
