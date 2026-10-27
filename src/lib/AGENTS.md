@@ -421,6 +421,16 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   and `shouldPanToUser` pans to the reader only when they are inside the fitted box.
   `BuildingMap.tsx` fits once (`didFitRef`) and never again on refetch, and skips viewport
   refetches until the first unbounded load lands so that one fit sees every building.
+- **The homepage dropdown has its own Places scope.** `GET /api/places/autocomplete` serves
+  two islands. The review form's `AddressAutocomplete` sends no scope and gets any US
+  address (people review buildings outside Boston). `HomeSearch` alone sends `scope=boston`:
+  `autocompleteRequestBody` (`places.ts`) adds a location bias to `BOSTON_BOX`,
+  `bostonScopePredictions` drops every suggestion not in Massachusetts and puts Boston
+  first, and `matchPredictionsToBuildings` (`homeSearchMatch.ts`) resolves each suggestion
+  read-only through `findExistingBuilding`, refusing an address-key match when Google and
+  the building name different neighborhoods. `homeSearchItems.ts` (a leaf) orders the rows:
+  buildings we have ("See this building", with "Write a review" beside it), landlords, then
+  "Other addresses". Never add the scope to the review form without the owner's say.
 - **`mapCluster.ts` decides how a marker cluster looks.** The badge is filled with
   `getScoreHex` of the plain mean of the clustered buildings' scores (unscored ones left
   out; none scored → the no-score grey). It is a map colour only — never shown as a number,
