@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BOSTON_SUB_AREAS } from '../bostonLocalities';
-import { displayLocality, localityLine, resolveBostonSubArea } from '../locality';
+import { BOSTON_LOCALITY_NAMES, BOSTON_SUB_AREAS } from '../bostonLocalities';
+import { bostonLocalityName, displayLocality, isBostonLocality, localityLine, resolveBostonSubArea } from '../locality';
 
 describe('resolveBostonSubArea', () => {
   it('maps a sub-area to its neighborhood, ignoring case and spacing', () => {
@@ -150,4 +150,41 @@ describe('localityLine', () => {
     expect(localityLine({ address: '1 Main St', neighborhood: null, city: null }, 'MA')).toBe('');
     expect(localityLine({ address: '1 Main St', neighborhood: undefined, city: undefined }, 'MA')).toBe('');
   });
+});
+
+describe('bostonLocalityName', () => {
+  it.each([
+    ['east boston', 'East Boston'],
+    ['EAST BOSTON', 'East Boston'],
+    [' Hyde Park ', 'Hyde Park'],
+    ['hyde-park', 'Hyde Park'],
+    ['Boston, MA', 'Boston'],
+  ])('gives %j the display spelling %j', (input, expected) => {
+    expect(bostonLocalityName(input)).toBe(expected);
+  });
+
+  it.each(['Brookline', 'Newton', 'Chestnut Hill', "St. Elizabeth's"])('gives null for the non-locality %j', (input) => {
+    expect(bostonLocalityName(input)).toBeNull();
+  });
+
+  it('gives null for a sub-area, which is not a locality name', () => {
+    expect(bostonLocalityName('Aberdeen')).toBeNull();
+  });
+
+  it('gives null for blank and missing values', () => {
+    expect(bostonLocalityName('')).toBeNull();
+    expect(bostonLocalityName(null)).toBeNull();
+    expect(bostonLocalityName(undefined)).toBeNull();
+  });
+
+  it('round-trips every name in the vocabulary', () => {
+    for (const name of BOSTON_LOCALITY_NAMES) expect(bostonLocalityName(name)).toBe(name);
+  });
+
+  it.each(['Boston', 'boston, ma', 'Roxbury', 'Readville', 'Brookline', 'Chestnut Hill', '', "St. Elizabeth's", 'South End'])(
+    'agrees with isBostonLocality on %j',
+    (value) => {
+      expect(bostonLocalityName(value) !== null).toBe(isBostonLocality(value));
+    },
+  );
 });

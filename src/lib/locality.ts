@@ -71,6 +71,21 @@ export function isBostonLocality(city: string | null | undefined): boolean {
   return key === 'boston' || BOSTON_NEIGHBORHOODS.has(key);
 }
 
+// `BOSTON_LOCALITY_NAMES` keyed by `normalize()`, so "east boston" and "EAST BOSTON" both find "East Boston".
+const BOSTON_LOCALITY_BY_KEY: ReadonlyMap<string, string> = new Map(
+  BOSTON_LOCALITY_NAMES.map((name) => [normalize(name), name])
+);
+
+/**
+ * The display spelling, from `BOSTON_LOCALITY_NAMES`, of a value `isBostonLocality` accepts
+ * ("east boston" -> "East Boston", "Boston, MA" -> "Boston"); null for anything else. Sub-areas
+ * ("Aberdeen") are not locality names: pass the value through `displayLocality` first.
+ */
+export function bostonLocalityName(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return BOSTON_LOCALITY_BY_KEY.get(normalize(value.replace(/,\s*[A-Za-z]{2}\s*$/, ''))) ?? null;
+}
+
 function addressWords(address?: string | null): Set<string> {
   if (!address) return new Set();
   return new Set(
