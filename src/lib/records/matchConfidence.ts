@@ -5,8 +5,9 @@
 // "none on record", and says why.
 //
 // A page ZIP that disagrees with the parcel's is not a reason: the pull searches those feeds
-// under both ZIPs (`recordZips` in identity.ts), and the parcel ZIP this module could compare is
-// only ever stored by a pull that did.
+// under both ZIPs (`recordZips` in identity.ts), taking the parcel's from the current-year row it
+// stores, or from the row already stored when this pull's assessor fails (`pull.ts`). So the
+// parcel ZIP this module could compare is always one the feeds were searched under.
 //
 // Read side only: derived from the stored address and the stored current-year assessment, so
 // it needs no column of its own and changes nothing that is written.

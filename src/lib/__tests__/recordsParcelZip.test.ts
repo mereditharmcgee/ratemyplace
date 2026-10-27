@@ -7,7 +7,7 @@ import { ENFORCEMENT_RESOURCE_ID, enforcementSource } from '../records/sources/b
 import { LEGACY_311_RESOURCES, NEW_311_RESOURCE_ID, serviceRequestsSource } from '../records/sources/boston/serviceRequests';
 import { VIOLATIONS_RESOURCE_ID, violationsSource } from '../records/sources/boston/violations';
 import type { BuildingRowForIdentity } from '../records/identity';
-import type { AssessmentPayload, BuildingIdentity } from '../records/types';
+import type { AssessmentPayload, BuildingIdentity, RecordsDb, RecordsPreparedStatement } from '../records/types';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
@@ -117,7 +117,7 @@ suite('pullBuildingRecords reads the parcel ZIP before the address-keyed feeds r
   const ADMIN_ID = 'admin-zip';
   const BUILDING_ID = 'bldg-zip';
 
-  function assessorRow(zip: string): Record<string, string | null> {
+  function assessorRow(zip: string | null): Record<string, string | null> {
     return {
       PID: '0100000012', OWNER: 'EXAMPLE HOLDINGS LLC', LU: 'A', LU_DESC: 'APARTMENT', YR_BUILT: '1910', YR_REMODEL: null,
       GROSS_AREA: '9000', LIVING_AREA: '8000', RES_UNITS: '6', COM_UNITS: null, TOTAL_VALUE: '2,000,000', LAND_VALUE: '500,000',
@@ -152,10 +152,10 @@ suite('pullBuildingRecords reads the parcel ZIP before the address-keyed feeds r
     return { db, building: building! };
   }
 
-  /** The SQL a source stored as provenance; 311 stores a JSON array of its queries, joined here. */
+  /** The SQL a source's latest pull stored as provenance; 311 stores a JSON array of its queries, joined here. */
   async function storedQuery(db: TestD1Database, sourceId: string): Promise<string> {
     const row = await db
-      .prepare('SELECT query FROM record_pulls WHERE building_id = ? AND source_id = ?')
+      .prepare('SELECT query FROM record_pulls WHERE building_id = ? AND source_id = ? ORDER BY rowid DESC LIMIT 1')
       .bind(BUILDING_ID, sourceId)
       .first<{ query: string }>();
     const query = row?.query ?? '';
@@ -203,7 +203,7 @@ suite('pullBuildingRecords reads the parcel ZIP before the address-keyed feeds r
     expect(await kinds(db)).not.toHaveProperty('service_request');
   });
 
-  it('falls back to the page ZIP alone when the current-year assessor fails', async () => {
+  it('falls back to the page ZIP alone when the current-year assessor fails and nothing is stored yet', async () => {
     const { db, building } = await setUp();
     const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, errorStatus: 503, errorMessage: 'upstream unavailable' }, ...parcelZipRoutes]);
 
@@ -212,5 +212,97 @@ suite('pullBuildingRecords reads the parcel ZIP before the address-keyed feeds r
     expect(summary.sources.find((s) => s.label === 'Property Assessment FY2026')?.status).toBe('error');
     expect(await storedQuery(db, VIOLATIONS_RESOURCE_ID)).toContain(`"violation_zip" = '02199'`);
     expect(await storedQuery(db, VIOLATIONS_RESOURCE_ID)).not.toContain(`'02101'`);
+  });
+
+  const ASSESSOR_UNAVAILABLE = { resourceId: FY2026_RESOURCE_ID, errorStatus: 503, errorMessage: 'upstream unavailable' };
+
+  function currentYear(zip: string | null) {
+    return { resourceId: FY2026_RESOURCE_ID, records: [assessorRow(zip)] };
+  }
+
+  async function storedParcelZip(db: TestD1Database): Promise<string | null | undefined> {
+    const row = await db
+      .prepare("SELECT payload FROM building_records WHERE building_id = ? AND kind = 'assessment' AND source_key = 'FY2026'")
+      .bind(BUILDING_ID)
+      .first<{ payload: string }>();
+    return row ? (JSON.parse(row.payload) as AssessmentPayload).parcelZip : undefined;
+  }
+
+  /** Wraps the test db so `batch` rejects, as a locked D1 would, for the current-year assessor's write only. */
+  function failCurrentYearWrites(db: TestD1Database): RecordsDb {
+    const bound = new WeakMap<RecordsPreparedStatement, unknown[]>();
+    return {
+      prepare(sql: string): RecordsPreparedStatement {
+        const inner = db.prepare(sql);
+        const statement: RecordsPreparedStatement = {
+          bind(...values: unknown[]) {
+            inner.bind(...(values as never[]));
+            bound.set(statement, values);
+            return statement;
+          },
+          first: <T,>() => inner.first<T>(),
+          all: <T,>() => inner.all<T>(),
+          run: () => inner.run(),
+        };
+        return statement;
+      },
+      async batch(statements: RecordsPreparedStatement[]): Promise<unknown> {
+        if (statements.some((s) => bound.get(s)?.includes(FY2026_RESOURCE_ID))) throw new Error('D1_ERROR: database is locked');
+        return db.batch(statements as never);
+      },
+    };
+  }
+
+  it('keeps searching the stored parcel ZIP when the current-year assessor fails on a later pull', async () => {
+    const { db, building } = await setUp();
+    await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl: fixtureFetch([currentYear('02101'), ...parcelZipRoutes]) });
+    expect(await kinds(db)).toMatchObject({ violation: 1, service_request: 1 });
+
+    const summary = await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl: fixtureFetch([ASSESSOR_UNAVAILABLE, ...parcelZipRoutes]) });
+
+    expect(summary.sources.find((s) => s.label === 'Property Assessment FY2026')?.status).toBe('error');
+    for (const sourceId of [NEW_311_RESOURCE_ID, VIOLATIONS_RESOURCE_ID, ENFORCEMENT_RESOURCE_ID]) {
+      expect(await storedQuery(db, sourceId)).toContain(BOTH_ZIPS);
+    }
+    // The records attached under the parcel ZIP on the first pull are still there.
+    expect(await kinds(db)).toMatchObject({ violation: 1, service_request: 1 });
+    expect(await storedParcelZip(db)).toBe('02101');
+  });
+
+  it('lets a freshly stored current-year row replace the stored parcel ZIP, or clear it', async () => {
+    const { db, building } = await setUp();
+    await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl: fixtureFetch([currentYear('02101'), ...parcelZipRoutes]) });
+
+    await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl: fixtureFetch([currentYear('02108'), ...parcelZipRoutes]) });
+    expect(await storedQuery(db, VIOLATIONS_RESOURCE_ID)).toContain(`"violation_zip" IN ('02199','02108')`);
+
+    await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl: fixtureFetch([currentYear(null), ...parcelZipRoutes]) });
+    expect(await storedQuery(db, VIOLATIONS_RESOURCE_ID)).toContain(`"violation_zip" = '02199')`);
+    expect(await storedParcelZip(db)).toBeNull();
+  });
+
+  it('uses the fresh parcel ZIP when the current-year write fails and nothing is stored yet', async () => {
+    const { db, building } = await setUp();
+    const fetchImpl = fixtureFetch([currentYear('02101'), ...parcelZipRoutes]);
+
+    const summary = await pullBuildingRecords(failCurrentYearWrites(db), building, { triggeredBy: ADMIN_ID, fetchImpl });
+
+    expect(summary.sources.find((s) => s.label === 'Property Assessment FY2026')?.status).toBe('error');
+    expect(await storedParcelZip(db)).toBeUndefined();
+    expect(await storedQuery(db, VIOLATIONS_RESOURCE_ID)).toContain(BOTH_ZIPS);
+    expect(await kinds(db)).toMatchObject({ violation: 1, service_request: 1 });
+  });
+
+  it('keeps the stored parcel ZIP when a later current-year write fails, so the stored row matches what was searched', async () => {
+    const { db, building } = await setUp();
+    await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl: fixtureFetch([currentYear('02101'), ...parcelZipRoutes]) });
+
+    const fetchImpl = fixtureFetch([currentYear('02108'), ...parcelZipRoutes]);
+    await pullBuildingRecords(failCurrentYearWrites(db), building, { triggeredBy: ADMIN_ID, fetchImpl });
+
+    expect(await storedParcelZip(db)).toBe('02101');
+    expect(await storedQuery(db, VIOLATIONS_RESOURCE_ID)).toContain(BOTH_ZIPS);
+    expect(await storedQuery(db, VIOLATIONS_RESOURCE_ID)).not.toContain(`'02108'`);
+    expect(await kinds(db)).toMatchObject({ violation: 1, service_request: 1 });
   });
 });

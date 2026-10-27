@@ -306,7 +306,11 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   backslash anywhere. Permits take the middle numbers only; their parcel arm covers the rest.
 - **The 311 and violation-feed ZIP filters also accept the parcel's ZIP.** The current-year
   assessor row carries the parcel's own `ZIP_CODE`, and `pullBuildingRecords` copies it onto
-  `identity.parcelZip` (through `zip5`) once that row is stored. The assessor years run first in
+  `identity.parcelZip` (through `zip5`) once that row is stored. It starts from the ZIP on the
+  row an earlier pull stored, so a current-year assessor that fails (or whose write fails) does
+  not drop the parcel ZIP and empty the records attached under it. A freshly stored row replaces
+  it; on a failed write the fresh ZIP fills in only when the stored row has none. Either way the
+  stored row's ZIP is one the feeds searched. The assessor years run first in
   `sourcesForCity`, so 311, ISD and Public Works see it; `recordZips` then lists the page ZIP
   plus the parcel's when they differ, and `zipEqualsClause` writes `=` for one and `IN` for two.
   It only widens: a page with no usable ZIP stays unnarrowed rather than narrowed to the

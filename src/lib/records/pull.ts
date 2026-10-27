@@ -17,6 +17,7 @@ import { ASSESSOR_YEARS, resolveParcel, type ParcelResolution } from './sources/
 import {
   NO_QUERY,
   SourceError,
+  type AssessmentPayload,
   type BuildingIdentity,
   type FetchLike,
   type PullSourceSummary,
@@ -124,6 +125,13 @@ function replaceStatements(
   return statements;
 }
 
+/** The only assessor year whose row carries the parcel's own ZIP (`parcelZip`). */
+const CURRENT_FISCAL_YEAR = ASSESSOR_YEARS[0].fiscalYear;
+
+function isCurrentAssessor(source: RecordSource): boolean {
+  return source.kinds.includes('assessment') && source.ownsSourceKey === CURRENT_FISCAL_YEAR;
+}
+
 /**
  * The current-year parcel's ZIP from an assessor source's rows, as five digits, or null. Only the
  * current fiscal year's row carries one (`parcelZip`). Normalized here, not when stored: the
@@ -136,6 +144,26 @@ function parcelZipFrom(rows: RecordRow[]): string | null {
     if (zip) return zip;
   }
   return null;
+}
+
+/**
+ * The parcel ZIP on the current-year assessment row an earlier pull stored, as five digits, or
+ * null: no row yet, a condominium row, a row stored before the ZIP was captured, or a read that
+ * failed. This pull starts from it, so a current-year assessor that fails this time leaves the
+ * feeds searching the ZIP that row still shows, and records attached under it on an earlier pull
+ * are not deleted by an empty result. A read failure only costs the widening, never the pull.
+ */
+async function storedParcelZip(db: RecordsDb, buildingId: string): Promise<string | null> {
+  try {
+    const row = await db
+      .prepare("SELECT payload FROM building_records WHERE building_id = ? AND kind = 'assessment' AND source_key = ?")
+      .bind(buildingId, CURRENT_FISCAL_YEAR)
+      .first<{ payload: string }>();
+    if (!row) return null;
+    return zip5((JSON.parse(row.payload) as Partial<AssessmentPayload>).parcelZip);
+  } catch {
+    return null;
+  }
 }
 
 /** The first non-empty SAM id in a source's rows. Only the violation feeds carry one. */
@@ -216,6 +244,10 @@ export async function pullBuildingRecords(
     const failure = await resolveIdentityParcel(db, identity, fetchImpl);
     if (failure) resolutionError = truncateError(failure);
   }
+  if (identity && !resolutionError && sources.some(isCurrentAssessor)) {
+    // Replaced below once this pull's current-year assessor row is stored.
+    identity.parcelZip = await storedParcelZip(db, building.id);
+  }
 
   const summaries: PullSourceSummary[] = [];
   let samIdKnown = Boolean(building.sam_id?.trim());
@@ -245,6 +277,12 @@ export async function pullBuildingRecords(
     }
 
     const status: PullSourceSummary['status'] = result.rows.length > 0 ? 'ok' : 'empty';
+    // The assessor years run first (`sourcesForCity`), so the current year's parcel ZIP is in
+    // hand before 311 and the violation feeds run. They accept it beside the page's ZIP, so a
+    // page whose ZIP disagrees with the assessor's still finds the records the city filed
+    // under the parcel's. Matching only: the building row is never changed. Read before the
+    // write so a failed write does not lose it; applied below according to what got stored.
+    const freshParcelZip = isCurrentAssessor(source) ? parcelZipFrom(result.rows) : null;
     // One batch: the provenance row and the rows it vouches for land together or not at all.
     try {
       await db.batch([
@@ -259,19 +297,17 @@ export async function pullBuildingRecords(
       const message = truncateError(`Write failed: ${errorMessage(err)}`);
       await pullRowStatement(db, { ...base, query: result.query, status: 'error', rowCount: 0, errorMessage: message }).run();
       summaries.push({ sourceId: source.id, label: source.label, status: 'error', rowCount: 0, error: message });
+      // The earlier current-year row survived, so its ZIP (already on the identity) still
+      // stands. The fresh one is used only when that row has none to keep: a stored parcel
+      // ZIP is always one the feeds were searched under.
+      if (isCurrentAssessor(source) && !identity.parcelZip) identity.parcelZip = freshParcelZip;
       continue;
     }
     summaries.push({ sourceId: source.id, label: source.label, status, rowCount: result.rows.length });
 
-    if (!identity.parcelZip) {
-      // The assessor years run first (`sourcesForCity`), so the current year's parcel ZIP is in
-      // hand before 311 and the violation feeds run. They accept it beside the page's ZIP, so a
-      // page whose ZIP disagrees with the assessor's still finds the records the city filed
-      // under the parcel's. Matching only: the building row is never changed. Set after the
-      // write, so the stored assessment shows the ZIP those queries used.
-      const parcelZip = parcelZipFrom(result.rows);
-      if (parcelZip) identity.parcelZip = parcelZip;
-    }
+    // The stored current-year row is now this one (or gone, when the year came back empty), so
+    // the feeds search the ZIP it shows, or the page's alone when it shows none.
+    if (isCurrentAssessor(source)) identity.parcelZip = freshParcelZip;
 
     if (!samIdKnown) {
       const samId = samIdFrom(result.rows);
