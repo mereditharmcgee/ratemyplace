@@ -9,6 +9,7 @@ import {
   bostonScopePredictions,
   parseAutocompleteSuggestions,
   PLACES_AUTOCOMPLETE_URL,
+  type AutocompleteRequestBody,
   type GoogleAutocompleteResponse,
 } from '../../../lib/places';
 import { matchPredictionsToBuildings, type MatchedPrediction } from '../../../lib/homeSearchMatch';
@@ -50,21 +51,33 @@ export async function GET(context: APIContext): Promise<Response> {
 
   try {
     // Use Places API (New) - Autocomplete
-    const body = autocompleteRequestBody(input, { sessionToken, scope });
+    const callGoogle = async (body: AutocompleteRequestBody): Promise<GoogleAutocompleteResponse> => {
+      const response = await fetch(
+        PLACES_AUTOCOMPLETE_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': apiKey,
+            'Referer': 'https://ratemyplace.org/',
+          },
+          body: JSON.stringify(body),
+        }
+      );
+      return (await response.json()) as GoogleAutocompleteResponse;
+    };
 
-    const response = await fetch(
-      PLACES_AUTOCOMPLETE_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
-          'Referer': 'https://ratemyplace.org/',
-        },
-        body: JSON.stringify(body),
-      }
-    );
+    let data = await callGoogle(autocompleteRequestBody(input, { sessionToken, scope }));
 
-    const data = (await response.json()) as GoogleAutocompleteResponse;
+    // The Boston bias cannot be exercised on preview (no key there). If Google ever refuses
+    // the request because of it, ask once more without it rather than leave the homepage with
+    // no suggestions; the Massachusetts filter below still applies.
+    if (data.error && scope === 'boston') {
+      logError('places_autocomplete_bias_refused', {
+        endpoint: '/api/places/autocomplete',
+        status: data.error.status,
+      });
+      data = await callGoogle(autocompleteRequestBody(input, { sessionToken }));
+    }
 
     if (data.error) {
       console.error('Places API error:', JSON.stringify(data.error));

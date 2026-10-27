@@ -257,13 +257,36 @@ routeSuite('GET /api/places/autocomplete', () => {
     expect((await res.json()).predictions).toEqual([{ ...ours, existing: null }]);
   });
 
-  it('keeps the error envelope on a Google error body', async () => {
+  it('keeps the error envelope on a Google error body, in both scopes', async () => {
     db = createRecordsTestDb();
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { status: 'PERMISSION_DENIED' } }), { status: 403 })));
-    const res = await autocompleteGET(ctx('input=12+Example&scope=boston'));
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: 'Places API error', predictions: [] });
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: { status: 'PERMISSION_DENIED' } }), { status: 403 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const boston = await autocompleteGET(ctx('input=12+Example&scope=boston'));
+    expect(boston.status).toBe(500);
+    expect(await boston.json()).toEqual({ error: 'Places API error', predictions: [] });
+    const plain = await autocompleteGET(ctx('input=12+Example'));
+    expect(plain.status).toBe(500);
+    expect(await plain.json()).toEqual({ error: 'Places API error', predictions: [] });
+    // Boston asked twice (with and without the bias); the review form's scope once.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('asks again without the bias if Google refuses the Boston request, and still filters', async () => {
+    await seedOurs();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = vi
+      .fn(async (_url: string, _init?: RequestInit) => new Response('{}'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { status: 'INVALID_ARGUMENT' } }), { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(googleBody([otherState, ours])), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await autocompleteGET(ctx('input=12+Example&sessionToken=tok&scope=boston'));
+    expect(res.status).toBe(200);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toHaveProperty('locationBias');
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).not.toHaveProperty('locationBias');
+    const { predictions } = await res.json();
+    expect(predictions.map((p: { placeId: string }) => p.placeId)).toEqual(['gp-ours']);
+    expect(predictions[0].existing?.slug).toBe('12-example-road-boston');
   });
 
   it('answers short input with nothing and calls no one', async () => {
