@@ -26,9 +26,13 @@ function walk(dir: string, accept: (path: string) => boolean): string[] {
 
 const EMAIL_MODULE = join(ROOT, 'src', 'lib', 'email.ts');
 
+/** The records Worker is a second deployable; its alerts must be tracked too. */
+const WORKER_ENTRY = join(ROOT, 'workers', 'records-scheduler', 'src', 'index.ts');
+
 const SCANNED: string[] = [
   ...walk(join(ROOT, 'src', 'pages'), (path) => path.endsWith('.ts') || path.endsWith('.astro')),
   ...walk(join(ROOT, 'src', 'lib'), (path) => path.endsWith('.ts') && path !== EMAIL_MODULE),
+  WORKER_ENTRY,
 ];
 
 const sources = new Map(SCANNED.map((path) => [relative(ROOT, path).split(sep).join('/'), readFileSync(path, 'utf8')]));
@@ -46,6 +50,11 @@ describe('every email send is tracked', () => {
     expect(sources.has('src/pages/api/contact.ts')).toBe(true);
     expect(sources.has('src/lib/ownerNotify.ts')).toBe(true);
     expect(sources.has('src/lib/email.ts')).toBe(false);
+    expect(sources.has('workers/records-scheduler/src/index.ts')).toBe(true);
+  });
+
+  it('leaves the Worker entry as wiring: its alerts go through records/schedulerAlert.ts', () => {
+    expect(readFileSync(WORKER_ENTRY, 'utf8')).not.toMatch(/send[A-Z]\w*Email/);
   });
 
   it('counts the sends a file makes, so the count check cannot pass vacuously', () => {
