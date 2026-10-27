@@ -502,10 +502,12 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   two islands. The review form's `AddressAutocomplete` sends no scope and gets any US
   address (people review buildings outside Boston). `HomeSearch` alone sends `scope=boston`:
   `autocompleteRequestBody` (`places.ts`) adds a location bias to `BOSTON_BOX`,
-  `bostonScopePredictions` drops every suggestion not in Massachusetts and puts Boston
-  first, and `matchPredictionsToBuildings` (`homeSearchMatch.ts`) resolves each suggestion
-  read-only through `findExistingBuilding`, refusing an address-key match when Google and
-  the building name different neighborhoods. `homeSearchItems.ts` (a leaf) orders the rows:
+  `matchPredictionsToBuildings` (`homeSearchMatch.ts`) resolves each suggestion read-only
+  through `findExistingBuilding`, refusing an address-key match when Google and the building
+  name different neighborhoods, and matching a suggestion outside Massachusetts by its exact
+  place id only (Boston's neighborhood names are towns elsewhere: "Brighton, MI"). Then
+  `bostonScopePredictions` keeps Massachusetts, Boston first, and drops every suggestion
+  from elsewhere that did not match one of our buildings. `homeSearchItems.ts` (a leaf) orders the rows:
   buildings we have ("See this building", with "Write a review" beside it), landlords, then
   "Other addresses". Never add the scope to the review form without the owner's say.
 - **`mapCluster.ts` decides how a marker cluster looks.** The badge is filled with

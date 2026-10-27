@@ -16,8 +16,9 @@ import { matchPredictionsToBuildings, type MatchedPrediction } from '../../../li
 
 // Two callers. The review form's AddressAutocomplete sends no scope and gets any US address,
 // exactly as before. The homepage's HomeSearch sends `scope=boston`: Google is biased to
-// Boston's box, results outside Massachusetts are dropped, Boston comes first, and each
-// suggestion carries the building page it already has, if any (`existing`).
+// Boston's box, each suggestion carries the building page it already has, if any
+// (`existing`), results outside Massachusetts are dropped unless they are one of those
+// buildings, and Boston comes first.
 export async function GET(context: APIContext): Promise<Response> {
   const input = context.url.searchParams.get('input') || '';
   const sessionToken = context.url.searchParams.get('sessionToken') || '';
@@ -95,21 +96,25 @@ export async function GET(context: APIContext): Promise<Response> {
       });
     }
 
-    const scoped = bostonScopePredictions(predictions);
+    // Matched before the Massachusetts filter: a suggestion from another state stays when it
+    // is a building we already have (by exact place id; see homeSearchMatch.ts), and is
+    // dropped otherwise.
     let matched: MatchedPrediction[];
     try {
-      matched = await matchPredictionsToBuildings(db, scoped);
+      matched = await matchPredictionsToBuildings(db, predictions);
     } catch (error) {
       // The suggestions still work without the match: the review handoff resolves the
-      // building on click. Never log the input, an address or a place id.
+      // building on click. With no match, nothing from outside Massachusetts is kept. Never
+      // log the input, an address or a place id.
       logError('places_autocomplete_match_error', {
         endpoint: '/api/places/autocomplete',
         error: error instanceof Error ? error.name : 'unknown',
       });
-      matched = scoped.map((p) => ({ ...p, existing: null }));
+      matched = predictions.map((p) => ({ ...p, existing: null }));
     }
+    const scoped = bostonScopePredictions(matched, (p) => p.existing !== null);
 
-    return new Response(JSON.stringify({ predictions: matched }), {
+    return new Response(JSON.stringify({ predictions: scoped }), {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
