@@ -119,8 +119,8 @@ npx wrangler d1 execute ratemyplace-db --remote --command \
   "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_records_queue_reason_requested'"
 ```
 
-**`0034` (owner of record) is idempotent too, and is NOT YET APPLIED TO PRODUCTION**
-(written 2026-10-27). One `CREATE TABLE IF NOT EXISTS building_owners` and one
+**`0034` (owner of record) is idempotent too, and was APPLIED TO PRODUCTION 2026-10-27**
+by hand, before the site deploy, with the command below. One `CREATE TABLE IF NOT EXISTS building_owners` and one
 `CREATE INDEX IF NOT EXISTS idx_building_owners_key`: no `ALTER TABLE`, nothing on
 `buildings`, so it cannot half-apply, re-running it is harmless, and `buildings.updated_at`
 (the sitemap's lastmod) does not move. Apply it by hand like `0033`:
