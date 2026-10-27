@@ -1,0 +1,644 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`email payloads (snapshot) > sendContactConfirmationEmail (general) 1`] = `
+{
+  "from": "RateMyPlace Boston <meredith@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">We received your message</h2>
+
+  <p>Hi Pat &lt;Doe&gt;,</p>
+
+  <p>We've got your general inquiry and will reply within 2-3 business days.</p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reply to this email or use <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>. Both reach us.
+  </p>
+</body>
+</html>
+      ",
+  "replyTo": "meredith@ratemyplace.org",
+  "subject": "We received your message",
+  "to": "sender@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendContactConfirmationEmail (landlord) 1`] = `
+{
+  "from": "RateMyPlace Boston <meredith@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">We received your message</h2>
+
+  <p>Hi Pat &lt;Doe&gt;,</p>
+
+  <p>We've got your landlord/property manager inquiry and will reply within 2-3 business days.</p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reply to this email or use <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>. Both reach us.
+  </p>
+</body>
+</html>
+      ",
+  "replyTo": "meredith@ratemyplace.org",
+  "subject": "We received your message",
+  "to": "sender@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendContactConfirmationEmail (other) 1`] = `
+{
+  "from": "RateMyPlace Boston <meredith@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">We received your message</h2>
+
+  <p>Hi Pat &lt;Doe&gt;,</p>
+
+  <p>We've got your inquiry and will reply within 2-3 business days.</p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reply to this email or use <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>. Both reach us.
+  </p>
+</body>
+</html>
+      ",
+  "replyTo": "meredith@ratemyplace.org",
+  "subject": "We received your message",
+  "to": "sender@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendContactConfirmationEmail (privacy) 1`] = `
+{
+  "from": "RateMyPlace Boston <meredith@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">We received your message</h2>
+
+  <p>Hi Pat &lt;Doe&gt;,</p>
+
+  <p>We've got your privacy concern and will reply within 2-3 business days.</p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reply to this email or use <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>. Both reach us.
+  </p>
+</body>
+</html>
+      ",
+  "replyTo": "meredith@ratemyplace.org",
+  "subject": "We received your message",
+  "to": "sender@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendContactConfirmationEmail (support) 1`] = `
+{
+  "from": "RateMyPlace Boston <meredith@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">We received your message</h2>
+
+  <p>Hi Pat &lt;Doe&gt;,</p>
+
+  <p>We've got your support request and will reply within 2-3 business days.</p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reply to this email or use <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>. Both reach us.
+  </p>
+</body>
+</html>
+      ",
+  "replyTo": "meredith@ratemyplace.org",
+  "subject": "We received your message",
+  "to": "sender@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendContactNotificationEmail 1`] = `
+{
+  "from": "RateMyPlace Boston <noreply@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">New Contact Form Submission</h2>
+
+  <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 8px 0;"><strong>Name:</strong> Pat &lt;script&gt;</p>
+    <p style="margin: 0 0 8px 0;"><strong>Email:</strong> <a href="mailto:pat%40example.com" style="color: #0d9488;">pat@example.com</a></p>
+    <p style="margin: 0 0 8px 0;"><strong>Category:</strong> support</p>
+    <p style="margin: 16px 0 4px 0;"><strong>Message preview:</strong></p>
+    <p style="margin: 0; color: #666;">Hello &amp; &lt;b&gt;bye&lt;/b&gt;</p>
+  </div>
+
+  <p style="color: #666; font-size: 14px;">
+    View all submissions at <a href="https://ratemyplace.org/admin/contact" style="color: #0d9488;">ratemyplace.org/admin/contact</a>
+  </p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">This is an automated admin notification from RateMyPlace Boston.</p>
+</body>
+</html>
+      ",
+  "subject": "New contact: support from Pat <script>",
+  "to": "meredith@ratemyplace.org",
+}
+`;
+
+exports[`email payloads (snapshot) > sendDisputeConfirmationEmail with an explanation 1`] = `
+{
+  "from": "RateMyPlace Boston <meredith@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">We received your dispute</h2>
+
+  <p>Hi Acme LLC,</p>
+
+  <p>Your dispute about the review at <strong>23-27 Lanark Rd, Boston, MA 02135</strong> is in our queue.</p>
+
+  <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 10px 0;"><strong>Reasons cited:</strong></p>
+    <ul style="margin: 0; padding-left: 20px;">
+      <li>Not a tenant</li><li>&lt;b&gt;x&lt;/b&gt;</li>
+    </ul>
+    
+    <p style="margin: 16px 0 0 0;"><strong>Your explanation:</strong></p>
+    <p style="margin: 8px 0 0 0; color: #666;">The reviewer &lt;never&gt; lived here &amp; says so</p>
+    
+  </div>
+
+  <p>We'll review and follow up by email with the outcome, whether we uphold, partially uphold, or dismiss the dispute.</p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a> for follow-ups.
+  </p>
+</body>
+</html>
+      ",
+  "subject": "We received your dispute",
+  "to": "landlord@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendDisputeConfirmationEmail without an explanation 1`] = `
+{
+  "from": "RateMyPlace Boston <meredith@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">We received your dispute</h2>
+
+  <p>Hi Acme LLC,</p>
+
+  <p>Your dispute about the review at <strong>23-27 Lanark Rd, Boston, MA 02135</strong> is in our queue.</p>
+
+  <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 10px 0;"><strong>Reasons cited:</strong></p>
+    <ul style="margin: 0; padding-left: 20px;">
+      <li>Not a tenant</li><li>&lt;b&gt;x&lt;/b&gt;</li>
+    </ul>
+    
+  </div>
+
+  <p>We'll review and follow up by email with the outcome, whether we uphold, partially uphold, or dismiss the dispute.</p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a> for follow-ups.
+  </p>
+</body>
+</html>
+      ",
+  "subject": "We received your dispute",
+  "to": "landlord@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendDisputeResolutionEmail (dismiss) 1`] = `
+{
+  "from": "RateMyPlace Boston <meredith@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">We did not uphold your dispute</h2>
+
+  <p>Hi Acme &lt;LLC&gt;,</p>
+
+  <p>We reviewed your dispute and decided not to act on it. The review stands. Reviews can be valid even when a landlord disagrees, so long as they meet our <a href="https://ratemyplace.org/guidelines" style="color: #0d9488;">content guidelines</a>.</p>
+
+  <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 10px 0;"><strong>Resolution notes:</strong></p>
+    <p style="margin: 0; color: #666;">Notes &amp; &lt;i&gt;more&lt;/i&gt;</p>
+  </div>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>.
+  </p>
+</body>
+</html>
+      ",
+  "subject": "We did not uphold your dispute",
+  "to": "landlord@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendDisputeResolutionEmail (partially_valid) 1`] = `
+{
+  "from": "RateMyPlace Boston <meredith@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">We partially upheld your dispute</h2>
+
+  <p>Hi Acme &lt;LLC&gt;,</p>
+
+  <p>We found some of your concerns valid and addressed them. Other parts of the review stand. Specifics are in the resolution notes below.</p>
+
+  <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 10px 0;"><strong>Resolution notes:</strong></p>
+    <p style="margin: 0; color: #666;">Notes &amp; &lt;i&gt;more&lt;/i&gt;</p>
+  </div>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>.
+  </p>
+</body>
+</html>
+      ",
+  "subject": "We partially upheld your dispute",
+  "to": "landlord@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendDisputeResolutionEmail (uphold) 1`] = `
+{
+  "from": "RateMyPlace Boston <meredith@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">We upheld your dispute</h2>
+
+  <p>Hi Acme &lt;LLC&gt;,</p>
+
+  <p>We've upheld your dispute. The review has been updated according to our <a href="https://ratemyplace.org/guidelines" style="color: #0d9488;">content guidelines</a>.</p>
+
+  <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 10px 0;"><strong>Resolution notes:</strong></p>
+    <p style="margin: 0; color: #666;">Notes &amp; &lt;i&gt;more&lt;/i&gt;</p>
+  </div>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>.
+  </p>
+</body>
+</html>
+      ",
+  "subject": "We upheld your dispute",
+  "to": "landlord@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendPasswordResetEmail 1`] = `
+{
+  "from": "RateMyPlace Boston <noreply@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">Reset Your Password</h2>
+
+  <p>We received a request to reset your password for your RateMyPlace Boston account.</p>
+
+  <p style="margin: 30px 0;">
+    <a href="https://ratemyplace.org/auth/reset-password?token=tok123"
+       style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+      Reset Password
+    </a>
+  </p>
+
+  <p style="color: #666; font-size: 14px;">
+    Or copy and paste this link into your browser:<br>
+    <a href="https://ratemyplace.org/auth/reset-password?token=tok123" style="color: #0d9488; word-break: break-all;">https://ratemyplace.org/auth/reset-password?token=tok123</a>
+  </p>
+
+  <p style="color: #dc2626; font-size: 14px; font-weight: 500;">This link will expire in 1 hour.</p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.
+  </p>
+</body>
+</html>
+      ",
+  "subject": "Reset your password",
+  "to": "user@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendRecordCorrectionOutcomeEmail (repulled_unchanged) 1`] = `
+{
+  "from": "RateMyPlace Boston <noreply@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">We re-checked the public record you reported</h2>
+
+  <p>You reported a public record for <strong>23-27 Lanark Rd &lt;b&gt;</strong>.</p>
+
+  <p>We pulled the record again from the city's primary source. It still shows what our page shows, so nothing changed.</p>
+
+  <p><a href="https://ratemyplace.org/building/bldg-lanark#records" style="color: #0d9488;">View the building page</a></p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>.
+  </p>
+</body>
+</html>
+      ",
+  "subject": "We re-checked the public record you reported",
+  "to": "filer@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendRecordCorrectionOutcomeEmail (repulled_updated) 1`] = `
+{
+  "from": "RateMyPlace Boston <noreply@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">The public record you reported has been updated</h2>
+
+  <p>You reported a public record for <strong>23-27 Lanark Rd &lt;b&gt;</strong>.</p>
+
+  <p>We pulled the record again from the city's primary source. The source had changed, and the page now reflects it.</p>
+
+  <p><a href="https://ratemyplace.org/building/bldg-lanark#records" style="color: #0d9488;">View the building page</a></p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>.
+  </p>
+</body>
+</html>
+      ",
+  "subject": "The public record you reported has been updated",
+  "to": "filer@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendRecordCorrectionOutcomeEmail (source_mismatch_noted) 1`] = `
+{
+  "from": "RateMyPlace Boston <noreply@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">We noted a mismatch in the public record you reported</h2>
+
+  <p>You reported a public record for <strong>23-27 Lanark Rd &lt;b&gt;</strong>.</p>
+
+  <p>We pulled the record again. The city's own data still disagrees with what you told us, so we have added a dated note to that section rather than editing the record by hand.</p>
+
+  <p><a href="https://ratemyplace.org/building/bldg-lanark#records" style="color: #0d9488;">View the building page</a></p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>.
+  </p>
+</body>
+</html>
+      ",
+  "subject": "We noted a mismatch in the public record you reported",
+  "to": "filer@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendRecordsBreakerEmail 1`] = `
+{
+  "from": "RateMyPlace Boston <noreply@ratemyplace.org>",
+  "subject": "Records fill paused",
+  "text": "Line one
+Line two",
+  "to": "ops@example.org",
+}
+`;
+
+exports[`email payloads (snapshot) > sendRecordsResumedEmail 1`] = `
+{
+  "from": "RateMyPlace Boston <noreply@ratemyplace.org>",
+  "subject": "Records fill resumed",
+  "text": "Back to normal",
+  "to": "ops@example.org",
+}
+`;
+
+exports[`email payloads (snapshot) > sendReviewRejectedEmail with a reason 1`] = `
+{
+  "from": "RateMyPlace Boston <meredith@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">Your review wasn't published</h2>
+
+  <p>We didn't publish your review of <strong>1 Main St &lt;b&gt;</strong>. It didn't meet our <a href="https://ratemyplace.org/guidelines" style="color: #0d9488;">content guidelines</a>.</p>
+
+  <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 10px 0;"><strong>What we noted:</strong></p>
+    <p style="margin: 0; color: #666;">Names a &lt;neighbor&gt;</p>
+  </div>
+
+  <p>You can edit and resubmit from your <a href="https://ratemyplace.org/profile" style="color: #0d9488;">profile</a>. Most rejections are about specific fixes (removing names, dates, or other identifying details), not the substance of what you experienced.</p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a> if you think this was a mistake.
+  </p>
+</body>
+</html>
+      ",
+  "subject": "Your review wasn't published",
+  "to": "reviewer@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendReviewRejectedEmail without a reason 1`] = `
+{
+  "from": "RateMyPlace Boston <meredith@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">Your review wasn't published</h2>
+
+  <p>We didn't publish your review of <strong>1 Main St</strong>. It didn't meet our <a href="https://ratemyplace.org/guidelines" style="color: #0d9488;">content guidelines</a>.</p>
+
+  <p>You can edit and resubmit from your <a href="https://ratemyplace.org/profile" style="color: #0d9488;">profile</a>. Most rejections are about specific fixes (removing names, dates, or other identifying details), not the substance of what you experienced.</p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a> if you think this was a mistake.
+  </p>
+</body>
+</html>
+      ",
+  "subject": "Your review wasn't published",
+  "to": "reviewer@example.com",
+}
+`;
+
+exports[`email payloads (snapshot) > sendVerificationEmail 1`] = `
+{
+  "from": "RateMyPlace Boston <noreply@ratemyplace.org>",
+  "html": "
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">Verify your email</h2>
+
+  <p>Confirm your email so you can post reviews. The next tenant is reading.</p>
+
+  <p style="margin: 30px 0;">
+    <a href="https://ratemyplace.org/api/auth/verify-email?token=tok123"
+       style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+      Verify email
+    </a>
+  </p>
+
+  <p style="color: #666; font-size: 14px;">
+    Or copy and paste this link into your browser:<br>
+    <a href="https://ratemyplace.org/api/auth/verify-email?token=tok123" style="color: #0d9488; word-break: break-all;">https://ratemyplace.org/api/auth/verify-email?token=tok123</a>
+  </p>
+
+  <p style="color: #666; font-size: 14px;">This link will expire in 24 hours.</p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #999; font-size: 12px;">
+    If you didn't create an account on RateMyPlace Boston, you can safely ignore this email.
+  </p>
+</body>
+</html>
+      ",
+  "subject": "Verify your email",
+  "to": "user@example.com",
+}
+`;
