@@ -91,7 +91,8 @@ const apiKey = getEnv(context).RESEND_API_KEY;
 
 `maybeEnv(locals)` is the exception, and only for render paths that must never throw and
 have a safe default for every value they read — today, BaseLayout's head, which reads
-`SITE_URL` and falls back to `https://ratemyplace.org`. It returns `undefined` when there is
+`SITE_URL` and falls back to `https://ratemyplace.org`, and the sign-in and sign-up pages'
+review note (`reviewSignin.ts`), which reads `DB` and drops the address without it. It returns `undefined` when there is
 no runtime (the Astro container in unit tests) and when the Astro 6+ Cloudflare adapter's
 `locals.runtime.env` getter throws its migration error, and logs that once per isolate.
 Everything else keeps using `getEnv`, which throws on purpose.
