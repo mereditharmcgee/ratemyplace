@@ -34,6 +34,15 @@ interface Props {
   showIcons?: boolean;
 }
 
+// One row per card: the name and its details on the left, the score or a short label on the
+// right. The row wraps, and the left column starts at 10rem and grows into the free space, so
+// on a phone a label too wide to sit beside the name ("No reviews yet · city records") moves
+// to its own line below it, still against the right edge. Without the wrap the label kept its
+// full width and the name was squeezed until long street names broke mid-word.
+const CARD_ROW = 'flex flex-wrap justify-between items-start gap-x-4 gap-y-2';
+const CARD_MAIN = 'min-w-0 grow basis-40';
+const CARD_SIDE = 'ml-auto text-right';
+
 const PAGE_SIZE = 10;
 
 function BuildingCard({ building }: { building: Building }) {
@@ -42,8 +51,8 @@ function BuildingCard({ building }: { building: Building }) {
       href={`/building/${building.slug}`}
       className="block bg-white border border-gray-200 rounded-[6px] p-6 hover:shadow-md transition-shadow"
     >
-      <div className="flex justify-between items-start gap-4">
-        <div className="min-w-0 flex-1">
+      <div className={CARD_ROW}>
+        <div className={CARD_MAIN}>
           <h3 className="text-lg font-semibold text-gray-900 break-words">{building.address}</h3>
           <p className="text-gray-600">
             {localityLine(building, building.state)}
@@ -52,7 +61,7 @@ function BuildingCard({ building }: { building: Building }) {
             <p className="text-sm text-gray-500 mt-1">Landlord: {building.landlord_name}</p>
           )}
         </div>
-        <div className="text-right">
+        <div className={CARD_SIDE}>
           {building.avg_overall ? (
             <div>
               <div className={`text-2xl font-bold ${getScoreTextColor(Number(building.avg_overall))}`}>{Number(building.avg_overall).toFixed(1)}</div>
@@ -77,14 +86,14 @@ function LandlordCard({ landlord }: { landlord: Landlord }) {
       href={`/landlord/${landlord.slug}`}
       className="block bg-white border border-gray-200 rounded-[6px] p-6 hover:shadow-md transition-shadow"
     >
-      <div className="flex justify-between items-start gap-4">
-        <div className="min-w-0 flex-1">
+      <div className={CARD_ROW}>
+        <div className={CARD_MAIN}>
           <h3 className="text-lg font-semibold text-gray-900 break-words">{landlord.name}</h3>
           {landlord.building_count > 0 && (
             <p className="text-gray-600">{landlord.building_count} building{landlord.building_count !== 1 ? 's' : ''}</p>
           )}
         </div>
-        <div className="text-right">
+        <div className={CARD_SIDE}>
           {scoreState === 'available' ? (
             <div>
               <div className={`text-2xl font-bold ${getScoreTextColor(Number(landlord.avg_overall))}`}>{Number(landlord.avg_overall).toFixed(1)}</div>
