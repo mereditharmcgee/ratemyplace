@@ -128,10 +128,12 @@ export const BUILDING_SEARCH_ORDER = 'ORDER BY (COUNT(r.id) > 0) DESC, COUNT(r.i
  *   everything else rather than in a third group.
  * - "Newest review" is `MAX(r.created_at)` over the joined rows, and both call sites join
  *   reviews `ON ... AND r.status = 'approved'`, so a pending or rejected review never moves a
- *   building. `created_at` (submission) rather than an approval time because reviews carry
- *   no approval time: `moderated_at` is never written, and `updated_at` moves again on any
- *   later moderation-note save or edit, which would reshuffle the list for nothing a reader
- *   can see. The value orders rows only; it is never selected or shown.
+ *   building. `created_at` (submission) rather than approval time because the reviews row
+ *   has no approval time: `moderated_at` is never written, and `updated_at` moves again on
+ *   any later moderation-note save or edit. The approval time exists only in the admin
+ *   `audit_logs` table (`review_approved`), which a public query should not join, and
+ *   submission and approval are days apart at most. The value orders rows only; it is never
+ *   selected or shown.
  * - `b.id` is unique, so the order is total and LIMIT/OFFSET pages neither repeat nor skip
  *   a row. Browse rows are reviewed-only (`HAVING COUNT(r.id) > 0`), so the MAX is never NULL.
  *

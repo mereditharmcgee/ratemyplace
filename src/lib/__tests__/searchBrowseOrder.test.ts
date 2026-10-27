@@ -99,9 +99,11 @@ async function seed(db: TestD1Database): Promise<void> {
   await insertBuilding(db, { id: 'away-older', address: '32 Sample St', zip_code: '02400', city: 'Nearby Town', state: 'MA' });
   await review(db, 'away-older', 'r-ao', at('2026-07-01'));
   await review(db, 'away-older', 'r-ao-rejected', at('2026-10-25'), 'rejected');
+  // No city at all. Its review falls between the other two, so it only lands in the middle if
+  // the NULL city sorts with them; without the COALESCE in BROWSE_BUILDINGS_ORDER it sorts last.
   await insertBuilding(db, { id: 'away-no-city', address: '34 Sample St', zip_code: '00000' });
   await db.prepare("UPDATE buildings SET city = NULL WHERE id = 'away-no-city'").run();
-  await review(db, 'away-no-city', 'r-nc', at('2026-02-01'));
+  await review(db, 'away-no-city', 'r-nc', at('2026-08-15'));
 
   // Not listed at all: browse stays reviewed-only.
   await insertBuilding(db, { id: 'boston-pending-only', address: '40 Example Rd', zip_code: '02100', parcel_id: '0100000005' });
@@ -116,8 +118,8 @@ const EXPECTED = [
   'boston-no-parcel',
   'boston-older',
   'away-newest',
-  'away-older',
   'away-no-city',
+  'away-older',
 ];
 
 suite('browse order: Boston first, most recently reviewed', () => {
