@@ -1,4 +1,6 @@
 ---
+import { formatTenancyRange } from '../../lib/privacy';
+
 interface Props {
   moveInSeason?: string | null;
   moveInYear?: number | string | null;
@@ -17,28 +19,8 @@ const {
   class: className = '',
 } = Astro.props;
 
-const seasonLabels: Record<string, string> = {
-  winter: 'Winter',
-  spring: 'Spring',
-  summer: 'Summer',
-  fall: 'Fall',
-};
-
-function formatDate(season?: string | null, year?: number | string | null): string | null {
-  if (!season || !year) return null;
-  const label = seasonLabels[season.toLowerCase()] || season;
-  return `${label} ${year}`;
-}
-
-const moveIn = formatDate(moveInSeason, moveInYear);
-const moveOutFormatted = formatDate(moveOutSeason, moveOutYear);
-const moveOut = isCurrentTenant
-  ? 'Current'
-  : moveOutFormatted ?? (moveOutYear ? String(moveOutYear) : null);
-
-const display =
-  moveIn && moveOut ? `${moveIn} · ${moveOut}` :
-  moveIn ?? moveOut ?? null;
+// The range logic (and the rule that it never runs backwards) lives in privacy.ts.
+const display = formatTenancyRange({ moveInSeason, moveInYear, moveOutSeason, moveOutYear, isCurrentTenant });
 ---
 
 {display && (

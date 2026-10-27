@@ -25,6 +25,57 @@ export function formatFuzzyDate(year: number, season: string): string {
   return `${seasonLabel} ${year}`;
 }
 
+/** The lowest move-out choice on the review form, stored as a token rather than a year. */
+const MOVE_OUT_2020_OR_EARLIER = '2020_or_earlier';
+
+/**
+ * The fuzzy tenancy range on a review card's season chip: "Summer 2024 · 2025",
+ * "Fall 2025 · Current", or one end alone. Only seasons and years, never a month or day.
+ *
+ * When a reviewer skips the optional move-in question, the submit route stores winter of the
+ * current year (the columns are NOT NULL), so a stored move-in can fall after the move-out
+ * year. A range that runs backwards is impossible, so the move-in is left out and only the
+ * move-out shows. A placeholder move-in on a range that runs forward is still shown; it
+ * can't be told apart from a real December-February move-in.
+ */
+export function formatTenancyRange(input: {
+  moveInSeason?: string | null;
+  moveInYear?: number | string | null;
+  moveOutSeason?: string | null;
+  moveOutYear?: number | string | null;
+  isCurrentTenant?: boolean;
+}): string | null {
+  const { moveInSeason, moveInYear, moveOutSeason, moveOutYear } = input;
+  const isCurrent = input.isCurrentTenant === true || moveOutYear === 'current';
+
+  let moveIn = moveInSeason && moveInYear
+    ? formatFuzzyDate(Number(moveInYear), moveInSeason.toLowerCase())
+    : null;
+
+  let moveOut: string | null = null;
+  // The latest year the move-out could be, to check that the range runs forward.
+  let latestMoveOutYear: number | null = null;
+  if (isCurrent) {
+    moveOut = 'Current';
+  } else if (moveOutYear === MOVE_OUT_2020_OR_EARLIER) {
+    moveOut = '2020 or earlier';
+    latestMoveOutYear = 2020;
+  } else if (moveOutYear !== null && moveOutYear !== undefined && moveOutYear !== '') {
+    const year = Number(moveOutYear);
+    moveOut = moveOutSeason && Number.isFinite(year)
+      ? formatFuzzyDate(year, moveOutSeason.toLowerCase())
+      : String(moveOutYear);
+    if (Number.isFinite(year)) latestMoveOutYear = year;
+  }
+
+  if (moveIn && latestMoveOutYear !== null && Number(moveInYear) > latestMoveOutYear) {
+    moveIn = null;
+  }
+
+  if (moveIn && moveOut) return `${moveIn} · ${moveOut}`;
+  return moveIn ?? moveOut ?? null;
+}
+
 export function getCurrentSeason(): string {
   const month = new Date().getMonth();
   if (month >= 2 && month <= 4) return 'spring';
