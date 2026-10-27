@@ -93,7 +93,10 @@ suite('findExistingBuilding', () => {
       st_num_hi: 11,
     });
     const hit = await resolveWithoutWriting(input({ placeId: 'gp-app', address: '9 Appian Way', zip: '02134' }));
-    // flips to seed-appian when fix/street-suffix-search adds WY
+    // Pins the gap until fix/street-suffix-search adds WY. When that is on main, rebase
+    // this branch and change the line below to
+    //   expect(hit).toEqual({ id: 'seed-appian', slug: '9-11-appian-wy-boston', tier: 'address_key' });
+    // A green CI run from before that rebase does not cover the merged tree.
     expect(hit).toBeNull();
   });
 });
