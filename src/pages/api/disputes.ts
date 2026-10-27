@@ -1,7 +1,8 @@
 import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../lib/db';
 import { getEnv } from '../../lib/runtime';
-import { extractReviewIdFromUrl, DISPUTE_REASONS } from '../../lib/disputes';
+import { DISPUTE_REASONS } from '../../lib/disputes';
+import { resolveDisputedReview } from '../../lib/disputeTarget';
 import { sanitizeText, validateDisputeForm } from '../../lib/validation';
 import { sendDisputeConfirmationEmail } from '../../lib/email';
 import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../lib/rateLimit';
@@ -99,29 +100,21 @@ export const POST: APIRoute = async (context: APIContext) => {
       );
     }
 
-    // Extract and validate review URL
+    // Which review: a review link names it by id; a building page link names it by the
+    // dates on its card, then its title or first words when two cards share those dates
+    // (or is the page's only review). See lib/disputeTarget.ts.
     const siteUrl = new URL(request.url).origin;
-    const reviewId = extractReviewIdFromUrl(reviewUrl, siteUrl);
+    const target = await resolveDisputedReview(db, reviewUrl, body.reviewDates, siteUrl, body.reviewWords);
 
-    if (!reviewId) {
+    if (!target.ok) {
       return new Response(
-        JSON.stringify({ error: 'Invalid review URL. Please paste the full URL from your browser.' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: target.error }),
+        { status: target.status, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Verify review exists and get building info
-    const review = await db
-      .prepare('SELECT id, building_id, user_id FROM reviews WHERE id = ?')
-      .bind(reviewId)
-      .first<{ id: string; building_id: string; user_id: string }>();
-
-    if (!review) {
-      return new Response(
-        JSON.stringify({ error: 'Review not found. Please check the URL and try again.' }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
+    const review = target.review;
+    const reviewId = review.id;
 
     // Get building address for confirmation email
     const building = await db
