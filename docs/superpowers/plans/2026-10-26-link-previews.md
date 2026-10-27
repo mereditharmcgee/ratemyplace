@@ -92,10 +92,10 @@ Base: `main` at `1b8ca2b`. **No migration and no production data change.** Every
 ### 1. The image
 
 **Default:** the centred draft at
-`C:\Users\mmcge\AppData\Local\Temp\claude\C--Users-mmcge-ratemyplace-boston\e4bed66b-7eb9-44e3-aa17-a1ef131b648b\scratchpad\plan-oct26\rev\og-default-centered-v3.png`
+`C:/Users/mmcge/AppData/Local/Temp/claude/C--Users-mmcge-ratemyplace-boston/e4bed66b-7eb9-44e3-aa17-a1ef131b648b/scratchpad/plan-oct26/rev/og-default-centered-v3.png`
 
 Previews of the same draft at 400px wide, in a 200px centre-square crop and in X's 2:1 crop:
-`C:\Users\mmcge\AppData\Local\Temp\claude\C--Users-mmcge-ratemyplace-boston\e4bed66b-7eb9-44e3-aa17-a1ef131b648b\scratchpad\plan-oct26\rev\preview-sizes.png`
+`C:/Users/mmcge/AppData/Local/Temp/claude/C--Users-mmcge-ratemyplace-boston/e4bed66b-7eb9-44e3-aa17-a1ef131b648b/scratchpad/plan-oct26/rev/preview-sizes.png`
 
 **What the image shows:**
 - Paper background.
@@ -119,7 +119,7 @@ At feed-card size (one third scale) an 18px line becomes 6px. A top-left lockup 
 **The earlier draft's eyebrow ("Verified reviews · Evidence-based scoring") is removed.** Only 15 of 53 approved reviews are verified, and a 20px eyebrow shrinks to about 7px in a feed card. If the owner wants an eyebrow back, it must be at least 36px and its copy must be true of every page. "A public record for renters" (brand.md §7.4) would repeat the secondary line.
 
 **Alternative:** a left-aligned layout at
-`C:\Users\mmcge\AppData\Local\Temp\claude\C--Users-mmcge-ratemyplace-boston\e4bed66b-7eb9-44e3-aa17-a1ef131b648b\scratchpad\plan-oct26\rev\og-default-left-v3.png`
+`C:/Users/mmcge/AppData/Local/Temp/claude/C--Users-mmcge-ratemyplace-boston/e4bed66b-7eb9-44e3-aa17-a1ef131b648b/scratchpad/plan-oct26/rev/og-default-left-v3.png`
 A square thumbnail cuts its lockup. Choosing it means changing the template and dropping the script's centre-square check, keeping the 15px top and bottom check.
 
 **Or:** the owner supplies a 1200x630 PNG under 300 KB.
