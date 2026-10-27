@@ -6,6 +6,7 @@ import { escapeLikePattern, validateSearch } from '../lib/validation';
 import { BUILDING_SEARCH_ORDER, buildingSearchSelect, buildingSearchWhere } from '../lib/searchSql';
 import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../lib/scoring-sql';
 import { isSearchVariant } from '../lib/seo';
+import { BROWSE_BUILDINGS_ORDER } from '../lib/searchSql';
 
 const query = (Astro.url.searchParams.get('q') || '').trim();
 const type = Astro.url.searchParams.get('type') || 'all';
@@ -108,7 +109,8 @@ if (query && !searchRejected) {
     console.error('Search error:', error);
   }
 } else if (!query) {
-  // Browse mode — all reviewed properties with totals
+  // Browse mode — all reviewed properties with totals. Boston first, most recently
+  // reviewed: the order is `BROWSE_BUILDINGS_ORDER`, the same one Load more reads.
   try {
     const buildingCount = await db.prepare(`
       SELECT COUNT(*) as total FROM (
@@ -132,7 +134,7 @@ if (query && !searchRejected) {
         LEFT JOIN landlords l ON b.landlord_id = l.id
         GROUP BY b.id
         HAVING COUNT(r.id) > 0
-        ORDER BY COUNT(r.id) DESC, avg_overall DESC, b.id ASC
+        ${BROWSE_BUILDINGS_ORDER}
         LIMIT ?
       `).bind(PAGE_SIZE).all();
       buildings = buildingResults.results || [];
