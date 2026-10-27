@@ -104,6 +104,38 @@ suite('matchPredictionsToBuildings', () => {
     expect(match.existing?.slug).toBe('5-elsewhere-ave-springfield');
   });
 
+  it('matches a suggestion from another state by its exact place id', async () => {
+    await insertBuilding(db, {
+      id: 'user-ct',
+      address: '40 Sample Street',
+      slug: '40-sample-street-elsewhere',
+      neighborhood: null,
+      city: 'Elsewhere',
+      state: 'CT',
+      zip_code: '06500',
+      google_place_id: 'gp-ct',
+    });
+    const [match] = await matchPredictionsToBuildings(db, [prediction('40 Sample Street', 'Elsewhere, CT, USA', 'gp-ct')]);
+    expect(match.existing).toEqual({
+      slug: '40-sample-street-elsewhere',
+      title: '40 Sample Street',
+      subtitle: 'Elsewhere, CT',
+      reviewCount: 0,
+      avgScore: null,
+    });
+  });
+
+  it('never matches a suggestion from another state by address, even on a Boston neighborhood name', async () => {
+    // "Brighton, MI" and "Hyde Park, NY" are towns; our Boston building on the same street and
+    // number is not theirs. Unreadable states get the same rule.
+    const result = await matchPredictionsToBuildings(db, [
+      prediction('12 Example Road', 'Brighton, MI, USA', 'gp-mi'),
+      prediction('12 Example Road', 'Hyde Park, NY, USA', 'gp-ny'),
+      prediction('22 Sample St', 'Brighton', 'gp-nostate'),
+    ]);
+    expect(result.map((p) => p.existing)).toEqual([null, null, null]);
+  });
+
   it('refuses an address match when Google names a different neighborhood', async () => {
     const [match] = await matchPredictionsToBuildings(db, [prediction('12 Example Road', 'Dorchester, MA, USA', 'gp-c')]);
     expect(match.existing).toBeNull();

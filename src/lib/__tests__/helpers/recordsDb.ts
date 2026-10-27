@@ -213,20 +213,22 @@ export async function insertBuilding(db: TestD1Database, overrides: Partial<Buil
  * A finished pull row for one source, so the coverage reads can see it. The id folds in
  * `status` so one building can hold both an `ok` and an `error` row for the same source.
  * `trigger_reason` is fixed: nothing asserts it, and any value the union allows will do.
+ * `retrievedAt` (unix seconds) defaults to the column's own `unixepoch()`, a fresh pull.
  */
 export async function insertPull(
   db: TestD1Database,
   buildingId: string,
   sourceId: string,
   status: 'ok' | 'empty' | 'error' = 'ok',
+  retrievedAt?: number,
 ): Promise<void> {
   await db
     .prepare(
       'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, ' +
-        'row_count, error_message, triggered_by, correction_id, trigger_reason) ' +
-        "VALUES (?, ?, 'boston', ?, 'label', 'q', ?, 0, NULL, NULL, NULL, 'admin')",
+        'row_count, error_message, triggered_by, correction_id, trigger_reason, retrieved_at) ' +
+        "VALUES (?, ?, 'boston', ?, 'label', 'q', ?, 0, NULL, NULL, NULL, 'admin', COALESCE(?, unixepoch()))",
     )
-    .bind(`${buildingId}-${sourceId}-${status}`, buildingId, sourceId, status)
+    .bind(`${buildingId}-${sourceId}-${status}`, buildingId, sourceId, status, retrievedAt ?? null)
     .run();
 }
 

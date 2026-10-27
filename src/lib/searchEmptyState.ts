@@ -12,6 +12,10 @@
  * "02135") gets a message in those terms, since the street-name hint is no help to someone
  * who typed a place. A full address whose house number has no building offers the street
  * without the number, since a number matches only that number or a range holding it.
+ *
+ * Anything else falls to the general message. The All filter (the default) searched
+ * buildings and landlords both, so its title names both; the Buildings filter and an unknown
+ * type searched buildings only and keep the buildings title.
  */
 
 export interface SearchEmptyInput {
@@ -37,6 +41,9 @@ export const LANDLORD_EMPTY_DESCRIPTION =
   'Landlords named in reviews are listed once one of their buildings has a review. Owners of record are listed when they own two or more buildings here. Try part of the name.';
 export const LANDLORD_EMPTY_NEXT_LABEL = 'Search buildings instead';
 
+export const BUILDINGS_EMPTY_TITLE = 'No buildings match that search';
+export const ALL_EMPTY_TITLE = 'No buildings or landlords match that search';
+
 export function searchEmptyState({ query, type, areaSearch, streetQuery }: SearchEmptyInput): SearchEmptyState {
   if (type === 'landlords') {
     return {
@@ -60,7 +67,7 @@ export function searchEmptyState({ query, type, areaSearch, streetQuery }: Searc
     };
   }
   return {
-    title: 'No buildings match that search',
+    title: type === 'all' ? ALL_EMPTY_TITLE : BUILDINGS_EMPTY_TITLE,
     description: 'Try a wider neighborhood or a partial street name.',
     next: null,
   };

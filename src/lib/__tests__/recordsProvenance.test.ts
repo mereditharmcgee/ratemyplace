@@ -6,6 +6,7 @@ import {
   isPullStale,
   recordsCitations,
   resourceUrl,
+  showRefreshButton,
   showStalePullNote,
 } from '../records/provenance';
 import { pulledFromLine, rowPulledLabel } from '../records/display';
@@ -183,15 +184,47 @@ describe('showStalePullNote', () => {
   const now = Date.UTC(2026, 9, 27, 14) / 1000;
   const old = now - 45 * DAY;
 
-  it('shows on an old pull of a building whose deeper records are in', () => {
-    expect(showStalePullNote('pulled', old, now)).toBe(true);
-    expect(showStalePullNote('pulled', now - DAY, now)).toBe(false);
+  it('shows on an old pull of a building whose deeper records are in, queued refresh or not', () => {
+    for (const state of ['pulled', 'stale', 'refresh_requested'] as const) {
+      expect(showStalePullNote(state, old, now)).toBe(true);
+      expect(showStalePullNote(state, now - DAY, now)).toBe(false);
+    }
   });
 
   it('stays off every other page state, which already says what is happening to the records', () => {
     const others: RecordsRequestState[] = ['ineligible', 'fill_queued', 'parked', 'requested', 'never_pulled'];
     for (const state of others) {
       expect(showStalePullNote(state, old, now)).toBe(false);
+    }
+  });
+});
+
+describe('showRefreshButton', () => {
+  const now = Date.UTC(2026, 9, 27, 14) / 1000;
+  const old = now - 45 * DAY;
+
+  it('offers the button only on a stale building, under a date that reads old', () => {
+    expect(showRefreshButton('stale', old, now)).toBe(true);
+    // The printed date is the newest pull of any source; when it is recent, no button under it.
+    expect(showRefreshButton('stale', now - DAY, now)).toBe(false);
+  });
+
+  it('never offers it in any other state, including a queued refresh', () => {
+    const others: RecordsRequestState[] = [
+      'ineligible',
+      'refresh_requested',
+      'pulled',
+      'fill_queued',
+      'parked',
+      'requested',
+      'never_pulled',
+    ];
+    for (const state of others) expect(showRefreshButton(state, old, now)).toBe(false);
+  });
+
+  it('shows exactly when the stale note shows on a stale building', () => {
+    for (const pulledAt of [old, now - 30 * DAY, now - 30 * DAY - 1, now - DAY, Number.NaN]) {
+      expect(showRefreshButton('stale', pulledAt, now)).toBe(showStalePullNote('stale', pulledAt, now));
     }
   });
 });

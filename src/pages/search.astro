@@ -33,7 +33,7 @@ let totalOwners = 0;
 // The same length cap `/api/search/results` applies (`validateSearch`, 200 characters on the
 // trimmed query), so the page and the endpoint agree about what is a search. Over that, no
 // query runs at all: `buildings` and `landlords` stay empty and the totals stay 0, so the
-// markup below falls to the "No buildings match that search" empty state. Browse mode must
+// markup below falls to the general no-match empty state (`searchEmptyState`). Browse mode must
 // not catch it either — a 5,000-character `q` is a rejected search, not a request to list
 // everything — hence the explicit `!query` on the browse branch rather than a bare `else`.
 const searchRejected = query !== '' && validateSearch(query).length > 0;

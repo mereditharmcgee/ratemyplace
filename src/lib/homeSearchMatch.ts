@@ -6,12 +6,14 @@
 // even when the building has a page. Each suggestion is resolved read-only through the same
 // resolver the review handoff uses (`findExistingBuilding`: exact place id, then the Boston
 // address key with range containment), so "this is the page for that address" means the
-// same thing here as it does when the reader clicks through to write a review.
+// same thing here as it does when the reader clicks through to write a review. A suggestion
+// outside Massachusetts is matched by its exact place id only; the homepage keeps it only
+// when that finds a building (`bostonScopePredictions`).
 //
 // SERVER ONLY. Nothing here writes.
-import { findExistingBuilding, resolveInputFrom, type ResolvedBuilding } from './buildingResolve';
+import { findBuildingByPlaceId, findExistingBuilding, resolveInputFrom, type ResolvedBuilding } from './buildingResolve';
 import { bostonLocalityName, resolveBostonSubArea } from './locality';
-import { predictionPlace, type AutocompletePrediction } from './places';
+import { PLACE_ID_PATTERN, predictionPlace, type AutocompletePrediction } from './places';
 import type { RecordsDb } from './records/types';
 import { currentReviewYear, recencyWeightedOverallSql } from './scoring-sql';
 
@@ -71,6 +73,15 @@ export function localityAgrees(googleLocality: string, building: { neighborhood:
 
 async function resolvePrediction(db: RecordsDb, p: AutocompletePrediction): Promise<ResolvedBuilding | null> {
   const place = predictionPlace(p);
+  if (place.state !== 'MA') {
+    // Outside Massachusetts (or no state Google gave us), only the exact place id counts.
+    // The address-key tier is a Boston rule, and Boston's neighborhood names are towns in
+    // other states ("Brighton, MI", "Hyde Park, NY"): matched by address, a suggestion there
+    // would open the Boston building on the same street and number.
+    if (!PLACE_ID_PATTERN.test(p.placeId)) return null;
+    const byPlace = await findBuildingByPlaceId(db, p.placeId);
+    return byPlace ? { id: byPlace.id, slug: byPlace.slug, tier: 'place_id' } : null;
+  }
   const input = resolveInputFrom({
     placeId: p.placeId,
     streetAddress: p.mainText,

@@ -298,6 +298,14 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   in the emitted SQL goes through `lit()`; the file is applied with
   `wrangler d1 execute --file`, which binds nothing. Seeded rows have `source = 'seed'` and
   deterministic ids (`seed-<parcel>`), so re-running is an upsert.
+- **`seed/impliedUnits.ts` is the seed's land-use unit estimate (R2 is 2, R3 is 3), with two
+  readers.** The seed writes it into `buildings.unit_count` when the assessor leaves the count
+  blank, which the FY2026 file does for every residential parcel, and a seed match writes it
+  over a user row's count too. No column records who wrote a count, so `unitCountLabel` in
+  `buildingDetails.ts` labels a stored count "Units (estimated from land use)" when it equals
+  the estimate and the building's current assessor record (`getCurrentAssessment` in
+  `query.ts`, the row the facts strip shows) has no count. The facts strip prints the
+  assessor's own count only when there is one. Change the table here and both follow.
 - **`addressKey` / `streetKey` in `identity.ts`** are the lookup keys for seed matching and
   reviewer dedupe: base street name plus the assessor spelling of the suffix, and a
   house-number range. A change to the suffix table changes both, on purpose. Both return
@@ -339,14 +347,21 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   or the number alone would match every building with that number. A query that leaves no
   street word and no number but names a place or ZIP is an area search (`isAreaSearch`).
 - **`coverage.ts` is the page-state table, read-only.** `recordsRequestState` answers
-  `ineligible` / `pulled` / `fill_queued` / `parked` / `requested` / `never_pulled` in that
-  precedence, in **one** statement (indexed `building_id` seeks as correlated subqueries),
-  because the public endpoint calls it once per request; `hasDeeperPull` and
-  `pendingQueueReason` stay exported for callers that need one answer without the other.
+  `ineligible`, then for a building with any deeper pull `refresh_requested` / `stale` /
+  `pulled`, then `fill_queued` / `parked` / `requested` / `never_pulled`, in **one** statement
+  (indexed `building_id` seeks as correlated subqueries), because the public endpoint calls it
+  once per request; `hasDeeperPull` and `pendingQueueReason` stay exported for callers that
+  need one answer without the other. `stale` is `planRefresh`'s own predicate (newest deeper
+  pull, any status, older than `REFRESH_AFTER_SECONDS`) with no pending row but a `fill` one;
+  it is where the panel offers "Ask for newer records". `pulled` (30 days or less, or a parked
+  non-fill row) is the 409 and the per-building debounce. `isPulledState` groups the three.
   **Three callers enqueue off this state:** the reader button (`request.ts`), which enqueues
-  from every state but `ineligible` and `pulled`, and the follower enqueue on save and on
-  review approval (`PATCH /api/admin/reviews/[id]`, a `follower` row), both only from
-  `never_pulled`.
+  a `button` row from every state but `ineligible`, `pulled` and `refresh_requested` (that
+  one answers `already_queued` with no write, so a press can never turn a planner `refresh`
+  row into a cap-counted `button` row), and the follower enqueue on save and on review
+  approval (`PATCH /api/admin/reviews/[id]`, a `follower` row), both only from
+  `never_pulled`. A finished `button` row is interest to `planRefresh` forever, so a refresh
+  press keeps the building on the monthly cycle with no Worker change.
   Eligibility is `jurisdictionForCity` from the leaf `records/jurisdiction.ts`, not a string
   compare on 'Boston'. A **parked `fill` row
   still reads `fill_queued`**, so the button stays offered: a press replaces it with a fresh
@@ -445,7 +460,11 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   first, the typed neighborhood or ZIP deciding between twins. That is the only tier allowed
   above reviewed buildings; everywhere else a reviewed building never sorts below an
   unreviewed one. Then whole-word street matches, then the typed place, review count, score,
-  and the house number as a number (not text). The house number comes from `st_num_lo` /
+  and the house number as a number (not text). An area search (`isAreaSearch`: only a place
+  and/or ZIP, such as "Brighton" or "02135") puts the newest approved review
+  (`NEWEST_REVIEW_FIRST`, the browse rule) between the typed place and review count, so its
+  reviewed buildings read most recently reviewed first; unreviewed ones tie on it and keep
+  the order above. An address search never reads that key. The house number comes from `st_num_lo` /
   `st_num_hi` when set, else from the front of `b.address`. The ORDER BY carries binds and
   must be bound after the WHERE's. Keep a full query (where + order + LIMIT/OFFSET) under
   D1's 100 bound parameters: `__tests__/searchFullAddress.test.ts` checks the widest query
@@ -518,16 +537,22 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   two islands. The review form's `AddressAutocomplete` sends no scope and gets any US
   address (people review buildings outside Boston). `HomeSearch` alone sends `scope=boston`:
   `autocompleteRequestBody` (`places.ts`) adds a location bias to `BOSTON_BOX`,
-  `bostonScopePredictions` drops every suggestion not in Massachusetts and puts Boston
-  first, and `matchPredictionsToBuildings` (`homeSearchMatch.ts`) resolves each suggestion
-  read-only through `findExistingBuilding`, refusing an address-key match when Google and
-  the building name different neighborhoods. `homeSearchItems.ts` (a leaf) orders the rows:
+  `matchPredictionsToBuildings` (`homeSearchMatch.ts`) resolves each suggestion read-only
+  through `findExistingBuilding`, refusing an address-key match when Google and the building
+  name different neighborhoods, and matching a suggestion outside Massachusetts by its exact
+  place id only (Boston's neighborhood names are towns elsewhere: "Brighton, MI"). Then
+  `bostonScopePredictions` keeps Massachusetts, Boston first, and drops every suggestion
+  from elsewhere that did not match one of our buildings. `homeSearchItems.ts` (a leaf) orders the rows:
   buildings we have ("See this building", with "Write a review" beside it), landlords, then
   "Other addresses". Never add the scope to the review form without the owner's say.
-- **`mapCluster.ts` decides how a marker cluster looks.** The badge is filled with
-  `getScoreHex` of the plain mean of the clustered buildings' scores (unscored ones left
-  out; none scored → the no-score grey). It is a map colour only — never shown as a number,
-  not weighted, not recency-decayed — so it is not a fourth scoring path.
+- **`mapCluster.ts` decides how a marker cluster looks.** A dark neutral circle with a ring
+  and a whole-number count, labelled "N buildings", so it cannot be read as a score pin.
+  Never fill it with a score band colour: a reader once took a cluster's "2" in the
+  Concerning colour for a Concerning score. `mapCluster.test.ts` fails on any `SCORE_HEX`
+  value in the badge style, and no score of any kind is computed for a cluster. The map
+  legend shows the same circle as a "Group of buildings" row below the four score rows
+  (`CLUSTER_LEGEND_SWATCH_STYLE`); `buildingMapClusters.test.tsx` mounts the island on a
+  stubbed map to check the legend and the badge, since no Maps key exists off production.
 - **`admin/landlordMatch.ts` decides whether a tenant-typed landlord name is "the same
   landlord".** `classifyLandlordCandidates` preselects an existing landlord only when exactly
   one same-name landlord shares the building's state and city (Boston localities count as
