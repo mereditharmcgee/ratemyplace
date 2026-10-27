@@ -1,5 +1,7 @@
 # Review funnel fix: implementation plan (`fix/review-funnel`), revision 2
 
+**This is the public-repo copy, and it is redacted.** Production row ids, admin user ids, row creation times and the addresses of rows that users created are replaced with placeholders such as `<crawford-dup-id>` and `<admin-id>`. Step 0 is described only as narrowing the columns. The lead keeps the unredacted plan, including the runnable section 4 SQL, outside the repo.
+
 Branch from `main` at `1b8ca2b` (after the Step 0 hotfix has merged, branch from the new `main`). The work is TDD: for every step, write the listed tests first, watch them fail, then implement. Read `AGENTS.md`, `src/lib/AGENTS.md`, `src/components/AGENTS.md` and `migrations/AGENTS.md` before starting. Their traps apply to everything below.
 
 **Staging warning:** the main checkout has three untracked paths: `.agents/`, `ops/content/instagram/` and `src/pages/api/admin/verification/[id] (1).ts`. Stage files by explicit path. Never use `git add -A` or `git add .`.
@@ -15,7 +17,7 @@ Every blocking and important point in the critique is resolved. Each one was re-
 | **BLOCKING: open redirect through dot segments** (`/.//evil.example` and 6 more returned `//evil.example`) | Confirmed in node. `safeRedirectPath` (Step 1) now rejects any `.`/`..`/`%2e` path segment, before and after decoding. It rejects a decoded path containing `//`, requires a fixed point (re-parsing the output must give the same string on the same origin), and re-checks the output shape. All 7 critic inputs and 40+ others are pinned. A 300,000-case fuzz over a hostile alphabet produced 0 off-site outputs. The reference script is `C:/Users/mmcge/AppData/Local/Temp/claude/C--Users-mmcge-ratemyplace-boston/e4bed66b-7eb9-44e3-aa17-a1ef131b648b/scratchpad/plan-oct26/rev2/redirect2.mjs`. `/a/../review/new` is now **rejected**, not normalized. |
 | False "part of" note on directional streets | Confirmed: `100 West Broadway` and `100 W Broadway` both key `W BROADWAY 100-100`. The note now shows only when the matched row's `[st_num_lo, st_num_hi]` differs from the input's `[numLo, numHi]`. Tests cover both. |
 | Goal (c) only partly met until item 4 | The plan now says this outright (Sections 1c and 7, the risks, and the PR text). It recommends merging item 4 before this branch or on the same day, and pins the gap with a test the second-merging branch flips. |
-| Leak fix buried in step 6, and line 33 leaks too | Confirmed: `new.astro:33` also does `SELECT *`. The fix is now **Step 0**, a separate hotfix PR (`fix/review-form-select`) that ships first. It narrows both SELECTs and has a page-level HTML test. The repo is **public** (`gh repo view` → `PUBLIC`), so the hotfix PR description stays generic. |
+| Column-narrowing fix buried in step 6, and line 33 needs it too | Confirmed: `new.astro:33` also does `SELECT *`. The fix is now **Step 0**, a separate hotfix PR (`fix/review-form-select`) that ships first. It narrows both SELECTs and has a page-level HTML test. The repo is **public** (`gh repo view` → `PUBLIC`), so the hotfix PR description stays generic. |
 | Server code in the review-form bundle | Client helpers live in leaf modules with no runtime imports (`src/lib/reviewPaths.ts`, `src/lib/reviewSubmitOutcome.ts`, `src/lib/authRedirect.ts`). A source-scan test enforces this, and a post-build grep checks the client chunks. |
 | A 2xx with an unusable body navigates to `/building/undefined` | Submit outcomes are decided by a pure `submitOutcome()` in `src/lib`. A 2xx without a valid slug and id shows a "submitted, pending moderation" panel linking to `/profile`, with no reset and no re-enable. |
 | Minors | All taken; each is marked "(minor)" where it lands. The loop guard checks the decoded path. A handoff `existing` result now 302s to `?building=`, so reloads are free, and the limiter only gates the Google call. Try again never loads `api.js` twice. A `submittingRef` guard is added. HomeSearch comments may change. The insertBuilding `updated_at` is spelled out. Option 2 audit rows get per-row values. Check 8d no longer creates a review. The `/profile` and edit-page redirect is noted. The logging rule is stated. The exact-tier gap is added to follow-ups. The preview OAuth outcome is specified. |
@@ -41,8 +43,8 @@ The `?building=` path works and starts at `unit-details`.
 
 | Duplicate (user row) | Seeded twin | Place id on the duplicate |
 |---|---|---|
-| `fxprfippjn3bstne` "86 Crawford Street", 02121, `updated_at` 1791286537 | `seed-1202188000` "86-88 Crawford Street", `CRAWFORD ST` 86-88, 02121, `updated_at` 1788983774 | `ChIJNx18GtF744kR6W7CM_iVm58` |
-| `t6aaqyar342wrkhi` "9 Appian Way", 02134, `updated_at` 1791399579 | `seed-2201144001` "9-11 Appian Wy", `APPIAN WY` 9-11, 02134, `updated_at` 1788983965 | `ChIJJzsBVtd544kRa-LXILDKnKs` |
+| `<crawford-dup-id>`: a single-number Crawford Street row, 02121 | `seed-1202188000` "86-88 Crawford Street", `CRAWFORD ST` 86-88, 02121, `updated_at` 1788983774 | `<crawford-place-id>` |
+| `<appian-dup-id>`: a single-number Appian Way row, 02134 | `seed-2201144001` "9-11 Appian Wy", `APPIAN WY` 9-11, 02134, `updated_at` 1788983965 | `<appian-place-id>` |
 
 - Both duplicates have 0 reviews, 0 saves, 0 pulls, 0 records, 0 corrections, 0 queue rows, and no landlord or property manager.
 - Both duplicates have NULL `street_key`, `st_num_lo` and `st_num_hi`.
@@ -50,19 +52,18 @@ The `?building=` path works and starts at `unit-details`.
 
 **New findings (beyond the brief):**
 
-1. **The handoff is still creating rows.** There are 11 `source='user'` rows with NULL `street_key` since the seed (2026-09-09); the latest is 2026-10-25 07:10 UTC. All have 0 reviews. `POST /api/buildings` writes `street_key` for any parseable address, so all 11 came from the GET handoff:
+1. **The handoff is still creating rows.** There are 11 `source='user'` rows with NULL `street_key` since the seed (2026-09-09), the latest from late October. All have 0 reviews. `POST /api/buildings` writes `street_key` for any parseable address, so all 11 came from the GET handoff:
    - 2 are the Boston duplicates above.
-   - 3 are New Haven (92 Norton, 644 Orange, 900 Chapel).
-   - 6 are outside Boston and New Haven (Gilbert AZ, Moore OK, Tallahassee ×3, San Diego).
+   - 3 are in New Haven.
+   - 6 are outside Boston and New Haven.
 2. **Two suffix-table gaps affect dedupe** (checked with tsx against `identity.ts`):
    - `addressKey('9 Appian Way')` gives `APPIAN WAY`, but the seed key is `APPIAN WY`. `SUFFIX_SPELLINGS` has `['WAY']` and no `WY`.
    - The same miss applies to every parcel whose assessor suffix is absent from the table: about 375 parcels (`WY`, `HW`, `PW`, `LA`, `CI`, `RO`, ...), which item 4 (`fix/street-suffix-search`) targets.
    - `86 Crawford Street` gives `CRAWFORD ST` 86-86, which dedupes onto 86-88 today.
    - `100 West Broadway` and `100 W Broadway` both give `W BROADWAY` 100-100.
-3. **Security: island-prop leak on two lines.** `new.astro:23` (`?building=`) and `new.astro:33` (`?placeId=` tier 1) both `SELECT *` and pass the whole row to `<ReviewForm client:load>`. Astro serializes island props into the HTML, so `admin_notes`, `owner_name`, `owner_entity`, `owner_website` and `public_info` reach any signed-in user, and anyone can sign up.
-   - 3 production buildings have `admin_notes`: `kn5zn7ceem5e55ia`, `sb7ltjbou73kxfxq`, `sr5by3is2iyzgi2r`.
-   - The form reads only `id`, `address`, `neighborhood`, `city` (grep over `src/components/reviews/`).
-   - The GitHub repo `mereditharmcgee/ratemyplace` is **PUBLIC**.
+3. **Island props: fixed separately as Step 0.** `new.astro:23` (`?building=`) and `new.astro:33` (`?placeId=` tier 1) both `SELECT *` and pass the row to `<ReviewForm client:load>`.
+   - The form reads only `id`, `address`, `neighborhood`, `city` (grep over `src/components/reviews/`). Step 0 narrows both SELECTs to those four.
+   - The GitHub repo `mereditharmcgee/ratemyplace` is **PUBLIC**, so the details stay out of this repo.
 4. **`new.astro:45` puts the raw `placeId` into the Google URL path** with no encoding and no format check. `details.ts` does encode it.
 5. **The handoff skips `resolveBostonSubArea`**, which `details.ts:88-90` applies. Handoff rows store "Aberdeen" where other paths store "Brighton".
 6. **ConfirmStep can leak a widget.** If the script was not loaded at mount, the effect returns only `clearInterval` (`:79`), so a widget rendered later is never removed.
@@ -142,13 +143,13 @@ Branch `fix/review-form-select` from `main`. This is two lines of code plus one 
 - Use AstroContainer with the React server and client renderers, copied from `namedPartySsrVisibility.test.ts:107-122`. Guard with `const suite = sqliteAvailable ? describe : describe.skip`.
 - **Setup:**
   - `db = createRecordsTestDb()`.
-  - `db.exec("ALTER TABLE buildings ADD COLUMN admin_notes TEXT; ALTER TABLE buildings ADD COLUMN public_info TEXT; ALTER TABLE buildings ADD COLUMN owner_website TEXT;")`. The stub already has `owner_name` and `owner_entity`.
+  - Add, with `ALTER TABLE`, the admin-only building columns the stub lacks.
   - `insertBuilding(db, { id: 'b-leak', address: '45 Melnea Cass Blvd', city: 'Boston', zip_code: '02119', google_place_id: 'gp-leak' })`.
-  - `UPDATE buildings SET admin_notes='SENTINEL-ADMIN-NOTE', owner_name='SENTINEL-OWNER-NAME', owner_entity='SENTINEL-OWNER-ENTITY', public_info='SENTINEL-PUBLIC-INFO', owner_website='https://sentinel-owner.example' WHERE id='b-leak'`.
+  - Give every admin-only column of `b-leak` its own `SENTINEL-...` value.
 - **Locals:** `{ user: { id: 'u-1', email: 'u@example.com', isAdmin: false }, session: { id: 's-1' }, runtime: { env: { DB: db } } } as unknown as App.Locals`.
 - **Case A:** `renderToString` of `/review/new?building=b-leak`. The HTML contains `45 Melnea Cass Blvd`, and contains none of:
-  - the five sentinels;
-  - the key names `admin_notes`, `owner_name`, `owner_entity`, `owner_website`, `public_info`.
+  - the sentinels;
+  - the admin-only column names.
 - **Case B:** `/review/new?placeId=gp-leak` (tier-1 path, `new.astro:33`). Same assertions.
 - **Case C:** signed out (`user: null`). `renderToResponse` gives 302 with Location `/auth/signin?redirect=%2Freview%2Fnew%3FplaceId%3Dgp-leak`.
 - Watch A and B fail on `main`.
@@ -160,7 +161,7 @@ Branch `fix/review-form-select` from `main`. This is two lines of code plus one 
 
 **Commit and PR**
 - Commit `fix: select only the columns the review form renders`.
-- Keep the PR description generic, for example "The review form page now selects only the four columns the form uses." Do not name the exposed columns until it is live; the repo is public. Section 5 step 0 covers deploy and verification.
+- Keep the PR description generic, for example "The review form page now selects only the four columns the form uses." The repo is public. Section 5 step 0 covers deploy and verification.
 - Then branch `fix/review-funnel` from the updated `main`. The Step 6 rewrite keeps this narrowing through `loadReviewFormBuilding`.
 
 ### Step 1: `src/lib/authRedirect.ts` (new, leaf, no runtime imports)
@@ -503,7 +504,7 @@ How `resolveReviewHandoff` decides, in order:
   - With `{ partOf: true }`, the same path plus `&partOf=1`.
   - Add `reviewPaths.ts` to the leaf-guard list.
 - **Extend `reviewNewPage.test.ts` (from Step 0):**
-  - Case B now expects `renderToResponse` 302 with Location `/review/new?building=b-leak` (the tier-1 hit redirects). Case A still guards the leak on the page that redirect lands on.
+  - Case B now expects `renderToResponse` 302 with Location `/review/new?building=b-leak` (the tier-1 hit redirects). Case A still guards the island props on the page that redirect lands on.
   - `?building=b-leak&partOf=1` shows the `partOf` copy with "45 Melnea Cass Blvd".
   - `?building=b-leak` without the flag has no teal note.
   - `?building=missing` shows `notFound`.
@@ -697,7 +698,7 @@ Resource `error` events do not bubble, but window capture listeners receive them
 
 ### Step 9: e2e (yes, extend `review.spec.ts`)
 
-Today it covers only `?building=` paths, and none of the address-step click, the sign-in return, the handoff, retry or the leak.
+Today it covers only `?building=` paths, and none of the address-step click, the sign-in return, the handoff, retry or the island-props check.
 
 **`e2e/test-harness.ts`**
 - Export `TURNSTILE_SCRIPT` (the regex at line 14) so specs can unroute it.
@@ -771,7 +772,7 @@ Use `JSON.parse(executeLocalD1('SELECT COUNT(*) AS n FROM buildings'))[0].result
 2. **Bundle check:** after the build, `grep -l "st_num_lo\|places.googleapis.com\|google_place_id = ?" dist/_astro/*.js` must print nothing (it prints nothing on `main` today).
 3. Open the PR. Commit prefixes are `fix:`, `refactor:` and `docs:`.
 4. The PR text must include:
-   - the Step 0 leak, described now that it is live;
+   - nothing about which columns Step 0 stopped sending (owner decision, 2026-10-26);
    - the item-4 dependency for goal (c);
    - that `?redirect=/profile` from `profile.astro` is now honoured, and that the edit page now returns to itself.
 
@@ -797,18 +798,20 @@ Use `JSON.parse(executeLocalD1('SELECT COUNT(*) AS n FROM buildings'))[0].result
 
 Neither option should run without the owner's yes. Run it only **after** the main PR is deployed, so the old GET handoff cannot re-create a row in between.
 
+The SQL below uses placeholders (`<crawford-dup-id>`, `<appian-dup-id>`, `<crawford-place-id>`, `<appian-place-id>`, `<admin-id>`). Run it from the lead's unredacted copy, where they are filled in.
+
 **Why merge.** Deleting alone is fine for Crawford, because the address tier finds 86-88. For Appian it is not: until item 4 lands, a later Google pick of "9 Appian Way" misses the place-id and address-key tiers, and POST inserts a fresh row. Moving the place id onto the seeded parcel lets the place-id tier catch it today.
 
 **Confirm-first SELECTs.** Run each with `npx wrangler d1 execute ratemyplace-db --remote --json --command "..."`:
 
 ```sql
 -- A. Expect 4 rows: the two dups (source='user', street_key NULL, the two place ids) and the two seeds (google_place_id NULL). Record the seeds' updated_at (1788983774 / 1788983965 on 2026-10-26).
-SELECT id, address, slug, city, zip_code, source, google_place_id, street_key, st_num_lo, st_num_hi, parcel_id, created_at, updated_at FROM buildings WHERE id IN ('fxprfippjn3bstne','seed-1202188000','t6aaqyar342wrkhi','seed-2201144001');
+SELECT id, address, slug, city, zip_code, source, google_place_id, street_key, st_num_lo, st_num_hi, parcel_id, created_at, updated_at FROM buildings WHERE id IN ('<crawford-dup-id>','seed-1202188000','<appian-dup-id>','seed-2201144001');
 -- B. Every count must be 0, and landlord_id/property_manager_id NULL.
-SELECT b.id, (SELECT COUNT(*) FROM reviews WHERE building_id=b.id) AS reviews, (SELECT COUNT(*) FROM saved_buildings WHERE building_id=b.id) AS saves, (SELECT COUNT(*) FROM record_pulls WHERE building_id=b.id) AS pulls, (SELECT COUNT(*) FROM building_records WHERE building_id=b.id) AS records, (SELECT COUNT(*) FROM record_corrections WHERE building_id=b.id) AS corrections, (SELECT COUNT(*) FROM records_queue WHERE building_id=b.id) AS queue, b.landlord_id, b.property_manager_id FROM buildings b WHERE b.id IN ('fxprfippjn3bstne','t6aaqyar342wrkhi');
+SELECT b.id, (SELECT COUNT(*) FROM reviews WHERE building_id=b.id) AS reviews, (SELECT COUNT(*) FROM saved_buildings WHERE building_id=b.id) AS saves, (SELECT COUNT(*) FROM record_pulls WHERE building_id=b.id) AS pulls, (SELECT COUNT(*) FROM building_records WHERE building_id=b.id) AS records, (SELECT COUNT(*) FROM record_corrections WHERE building_id=b.id) AS corrections, (SELECT COUNT(*) FROM records_queue WHERE building_id=b.id) AS queue, b.landlord_id, b.property_manager_id FROM buildings b WHERE b.id IN ('<crawford-dup-id>','<appian-dup-id>');
 -- C. Expect exactly the two dup rows (idx_buildings_place_id is a partial UNIQUE index).
-SELECT id, google_place_id FROM buildings WHERE google_place_id IN ('ChIJNx18GtF744kR6W7CM_iVm58','ChIJJzsBVtd544kRa-LXILDKnKs');
--- D. The admin id to record. On 2026-10-26: hz5nyuvapccucqef (<owner personal address>), zeb2qgxefebywi5d.
+SELECT id, google_place_id FROM buildings WHERE google_place_id IN ('<crawford-place-id>','<appian-place-id>');
+-- D. The admin id to record as <admin-id>: any row this returns.
 SELECT id, email FROM users WHERE is_admin = 1;
 ```
 
@@ -816,16 +819,16 @@ SELECT id, email FROM users WHERE is_admin = 1;
 1. Save the SQL below to a file outside the repo (the session scratchpad), never in `migrations/`.
 2. Run it with `npx wrangler d1 execute ratemyplace-db --remote --file <path>`.
 
-Every statement is guarded, so a partial run is safe to re-run. The block shown is for Crawford; repeat it for Appian with `t6aaqyar342wrkhi`, `seed-2201144001` and `ChIJJzsBVtd544kRa-LXILDKnKs` (spelled out in `data_ops`).
+Every statement is guarded, so a partial run is safe to re-run. The block shown is for Crawford; repeat it for Appian with `<appian-dup-id>`, `seed-2201144001` and `<appian-place-id>` (spelled out in `data_ops`).
 
 ```sql
 INSERT INTO audit_logs (admin_user_id, admin_ip, action_type, entity_type, entity_id, old_value, new_value, notes)
-SELECT 'hz5nyuvapccucqef', 'wrangler-cli', 'building_deleted', 'building', b.id,
+SELECT '<admin-id>', 'wrangler-cli', 'building_deleted', 'building', b.id,
   json_object('id',b.id,'address',b.address,'slug',b.slug,'city',b.city,'zip_code',b.zip_code,'google_place_id',b.google_place_id,'latitude',b.latitude,'longitude',b.longitude,'source',b.source,'created_at',b.created_at),
   json_object('merged_into','seed-1202188000','moved_google_place_id',b.google_place_id),
   'Hand merge (fix/review-funnel): duplicate made by the /review/new?placeId handoff before it deduped; place id moved to the seeded parcel.'
 FROM buildings b
-WHERE b.id = 'fxprfippjn3bstne' AND b.source = 'user'
+WHERE b.id = '<crawford-dup-id>' AND b.source = 'user'
   AND NOT EXISTS (SELECT 1 FROM reviews WHERE building_id = b.id)
   AND NOT EXISTS (SELECT 1 FROM saved_buildings WHERE building_id = b.id)
   AND NOT EXISTS (SELECT 1 FROM record_pulls WHERE building_id = b.id)
@@ -834,20 +837,20 @@ WHERE b.id = 'fxprfippjn3bstne' AND b.source = 'user'
   AND NOT EXISTS (SELECT 1 FROM records_queue WHERE building_id = b.id)
   AND NOT EXISTS (SELECT 1 FROM audit_logs WHERE action_type = 'building_deleted' AND entity_id = b.id);
 DELETE FROM buildings
-WHERE id = 'fxprfippjn3bstne' AND source = 'user'
-  AND NOT EXISTS (SELECT 1 FROM reviews WHERE building_id = 'fxprfippjn3bstne')
-  AND NOT EXISTS (SELECT 1 FROM saved_buildings WHERE building_id = 'fxprfippjn3bstne')
-  AND NOT EXISTS (SELECT 1 FROM record_pulls WHERE building_id = 'fxprfippjn3bstne')
-  AND NOT EXISTS (SELECT 1 FROM building_records WHERE building_id = 'fxprfippjn3bstne')
-  AND NOT EXISTS (SELECT 1 FROM record_corrections WHERE building_id = 'fxprfippjn3bstne')
-  AND NOT EXISTS (SELECT 1 FROM records_queue WHERE building_id = 'fxprfippjn3bstne');
+WHERE id = '<crawford-dup-id>' AND source = 'user'
+  AND NOT EXISTS (SELECT 1 FROM reviews WHERE building_id = '<crawford-dup-id>')
+  AND NOT EXISTS (SELECT 1 FROM saved_buildings WHERE building_id = '<crawford-dup-id>')
+  AND NOT EXISTS (SELECT 1 FROM record_pulls WHERE building_id = '<crawford-dup-id>')
+  AND NOT EXISTS (SELECT 1 FROM building_records WHERE building_id = '<crawford-dup-id>')
+  AND NOT EXISTS (SELECT 1 FROM record_corrections WHERE building_id = '<crawford-dup-id>')
+  AND NOT EXISTS (SELECT 1 FROM records_queue WHERE building_id = '<crawford-dup-id>');
 -- updated_at deliberately untouched: a place id changes nothing on the page, and updated_at feeds sitemap lastmod.
-UPDATE buildings SET google_place_id = 'ChIJNx18GtF744kR6W7CM_iVm58'
+UPDATE buildings SET google_place_id = '<crawford-place-id>'
 WHERE id = 'seed-1202188000' AND google_place_id IS NULL
-  AND NOT EXISTS (SELECT 1 FROM buildings WHERE google_place_id = 'ChIJNx18GtF744kR6W7CM_iVm58');
+  AND NOT EXISTS (SELECT 1 FROM buildings WHERE google_place_id = '<crawford-place-id>');
 ```
 
-`admin_ip` is NOT NULL. `'wrangler-cli'` is a sentinel rather than an IP, so it does not widen IP storage. Use `zeb2qgxefebywi5d` as the admin id if the owner prefers.
+`admin_ip` is NOT NULL. `'wrangler-cli'` is a sentinel rather than an IP, so it does not widen IP storage. Any admin id from SELECT D will do; the owner picks.
 
 **Option 2: DELETE only.** Run the INSERT and DELETE pairs with **per-row** `new_value`s and `notes`, and skip both UPDATEs:
 - Crawford: `json_object('reason','duplicate of seed-1202188000; no dependents')`.
@@ -860,16 +863,16 @@ The cost: "9 Appian Way" can be re-created until item 4 merges.
 
 ```sql
 -- MERGE: expect 2 rows (the seeds) carrying the place ids, updated_at equal to SELECT A's values. DELETE-only: the seeds with google_place_id NULL.
-SELECT id, google_place_id, updated_at FROM buildings WHERE id IN ('fxprfippjn3bstne','t6aaqyar342wrkhi','seed-1202188000','seed-2201144001');
+SELECT id, google_place_id, updated_at FROM buildings WHERE id IN ('<crawford-dup-id>','<appian-dup-id>','seed-1202188000','seed-2201144001');
 -- expect 2 rows
-SELECT id, action_type, entity_id, new_value FROM audit_logs WHERE entity_id IN ('fxprfippjn3bstne','t6aaqyar342wrkhi');
+SELECT id, action_type, entity_id, new_value FROM audit_logs WHERE entity_id IN ('<crawford-dup-id>','<appian-dup-id>');
 ```
 
-Then check that `curl -s -o /dev/null -w '%{http_code}' https://ratemyplace.org/building/86-crawford-street-boston` returns 404 and `/building/86-88-crawford-street-boston` returns 200. The deleted slugs were never in the sitemap: no parcel and no approved review.
+Then check with `curl -s -o /dev/null -w '%{http_code}' https://ratemyplace.org/building/<slug>` that each duplicate's slug (from SELECT A) returns 404 and `/building/86-88-crawford-street-boston` returns 200. The deleted slugs were never in the sitemap: no parcel and no approved review.
 
 **Not in this branch (owner):** the other 9 handoff rows.
 - The 6 outside Boston and New Haven are exactly what the audited "Delete orphan buildings" button in `/admin/buildings` removes.
-- The 3 New Haven zero-review rows are a keep-or-delete call. "92 Norton Street" sits next to the reviewed "93 Norton Street"; these are different numbers, not a confirmed duplicate.
+- The 3 New Haven zero-review rows are a keep-or-delete call. None is a confirmed duplicate of a reviewed row.
 
 ---
 
@@ -880,7 +883,7 @@ Merging to `main` auto-deploys the site. The records Worker is unaffected.
 **Step 0 hotfix**, after its merge:
 1. `curl -s https://ratemyplace.org/api/health` shows the merge SHA.
 2. Run `npm run smoke -- --environment production --base-url https://ratemyplace.org --expected-release <40-char sha>`.
-3. **Owner, signed in:** view-source of `https://ratemyplace.org/review/new?building=kn5zn7ceem5e55ia` (a building with admin notes). Searching for `admin_notes`, `owner_name` and `public_info` finds nothing. Before the hotfix, `admin_notes` is present.
+3. **Owner, signed in:** view-source of `https://ratemyplace.org/review/new?building=<id>` for a building with admin-only fields filled in (the id is in the lead's copy). The island props carry only `id`, `address`, `neighborhood` and `city`.
 
 **Main PR**, after its merge:
 1. **Release and smoke.** Run the same health and smoke checks with the new SHA.
