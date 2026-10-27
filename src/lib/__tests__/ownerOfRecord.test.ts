@@ -5,6 +5,7 @@ import {
   isResidentialAssessment,
   linkableOwnerKey,
   ownerKey,
+  ownerRowFromAssessment,
 } from '../records/ownerOfRecord';
 import { showMailingAddress } from '../records/display';
 
@@ -138,5 +139,43 @@ describe('linkableOwnerKey', () => {
     expect(linkableOwnerKey(typedPerson, 1)).toBeNull();
     expect(linkableOwnerKey(typedPerson, 2)).toBe('DOE JANE');
     expect(linkableOwnerKey({ owner: 'sample holdings llc', condominium: false }, 0)).toBe('SAMPLE HOLDINGS LLC');
+  });
+});
+
+describe('ownerRowFromAssessment', () => {
+  const assessment = {
+    fiscalYear: 'FY2026',
+    parcelId: '0100001000',
+    owner: '  Example Realty, L.P. ',
+    condominium: false,
+    landUse: 'R3',
+    landUseDescription: 'THREE-FAM DWELLING',
+  };
+
+  it('keeps the owner as recorded beside its key and both flags', () => {
+    expect(ownerRowFromAssessment('b-1', assessment)).toEqual({
+      buildingId: 'b-1',
+      fiscalYear: 'FY2026',
+      parcelId: '0100001000',
+      owner: 'Example Realty, L.P.',
+      ownerKey: 'EXAMPLE REALTY LP',
+      isEntity: 1,
+      residential: 1,
+    });
+    expect(ownerRowFromAssessment('b-2', { ...assessment, owner: 'DOE JANE', landUse: 'C', landUseDescription: 'COMMERCIAL' })).toMatchObject({
+      ownerKey: 'DOE JANE',
+      isEntity: 0,
+      residential: 0,
+    });
+  });
+
+  it('has no row for a condominium or a blank owner', () => {
+    expect(ownerRowFromAssessment('b-1', { ...assessment, condominium: true })).toBeNull();
+    expect(ownerRowFromAssessment('b-1', { ...assessment, owner: null })).toBeNull();
+    expect(ownerRowFromAssessment('b-1', { ...assessment, owner: ' , ' })).toBeNull();
+  });
+
+  it('stores a blank parcel id as null, so the person rule never counts it', () => {
+    expect(ownerRowFromAssessment('b-1', { ...assessment, parcelId: '  ' })?.parcelId).toBeNull();
   });
 });

@@ -1,9 +1,9 @@
 // Rules for linking an assessor owner of record to the other buildings recorded under the
-// same name. Pure functions only: nothing here reads the database. The lookup itself is not
-// built yet, because the owner name lives only inside `building_records.payload` JSON and a
-// name match across every building is a full scan of that table on each request (see
-// docs/superpowers/specs/2026-10-27-owner-of-record-list-design.md). These rules hold
-// whatever storage the lookup ends up using.
+// same name. Pure functions only: nothing here reads the database. `owners.ts` writes the
+// row these functions compute into `building_owners` during a pull, the owners backfill
+// writes the same row from stored payloads, and `ownerList.ts` reads it back for the panel
+// link, the list page and landlord search (see
+// docs/superpowers/specs/2026-10-27-owner-of-record-list-design.md).
 //
 // Three rules, each a guardrail rather than a formatting choice:
 // 1. Group by the exact owner name only, normalized for case, spacing and punctuation.
@@ -87,4 +87,43 @@ export function linkableOwnerKey(
   if (key === null) return null;
   if (isEntityOwner(key)) return key;
   return residentialParcels >= MIN_PARCELS_FOR_PERSON ? key : null;
+}
+
+/**
+ * One `building_owners` row: the owner of record off one assessor row, with every derived
+ * column the list, the panel link and landlord search read. Both writers build it here, the
+ * pull (`owners.ts`) and the owners backfill, so the two cannot compute a different key.
+ */
+export interface OwnerRow {
+  buildingId: string;
+  fiscalYear: string;
+  parcelId: string | null;
+  /** As the assessor recorded it, trimmed. */
+  owner: string;
+  ownerKey: string;
+  isEntity: 0 | 1;
+  residential: 0 | 1;
+}
+
+/**
+ * The owner row for a building's assessor row, or null when there is nothing to link: a
+ * condominium parcel (no single owner of record is shown, so none is stored) or a blank owner.
+ */
+export function ownerRowFromAssessment(
+  buildingId: string,
+  assessment: Pick<AssessmentPayload, 'fiscalYear' | 'parcelId' | 'owner' | 'condominium' | 'landUse' | 'landUseDescription'>,
+): OwnerRow | null {
+  if (assessment.condominium) return null;
+  const owner = assessment.owner?.trim() ?? '';
+  const key = ownerKey(owner);
+  if (key === null) return null;
+  return {
+    buildingId,
+    fiscalYear: assessment.fiscalYear,
+    parcelId: assessment.parcelId?.trim() || null,
+    owner,
+    ownerKey: key,
+    isEntity: isEntityOwner(key) ? 1 : 0,
+    residential: isResidentialAssessment(assessment) ? 1 : 0,
+  };
 }
