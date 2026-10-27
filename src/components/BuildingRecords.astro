@@ -28,6 +28,7 @@ import {
   KIND_LABELS,
   REQUESTED_COPY,
   REQUEST_PARKED_COPY,
+  REFRESH_REQUESTED_COPY,
   STALE_PULL_NOTE,
   SOURCES_HEADING,
   SOURCES_CREDIT_LEAD,
@@ -40,6 +41,7 @@ import {
   ANALYZE_BOSTON_URL,
   BOSTON_OPEN_DATA_LICENSE,
   recordsCitations,
+  showRefreshButton,
   showStalePullNote,
 } from '../lib/records/provenance';
 import { ledgerModel } from '../lib/records/ledger';
@@ -75,6 +77,8 @@ let view: BuildingRecordsView | null = null;
 // panel read: a queue or coverage read that fails costs the page nothing but the button,
 // where sharing the panel's try/catch would have cost it the whole panel.
 let requestState: RecordsRequestState = 'ineligible';
+// One clock for the page: the state's `stale` and the note's age are read against the same now.
+const nowSeconds = Math.floor(Date.now() / 1000);
 try {
   view = await getBuildingRecords(Astro.locals.runtime.env.DB, buildingId);
 } catch (error) {
@@ -86,7 +90,7 @@ try {
 }
 if (view) {
   try {
-    requestState = await recordsRequestState(Astro.locals.runtime.env.DB, buildingId);
+    requestState = await recordsRequestState(Astro.locals.runtime.env.DB, buildingId, nowSeconds);
   } catch (error) {
     logError('records_request_state_failed', {
       buildingId,
@@ -103,12 +107,14 @@ const ledger = view ? ledgerModel(view, new Date()) : null;
 // The line under the heading says when this site pulled the records, plus a plain note once
 // that pull is older than the refresh interval. The list at the foot cites the resources the
 // stored pulls came from, one link per resource (`lib/records/provenance.ts`).
-const nowSeconds = Math.floor(Date.now() / 1000);
 const pulledLine = view
   ? [pulledFromLine(view.pulledAt), showStalePullNote(requestState, view.pulledAt, nowSeconds) ? STALE_PULL_NOTE : null]
       .filter(Boolean)
       .join(' ')
   : '';
+// Under that note, on a building whose records are in and old with nothing queued: the same
+// request island, worded "Ask for newer records". Once a new pull is queued, a line instead.
+const offerRefresh = view ? showRefreshButton(requestState, view.pulledAt, nowSeconds) : false;
 const citations = view ? recordsCitations(Object.keys(view.sources)) : [];
 // The resource links stand alone on their lines, padded to a 28px-tall hit area like each
 // row's Source link. The two links inside the credit sentence stay inline so the sentence
@@ -144,6 +150,10 @@ const chartsClass = 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5';
       <div>
         <h2 class="text-xl font-semibold text-gray-900">Public records</h2>
         <p class="mt-0.5 text-xs text-gray-500">{pulledLine}</p>
+        {offerRefresh && <RecordsRequestButton client:load buildingId={buildingId} initialState="stale" />}
+        {requestState === 'refresh_requested' && (
+          <p class="mt-2 text-sm text-gray-600" role="status">{REFRESH_REQUESTED_COPY}</p>
+        )}
       </div>
       {/* Padded to a 44px tap target rather than sized as bare text — it is the panel's one
           call to action and it sits on a phone next to a scrolling list. */}
