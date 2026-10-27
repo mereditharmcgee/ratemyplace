@@ -246,7 +246,7 @@ export default function UsersTable({ currentUserId }: Props) {
         )}
       </div>
 
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-600">
         Showing {filteredUsers.length} of {users.length} users
       </div>
     </div>

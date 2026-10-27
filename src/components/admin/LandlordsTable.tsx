@@ -192,7 +192,7 @@ export default function LandlordsTable() {
   };
 
   const getScoreColor = (score: number | null) => {
-    if (score === null) return 'text-gray-400';
+    if (score === null) return 'text-gray-600';
     return getScoreTextColor(score);
   };
 
@@ -375,7 +375,7 @@ export default function LandlordsTable() {
                     )}
                   </div>
                   <svg
-                    className={`w-5 h-5 text-gray-400 transition-transform ${
+                    className={`w-5 h-5 text-gray-500 transition-transform ${
                       expandedLandlord === landlord.id ? 'rotate-180' : ''
                     }`}
                     fill="none"
@@ -582,7 +582,7 @@ export default function LandlordsTable() {
       )}
 
       {/* Pagination footer — search filters are client-side and only see the loaded slice */}
-      <div className="flex items-center justify-between text-sm text-gray-500">
+      <div className="flex items-center justify-between text-sm text-gray-600">
         <span>
           Showing {filteredLandlords.length}
           {search ? ` of ${landlords.length} loaded` : ''} ({total} total)

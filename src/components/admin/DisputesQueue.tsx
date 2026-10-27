@@ -240,7 +240,7 @@ export default function DisputesQueue() {
                       {dispute.status}
                     </span>
                     <svg
-                      className={`w-5 h-5 text-gray-400 transition-transform ${
+                      className={`w-5 h-5 text-gray-500 transition-transform ${
                         expandedDispute === dispute.id ? 'rotate-180' : ''
                       }`}
                       fill="none"
@@ -434,7 +434,7 @@ export default function DisputesQueue() {
         </div>
       )}
 
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-600">
         Showing {sortedDisputes.length} of {disputes.length} disputes
       </div>
     </div>

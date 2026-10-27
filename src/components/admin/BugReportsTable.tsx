@@ -202,7 +202,7 @@ export default function BugReportsTable() {
                     {bug.status === 'wont_fix' ? "won't fix" : bug.status === 'in_progress' ? 'in progress' : bug.status}
                   </span>
                   <svg
-                    className={`w-5 h-5 text-gray-400 transition-transform ${expandedBug === bug.id ? 'rotate-180' : ''}`}
+                    className={`w-5 h-5 text-gray-500 transition-transform ${expandedBug === bug.id ? 'rotate-180' : ''}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -287,7 +287,7 @@ export default function BugReportsTable() {
                       <button
                         onClick={() => updateBug(bug.id, 'in_progress', adminNotes)}
                         disabled={processing === bug.id}
-                        className="px-4 py-2 bg-amber-500 text-white rounded-[6px] text-sm font-medium hover:bg-amber-600 disabled:opacity-50"
+                        className="px-4 py-2 bg-amber-700 text-white rounded-[6px] text-sm font-medium hover:bg-amber-800 disabled:opacity-50"
                       >
                         {processing === bug.id ? 'Updating...' : 'Mark in progress'}
                       </button>
@@ -297,7 +297,7 @@ export default function BugReportsTable() {
                         <button
                           onClick={() => updateBug(bug.id, 'resolved', adminNotes)}
                           disabled={processing === bug.id}
-                          className="px-4 py-2 bg-green-600 text-white rounded-[6px] text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                          className="px-4 py-2 bg-green-700 text-white rounded-[6px] text-sm font-medium hover:bg-green-800 disabled:opacity-50"
                         >
                           {processing === bug.id ? 'Updating...' : 'Resolve'}
                         </button>
@@ -333,7 +333,7 @@ export default function BugReportsTable() {
         </div>
       )}
 
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-600">
         Showing {filteredBugs.length} of {bugs.length} bug reports
       </div>
     </div>

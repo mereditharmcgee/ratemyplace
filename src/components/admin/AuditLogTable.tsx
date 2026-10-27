@@ -142,7 +142,7 @@ export default function AuditLogTable() {
       </div>
 
       {/* Results count */}
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-600">
         Showing {logs.length} of {total} audit log entries
       </div>
 
@@ -175,7 +175,7 @@ export default function AuditLogTable() {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
                     <div>{log.admin_email || 'Unknown'}</div>
-                    <div className="text-xs text-gray-400">{log.admin_ip}</div>
+                    <div className="text-xs text-gray-600">{log.admin_ip}</div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className={`px-2 py-1 text-xs font-medium rounded ${getActionColor(log.action_type)}`}>
@@ -184,7 +184,7 @@ export default function AuditLogTable() {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
                     <div className="capitalize">{log.entity_type}</div>
-                    <div className="text-xs text-gray-400 font-mono">{log.entity_id.slice(0, 8)}...</div>
+                    <div className="text-xs text-gray-600 font-mono">{log.entity_id.slice(0, 8)}...</div>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700">
                     {isExpanded ? (
@@ -209,7 +209,7 @@ export default function AuditLogTable() {
                         )}
                       </div>
                     ) : (
-                      <span className="text-gray-400 text-xs">Click to expand</span>
+                      <span className="text-gray-600 text-xs">Click to expand</span>
                     )}
                   </td>
                 </tr>

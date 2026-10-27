@@ -54,7 +54,7 @@ export default function BuildingsFilterBar({
           />
           Outside Boston / New Haven, no reviews
         </label>
-        {refreshing && <span className="text-gray-500">Updating...</span>}
+        {refreshing && <span className="text-gray-600">Updating...</span>}
       </div>
     </div>
   );
