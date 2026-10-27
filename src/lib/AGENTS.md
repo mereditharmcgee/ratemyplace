@@ -371,6 +371,15 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   `streetKey`.** It removes a comma-less trailing "Boston" / neighborhood / "MA" / ZIP tail
   that `normalizeStreet`'s comma rule cannot see. `streetKey` takes a street it has already
   been handed, so adding the stripper there would change seed keys.
+- **`recordGroups.ts` sorts 311 into the panel's three groups at render time** (living
+  conditions, building safety and code, property upkeep, in that order), by the request type
+  the city recorded. It never changes the pull-time `classification` in
+  `sources/boston/serviceRequests.ts`, which the daily fixture check and the breaker read, so
+  editing the table needs no Worker deploy and cannot pause the fill. A request the pull
+  calls `housing` always lands in a group; a type in no group is counted, never listed. The
+  methodology page renders the same table, so add a type there and nowhere else. ISD
+  violations are counted by case number and Public Works tickets by ticket number
+  (`ledger.ts`), not by code line.
 - **`display.ts` holds a privacy gate.** `showMailingAddress` publishes a tax mailing
   address only for an owner that reads as an entity, and `mailingAddressLine` holds the
   addressee to the same test — an entity can list a person as its `C/O ATT`. It errs

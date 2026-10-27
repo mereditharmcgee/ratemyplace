@@ -2,6 +2,7 @@
 import BaseLayout from '../components/layout/BaseLayout.astro';
 import { getScoreColor, getScoreTextColor, getScoreBgTint } from '../lib/scoring-colors';
 import { NAMED_PARTY_MIN_REVIEWS } from '../lib/scoring';
+import { RECORD_GROUPS, SERVICE_REQUEST_TYPE_GROUPS } from '../lib/records/recordGroups';
 
 // Drive the four-card legend from the canonical helper so any future band-name
 // or color change propagates here automatically. Range and qualifier text stay
@@ -584,8 +585,23 @@ const realExamples = [
           Some building pages show public records from the City of Boston beneath the building details. Every value there is a field from a primary record or a count of records, carrying the date it was retrieved and a link to the dataset it came from. Those records never enter a building, landlord, or property manager score, and no number on this page changes because of them. Reviews are the judgment layer. The records panel has no opinion.
         </p>
         <p class="text-gray-600">
-          311 service requests are labelled housing-related by a published list of the city's own categories, Housing, Building, and Code Enforcement, plus requests the city routes to Inspectional Services. The panel carries that list in a "How requests are classified" note under the counts, so the split can be checked rather than taken on trust.
+          The panel sorts the city's records into three groups, in this order. Living conditions: 311 requests about conditions inside the home, such as heat, utilities, pests (including rodent activity reported to Inspectional Services), mold, unsafe or dangerous conditions, and living-condition and maintenance complaints. Building safety and code: ISD violations, 311 building and code requests such as work without a permit, contractor complaints, and inspection requests, and building permits, which are a record of permitted work rather than a problem. Property upkeep: Public Works code enforcement tickets and 311 requests about trash storage, unshoveled sidewalks, illegal dumping, and the condition of the property. No group is scored or ranked.
         </p>
+        <p class="text-gray-600 mt-4">
+          A 311 request is placed by the request type the city recorded, using the list below. A type not on the list goes by the category the city filed it under: Housing to living conditions, Code Enforcement to property upkeep, and Building, or Inspectional Services in the city's newer 311 system, to building safety and code. Any other 311 request at or near the address, such as parking, street cleaning, or a streetlight, is counted on the panel but not listed. ISD violations are counted by case number and Public Works tickets by ticket number, so several code lines cited on one case or ticket count once.
+        </p>
+        <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4">
+          {RECORD_GROUPS.map((group) => (
+            <div>
+              <h3 class="text-sm font-semibold text-gray-900">{group.title}</h3>
+              <ul class="mt-1 space-y-0.5 text-xs text-gray-600">
+                {SERVICE_REQUEST_TYPE_GROUPS[group.id].map((type) => (
+                  <li>{type}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
         <p class="text-gray-600 mt-4">
           How often records refresh: a building with a review, a saved follower, or a reader's records request is re-pulled about monthly. Every other Boston building is pulled once in a city-wide pass. After that pass its records are refreshed only if the building gains a review or a saved follower, which puts it on the monthly cycle above. Every value on the panel shows its own retrieval date, so a reader never has to guess which rule applied.
         </p>

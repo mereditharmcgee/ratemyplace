@@ -1,10 +1,13 @@
-// The view model behind the public records ledger: four sources, each reduced to a count, a
-// span, a breakdown, and a list of rows the template prints without deciding anything.
+// The view model behind the public records ledger: the city's records in three groups
+// (living conditions, building safety and code, property upkeep), each source reduced to a
+// count, a span, a breakdown, and a list of rows the template prints without deciding anything.
 //
 // Product rule, non-negotiable: the panel has no opinion. Everything below is a count of
 // stored rows, a field off one of them, or a span of the years they cover. Nothing here
-// reads a figure and decides what it means, and no ordering encodes a judgement — violations
-// are grouped by the city's own status word, which is a fact about the record.
+// reads a figure and decides what it means, and no ordering encodes a judgement — ISD and
+// Public Works lines are grouped under the city's own case or ticket number and listed by the
+// city's own status word, which are facts about the record. Which group a 311 request sits in
+// comes from the request type the city recorded (`recordGroups.ts`).
 //
 // This exists so the counts can be tested without rendering a page. It lived in
 // `BuildingRecords.astro`'s frontmatter, where "does a never-pulled source show a dash"
@@ -12,28 +15,35 @@
 import { ROW_CAP } from './ckan';
 import { countByKey, countByYear, observedYears, type KeyBreakdown, type YearCount } from './charts';
 import {
+  CAPPED_CODE_LINES_COPY,
   CAPPED_REQUESTS_COPY,
   CAPPED_ROWS_COPY,
+  CAPPED_VIOLATION_LINES_COPY,
   PERMIT_COVERAGE_YEAR_NUMBER,
   STILL_OPEN_NOTE,
+  caseLinesNote,
   formatDollarsCompact,
   formatRecordDate,
   isOpenStatus,
   openSubCount,
   orNotRecorded,
+  otherRequestsLine,
   permitSummary,
   rentSmartDisagreement,
-  splitServiceRequests,
+  showAllLabel,
   statusText,
   stillOpenLabel,
+  ticketLinesNote,
   yearSpanLabel,
   type PermitSummary,
 } from './display';
+import { groupServiceRequests } from './recordGroups';
 import { PERMITS_RESOURCE_ID } from './sources/boston/permits';
 import { VIOLATIONS_RESOURCE_ID } from './sources/boston/violations';
 import { ENFORCEMENT_RESOURCE_ID } from './sources/boston/enforcement';
 import { NEW_311_RESOURCE_ID } from './sources/boston/serviceRequests';
 import type { BuildingRecordsView, SourceStatus } from './query';
+import type { EnforcementTicketPayload, ServiceRequestPayload, ViolationPayload } from './types';
 
 /** The figure a source with nothing to count shows. Not a zero, which would be a finding. */
 const NO_COUNT = '—';
@@ -77,16 +87,38 @@ export interface LedgerSection {
    * city records. Null when it lists none, and always null for permits, whose status is kept.
    */
   openNote: string | null;
+  /** The label on the disclosure over the full list. */
+  showAll: string;
 }
 
 export interface RequestsSection extends LedgerSection {
   /** The open rows on their own, listed above the full disclosure. */
   openRows: RecordRow[];
-  /** Requests at this address the city did not file as housing. Counted, never listed. */
-  otherCount: number;
   years: YearCount[];
   types: KeyBreakdown;
-  rentSmartNote: string | null;
+}
+
+/**
+ * One ISD case or one Public Works ticket: the number the city files it under and the code
+ * lines it holds. Nobody can ask the city about a record without its number, and six lines
+ * from one inspection are one case, not six.
+ */
+export interface RecordCase {
+  /** The case or ticket number as the city recorded it. */
+  id: string;
+  /** `Case V100001` / `Ticket T1`, as printed. */
+  label: string;
+  /** The most recent status date among its lines, as stored. */
+  date: string | null;
+  /** Whether any of its lines is still open in the city's records. */
+  open: boolean;
+  /** Its lines, open first. A line's date shows in `trailing` only where it differs from the case's. */
+  lines: RecordRow[];
+}
+
+export interface CaseSection extends LedgerSection {
+  /** The rows grouped under their case or ticket number. `rows` keeps the flat lines. */
+  cases: RecordCase[];
 }
 
 export interface PermitsSection extends LedgerSection {
@@ -95,19 +127,33 @@ export interface PermitsSection extends LedgerSection {
   types: KeyBreakdown;
 }
 
-export interface EnforcementSection extends LedgerSection {
+export interface EnforcementSection extends CaseSection {
   types: KeyBreakdown;
 }
 
-export interface ViolationsSection extends LedgerSection {
+export interface ViolationsSection extends CaseSection {
   years: YearCount[];
 }
 
+/** What sits under the three groups: the 311 requests in none of them, and the RentSmart cross-check. */
+export interface OtherRequests {
+  count: number;
+  /** The sentence that counts them. Null when there are none, or when 311 has no count to give. */
+  line: string | null;
+  rentSmartNote: string | null;
+}
+
 export interface LedgerModel {
-  requests: RequestsSection;
-  permits: PermitsSection;
-  enforcement: EnforcementSection;
+  /** Group 1, living conditions. */
+  living: RequestsSection;
+  /** Group 2, building safety and code. */
   violations: ViolationsSection;
+  buildingRequests: RequestsSection;
+  permits: PermitsSection;
+  /** Group 3, property upkeep. */
+  enforcement: EnforcementSection;
+  upkeepRequests: RequestsSection;
+  other: OtherRequests;
 }
 
 function statusFor(view: BuildingRecordsView, sourceId: string): SourceStatus | null {
@@ -134,11 +180,6 @@ function cappedNote(rowCount: number, note: string): string | null {
   return rowCount >= ROW_CAP ? note : null;
 }
 
-/** Open rows first, then everything else, each group keeping the query's date order. */
-function openFirst<T extends { status: string | null }>(rows: readonly T[]): T[] {
-  return [...rows.filter((row) => isOpenStatus(row.status)), ...rows.filter((row) => !isOpenStatus(row.status))];
-}
-
 function closedTrailing(closedAt: string | null): string | null {
   return closedAt ? ` · closed ${formatRecordDate(closedAt)}` : null;
 }
@@ -156,43 +197,130 @@ function openNoteFor(openCount: number): string | null {
   return openCount > 0 ? STILL_OPEN_NOTE : null;
 }
 
-export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
-  const currentYear = now.getFullYear();
+const REQUEST_NOUN = { one: 'request', many: 'requests' };
 
-  // --- 311 housing requests -------------------------------------------------
-  const requestStatus = statusFor(view, NEW_311_RESOURCE_ID);
-  const { housing, otherCount } = splitServiceRequests(view.serviceRequests);
-  // `hasRows` is about the source, not the section: a pull that returned only non-housing
-  // requests still answered, so a later failure is a stale answer rather than no answer.
-  const requestsCountable = isCountable(requestStatus, view.serviceRequests.length > 0);
-  const openRequests = housing.filter((row) => isOpenStatus(row.status));
-  const requestYears = countByYear(housing, (row) => row.openedAt, { to: currentYear });
-  const requestRow = (row: (typeof housing)[number], trailing: string | null): RecordRow => ({
+/**
+ * One 311 group's section. Every group reads the same source, so whether there is a count at
+ * all, and whether the cap bit, is the source's answer rather than the group's: a pull that
+ * returned only other requests still answered, so a later failure is a stale answer rather
+ * than no answer.
+ */
+function requestsSection(
+  view: BuildingRecordsView,
+  rows: readonly ServiceRequestPayload[],
+  currentYear: number,
+): RequestsSection {
+  const status = statusFor(view, NEW_311_RESOURCE_ID);
+  const hasRows = view.serviceRequests.length > 0;
+  const countable = isCountable(status, hasRows);
+  const open = rows.filter((row) => isOpenStatus(row.status));
+  const years = countByYear(rows, (row) => row.openedAt, { to: currentYear });
+  const toRow = (row: ServiceRequestPayload, trailing: string | null): RecordRow => ({
     date: row.openedAt,
     label: row.type ?? row.title ?? 'Request',
     status: row.status,
     statusLabel: caseStatusLabel(row.status, row.openedAt),
     trailing,
   });
-
-  const requests: RequestsSection = {
-    status: requestStatus,
-    hasRows: view.serviceRequests.length > 0,
-    count: requestsCountable ? String(housing.length) : NO_COUNT,
-    subCount: requestsCountable ? openSubCount(openRequests.length, housing.length) : '',
-    span: requestsCountable ? yearSpanLabel(observedYears(requestYears)) : null,
-    note:
-      requestsCountable && otherCount > 0
-        ? `${otherCount} other request${otherCount === 1 ? '' : 's'} not shown`
-        : null,
+  return {
+    status,
+    hasRows,
+    count: countable ? String(rows.length) : NO_COUNT,
+    subCount: countable ? openSubCount(open.length, rows.length) : '',
+    span: countable ? yearSpanLabel(observedYears(years)) : null,
+    note: null,
+    // 311's cap applies before grouping, so every group carries the note when it bites.
     cappedNote: cappedNote(view.serviceRequests.length, CAPPED_REQUESTS_COPY),
-    rows: housing.map((row) => requestRow(row, closedTrailing(row.closedAt))),
-    openNote: openNoteFor(openRequests.length),
-    openRows: openRequests.map((row) => requestRow(row, null)),
-    otherCount,
-    years: requestYears,
-    types: countByKey(housing, (row) => row.type ?? row.title, 6),
-    rentSmartNote: rentSmartDisagreement(view.rentsmart, housing.length),
+    rows: rows.map((row) => toRow(row, closedTrailing(row.closedAt))),
+    openNote: openNoteFor(open.length),
+    openRows: open.map((row) => toRow(row, null)),
+    years,
+    types: countByKey(rows, (row) => row.type ?? row.title, 6),
+    showAll: showAllLabel(rows.length, REQUEST_NOUN),
+  };
+}
+
+/** A line's own date beside it, only where it differs from the date its case shows. */
+function lineDateTrailing(lineDate: string | null, caseDate: string | null): string | null {
+  if (!lineDate || lineDate.slice(0, 10) === (caseDate ?? '').slice(0, 10)) return null;
+  return ` · ${formatRecordDate(lineDate)}`;
+}
+
+/**
+ * Rows grouped under the number the city files them by. Open cases first, then the rest, each
+ * keeping the query's own order (the feeds are fetched newest status date first). A case's date
+ * is the most recent status date among its lines; inside a case, open lines come first.
+ */
+export function groupIntoCases<T extends ViolationPayload>(
+  rows: readonly T[],
+  keyOf: (row: T) => string,
+  caseLabel: (key: string, row: T) => string,
+  lineLabel: (row: T) => string,
+): RecordCase[] {
+  const byKey = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    const list = byKey.get(key);
+    if (list) list.push(row);
+    else byKey.set(key, [row]);
+  }
+  const cases: RecordCase[] = Array.from(byKey.entries()).map(([key, lines]) => {
+    // Plain string comparison on the stored timestamps, never `Date` (see formatRecordDate).
+    const date = lines.reduce<string | null>(
+      (latest, line) => (line.statusDate && (latest === null || line.statusDate > latest) ? line.statusDate : latest),
+      null,
+    );
+    const ordered = [
+      ...lines.filter((line) => isOpenStatus(line.status)),
+      ...lines.filter((line) => !isOpenStatus(line.status)),
+    ];
+    return {
+      id: key,
+      label: caseLabel(key, lines[0]),
+      date,
+      open: lines.some((line) => isOpenStatus(line.status)),
+      lines: ordered.map((line) => ({
+        date: line.statusDate,
+        label: lineLabel(line),
+        status: line.status,
+        // The feed has a status date, not a filing date, so no filing year is claimed.
+        statusLabel: caseStatusLabel(line.status, null),
+        trailing: lineDateTrailing(line.statusDate, date),
+      })),
+    };
+  });
+  return [...cases.filter((entry) => entry.open), ...cases.filter((entry) => !entry.open)];
+}
+
+/** A Public Works ticket's number, or its case number when the feed left the ticket number blank. */
+export function ticketKey(row: Pick<EnforcementTicketPayload, 'ticketNumber' | 'caseNumber'>): string {
+  const ticket = row.ticketNumber?.trim() ?? '';
+  return ticket !== '' ? ticket : row.caseNumber;
+}
+
+function violationLineLabel(row: ViolationPayload): string {
+  return [row.code, row.description].filter(Boolean).join(' · ') || 'Violation';
+}
+
+export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
+  const currentYear = now.getFullYear();
+
+  // --- 311, split across the three groups -----------------------------------
+  const grouped = groupServiceRequests(view.serviceRequests);
+  const living = requestsSection(view, grouped.living, currentYear);
+  const buildingRequests = requestsSection(view, grouped.building, currentYear);
+  const upkeepRequests = requestsSection(view, grouped.upkeep, currentYear);
+  const requestsCountable = isCountable(statusFor(view, NEW_311_RESOURCE_ID), view.serviceRequests.length > 0);
+  const listedRequestCount = grouped.living.length + grouped.building.length + grouped.upkeep.length;
+  const other: OtherRequests = {
+    count: grouped.otherCount,
+    line: requestsCountable ? otherRequestsLine(grouped.otherCount) : null,
+    // Against every listed 311 request, as before the split into groups. The note only speaks
+    // when the roll-up claims more than the panel lists, so a wider comparison can only keep
+    // it quieter, never make it claim a gap the old panel did not.
+    // Only alongside counts it can disagree with: under "Record unavailable" or "Not retrieved
+    // yet" there is nothing listed for it to disagree with.
+    rentSmartNote: requestsCountable ? rentSmartDisagreement(view.rentsmart, listedRequestCount) : null,
   };
 
   // --- Building permits -----------------------------------------------------
@@ -227,62 +355,70 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
       trailing: null,
     })),
     openNote: null,
+    showAll: showAllLabel(summary.count, { one: 'permit', many: 'permits' }),
     summary,
     years: permitYears,
     types: countByKey(view.permits, (row) => row.description ?? row.permitType ?? row.workType, 6),
   };
 
-  // --- Code enforcement tickets ---------------------------------------------
+  // --- Public Works code enforcement tickets --------------------------------
+  // Counted by ticket, not by row: one ticket can carry several violation lines.
   const enforcementStatus = statusFor(view, ENFORCEMENT_RESOURCE_ID);
   const enforcementCountable = isCountable(enforcementStatus, view.enforcement.length > 0);
-  const openEnforcement = view.enforcement.filter((row) => isOpenStatus(row.status));
-  const enforcementYears = countByYear(view.enforcement, (row) => row.statusDate, { to: currentYear });
+  const tickets = groupIntoCases(
+    view.enforcement,
+    ticketKey,
+    (key, row) => ((row.ticketNumber?.trim() ?? '') !== '' ? `Ticket ${key}` : `Case ${key}`),
+    (row) => orNotRecorded(row.description),
+  );
+  const openTickets = tickets.filter((entry) => entry.open).length;
+  const enforcementYears = countByYear(tickets, (entry) => entry.date, { to: currentYear });
 
   const enforcement: EnforcementSection = {
     status: enforcementStatus,
     hasRows: view.enforcement.length > 0,
-    count: enforcementCountable ? String(view.enforcement.length) : NO_COUNT,
-    subCount: enforcementCountable ? openSubCount(openEnforcement.length, view.enforcement.length) : '',
+    count: enforcementCountable ? String(tickets.length) : NO_COUNT,
+    subCount: enforcementCountable ? openSubCount(openTickets, tickets.length) : '',
     span: enforcementCountable ? yearSpanLabel(observedYears(enforcementYears)) : null,
-    note: null,
-    cappedNote: cappedNote(view.enforcement.length, CAPPED_ROWS_COPY),
-    rows: view.enforcement.map((row) => ({
-      date: row.statusDate,
-      label: orNotRecorded(row.description),
-      status: row.status,
-      // The feed has a status date, not a filing date, so no filing year is claimed.
-      statusLabel: caseStatusLabel(row.status, null),
-      trailing: null,
-    })),
-    openNote: openNoteFor(openEnforcement.length),
+    note: enforcementCountable ? ticketLinesNote(view.enforcement.length, tickets.length) : null,
+    // The cap counts violation lines, not tickets, so the note names lines.
+    cappedNote: cappedNote(view.enforcement.length, CAPPED_VIOLATION_LINES_COPY),
+    rows: tickets.flatMap((entry) => entry.lines),
+    openNote: openNoteFor(openTickets),
+    showAll: showAllLabel(tickets.length, { one: 'ticket', many: 'tickets' }),
+    cases: tickets,
+    // What was ticketed, by violation line: the city's description of each line, counted.
     types: countByKey(view.enforcement, (row) => row.description, 6),
   };
 
   // --- ISD violations -------------------------------------------------------
+  // Counted by case, not by code line: one inspection can cite several codes on one case.
   const violationStatus = statusFor(view, VIOLATIONS_RESOURCE_ID);
   const violationsCountable = isCountable(violationStatus, view.violations.length > 0);
-  const openViolations = view.violations.filter((row) => isOpenStatus(row.status));
-  const violationYears = countByYear(view.violations, (row) => row.statusDate, { to: currentYear });
+  const cases = groupIntoCases(
+    view.violations,
+    (row) => row.caseNumber,
+    (key) => `Case ${key}`,
+    violationLineLabel,
+  );
+  const openCases = cases.filter((entry) => entry.open).length;
+  const violationYears = countByYear(cases, (entry) => entry.date, { to: currentYear });
 
   const violations: ViolationsSection = {
     status: violationStatus,
     hasRows: view.violations.length > 0,
-    count: violationsCountable ? String(view.violations.length) : NO_COUNT,
-    subCount: violationsCountable ? openSubCount(openViolations.length, view.violations.length) : '',
+    count: violationsCountable ? String(cases.length) : NO_COUNT,
+    subCount: violationsCountable ? openSubCount(openCases, cases.length) : '',
     span: violationsCountable ? yearSpanLabel(observedYears(violationYears)) : null,
-    note: null,
-    cappedNote: cappedNote(view.violations.length, CAPPED_ROWS_COPY),
-    rows: openFirst(view.violations).map((row) => ({
-      date: row.statusDate,
-      label: [row.code, row.description].filter(Boolean).join(' · ') || 'Violation',
-      status: row.status,
-      // The feed has a status date, not a filing date, so no filing year is claimed.
-      statusLabel: caseStatusLabel(row.status, null),
-      trailing: null,
-    })),
-    openNote: openNoteFor(openViolations.length),
+    note: violationsCountable ? caseLinesNote(view.violations.length, cases.length) : null,
+    // The cap counts code lines, not cases, so the note names lines.
+    cappedNote: cappedNote(view.violations.length, CAPPED_CODE_LINES_COPY),
+    rows: cases.flatMap((entry) => entry.lines),
+    openNote: openNoteFor(openCases),
+    showAll: showAllLabel(cases.length, { one: 'case', many: 'cases' }),
+    cases,
     years: violationYears,
   };
 
-  return { requests, permits, enforcement, violations };
+  return { living, violations, buildingRequests, permits, enforcement, upkeepRequests, other };
 }
