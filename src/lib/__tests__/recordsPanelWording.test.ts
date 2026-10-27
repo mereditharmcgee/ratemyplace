@@ -6,6 +6,7 @@ import {
   SHOW_LESS_LABEL,
   showAllLabel,
   showLessAtEnd,
+  yearChartLabel,
 } from '../records/display';
 import { PERMIT_COVERAGE_START } from '../records/sources/boston/permits';
 
@@ -72,5 +73,28 @@ describe('the full-list disclosure', () => {
     expect(showLessAtEnd(5)).toBe(false);
     expect(showLessAtEnd(6)).toBe(true);
     expect(showLessAtEnd(220)).toBe(true);
+  });
+});
+
+describe('yearChartLabel', () => {
+  const noun = { one: 'request', many: 'requests' };
+
+  it('puts the total in the right number', () => {
+    expect(yearChartLabel('Requests by year opened', 1, noun, 2013, 2026)).toBe(
+      'Requests by year opened: 1 request across 2013 to 2026',
+    );
+    expect(yearChartLabel('Requests by year opened', 34, noun, 2012, 2026)).toBe(
+      'Requests by year opened: 34 requests across 2012 to 2026',
+    );
+  });
+
+  it('says "in" for a one-year chart rather than a span from a year to itself', () => {
+    expect(yearChartLabel('Requests by year opened', 1, noun, 2026, 2026)).toBe('Requests by year opened: 1 request in 2026');
+  });
+
+  it('names the years drawn as missing', () => {
+    expect(yearChartLabel('Requests by year opened', 3, noun, 2012, 2026, [2014])).toBe(
+      'Requests by year opened: 3 requests across 2012 to 2026, no data for 2014',
+    );
   });
 });

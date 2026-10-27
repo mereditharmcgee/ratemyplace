@@ -234,7 +234,7 @@ const chartsClass = 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5';
             ) : (
               <>
                 <div class={chartsClass}>
-                  <YearBars title="Permits by year issued" series={ledger.permits.years} noun="permits" />
+                  <YearBars title="Permits by year issued" series={ledger.permits.years} noun={{ one: 'permit', many: 'permits' }} />
                   <CategoryBars title="Type of work" breakdown={ledger.permits.types} noun={{ one: 'permit', many: 'permits' }} />
                 </div>
                 <p class={noteClass}>

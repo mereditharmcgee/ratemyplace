@@ -10,12 +10,13 @@
 // arrive in `missingYears` (worked out in `ledger.ts`) and draw as a dashed, unfilled outline
 // instead of a bar, with `missingNote` under the chart saying why.
 import type { YearCount } from '../../lib/records/charts';
+import { yearChartLabel, type CountNoun } from '../../lib/records/display';
 
 interface Props {
   title: string;
   series: YearCount[];
-  /** Plural noun for the accessible description, e.g. `requests`. */
-  noun: string;
+  /** The noun for the accessible description, in both numbers, e.g. request / requests. */
+  noun: CountNoun;
   /** Years in the series with no data from the city, drawn as missing rather than as zero. */
   missingYears?: readonly number[];
   /** The line under the chart that says why those years are missing. */
@@ -60,8 +61,7 @@ function axisLabel(year: number): string {
 const missingInSeries = series.filter((entry) => missing.has(entry.year)).map((entry) => entry.year);
 const ariaLabel =
   series.length > 0
-    ? `${title}: ${total} ${noun} across ${series[0].year} to ${series[series.length - 1].year}` +
-      (missingInSeries.length > 0 ? `, no data for ${missingInSeries.join(' and ')}` : '')
+    ? yearChartLabel(title, total, noun, series[0].year, series[series.length - 1].year, missingInSeries)
     : '';
 ---
 

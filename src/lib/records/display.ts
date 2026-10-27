@@ -514,6 +514,23 @@ export function missingYearsNote(years: readonly number[]): string | null {
 }
 
 /**
+ * The accessible label on a year chart: the total in the right number, the span, and any year
+ * drawn as missing. It read "1 requests across 2026 to 2026" before; one year now reads "in".
+ */
+export function yearChartLabel(
+  title: string,
+  total: number,
+  noun: CountNoun,
+  firstYear: number,
+  lastYear: number,
+  missingYears: readonly number[] = [],
+): string {
+  const span = firstYear === lastYear ? `in ${firstYear}` : `across ${firstYear} to ${lastYear}`;
+  const missing = missingYears.length > 0 ? `, no data for ${joinYears(missingYears)}` : '';
+  return `${title}: ${countWithNoun(total, noun)} ${span}${missing}`;
+}
+
+/**
  * The span a dense year series covers, as the ledger's coverage line writes it. Null when no
  * row carried a readable date — there is no span to state, and "–" alone would suggest one.
  */
@@ -611,4 +628,5 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   'assessorUnitsText() — blank': assessorUnitsText(null),
   'missingYearsNote() — one': missingYearsNote([2014]) ?? '',
   'missingYearsNote() — two': missingYearsNote([2011, 2014]) ?? '',
+  'yearChartLabel()': yearChartLabel('Requests by year opened', 1, { one: 'request', many: 'requests' }, 2013, 2026, [2014]),
 };
