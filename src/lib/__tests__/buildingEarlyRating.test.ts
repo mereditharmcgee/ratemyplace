@@ -3,7 +3,7 @@ import reactRenderer from '@astrojs/react/server.js';
 import { describe, expect, it } from 'vitest';
 import BuildingPage from '../../pages/building/[slug].astro';
 import { NAMED_PARTY_MIN_REVIEWS } from '../scoring';
-import { getEarlyScoreTextColor } from '../scoring-colors';
+import { getEarlyScoreStyle, getScoreColor, getScoreTextColor } from '../scoring-colors';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 
@@ -101,8 +101,13 @@ suite('building page, one review', () => {
     expect(text(header)).toContain('3.9 · from 1 review');
     expect(text(header)).toContain('Early rating');
     expect(header!.querySelector('a')?.getAttribute('href')).toBe('/methodology#early-ratings');
-    const number = header!.querySelector('span');
-    expect(number?.getAttribute('class')).toContain(getEarlyScoreTextColor(3.9));
+    const marker = header!.querySelector('[data-early-score-marker]');
+    expect(marker?.getAttribute('aria-hidden')).toBe('true');
+    expect(marker?.getAttribute('class')).toContain(getScoreColor(3.9).bg);
+    const number = marker!.nextElementSibling;
+    expect(number?.textContent).toBe('3.9');
+    expect(number?.getAttribute('class')).toContain(getEarlyScoreStyle(3.9).text);
+    expect(number?.getAttribute('class')).not.toContain(getScoreTextColor(3.9));
     expect(number?.getAttribute('class')).toContain('font-semibold');
   });
 
@@ -117,13 +122,13 @@ suite('building page, one review', () => {
     expect(commonIssueRows(root)).toEqual(['Pest issues: 1 of 1 review', 'Heat/hot water issues: 1 of 1 review']);
   });
 
-  it('draws the sub-scores in the breakdown lighter too', async () => {
+  it('mutes the sub-scores in the breakdown too', async () => {
     const root = await renderPage(await seed([{ recommend: 'yes' }]));
     const tiles = breakdownTileNumbers(root);
     expect(tiles.length).toBeGreaterThan(0);
     for (const tile of tiles) {
       expect(tile).toContain('font-semibold');
-      expect(tile).toContain(getEarlyScoreTextColor(4));
+      expect(tile).toContain(getEarlyScoreStyle(4).text);
     }
   });
 

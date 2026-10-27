@@ -55,18 +55,18 @@ Use the helpers — never hardcode a threshold or a color:
 - `getScoreTextColor(score)` → Tailwind class for a colored score number
 - `getScoreBgTint(score)` → soft-tinted background for score detail tiles
 - `getScoreHex(score)` / `SCORE_HEX` → hex for non-Tailwind contexts (Maps markers, OG images)
-- `getEarlyScoreTextColor(score)` → the same band for an early rating, one shade lighter
-  where that still reads on Paper (emerald-600, red-600); Mixed stays amber-700 because
-  amber-600 is about 2.9:1 on Paper. Large text (24px and up) only, since these clear 3:1
-  on Paper, white and the score tints, not 4.5:1
+- `getEarlyScoreStyle(score)` → the muted look of an early rating: `text` / `textHex` is a
+  neutral gray-600 for the number (AA at any size on white, Paper and the score tints), and
+  `marker` / `markerHex` is the band fill for the small dot beside it, so the band still reads
 
 ### `earlyRating.ts` is how a thin score is displayed, not computed
 
 A building score shows from its first approved review. Below `NAMED_PARTY_MIN_REVIEWS` it is
 an **early rating** everywhere a building score appears (building page, search cards,
 landlord and property manager building lists, map info window): the count sits beside the
-score ("from 1 review"), `scoreNumberClass` draws it lighter, and issue and recommend rates
-are counts ("1 of 1 review") instead of percentages. Import the constant; never type 3.
+score ("from 1 review"), `scoreNumberClass` mutes it to gray with an `earlyScoreMarkerClass`
+band dot beside it, and issue and recommend rates are counts ("1 of 1 review") instead of
+percentages. Import the constant; never type 3.
 
 The percentages it still prints use the formulas in `calculateAggregatedScores` /
 `calculateBuildingAverages`, and `earlyRating.test.ts` holds them equal. It changes no score.

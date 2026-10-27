@@ -14,6 +14,7 @@ import {
   EARLY_RATING_HREF,
   EARLY_RATING_LABEL,
   buildingRateCounts,
+  earlyScoreMarkerClass,
   isEarlyRating,
   issueRateText,
   recommendTally,
@@ -293,6 +294,7 @@ const meta = buildingPageMeta(
           {scores?.avg_overall && earlyRating ? (
             <div class="text-right" data-early-rating>
               <div class="flex items-baseline justify-end gap-2">
+                <span aria-hidden="true" data-early-score-marker class={`${earlyScoreMarkerClass(scores.avg_overall)} self-center`}></span>
                 <span class={`text-3xl ${scoreNumberClass(scores.avg_overall, scores.review_count)}`}>{scores.avg_overall.toFixed(1)}</span>
                 <span class="text-sm text-gray-500 whitespace-nowrap">· {scoreBasisText(scores.review_count)}</span>
               </div>
