@@ -1,6 +1,9 @@
 ---
 import BaseLayout from '../../components/layout/BaseLayout.astro';
+import ReviewSigninNote from '../../components/auth/ReviewSigninNote.astro';
 import { redirectQuery, safeRedirectPath } from '../../lib/authRedirect';
+import { loadReviewSigninContext } from '../../lib/reviewSignin';
+import { maybeEnv } from '../../lib/runtime';
 
 // Where to go after signing in. Validated here and again in the page script before it
 // navigates; an unsafe or missing value is '/', which also keeps every link below bare.
@@ -10,6 +13,9 @@ const redirectTo = safeRedirectPath(Astro.url.searchParams.get('redirect'));
 if (Astro.locals.user) {
   return Astro.redirect(redirectTo);
 }
+
+// The same note sign-in shows when the return path is the review form; null otherwise.
+const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, redirectTo);
 ---
 
 <BaseLayout title="Sign up" noindex>
@@ -23,6 +29,7 @@ if (Astro.locals.user) {
             Sign in
           </a>
         </p>
+        {reviewContext && <ReviewSigninNote place={reviewContext.place} />}
       </div>
 
       <div class="mt-8">
@@ -133,9 +140,9 @@ if (Astro.locals.user) {
 
         <div class="text-sm text-gray-600">
           By signing up, you agree to our{' '}
-          <a href="/terms" class="text-teal-700 hover:text-teal-500">Terms of Service</a>
+          <a href="/terms" class="inline-block py-1 text-teal-700 hover:text-teal-500">Terms of Service</a>
           {' '}and{' '}
-          <a href="/privacy" class="text-teal-700 hover:text-teal-500">Privacy Policy</a>.
+          <a href="/privacy" class="inline-block py-1 text-teal-700 hover:text-teal-500">Privacy Policy</a>.
         </div>
 
         <div id="turnstile-container" class="flex justify-center"></div>

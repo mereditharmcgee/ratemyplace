@@ -17,7 +17,8 @@ let envUnreadableLogged = false;
  * The runtime env, or undefined when it cannot be read: no runtime at all (the Astro container
  * in unit tests), or the Astro 6+ Cloudflare adapter, whose `locals.runtime.env` is a getter
  * that throws a migration error. Only for render paths that must never throw and have a safe
- * default for every value they read — BaseLayout's head. Anything that needs a binding uses
+ * default for every value they read — BaseLayout's head, and the auth pages' review note, which
+ * drops the building address when there is no DB. Anything else that needs a binding uses
  * `getEnv`, which throws on purpose.
  */
 export function maybeEnv(locals: App.Locals): App.Platform['env'] | undefined {
