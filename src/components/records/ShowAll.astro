@@ -1,0 +1,67 @@
+---
+// The disclosure over a section's full list. Closed, it says what opening it shows ("Show all
+// 31 requests"); open, it says "Show less". The label used to stay "Show all 31 requests" after
+// the list unfolded under it, so it read as a second control in the middle of the list and
+// never said how to fold it again.
+//
+// A long list also gets a "Show less" after its last row, so a reader at the end of the list
+// can fold it without scrolling back to the top. That button closes the disclosure with script,
+// so it ships hidden and the script below reveals it: without script it would be a control
+// that does nothing, which is the complaint this replaces.
+//
+// The labels arrive built (`showAllLabel`, `SHOW_LESS_LABEL` in `lib/records/display.ts`).
+import { SHOW_LESS_LABEL, showLessAtEnd } from '../../lib/records/display';
+
+interface Props {
+  /** The closed label, from `showAllLabel`, e.g. `Show all 31 requests`. */
+  label: string;
+  /** How many rows the list holds, which decides whether it gets a second control at its end. */
+  rowCount: number;
+}
+
+const { label, rowCount } = Astro.props;
+
+const controlClass =
+  'text-sm text-teal-700 underline underline-offset-2 cursor-pointer rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700';
+---
+
+<details class="records-show-all">
+  <summary class={`mt-4 list-none [&::-webkit-details-marker]:hidden ${controlClass}`}>
+    <span class="records-show-all-closed">{label}</span>
+    <span class="records-show-all-open">{SHOW_LESS_LABEL}</span>
+  </summary>
+  <slot />
+  {showLessAtEnd(rowCount) && (
+    <button type="button" hidden data-records-show-less class={`mt-2 ${controlClass}`}>{SHOW_LESS_LABEL}</button>
+  )}
+</details>
+
+<style>
+  .records-show-all-open {
+    display: none;
+  }
+  .records-show-all[open] > summary .records-show-all-open {
+    display: inline;
+  }
+  .records-show-all[open] > summary .records-show-all-closed {
+    display: none;
+  }
+</style>
+
+<script>
+  // Fold the list from its end, then put the reader back on the control at its top: focus for
+  // keyboard and screen-reader users, and a scroll only as far as needed to bring it into view.
+  document.querySelectorAll<HTMLButtonElement>('button[data-records-show-less]').forEach((button) => {
+    button.hidden = false;
+    button.addEventListener('click', () => {
+      const details = button.closest('details');
+      if (!details) return;
+      details.open = false;
+      const summary = details.querySelector('summary');
+      if (summary instanceof HTMLElement) {
+        summary.focus({ preventScroll: true });
+        summary.scrollIntoView({ block: 'nearest' });
+      }
+    });
+  });
+</script>

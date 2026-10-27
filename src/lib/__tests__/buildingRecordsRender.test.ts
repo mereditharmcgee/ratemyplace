@@ -20,6 +20,7 @@ import {
   REQUESTED_COPY,
   REQUEST_BUTTON_LABEL,
   REQUEST_PARKED_COPY,
+  SHOW_LESS_LABEL,
   STILL_OPEN_NOTE,
 } from '../records/display';
 import { ROW_CAP } from '../records/ckan';
@@ -39,6 +40,7 @@ import enforcementRows from './helpers/records/enforcement-lanark.json';
 const FY2025_RESOURCE_ID = ASSESSOR_YEARS[1].resourceId;
 const LEGACY_2024_RESOURCE_ID = LEGACY_311_RESOURCES.find((resource) => resource.year === 2024)!.resourceId;
 const LEGACY_2013_RESOURCE_ID = LEGACY_311_RESOURCES.find((resource) => resource.year === 2013)!.resourceId;
+const LEGACY_2023_RESOURCE_ID = LEGACY_311_RESOURCES.find((resource) => resource.year === 2023)!.resourceId;
 
 /**
  * The panel's privacy and empty-state rules, checked against the HTML the server actually
@@ -529,6 +531,47 @@ suite('BuildingRecords.astro ledger', () => {
     expect(statuses).toContain('Open');
     expect(permits.textContent).not.toContain('Still open in city records');
     expect(permits.textContent).not.toContain(STILL_OPEN_NOTE);
+  });
+
+  it('turns "Show all" into "Show less" once the list is open', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const permits = ledgerRow(await renderPanel(db), 'Building permits');
+    const disclosure = permits.querySelector('details.records-show-all');
+    const summary = disclosure?.querySelector('summary');
+
+    // Both labels are in the summary; the panel's stylesheet shows the closed one until the
+    // disclosure is open and the open one after, so the control never claims to show what is
+    // already on screen.
+    expect(summary?.querySelector('.records-show-all-closed')?.textContent?.trim()).toBe('Show all 2 permits');
+    expect(summary?.querySelector('.records-show-all-open')?.textContent?.trim()).toBe(SHOW_LESS_LABEL);
+    // A two-row list needs no second control at its end.
+    expect(disclosure?.querySelector('button[data-records-show-less]')).toBeNull();
+  });
+
+  it('puts a second "Show less" after the last row of a long list, hidden until script can run it', async () => {
+    const db = await createDbWithAdmin();
+    const heat = (legacy311 as AssessorRow[]).find((row) => String(row.type).startsWith('Heat'))!;
+    const manyRequests = Array.from({ length: 6 }, (_unused, index) => ({
+      ...heat,
+      case_enquiry_id: `10100000100${index}`,
+      open_dt: `2023-0${index + 1}-01 09:00:00`,
+      closed_dt: `2023-0${index + 1}-02 09:00:00`,
+      case_status: 'Closed',
+    }));
+    await seedFullBuilding(db, [{ resourceId: LEGACY_2023_RESOURCE_ID, records: manyRequests }]);
+
+    const requests = ledgerRow(await renderPanel(db), '311 living conditions requests');
+    const disclosure = requests.querySelector('details.records-show-all');
+    const endButton = disclosure?.querySelector('button[data-records-show-less]');
+
+    expect(endButton?.textContent?.trim()).toBe(SHOW_LESS_LABEL);
+    expect(endButton?.getAttribute('type')).toBe('button');
+    // Script closes the list, so without script the button stays hidden rather than doing nothing.
+    expect(endButton?.hasAttribute('hidden')).toBe(true);
+    // It sits after the list, as the disclosure's last element.
+    expect(disclosure?.lastElementChild).toBe(endButton);
   });
 
   it('keeps the full lists one disclosure down rather than dropping them', async () => {

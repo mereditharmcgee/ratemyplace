@@ -115,6 +115,24 @@ export function showAllLabel(count: number, noun: CountNoun): string {
 }
 
 /**
+ * What the same disclosure says once it is open. "Show all 31 requests" stayed on the control
+ * after the list unfolded, so it never said how to fold it again.
+ */
+export const SHOW_LESS_LABEL = 'Show less';
+
+/** From this many rows, an open list also gets a "Show less" at its end. */
+const SHOW_LESS_AT_END_FROM = 6;
+
+/**
+ * Whether an open list is long enough to need a second "Show less" after its last row. A reader
+ * who scrolled to the end of a long list should not have to scroll back to its top to fold it;
+ * on a short list the control at the top is already in view.
+ */
+export function showLessAtEnd(rowCount: number): boolean {
+  return rowCount >= SHOW_LESS_AT_END_FROM;
+}
+
+/**
  * The leftover line under a category chart. Built as one string because the template wrote it
  * as two adjacent expressions, and the space between them was lost in the rendered page
  * ("3 more types · 7requests").
@@ -562,6 +580,7 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   SEARCH_SEEDED_COPY,
   STILL_OPEN_LABEL,
   STILL_OPEN_NOTE,
+  SHOW_LESS_LABEL,
   ...Object.fromEntries(
     Object.entries(KIND_LABELS).map(([kind, label]) => [`KIND_LABELS.${kind}`, label]),
   ),

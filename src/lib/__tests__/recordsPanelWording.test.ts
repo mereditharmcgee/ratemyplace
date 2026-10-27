@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { assessorUnitsText, missingYearsNote, PERMIT_COVERAGE_NOTE } from '../records/display';
+import {
+  assessorUnitsText,
+  missingYearsNote,
+  PERMIT_COVERAGE_NOTE,
+  SHOW_LESS_LABEL,
+  showAllLabel,
+  showLessAtEnd,
+} from '../records/display';
 import { PERMIT_COVERAGE_START } from '../records/sources/boston/permits';
 
 /**
@@ -50,5 +57,20 @@ describe('missingYearsNote', () => {
   it('stays plain: no dash, no exclamation point', () => {
     expect(missingYearsNote([2014])).not.toMatch(/[—!]/);
     expect(missingYearsNote([2011, 2014])).not.toMatch(/[—!]/);
+  });
+});
+
+describe('the full-list disclosure', () => {
+  it('says "Show less" once open, instead of repeating the closed label', () => {
+    expect(SHOW_LESS_LABEL).toBe('Show less');
+    expect(showAllLabel(31, { one: 'request', many: 'requests' })).toBe('Show all 31 requests');
+  });
+
+  it('adds a second "Show less" at the end of a long list only', () => {
+    expect(showLessAtEnd(0)).toBe(false);
+    expect(showLessAtEnd(1)).toBe(false);
+    expect(showLessAtEnd(5)).toBe(false);
+    expect(showLessAtEnd(6)).toBe(true);
+    expect(showLessAtEnd(220)).toBe(true);
   });
 });
