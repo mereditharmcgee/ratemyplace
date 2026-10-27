@@ -1,13 +1,34 @@
 ---
 import { getScoreColor, getScoreTextColor, getScoreBgTint } from '../../lib/scoring-colors';
+import {
+  countOfReviews,
+  earlyRatingNote,
+  isEarlyRating,
+  recommendDisplay,
+  scoreNumberClass,
+  type BuildingRateCounts,
+  type IssueCounts,
+} from '../../lib/earlyRating';
+import { supplementaryItems } from '../../lib/surveyItems';
 
 interface Props {
   scores: any;
   type: 'building' | 'landlord';
   grouped?: boolean;
+  /**
+   * A building's raw counts. With them the card shows a recommend row that never counts a
+   * maybe as a no, and below the named-party threshold it marks the rating as early and
+   * shows counts ("1 of 1 review") instead of percentages (lib/earlyRating.ts).
+   */
+  rates?: BuildingRateCounts;
 }
 
-const { scores, type, grouped = true } = Astro.props;
+const { scores, type, grouped = true, rates } = Astro.props;
+
+const early = type === 'building' && rates !== undefined && isEarlyRating(rates.reviewCount);
+const recommendRows = type === 'building' && rates ? recommendDisplay(rates.recommend, rates.reviewCount) : null;
+// The survey's own wording for the answer, so the row reads as the option the tenant chose.
+const maybeLabel = supplementaryItems.wouldRecommend.options.find((o) => o.value === 'maybe')?.label ?? 'Maybe';
 
 // New domain-based categories
 const domainCategories = [
@@ -42,12 +63,12 @@ const availableDomains = domainCategories.filter(c => scores?.[c.key] != null);
 const availableBuilding = buildingCategories.filter(c => scores?.[c.key] != null);
 const availableLandlord = landlordCategories.filter(c => scores?.[c.key] != null);
 
-// Issue percentages
-const issues = [
-  { key: 'pct_pest_issues', label: 'Reported pest issues', threshold: 20 },
-  { key: 'pct_heat_issues', label: 'Reported heat/hot water issues', threshold: 20 },
-  { key: 'pct_water_issues', label: 'Reported plumbing issues', threshold: 20 },
-  { key: 'pct_deposit_issues', label: 'Reported deposit issues', threshold: 30 },
+// Issue percentages, or counts for an early rating
+const issues: Array<{ key: string; count: keyof IssueCounts; label: string; threshold: number }> = [
+  { key: 'pct_pest_issues', count: 'pest', label: 'Reported pest issues', threshold: 20 },
+  { key: 'pct_heat_issues', count: 'heat', label: 'Reported heat/hot water issues', threshold: 20 },
+  { key: 'pct_water_issues', count: 'water', label: 'Reported plumbing issues', threshold: 20 },
+  { key: 'pct_deposit_issues', count: 'deposit', label: 'Reported deposit issues', threshold: 30 },
 ];
 
 const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.key] > 0);
@@ -55,6 +76,9 @@ const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.k
 
 <div class="bg-white rounded-[6px] border border-gray-200 p-6">
   <h3 class="font-semibold text-gray-900 mb-4">Rating breakdown</h3>
+  {early && rates && (
+    <p class="text-sm text-gray-500 -mt-2 mb-4" data-early-rating-note>{earlyRatingNote(rates.reviewCount)}</p>
+  )}
 
   {hasNewDomainScores ? (
     <!-- New domain-based display -->
@@ -66,7 +90,7 @@ const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.k
             const score = scores[domain.key];
             return (
               <div class={`text-center p-3 rounded-[6px] ${getScoreBgTint(score)}`}>
-                <div class={`text-2xl font-bold ${getScoreTextColor(score)}`}>
+                <div class={`text-2xl ${early && rates ? scoreNumberClass(score, rates.reviewCount) : `font-bold ${getScoreTextColor(score)}`}`}>
                   {score.toFixed(1)}
                 </div>
                 <div class="text-xs text-gray-600 mt-1">{domain.label}</div>
@@ -76,8 +100,30 @@ const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.k
         </div>
       )}
 
-      <!-- Would Recommend -->
-      {scores?.pct_would_recommend != null && (
+      <!-- Would Recommend. A building passes its counts: a count while early, a maybe on its
+           own row and never folded into the no side. Other cards keep the percentage. -->
+      {recommendRows ? (
+        <>
+          {recommendRows.recommend !== null && (
+            <div class="flex items-center justify-between gap-3 py-3 border-t border-gray-100">
+              <span class="text-sm text-gray-600">Would recommend</span>
+              {early ? (
+                <span class="text-sm font-medium text-gray-700 whitespace-nowrap">{recommendRows.recommend}</span>
+              ) : (
+                <span class={`text-lg font-bold ${scores.pct_would_recommend >= 70 ? 'text-emerald-700' : scores.pct_would_recommend >= 50 ? 'text-amber-700' : 'text-red-700'}`}>
+                  {recommendRows.recommend}
+                </span>
+              )}
+            </div>
+          )}
+          {recommendRows.maybe !== null && (
+            <div class="flex items-center justify-between gap-3 py-3 border-t border-gray-100">
+              <span class="text-sm text-gray-600">{maybeLabel}</span>
+              <span class="text-sm font-medium text-gray-700 whitespace-nowrap">{recommendRows.maybe}</span>
+            </div>
+          )}
+        </>
+      ) : scores?.pct_would_recommend != null && (
         <div class="flex items-center justify-between py-3 border-t border-gray-100">
           <span class="text-sm text-gray-600">Would recommend</span>
           <span class={`text-lg font-bold ${scores.pct_would_recommend >= 70 ? 'text-emerald-700' : scores.pct_would_recommend >= 50 ? 'text-amber-700' : 'text-red-700'}`}>
@@ -98,11 +144,14 @@ const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.k
           <div class="space-y-2">
             {availableIssues.map((issue) => {
               const pct = scores[issue.key];
-              const isHigh = pct >= issue.threshold;
+              // A threshold on a percentage of one or two reviews means nothing, so an early
+              // rating's counts are never highlighted.
+              const isHigh = !early && pct >= issue.threshold;
+              const value = early && rates ? countOfReviews(rates.issues[issue.count], rates.reviewCount) : `${pct}%`;
               return (
-                <div class={`flex items-center justify-between text-sm p-2 rounded ${isHigh ? 'bg-red-50' : 'bg-gray-50'}`}>
+                <div class={`flex items-center justify-between gap-3 text-sm p-2 rounded ${isHigh ? 'bg-red-50' : 'bg-gray-50'}`}>
                   <span class={isHigh ? 'text-red-700' : 'text-gray-600'}>{issue.label}</span>
-                  <span class={`font-medium ${isHigh ? 'text-red-700' : 'text-gray-700'}`}>{pct}%</span>
+                  <span class={`font-medium whitespace-nowrap ${isHigh ? 'text-red-700' : 'text-gray-700'}`}>{value}</span>
                 </div>
               );
             })}
