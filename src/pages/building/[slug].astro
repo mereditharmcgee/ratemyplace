@@ -9,10 +9,23 @@ import PostSubmitVerification from '../../components/profile/PostSubmitVerificat
 import BuildingRecords from '../../components/BuildingRecords.astro';
 import { calculateBuildingAverages, getRecencyWeight, getReviewYear } from '../../lib/scoring';
 import { currentReviewYear } from '../../lib/scoring-sql';
-import { getScoreTextColor } from '../../lib/scoring-colors';
+import {
+  EARLY_RATING_HREF,
+  EARLY_RATING_LABEL,
+  buildingRateCounts,
+  earlyScoreMarkerClass,
+  isEarlyRating,
+  issueRateText,
+  recommendTally,
+  scoreBasisText,
+  scoreNumberClass,
+  unitRecommendText,
+  type RecommendTally,
+} from '../../lib/earlyRating';
 import { humanize } from '../../lib/format';
 import { BUILDING_DETAIL_FIELDS, hasBuildingDetails, type BuildingDetailFields } from '../../lib/buildingDetails';
 import { localityLine } from '../../lib/locality';
+import { NO_CHECKLIST_ISSUES_COPY, resolveUnitType } from '../../lib/reviewDisplay';
 import { buildingPageMeta } from '../../lib/buildingMeta';
 
 // Label and formatter for each field in BUILDING_DETAIL_FIELDS, in display order —
@@ -116,14 +129,15 @@ interface UnitStats {
   avgScore: number;
   minRent: number | null;
   maxRent: number | null;
-  wouldRecommendPct: number;
+  recommend: RecommendTally;
   reviews: any[];
 }
 
 const reviewsByUnit = new Map<string, UnitStats>();
 
 reviews.forEach(review => {
-  const unitType = review.unit_type || 'unknown';
+  // The bedrooms answer wins over a stored unit_type that disagrees with it (reviewDisplay.ts).
+  const unitType = resolveUnitType(review) || 'unknown';
   const unitKey = unitType;
   const displayName = unitTypeLabels[unitType] || unitType;
 
@@ -136,7 +150,7 @@ reviews.forEach(review => {
       avgScore: 0,
       minRent: null,
       maxRent: null,
-      wouldRecommendPct: 0,
+      recommend: { yes: 0, no: 0, maybe: 0 },
       reviews: []
     });
   }
@@ -167,20 +181,9 @@ reviewsByUnit.forEach((stats) => {
     stats.maxRent = Math.max(...rents);
   }
 
-  // % would recommend — match calculateAggregatedScores in scoring.ts: exclude
-  // 'maybe' and missing answers from the denominator, count only definitive yes/no.
-  let recommendYes = 0;
-  let recommendTotal = 0;
-  stats.reviews.forEach(review => {
-    const wouldRecommend = review.would_recommend_new;
-    if (wouldRecommend !== null && wouldRecommend !== undefined && wouldRecommend !== 'maybe') {
-      recommendTotal++;
-      if (wouldRecommend === 'yes' || wouldRecommend === 1 || wouldRecommend === true) {
-        recommendYes++;
-      }
-    }
-  });
-  stats.wouldRecommendPct = recommendTotal > 0 ? (recommendYes / recommendTotal) * 100 : 0;
+  // Yes, no and maybe answers, classified as calculateAggregatedScores does. The card's line
+  // comes from unitRecommendText, which never turns a lone maybe into "0% recommend".
+  stats.recommend = recommendTally(stats.reviews);
 });
 
 const sortedUnits = Array.from(reviewsByUnit.values())
@@ -191,6 +194,10 @@ const showBuildingDetails = hasBuildingDetails(building);
 // after the header and the header's "No reviews yet" line and button are the whole empty
 // state. With reviews, the reviews come first and the records follow them.
 const hasReviews = reviews.length > 0;
+// Below the named-party threshold the headline score is an early rating: lighter, with its
+// review count beside it, and the issue and recommend rates are counts (lib/earlyRating.ts).
+const rates = hasReviews ? buildingRateCounts(reviews) : null;
+const earlyRating = isEarlyRating(reviews.length);
 // The records card sits in a row laid out like the main grid, so it is exactly as wide as
 // the main column's cards at every breakpoint.
 const recordsRowClass = 'grid lg:grid-cols-3 gap-8';
@@ -245,9 +252,11 @@ const meta = buildingPageMeta(
     <!-- Header -->
     <div class="mb-8">
       <nav class="text-sm text-gray-500 mb-4">
-        <a href="/" class="hover:text-teal-700">Home</a>
+        {/* py-1 makes each link a 28px-tall target (bare text measured 17px); the matching
+            negative margin keeps the header where it was. */}
+        <a href="/" class="-my-1 inline-block py-1 hover:text-teal-700">Home</a>
         <span class="mx-2">/</span>
-        <a href="/search" class="hover:text-teal-700">Search</a>
+        <a href="/search" class="-my-1 inline-block py-1 hover:text-teal-700">Search</a>
         <span class="mx-2">/</span>
         <span class="text-gray-900">{building.address}</span>
       </nav>
@@ -281,9 +290,23 @@ const meta = buildingPageMeta(
         </div>
 
         <div class="flex flex-col items-end">
-          {scores?.avg_overall ? (
+          {scores?.avg_overall && earlyRating ? (
+            <div class="text-right" data-early-rating>
+              <div class="flex items-baseline justify-end gap-2">
+                <span aria-hidden="true" data-early-score-marker class={`${earlyScoreMarkerClass(scores.avg_overall)} self-center`}></span>
+                <span class={`text-3xl ${scoreNumberClass(scores.avg_overall, scores.review_count)}`}>{scores.avg_overall.toFixed(1)}</span>
+                <span class="text-sm text-gray-500 whitespace-nowrap">· {scoreBasisText(scores.review_count)}</span>
+              </div>
+              <div class="flex justify-end opacity-60">
+                <StarRating rating={scores.avg_overall} />
+              </div>
+              <p class="text-xs text-gray-500 mt-1">
+                <a href={EARLY_RATING_HREF} class="inline-block py-1 underline decoration-gray-300 underline-offset-2 hover:text-teal-700">{EARLY_RATING_LABEL}</a>
+              </p>
+            </div>
+          ) : scores?.avg_overall ? (
             <div class="text-right">
-              <div class={`text-4xl font-bold ${getScoreTextColor(scores.avg_overall)}`}>{scores.avg_overall.toFixed(1)}</div>
+              <div class={`text-4xl ${scoreNumberClass(scores.avg_overall, scores.review_count)}`}>{scores.avg_overall.toFixed(1)}</div>
               <StarRating rating={scores.avg_overall} />
               <p class="text-sm text-gray-500 mt-1">
                 {scores.review_count} review{scores.review_count !== 1 ? 's' : ''}
@@ -322,39 +345,41 @@ const meta = buildingPageMeta(
       {/* Rating cards only, so it is hidden when there is no review: an empty grid item
           would still add a row gap on a phone. */}
       <div class:list={['lg:col-start-3 lg:row-start-1 lg:col-span-1 lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto', { hidden: !hasReviews }]}>
-        {scores && <ScoreCard scores={scores} type="building" />}
+        {scores && <ScoreCard scores={scores} type="building" rates={rates ?? undefined} />}
 
-        {scores && scores.review_count > 0 && (
+        {scores && rates && scores.review_count > 0 && (
           <div class="bg-white rounded-[6px] border border-gray-200 p-6 mt-6">
             <h3 class="font-semibold text-gray-900 mb-4">Common issues reported</h3>
+            {/* A count ("1 of 1 review") below the named-party threshold, the same percentage
+                as before at or above it (issueRateText). */}
             <ul class="space-y-2 text-sm">
               {scores.pct_pest_issues > 0 && (
-                <li class="flex justify-between">
+                <li class="flex justify-between gap-3">
                   <span class="text-gray-600">Pest issues</span>
-                  <span class="text-red-600 font-medium">{Math.round(scores.pct_pest_issues)}%</span>
+                  <span class="text-red-600 font-medium whitespace-nowrap">{issueRateText(rates.issues.pest, rates.reviewCount)}</span>
                 </li>
               )}
               {scores.pct_heat_issues > 0 && (
-                <li class="flex justify-between">
+                <li class="flex justify-between gap-3">
                   <span class="text-gray-600">Heat/hot water issues</span>
-                  <span class="text-orange-600 font-medium">{Math.round(scores.pct_heat_issues)}%</span>
+                  <span class="text-orange-600 font-medium whitespace-nowrap">{issueRateText(rates.issues.heat, rates.reviewCount)}</span>
                 </li>
               )}
               {scores.pct_water_issues > 0 && (
-                <li class="flex justify-between">
+                <li class="flex justify-between gap-3">
                   <span class="text-gray-600">Water/plumbing issues</span>
-                  <span class="text-blue-600 font-medium">{Math.round(scores.pct_water_issues)}%</span>
+                  <span class="text-blue-600 font-medium whitespace-nowrap">{issueRateText(rates.issues.water, rates.reviewCount)}</span>
                 </li>
               )}
               {scores.pct_deposit_issues > 0 && (
-                <li class="flex justify-between">
+                <li class="flex justify-between gap-3">
                   <span class="text-gray-600">Deposit issues</span>
-                  <span class="text-yellow-600 font-medium">{Math.round(scores.pct_deposit_issues)}%</span>
+                  <span class="text-yellow-600 font-medium whitespace-nowrap">{issueRateText(rates.issues.deposit, rates.reviewCount)}</span>
                 </li>
               )}
             </ul>
             {scores.pct_pest_issues === 0 && scores.pct_heat_issues === 0 && scores.pct_water_issues === 0 && scores.pct_deposit_issues === 0 && (
-              <p class="text-gray-500 text-sm">No issues reported</p>
+              <p class="text-gray-500 text-sm">{NO_CHECKLIST_ISSUES_COPY}</p>
             )}
           </div>
         )}
@@ -420,12 +445,18 @@ const meta = buildingPageMeta(
 
                         <div class="text-right">
                           <div class="flex items-center gap-1">
-                            <span class={`text-lg font-bold ${getScoreTextColor(unitStats.avgScore)}`}>{unitStats.avgScore.toFixed(1)}</span>
+                            {/* Early or not by the unit's own count, as unitRecommendText below is. */}
+                            {isEarlyRating(unitStats.reviewCount) && (
+                              <span aria-hidden="true" data-early-score-marker class={`${earlyScoreMarkerClass(unitStats.avgScore)} mr-0.5`}></span>
+                            )}
+                            <span data-unit-score class={`text-lg ${scoreNumberClass(unitStats.avgScore, unitStats.reviewCount)}`}>{unitStats.avgScore.toFixed(1)}</span>
                             <StarRating rating={unitStats.avgScore} size="sm" />
                           </div>
-                          <p class="text-xs text-gray-500">
-                            {Math.round(unitStats.wouldRecommendPct)}% recommend
-                          </p>
+                          {unitRecommendText(unitStats.recommend, unitStats.reviewCount) && (
+                            <p class="text-xs text-gray-500">
+                              {unitRecommendText(unitStats.recommend, unitStats.reviewCount)}
+                            </p>
+                          )}
                         </div>
 
                         <svg

@@ -1,0 +1,26 @@
+---
+// A building's score and review count on a listing card (landlord and property manager
+// pages). Below the named-party threshold it is an early rating: muted gray with a dot in
+// its band colour, and the count it comes from under it. The search island renders the same
+// thing in SearchResults.tsx; both take their wording and classes from lib/earlyRating.ts.
+import { EARLY_RATING_LABEL, earlyScoreMarkerClass, isEarlyRating, reviewsText, scoreBasisText, scoreNumberClass } from '../../lib/earlyRating';
+
+interface Props {
+  score: number;
+  reviewCount: number;
+}
+
+const { score, reviewCount } = Astro.props;
+const early = isEarlyRating(reviewCount);
+---
+
+<div data-early-rating={early ? '' : undefined}>
+  <div class={`text-2xl ${early ? 'flex items-center justify-end gap-1.5 ' : ''}${scoreNumberClass(score, reviewCount)}`}>
+    {early && <span aria-hidden="true" data-early-score-marker class={earlyScoreMarkerClass(score)}></span>}
+    {score.toFixed(1)}
+  </div>
+  <div class="text-sm text-gray-500 whitespace-nowrap">
+    {early ? scoreBasisText(reviewCount) : reviewsText(reviewCount)}
+  </div>
+  {early && <div class="text-xs text-gray-500 whitespace-nowrap">{EARLY_RATING_LABEL}</div>}
+</div>

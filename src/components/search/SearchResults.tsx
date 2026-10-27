@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 import { getNamedPartyScoreState, NAMED_PARTY_MIN_REVIEWS } from '../../lib/scoring';
+import { EARLY_RATING_LABEL, earlyScoreMarkerClass, isEarlyRating, reviewsText, scoreBasisText, scoreNumberClass } from '../../lib/earlyRating';
 import { localityLine } from '../../lib/locality';
 import { SEARCH_SEEDED_COPY } from '../../lib/records/display';
 
@@ -46,6 +47,9 @@ const CARD_SIDE = 'ml-auto text-right';
 const PAGE_SIZE = 10;
 
 function BuildingCard({ building }: { building: Building }) {
+  // Below the named-party threshold the score is an early rating: muted gray with a dot in
+  // its band colour, and the count it comes from right under it (lib/earlyRating.ts).
+  const early = isEarlyRating(building.review_count);
   return (
     <a
       href={`/building/${building.slug}`}
@@ -63,9 +67,15 @@ function BuildingCard({ building }: { building: Building }) {
         </div>
         <div className={CARD_SIDE}>
           {building.avg_overall ? (
-            <div>
-              <div className={`text-2xl font-bold ${getScoreTextColor(Number(building.avg_overall))}`}>{Number(building.avg_overall).toFixed(1)}</div>
-              <div className="text-sm text-gray-500">{building.review_count} review{building.review_count !== 1 ? 's' : ''}</div>
+            <div data-early-rating={early ? '' : undefined}>
+              <div className={`text-2xl ${early ? 'flex items-center justify-end gap-1.5 ' : ''}${scoreNumberClass(Number(building.avg_overall), building.review_count)}`}>
+                {early && <span aria-hidden="true" data-early-score-marker className={earlyScoreMarkerClass(Number(building.avg_overall))} />}
+                {Number(building.avg_overall).toFixed(1)}
+              </div>
+              <div className="text-sm text-gray-500 whitespace-nowrap">
+                {early ? scoreBasisText(building.review_count) : reviewsText(building.review_count)}
+              </div>
+              {early && <div className="text-xs text-gray-500 whitespace-nowrap">{EARLY_RATING_LABEL}</div>}
             </div>
           ) : (
             <span className="text-sm text-gray-400">

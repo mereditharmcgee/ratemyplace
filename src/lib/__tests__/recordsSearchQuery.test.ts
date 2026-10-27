@@ -157,6 +157,34 @@ describe('parseSearchQuery', () => {
     expect(parsed.places).toHaveLength(3);
     expect(parsed.zips).toEqual(['02134', '02135']);
   });
+
+  it('reads the place as the street when a house number is the only other thing typed', () => {
+    // "7 Allston" names a building on a street called Allston, not every 7 in the city.
+    const parsed = parseSearchQuery('7 Allston');
+    expect(parsed.terms).toEqual([['allston']]);
+    expect(parsed.houseNumber).toEqual({ lo: 7, hi: 7 });
+    // Still a place for ranking.
+    expect(parsed.places).toEqual(['allston']);
+    expect(isAreaSearch(parsed)).toBe(false);
+    expect(street('7 Jamaica Plain, MA 02130')).toEqual(['jamaica', 'plain']);
+    // A street word typed means the place is a place again.
+    expect(street('7 Example Rd Allston')).toEqual(['example', 'rd']);
+    // A state alone is no street.
+    expect(parseSearchQuery('7 MA').terms).toEqual([]);
+  });
+
+  it('splits a hyphenated place name into its words, and keeps a range or ZIP+4 whole', () => {
+    const parsed = parseSearchQuery('12 Example St, Allston-Brighton');
+    expect(parsed.terms.map((term) => term[0])).toEqual(['example', 'st']);
+    expect(parsed.places).toEqual(['allston', 'brighton']);
+    const area = parseSearchQuery('Allston-Brighton');
+    expect(area.places).toEqual(['allston', 'brighton']);
+    expect(isAreaSearch(area)).toBe(true);
+    const full = parseSearchQuery('14-18 Example Rd, Allston-Brighton, MA 02135-1234');
+    expect(full.houseNumber).toEqual({ lo: 14, hi: 18 });
+    expect(full.zips).toEqual(['02135']);
+    expect(full.terms.map((term) => term[0])).toEqual(['example', 'rd']);
+  });
 });
 
 describe('withoutHouseNumber', () => {

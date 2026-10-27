@@ -17,13 +17,13 @@
 // data in through either door.
 import { ROW_CAP } from './ckan';
 import { PERMIT_COVERAGE_START } from './sources/boston/permits';
+import { RECORD_GROUPS } from './recordGroups';
 import type { YearCount } from './charts';
 import type {
   AssessmentPayload,
   PermitPayload,
   RecordKind,
   RentSmartPayload,
-  ServiceRequestPayload,
 } from './types';
 
 export const BANNED_WORDS: readonly string[] = [
@@ -63,11 +63,109 @@ export const PERMIT_COVERAGE_YEAR_NUMBER: number | null = /^\d{4}$/.test(PERMIT_
 
 export const ZERO_PERMITS_COPY = `No permitted work on record since ${PERMIT_COVERAGE_YEAR}. This means no permits were filed, not that no maintenance was done.`;
 
+/**
+ * Where the city's permit feed starts, said as a fact about the feed. It read "On record from
+ * September 2006" under a row headed with this building's own span ("2010–2026"), and the two
+ * looked like two answers to one question. The row's span is this building's permits; this is
+ * the feed's, which is also why the bars start in 2006.
+ */
+export const PERMIT_COVERAGE_NOTE = `The city's permit records start in ${PERMIT_COVERAGE_START}.`;
+
 export const DECLARED_VALUATION_CAVEAT =
   "Declared valuation is the applicant's own estimate at filing and is a floor, not a cost.";
 
-export const OTHER_REQUESTS_COPY =
-  'Other 311 requests at or near this address: parking, trash pickup, streetlights, and similar. Counted but not listed.';
+/**
+ * How the 311 rows are split across the panel's three groups, in one line. The full list of
+ * types per group is published on the methodology page from the same table the panel uses
+ * (`recordGroups.ts`), so the split can be checked rather than taken on trust.
+ */
+export const GROUPING_NOTE = 'How 311 requests are grouped: by the request type the city recorded.';
+
+/** The link text after `GROUPING_NOTE`, pointing at the methodology page's list of types. */
+export const GROUPING_LINK_TEXT = 'See the types in each group.';
+
+/**
+ * The 311 requests that fit none of the three groups: counted, never listed. Said as one
+ * sentence with its own count, so it cannot be read against a "Show all" link above it as a
+ * second, contradicting figure for the same list. Null when there are none.
+ */
+export function otherRequestsLine(count: number): string | null {
+  if (count <= 0) return null;
+  return count === 1
+    ? '1 other 311 request at or near this address, about something like parking, trash pickup or streetlights, falls outside these groups. It is counted here, not listed.'
+    : `${count} other 311 requests at or near this address, such as parking, trash pickup and streetlights, fall outside these groups. They are counted here, not listed.`;
+}
+
+/** A noun in both numbers, so a count of one never reads "1 requests". */
+export interface CountNoun {
+  one: string;
+  many: string;
+}
+
+export function countWithNoun(count: number, noun: CountNoun): string {
+  return `${count} ${count === 1 ? noun.one : noun.many}`;
+}
+
+/**
+ * The disclosure label over a full list. "Show all 1 requests" was both wrong in number and
+ * odd in sense; one record reads "Show 1 request".
+ */
+export function showAllLabel(count: number, noun: CountNoun): string {
+  return count === 1 ? `Show ${countWithNoun(count, noun)}` : `Show all ${countWithNoun(count, noun)}`;
+}
+
+/**
+ * What the same disclosure says once it is open. "Show all 31 requests" stayed on the control
+ * after the list unfolded, so it never said how to fold it again.
+ */
+export const SHOW_LESS_LABEL = 'Show less';
+
+/** From this many rows, an open list also gets a "Show less" at its end. */
+const SHOW_LESS_AT_END_FROM = 6;
+
+/**
+ * Whether an open list is long enough to need a second "Show less" after its last row. A reader
+ * who scrolled to the end of a long list should not have to scroll back to its top to fold it;
+ * on a short list the control at the top is already in view.
+ */
+export function showLessAtEnd(rowCount: number): boolean {
+  return rowCount >= SHOW_LESS_AT_END_FROM;
+}
+
+/**
+ * The leftover line under a category chart. Built as one string because the template wrote it
+ * as two adjacent expressions, and the space between them was lost in the rendered page
+ * ("3 more types · 7requests").
+ */
+export function categoryRestLine(restTypes: number, restCount: number, noun: CountNoun): string {
+  return `${countWithNoun(restTypes, { one: 'more type', many: 'more types' })} · ${countWithNoun(restCount, noun)}`;
+}
+
+/**
+ * Under an ISD count that is now a count of cases: how many code lines those cases hold, when
+ * that differs. One inspection can cite six code lines on a single case number.
+ */
+export function caseLinesNote(lines: number, cases: number): string | null {
+  if (lines <= cases) return null;
+  return `${countWithNoun(lines, { one: 'code line', many: 'code lines' })} in ${countWithNoun(cases, { one: 'case', many: 'cases' })}`;
+}
+
+/** The same for Public Works: one ticket can carry several violation lines. */
+export function ticketLinesNote(lines: number, tickets: number): string | null {
+  if (lines <= tickets) return null;
+  return `${countWithNoun(lines, { one: 'violation line', many: 'violation lines' })} on ${countWithNoun(tickets, { one: 'ticket', many: 'tickets' })}`;
+}
+
+/**
+ * The assessor's residential unit count, as the facts strip words it. A blank says whose field
+ * is blank. The building's own details can carry a unit count from elsewhere (the Boston seed
+ * gives a three-family parcel 3 units from its land use when the assessor left the count
+ * empty), and "units not recorded" printed beside "Units: 3" read as the site contradicting
+ * itself. Zero is a recorded value and prints as one.
+ */
+export function assessorUnitsText(units: number | null | undefined): string {
+  return units === null || units === undefined ? 'units not recorded by the assessor' : `units ${units}`;
+}
 
 export const CONDOMINIUM_COPY =
   'This building is divided into individually owned condominium units. No single owner of record is shown.';
@@ -186,6 +284,34 @@ export function formatPullDate(unix: number): string {
   return PULL_DATE_FORMAT.format(new Date(unix * 1000));
 }
 
+/**
+ * The line under the panel heading. The date is when this site pulled the records from the
+ * city, not when the city last updated its datasets, and the wording says so: it read
+ * "City of Boston · pulled <date>", and each row's "as of <date>" read as the city's own date.
+ */
+export function pulledFromLine(unix: number): string {
+  return `Pulled from City of Boston open data on ${formatPullDate(unix)}.`;
+}
+
+/**
+ * Beside the pull date once the stored pull is older than the refresh interval
+ * (`provenance.ts`). Analyze Boston updates the 311, ISD, permit, Public Works and RentSmart
+ * resources daily; the assessor once a year.
+ */
+export const STALE_PULL_NOTE = 'The city may have added records since then.';
+
+/** Each ledger row's own retrieval date, worded the same way as the panel's line. */
+export function rowPulledLabel(unix: number): string {
+  return `pulled ${formatPullDate(unix)}`;
+}
+
+// The source list at the foot of the panel. The license title and every link come from
+// `provenance.ts`; these are the words around them.
+export const SOURCES_HEADING = 'Sources';
+export const SOURCES_CREDIT_LEAD = 'Data from the City of Boston, published on';
+export const ANALYZE_BOSTON_LINK_TEXT = 'Analyze Boston (data.boston.gov)';
+export const SOURCES_LICENSE_LEAD = 'under the';
+
 export interface PermitSummary {
   count: number;
   /** Sum of the permits that carried a declared valuation; null when none did. A missing figure is not $0. */
@@ -206,34 +332,22 @@ export function permitSummary(permits: PermitPayload[]): PermitSummary {
   return { count: permits.length, declaredTotal, declaredCount };
 }
 
-export function splitServiceRequests(
-  rows: ServiceRequestPayload[],
-): { housing: ServiceRequestPayload[]; otherCount: number } {
-  // Plain string comparison, not localeCompare: these are ISO-ish date strings, and
-  // locale collation would make the order depend on the runtime's ICU data.
-  const housing = rows
-    .filter((row) => row.classification === 'housing')
-    .sort((a, b) => {
-      const left = a.openedAt ?? '';
-      const right = b.openedAt ?? '';
-      return left < right ? 1 : left > right ? -1 : 0;
-    });
-  const otherCount = rows.filter((row) => row.classification === 'other').length;
-  return { housing, otherCount };
-}
-
 /**
  * One-directional by design. RentSmart is a periodic roll-up of the same city data, so it
  * lagging the raw 311 feed is expected and unremarkable; only an excess — the roll-up
  * claiming more housing complaints than the records above show — is worth a note.
+ *
+ * RentSmart is matched by parcel (`sources/boston/rentsmart.ts`) while the 311 list is matched
+ * by address, and a parcel can hold several addresses. The sentence says "this parcel" and
+ * says why the two counts can differ, rather than claiming a gap at this address.
  */
-export function rentSmartDisagreement(rows: RentSmartPayload[], housingRequestCount: number): string | null {
+export function rentSmartDisagreement(rows: RentSmartPayload[], listedRequestCount: number): string | null {
   const complaintCount = rows.filter(
     (row) => (row.violationType ?? '').trim().toLowerCase() === 'housing complaints',
   ).length;
-  if (complaintCount <= housingRequestCount) return null;
+  if (complaintCount <= listedRequestCount) return null;
   const noun = complaintCount === 1 ? 'housing complaint' : 'housing complaints';
-  return `The city's RentSmart summary reports ${complaintCount} ${noun} for this address; the 311 records above show ${housingRequestCount}.`;
+  return `The city's RentSmart summary reports ${complaintCount} ${noun} for this parcel; the 311 records above show ${listedRequestCount}. A parcel can include more than one address.`;
 }
 
 /**
@@ -256,11 +370,18 @@ export function unavailableCopy(retrievedAt: number): string {
 
 /**
  * The CKAN row cap is a hard slice, so a full page means there may be more upstream. The 311
- * wording differs because its cap applies before the housing filter: the rows beyond it were
+ * wording differs because its cap applies before the 311 grouping: the rows beyond it were
  * not weighed at all, rather than fetched and left off a list.
  */
 export const CAPPED_REQUESTS_COPY = `First ${ROW_CAP} requests considered.`;
 export const CAPPED_ROWS_COPY = `First ${ROW_CAP} shown.`;
+/**
+ * ISD and Public Works are counted by case and by ticket, but the cap counts stored lines. "First
+ * 500 shown." beside "430 tickets" would read as 500 tickets listed, so these name the unit
+ * the cap applies to. When it bites, the last case or ticket in the list may be missing lines.
+ */
+export const CAPPED_CODE_LINES_COPY = `First ${ROW_CAP} code lines shown.`;
+export const CAPPED_VIOLATION_LINES_COPY = `First ${ROW_CAP} violation lines shown.`;
 
 // Reader-facing request button and page states (design spec Section 4). The button asks the
 // companion Worker to fetch; nothing is fetched in the request. Copy stays here so the
@@ -402,6 +523,41 @@ export function openSubCount(openCount: number, total: number): string {
   return `${openCount} open`;
 }
 
+/** `2014`, `2011 and 2014`, `2011, 2012 and 2014`. */
+function joinYears(years: readonly number[]): string {
+  if (years.length <= 1) return years.map(String).join('');
+  return `${years.slice(0, -1).join(', ')} and ${years[years.length - 1]}`;
+}
+
+/**
+ * Under a 311 year chart whose span crosses a year the city's 311 API returns no rows for (see
+ * `EMPTY_311_YEARS` in `ledger.ts`). The bar for that year is drawn as missing rather than as a
+ * zero, and this says why. Null when the chart crosses no such year.
+ */
+export function missingYearsNote(years: readonly number[]): string | null {
+  if (years.length === 0) return null;
+  return years.length === 1
+    ? `${years[0]} is marked as missing data, not zero. The city's open data API currently returns no 311 records for that year.`
+    : `${joinYears(years)} are marked as missing data, not zero. The city's open data API currently returns no 311 records for those years.`;
+}
+
+/**
+ * The accessible label on a year chart: the total in the right number, the span, and any year
+ * drawn as missing. It read "1 requests across 2026 to 2026" before; one year now reads "in".
+ */
+export function yearChartLabel(
+  title: string,
+  total: number,
+  noun: CountNoun,
+  firstYear: number,
+  lastYear: number,
+  missingYears: readonly number[] = [],
+): string {
+  const span = firstYear === lastYear ? `in ${firstYear}` : `across ${firstYear} to ${lastYear}`;
+  const missing = missingYears.length > 0 ? `, no data for ${joinYears(missingYears)}` : '';
+  return `${title}: ${countWithNoun(total, noun)} ${span}${missing}`;
+}
+
 /**
  * The span a dense year series covers, as the ledger's coverage line writes it. Null when no
  * row carried a readable date — there is no span to state, and "–" alone would suggest one.
@@ -443,13 +599,17 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   NOT_RECORDED,
   PANEL_FRAMING_COPY,
   ZERO_PERMITS_COPY,
+  PERMIT_COVERAGE_NOTE,
   DECLARED_VALUATION_CAVEAT,
-  OTHER_REQUESTS_COPY,
+  GROUPING_NOTE,
+  GROUPING_LINK_TEXT,
   CONDOMINIUM_COPY,
   NO_VIOLATIONS_CAVEAT,
   NEVER_PULLED_COPY,
   CAPPED_REQUESTS_COPY,
   CAPPED_ROWS_COPY,
+  CAPPED_CODE_LINES_COPY,
+  CAPPED_VIOLATION_LINES_COPY,
   REQUEST_BUTTON_LABEL,
   REQUEST_BUTTON_HELP,
   REQUEST_VERIFYING_COPY,
@@ -465,10 +625,26 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   SEARCH_SEEDED_COPY,
   STILL_OPEN_LABEL,
   STILL_OPEN_NOTE,
+  SHOW_LESS_LABEL,
+  STALE_PULL_NOTE,
+  SOURCES_HEADING,
+  SOURCES_CREDIT_LEAD,
+  ANALYZE_BOSTON_LINK_TEXT,
+  SOURCES_LICENSE_LEAD,
   ...Object.fromEntries(
     Object.entries(KIND_LABELS).map(([kind, label]) => [`KIND_LABELS.${kind}`, label]),
   ),
+  // The group headings and their one-line descriptions are defined beside the table that
+  // fills the groups, but they are panel copy and are scanned here with the rest.
+  ...Object.fromEntries(
+    RECORD_GROUPS.flatMap((group) => [
+      [`RECORD_GROUPS.${group.id}.title`, group.title],
+      [`RECORD_GROUPS.${group.id}.description`, group.description],
+    ]),
+  ),
   'unavailableCopy()': unavailableCopy(SAMPLE_PULL_DATE),
+  'pulledFromLine()': pulledFromLine(SAMPLE_PULL_DATE),
+  'rowPulledLabel()': rowPulledLabel(SAMPLE_PULL_DATE),
   'openSubCount() — empty': openSubCount(0, 0),
   'openSubCount() — all closed': openSubCount(0, 3),
   'openSubCount() — some open': openSubCount(2, 3),
@@ -477,4 +653,15 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   'formatRecordDate() — no date': formatRecordDate(null),
   'formatPullDate() — no date': formatPullDate(Number.NaN),
   'rentSmartDisagreement()': rentSmartDisagreement([SAMPLE_RENTSMART_ROW], 0) ?? '',
+  'otherRequestsLine() — one': otherRequestsLine(1) ?? '',
+  'otherRequestsLine() — many': otherRequestsLine(4) ?? '',
+  'showAllLabel() — one': showAllLabel(1, { one: 'request', many: 'requests' }),
+  'showAllLabel() — many': showAllLabel(3, { one: 'request', many: 'requests' }),
+  'categoryRestLine()': categoryRestLine(5, 8, { one: 'request', many: 'requests' }),
+  'caseLinesNote()': caseLinesNote(6, 1) ?? '',
+  'ticketLinesNote()': ticketLinesNote(12, 9) ?? '',
+  'assessorUnitsText() — blank': assessorUnitsText(null),
+  'missingYearsNote() — one': missingYearsNote([2014]) ?? '',
+  'missingYearsNote() — two': missingYearsNote([2011, 2014]) ?? '',
+  'yearChartLabel()': yearChartLabel('Requests by year opened', 1, { one: 'request', many: 'requests' }, 2013, 2026, [2014]),
 };
