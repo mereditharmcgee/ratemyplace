@@ -295,6 +295,14 @@ Things that have already cost time. Read before debugging.
 - **The domain is `ratemyplace.org`.** `ratemyplace.boston` does not resolve.
 - **Remote D1 CLI needs `CLOUDFLARE_API_TOKEN`** in the environment, or you get a 7403.
 - **`bg-coral-*` is not a Tailwind class.** Use `bg-red-*`.
+- **Tailwind reads `docs/` too, so a backslash path in Markdown can break the build.**
+  Tailwind v4 scans every file git does not ignore for class names, plans and notes (and
+  this file) included. A Windows path with a `--name` segment followed by a backslash and
+  hex digits, such as a Claude scratchpad path ending in its session id, reads as a
+  candidate carrying an out-of-range CSS escape, and `npm run build` fails with
+  `[@tailwindcss/vite:generate:build] Invalid code point` while nothing in `src/` changed.
+  Write paths in docs with forward slashes. Ten commits on the October 2026 link-previews
+  branch failed the build this way.
 - **The repo lives in a Google Drive synced folder.** The Vite watcher ignores
   `.tmp.driveupload/` so dev doesn't reload-loop. Don't remove that config.
 - **Google OAuth on production is historically flaky** (Workers bot detection) while fine
