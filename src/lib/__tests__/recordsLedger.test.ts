@@ -766,7 +766,7 @@ describe('ledgerModel Public Works tickets', () => {
   });
 });
 
-describe('ledgerModel years the city has no 311 file for', () => {
+describe('ledgerModel years the city API returns no 311 records for', () => {
   it('lists 2014 as missing, not zero, when a group spans it with no row in it', () => {
     const model = ledgerModel(
       view({
@@ -781,7 +781,7 @@ describe('ledgerModel years the city has no 311 file for', () => {
     expect(model.living.years.find((entry) => entry.year === 2014)).toEqual({ year: 2014, count: 0 });
     expect(model.living.missingYears).toEqual([2014]);
     expect(model.living.missingYearsNote).toBe(
-      "2014 is marked as missing data, not zero. The city's 311 file for that year is currently empty.",
+      "2014 is marked as missing data, not zero. The city's open data API currently returns no 311 records for that year.",
     );
     // A real empty year beside it stays an ordinary zero.
     expect(model.living.missingYears).not.toContain(2015);
