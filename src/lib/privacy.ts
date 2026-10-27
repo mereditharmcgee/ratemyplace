@@ -32,9 +32,11 @@ const MOVE_OUT_2020_OR_EARLIER = '2020_or_earlier';
  * The fuzzy tenancy range on a review card's season chip: "Summer 2024 · 2025",
  * "Fall 2025 · Current", or one end alone. Only seasons and years, never a month or day.
  *
- * Older reviews were stored with a placeholder move-in (winter of the year the review was
- * submitted), so a stored move-in can fall after the move-out year. A range that runs
- * backwards is impossible, so the move-in is left out and only the move-out shows.
+ * When a reviewer skips the optional move-in question, the submit route stores winter of the
+ * current year (the columns are NOT NULL), so a stored move-in can fall after the move-out
+ * year. A range that runs backwards is impossible, so the move-in is left out and only the
+ * move-out shows. A placeholder move-in on a range that runs forward is still shown; it
+ * can't be told apart from a real December-February move-in.
  */
 export function formatTenancyRange(input: {
   moveInSeason?: string | null;
