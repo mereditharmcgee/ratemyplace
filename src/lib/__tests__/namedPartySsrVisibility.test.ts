@@ -186,6 +186,18 @@ function searchIslandProps(html: string): string {
   return island.getAttribute('props') ?? '';
 }
 
+function headHtml(html: string): string {
+  const match = html.match(/<head>([\s\S]*?)<\/head>/);
+  if (!match) throw new Error('Rendered page is missing <head>');
+  return match[1];
+}
+
+function headTag(head: string, selector: string, attribute: string): string | null {
+  const fragment = document.createElement('div');
+  fragment.innerHTML = head;
+  return fragment.querySelector(selector)?.getAttribute(attribute) ?? null;
+}
+
 const suite = sqliteAvailable ? describe : describe.skip;
 
 suite('named-party score visibility in rendered SSR pages', () => {
@@ -316,6 +328,41 @@ suite('named-party score visibility in rendered SSR pages', () => {
       expect(headerText).toContain('3 approved reviews');
       expect(breakdownText).not.toBeNull();
       expect(breakdownText).toContain('4.0');
+    } finally {
+      database.close();
+    }
+  });
+
+  // SEO-06: link previews and search snippets come from the head, so a withheld score or an
+  // internal id must not reach it either. testLocals has no SITE_URL: the production origin is
+  // the fallback.
+  it.each([
+    { ...detailCases[0], thinIds: ['landlord-thin-1', 'landlord-thin-2', 'landlord-thin-review-1', '"landlord-thin"'] },
+    { ...detailCases[1], thinIds: ['manager-thin-1', 'manager-thin-2', 'manager-thin-review-1', '"manager-thin"'] },
+  ])('keeps the withheld $label aggregate and internal ids out of the head', async ({ Page, route, thinSlug, thinScore, thinIds }) => {
+    const database = makeDatabase();
+    try {
+      const head = headHtml(await renderDetail(database, Page, route, thinSlug));
+      const url = `https://ratemyplace.org/${route}/${thinSlug}`;
+
+      expect(head).not.toContain(thinScore);
+      for (const id of thinIds) expect(head).not.toContain(id);
+      expect(headTag(head, 'link[rel="canonical"]', 'href')).toBe(url);
+      expect(headTag(head, 'meta[property="og:url"]', 'content')).toBe(url);
+    } finally {
+      database.close();
+    }
+  });
+
+  it('noindexes a search query and keeps the withheld aggregate out of its head', async () => {
+    const database = makeDatabase();
+    try {
+      const head = headHtml(await renderSearch(database, 'Thin Data'));
+
+      expect(head).toContain('<meta name="robots" content="noindex, follow">');
+      expect(head).not.toContain('rel="canonical"');
+      expect(head).not.toContain('og:url');
+      expect(head).not.toContain('4.8');
     } finally {
       database.close();
     }
