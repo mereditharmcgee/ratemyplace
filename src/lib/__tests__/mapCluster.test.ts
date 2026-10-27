@@ -1,78 +1,63 @@
 import { describe, it, expect } from 'vitest';
 import {
-  averageScore,
-  clusterAppearance,
+  CLUSTER_COLORS,
   clusterBadgeSize,
+  clusterBadgeStyle,
   clusterTitle,
   CLUSTER_BADGE_SIZES,
 } from '../mapCluster';
-import { SCORE_HEX, getScoreHex } from '../scoring-colors';
+import { SCORE_HEX } from '../scoring-colors';
 
-describe('averageScore', () => {
-  it('averages the scored buildings', () => {
-    expect(averageScore([4, 2])).toBe(3);
-    expect(averageScore([4.5])).toBe(4.5);
-  });
+// A cluster shows a count, not a score. A reader once took a cluster's "2", drawn in a band
+// colour, for a Concerning score. These tests hold the badge to neutral colours only.
+const BAND_HEXES = Object.values(SCORE_HEX).map((hex) => hex.toLowerCase());
 
-  it('leaves unscored buildings out of the average rather than counting them as zero', () => {
-    expect(averageScore([4, null, 2, null])).toBe(3);
-  });
+/** "#1e293b" -> "30, 41, 59", the form a hex takes inside an rgb()/rgba() value. */
+function rgbTriplet(hex: string): string {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+}
 
-  it('is null when no building in the cluster has a score', () => {
-    expect(averageScore([null, null])).toBeNull();
-    expect(averageScore([])).toBeNull();
-  });
-
-  it('rounds to one decimal, the rule /api/buildings/map applies per building', () => {
-    // Unrounded, these come out as 3.9999999999999996 and 1.9999999999999998.
-    expect(averageScore([4.6, 3.8, 3.6])).toBe(4);
-    expect(averageScore([1.4, 3.3, 1.3])).toBe(2);
-    expect(averageScore([4, 3, 3])).toBe(3.3);
-  });
-
-  it('ignores a non-finite score instead of poisoning the average', () => {
-    expect(averageScore([4, Number.NaN, 2])).toBe(3);
-    expect(averageScore([Number.POSITIVE_INFINITY])).toBeNull();
+describe('CLUSTER_COLORS', () => {
+  it('uses no score band colour, including the no-score grey', () => {
+    for (const value of Object.values(CLUSTER_COLORS)) {
+      expect(BAND_HEXES).not.toContain(value.toLowerCase());
+    }
   });
 });
 
-describe('clusterAppearance', () => {
-  it('colours the cluster by the band of its average, through getScoreHex', () => {
-    // 4.5 and 3.7 average to 4.1: Good, even though one member is Mixed.
-    const look = clusterAppearance([4.5, 3.7]);
-    expect(look.average).toBeCloseTo(4.1);
-    expect(look.hex).toBe(SCORE_HEX.good);
-    expect(look.label).toBe('Good');
+describe('clusterBadgeStyle', () => {
+  it('draws a neutral filled circle with a ring', () => {
+    const css = clusterBadgeStyle(36);
+    expect(css).toContain('width: 36px');
+    expect(css).toContain('height: 36px');
+    expect(css).toContain('border-radius: 9999px');
+    expect(css).toContain(`background: ${CLUSTER_COLORS.fill}`);
+    expect(css).toContain(`color: ${CLUSTER_COLORS.text}`);
+    // The ring: a light inner border plus an outer halo, which a score pin never has.
+    expect(css).toContain(`border: 2px solid ${CLUSTER_COLORS.border}`);
+    expect(css).toMatch(/box-shadow: 0 0 0 \d+px /);
   });
 
-  it('follows the band edges exactly as the markers do', () => {
-    expect(clusterAppearance([3, 3]).hex).toBe(getScoreHex(3));
-    expect(clusterAppearance([3, 3]).label).toBe('Mixed');
-    expect(clusterAppearance([2.5]).label).toBe('Concerning');
-    expect(clusterAppearance([1, 1.5]).hex).toBe(SCORE_HEX.poor);
+  it('contains no score band colour at any size, as a hex or as rgb', () => {
+    for (const size of CLUSTER_BADGE_SIZES) {
+      const css = clusterBadgeStyle(size).toLowerCase();
+      for (const hex of BAND_HEXES) {
+        expect(css).not.toContain(hex);
+        expect(css).not.toContain(rgbTriplet(hex));
+      }
+    }
   });
 
-  it('lands a float-error average on the band its exact mean belongs to', () => {
-    expect(clusterAppearance([4.6, 3.8, 3.6]).label).toBe('Good');
-    expect(clusterAppearance([4.6, 3.8, 3.6]).hex).toBe(SCORE_HEX.good);
-    expect(clusterAppearance([1.4, 3.3, 1.3]).label).toBe('Concerning');
+  it('centres the badge on the cluster position rather than anchoring it like a pin', () => {
+    expect(clusterBadgeStyle(42)).toContain('transform: translateY(50%)');
   });
 
-  it('keeps a just-below-the-edge average in the lower band, and an exact edge in the upper', () => {
-    expect(clusterAppearance([3.9]).label).toBe('Mixed');
-    expect(clusterAppearance([4.0]).label).toBe('Good');
-  });
-
-  it('uses the no-score colour when nothing in the cluster is scored', () => {
-    const look = clusterAppearance([null, null, null]);
-    expect(look.average).toBeNull();
-    expect(look.hex).toBe(getScoreHex(null));
-    expect(look.hex).toBe(SCORE_HEX.none);
-    expect(look.label).toBeNull();
-  });
-
-  it('ignores unscored members when picking the colour', () => {
-    expect(clusterAppearance([null, 1.2, null]).hex).toBe(SCORE_HEX.poor);
+  it('steps the count text up on the larger badges', () => {
+    expect(clusterBadgeStyle(36)).toContain('font-size: 13px');
+    expect(clusterBadgeStyle(42)).toContain('font-size: 13px');
+    expect(clusterBadgeStyle(48)).toContain('font-size: 14px');
+    expect(clusterBadgeStyle(56)).toContain('font-size: 14px');
   });
 });
 
@@ -104,11 +89,12 @@ describe('clusterBadgeSize', () => {
 });
 
 describe('clusterTitle', () => {
-  it('names the count and the band of the average', () => {
-    expect(clusterTitle(12, 'Good')).toBe('12 buildings, average Good. Click to zoom in.');
+  it('names the count of buildings and nothing about scores', () => {
+    expect(clusterTitle(12)).toBe('12 buildings. Click to zoom in.');
+    expect(clusterTitle(2)).toBe('2 buildings. Click to zoom in.');
   });
 
-  it('says so when no building in the cluster has a score', () => {
-    expect(clusterTitle(3, null)).toBe('3 buildings, no scores yet. Click to zoom in.');
+  it('uses the singular for one building', () => {
+    expect(clusterTitle(1)).toBe('1 building. Click to zoom in.');
   });
 });

@@ -6,7 +6,12 @@ import { describe, expect, it } from 'vitest';
 // page scripts. A runtime import would pull whatever it imports into every visitor's
 // bundle, so a server module (the D1 resolvers, the Places client, records/*) could ship
 // to the client by accident. Type-only imports are erased at build time and are fine.
-const LEAF_MODULES = ['src/lib/authRedirect.ts', 'src/lib/reviewPaths.ts', 'src/lib/reviewSubmitOutcome.ts'];
+const LEAF_MODULES = [
+  'src/lib/authRedirect.ts',
+  'src/lib/mapCluster.ts',
+  'src/lib/reviewPaths.ts',
+  'src/lib/reviewSubmitOutcome.ts',
+];
 
 describe('client leaf modules have no runtime imports', () => {
   it.each(LEAF_MODULES.map((file) => [file]))('%s', (file) => {
