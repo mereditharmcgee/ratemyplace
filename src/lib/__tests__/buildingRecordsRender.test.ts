@@ -574,6 +574,21 @@ suite('BuildingRecords.astro ledger', () => {
     expect(disclosure?.lastElementChild).toBe(endButton);
   });
 
+  it('pads the Source links and the Show all controls to a tappable height', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const fragment = parse(await renderPanel(db));
+    const sources = Array.from(fragment.querySelectorAll('a')).filter((node) => (node.textContent ?? '').trim() === 'Source');
+    const summaries = Array.from(fragment.querySelectorAll('details.records-show-all > summary'));
+
+    // Bare text measured 40x15 (Source) and 20px tall (Show all); 24px is the floor.
+    expect(sources.length).toBeGreaterThan(0);
+    for (const link of sources) expect(link.className).toMatch(/\binline-block\b.*\bpy-1\.5\b|\bpy-1\.5\b.*\binline-block\b/);
+    expect(summaries.length).toBeGreaterThan(0);
+    for (const summary of summaries) expect(summary.className).toContain('py-1.5');
+  });
+
   it('keeps the full lists one disclosure down rather than dropping them', async () => {
     const db = await createDbWithAdmin();
     await seedFullBuilding(db);
