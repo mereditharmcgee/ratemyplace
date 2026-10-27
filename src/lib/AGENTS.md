@@ -178,7 +178,7 @@ precision here — the imprecision is the point.
 ### `validation.ts` — use the shared primitives
 
 `isValidEmail`, `isSafeHttpUrl`, `validateReviewText`, `enforceMaxLength`,
-`escapeLikePattern`, `sanitizeText`, plus per-form validators (`validateReviewForm`,
+`escapeLikePattern`, `fitsLikePattern`, `sanitizeText`, plus per-form validators (`validateReviewForm`,
 `validateDisputeForm`, `validateBugReport`, `validateContactForm`, `validateSearch`).
 
 `isSafeHttpUrl` exists because a `javascript:` URL in a bug report could take over an admin
@@ -325,6 +325,18 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   `normalizeSearchQuery` gives back `string[][]`: the search ORs the spellings inside a term
   and ANDs across terms, so "comm ave" matches both `Avenue` and `Ave` in stored addresses
   without matching a building that has neither. Consumed by `searchSql.ts`.
+- **`parseSearchQuery` reads a typed address before any of it is matched.** The stored
+  address is the street line only, so `BOSTON_LOCALITY_NAMES` (multiword names as a unit),
+  "MA", "Massachusetts", "USA", five-digit ZIPs and ZIP+4 come out of the street terms and
+  become `places` / `zips`, which rank and never filter. A place word stays a street word when
+  the next word in the same comma segment is a street suffix in any `SUFFIX_SPELLINGS`
+  spelling ("Brighton Ave", "Allston St", "Boston St"), or when it follows "the" ("The
+  Fenway"). The first number is the house number; later numbers, "apt"/"unit" plus the next
+  word, and anything after "#" are unit numbers and are dropped. A hyphenated word with no
+  digit is split ("Allston-Brighton" is two places); "14-18" and a ZIP+4 stay whole. A house
+  number with only a place beside it ("7 Allston") keeps the place as its street word too,
+  or the number alone would match every building with that number. A query that leaves no
+  street word and no number but names a place or ZIP is an area search (`isAreaSearch`).
 - **`coverage.ts` is the page-state table, read-only.** `recordsRequestState` answers
   `ineligible` / `pulled` / `fill_queued` / `parked` / `requested` / `never_pulled` in that
   precedence, in **one** statement (indexed `building_id` seeks as correlated subqueries),
@@ -400,12 +412,30 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
 ### Search, page metadata, and the sitemap
 
 - **`searchSql.ts` is the only spelling of the query-mode buildings query.**
-  `buildingSearchWhere`, `buildingSearchSelect` and `BUILDING_SEARCH_ORDER` are shared by
+  `buildingSearchWhere`, `buildingSearchSelect` and `buildingSearchOrder` are shared by
   `src/pages/search.astro` and `src/pages/api/search/results.ts`, so the page and the
   endpoint cannot disagree about which buildings match or in what order. Query mode returns
   every Boston building, reviewed ones first; browse mode, the landlord queries and the map
   keep their `HAVING COUNT(r.id) > 0`. `__tests__/recordsSearchParity.test.ts` fails if
   either call site stops using the fragments.
+- **Query-mode order: the exact address, then reviewed before unreviewed.**
+  `buildingSearchOrder` puts a building whose house number matches (whole, or inside a range
+  under the `rangeContains` parity rule) and whose street words all match as whole words
+  first, the typed neighborhood or ZIP deciding between twins. That is the only tier allowed
+  above reviewed buildings; everywhere else a reviewed building never sorts below an
+  unreviewed one. Then whole-word street matches, then the typed place, review count, score,
+  and the house number as a number (not text). The house number comes from `st_num_lo` /
+  `st_num_hi` when set, else from the front of `b.address`. The ORDER BY carries binds and
+  must be bound after the WHERE's. Keep a full query (where + order + LIMIT/OFFSET) under
+  D1's 100 bound parameters: `__tests__/searchFullAddress.test.ts` checks the widest query
+  the parser allows, which is why places and ZIPs are capped.
+- **D1 refuses a LIKE pattern over 50 bytes** (UTF-8, wildcards and escapes included) and
+  fails the whole statement, which the search page then shows as no match. A full address
+  typed with its neighborhood, "Boston, MA" and ZIP is over that easily. `fitsLikePattern`
+  (`validation.ts`) is the check: `searchSql.ts` writes a pattern that does not fit as `0`
+  (no address word, neighborhood or landlord name is that long), and the landlord queries
+  on the search page and the results endpoint skip it. `searchFullAddress.test.ts` measures
+  every bind of a long query.
 - **Browse mode is Boston first, most recently reviewed.** Its query stays in the two call
   sites, but its ORDER BY is `BROWSE_BUILDINGS_ORDER` in `searchSql.ts`: Boston buildings
   (`BOSTON_CITY_SQL`, the same city test `has_records` uses, without the parcel check), then
@@ -441,14 +471,15 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
 - **`bostonLocalities.ts` is the one Boston locality vocabulary.** `BOSTON_LOCALITY_NAMES`
   holds the 26 names in display form — every USPS city name for a Boston-only ZIP plus the
   neighborhood names people type, minus `CHESTNUT HILL`, whose 02467 also covers Newton and
-  Brookline. Four consumers derive from it and none restates it: `locality.ts`
+  Brookline. Five consumers derive from it and none restates it: `locality.ts`
   (`BOSTON_NEIGHBORHOODS`, normalized and minus 'boston', behind the `isBostonLocality`
   predicate — Google Places routinely hands back the neighborhood as the locality),
   `locality.ts` again (`bostonLocalityName`, the display spelling of any value
   `isBostonLocality` accepts, for records-page titles), `records/identity.ts`
   (`TRAILING_LOCALITIES`, uppercased, for the trailing-locality stripper), and
   `records/dedupe.ts` (`CITY_CANDIDATES`, the bind list for its `city IN (…)` candidate
-  predicate). Add a name here and nowhere else. `BOSTON_SUB_AREAS` in the same
+  predicate). A fifth, `searchQuery.ts`, strips them from typed searches. Add a name here
+  and nowhere else. `BOSTON_SUB_AREAS` in the same
   file maps sub-area names Google hands back as the locality (Aberdeen, Oak Square, Cleveland
   Circle, Savin Hill, …) to the neighborhood they sit in; `displayLocality` and
   `resolveBostonSubArea` in `locality.ts`, `titleCaseNeighborhood` in

@@ -44,7 +44,11 @@ function makeDatabase(): SQLiteDatabase {
       landlord_id TEXT,
       -- 0031. The query-mode buildings select reads it for has_records, so a fixture
       -- without it fails the whole query, not just that column.
-      parcel_id TEXT
+      parcel_id TEXT,
+      -- 0031. The search order reads the house number from these, falling back to the
+      -- address when they are NULL, so a fixture without them fails the whole query.
+      st_num_lo INTEGER,
+      st_num_hi INTEGER
     );
     CREATE TABLE reviews (
       id TEXT PRIMARY KEY,
