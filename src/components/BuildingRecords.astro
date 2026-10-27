@@ -28,9 +28,18 @@ import {
   KIND_LABELS,
   REQUESTED_COPY,
   REQUEST_PARKED_COPY,
+  SOURCES_HEADING,
+  SOURCES_CREDIT_LEAD,
+  ANALYZE_BOSTON_LINK_TEXT,
+  SOURCES_LICENSE_LEAD,
   formatDollars,
-  formatPullDate,
+  pulledFromLine,
 } from '../lib/records/display';
+import {
+  ANALYZE_BOSTON_URL,
+  BOSTON_OPEN_DATA_LICENSE,
+  recordsCitations,
+} from '../lib/records/provenance';
 import { ledgerModel } from '../lib/records/ledger';
 import { recordsRequestState, type RecordsRequestState } from '../lib/records/coverage';
 import { FY2026_RESOURCE_ID } from '../lib/records/sources/boston/assessor';
@@ -89,6 +98,17 @@ const current = view?.assessments[0] ?? null;
 const assessorStatus = view?.sources[FY2026_RESOURCE_ID] ?? null;
 const ledger = view ? ledgerModel(view, new Date()) : null;
 
+// The line under the heading says when this site pulled the records. The list at the foot
+// cites the resources the stored pulls came from, one link per resource
+// (`lib/records/provenance.ts`).
+const pulledLine = view ? pulledFromLine(view.pulledAt) : '';
+const citations = view ? recordsCitations(Object.keys(view.sources)) : [];
+// The resource links stand alone on their lines, padded to a 28px-tall hit area like each
+// row's Source link. The two links inside the credit sentence stay inline so the sentence
+// wraps as text, and are underlined because colour alone does not mark a link in running text.
+const sourceLinkClass = '-my-1.5 inline-block py-1.5 text-teal-700 hover:underline';
+const creditLinkClass = 'py-1.5 text-teal-700 underline underline-offset-2';
+
 /** A correction with no kind was filed against the pull as a whole, so it shows everywhere. */
 function notesFor(kind: string) {
   return (view?.corrections ?? []).filter((note) => note.recordKind === kind || note.recordKind === null);
@@ -116,7 +136,7 @@ const chartsClass = 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5';
     <div class="flex flex-wrap items-start justify-between gap-x-4">
       <div>
         <h2 class="text-xl font-semibold text-gray-900">Public records</h2>
-        <p class="mt-0.5 text-xs text-gray-500">City of Boston · pulled {formatPullDate(view.pulledAt)}</p>
+        <p class="mt-0.5 text-xs text-gray-500">{pulledLine}</p>
       </div>
       {/* Padded to a 44px tap target rather than sized as bare text — it is the panel's one
           call to action and it sits on a phone next to a scrolling list. */}
@@ -318,6 +338,37 @@ const chartsClass = 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5';
       {ledger.other.rentSmartNote && <p class={noteClass}>{ledger.other.rentSmartNote}</p>}
       <CorrectionNotes notes={notesFor('service_request')} />
     </div>
+
+    {/* Where every figure above came from: the city, the open data site that publishes it, the
+        license, and one link per resource the stored pulls read. Resource links rather than
+        dataset links, so a reader can open the exact yearly 311 file a count came from. */}
+    {citations.length > 0 && (
+      <div id="records-sources" class="mt-6">
+        <h3 class="text-sm font-semibold text-gray-900">{SOURCES_HEADING}</h3>
+        <p class="mt-1 text-xs text-gray-500">
+          {SOURCES_CREDIT_LEAD}{' '}
+          <a href={ANALYZE_BOSTON_URL} target="_blank" rel="noopener noreferrer" class={creditLinkClass}>{ANALYZE_BOSTON_LINK_TEXT}</a>{' '}
+          {SOURCES_LICENSE_LEAD}{' '}
+          <a href={BOSTON_OPEN_DATA_LICENSE.url} target="_blank" rel="noopener noreferrer" class={creditLinkClass}>{BOSTON_OPEN_DATA_LICENSE.title}</a>.
+        </p>
+        <ul class="mt-2 space-y-1 text-xs text-gray-500">
+          {citations.map((citation) =>
+            citation.resources.length === 1 && citation.resources[0].label === null ? (
+              <li>
+                <a href={citation.resources[0].url} target="_blank" rel="noopener noreferrer" class={sourceLinkClass}>{citation.title}</a>
+              </li>
+            ) : (
+              <li class="flex flex-wrap items-baseline gap-x-3">
+                <span>{citation.title}:</span>
+                {citation.resources.map((link) => (
+                  <a href={link.url} target="_blank" rel="noopener noreferrer" aria-label={link.name} class={sourceLinkClass}>{link.label}</a>
+                ))}
+              </li>
+            ),
+          )}
+        </ul>
+      </div>
+    )}
 
     {/* Folded by default: most readers never report an error, and an open form (with its
         Turnstile) made the panel's last screen a form. The header link, a #report-record URL,

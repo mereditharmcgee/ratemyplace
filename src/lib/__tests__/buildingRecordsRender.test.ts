@@ -282,10 +282,56 @@ suite('BuildingRecords.astro ledger', () => {
     await seedFullBuilding(db);
 
     const html = await renderPanel(db);
+    const heading = parse(html).querySelector('#public-records h2');
+    const line = heading?.nextElementSibling?.textContent ?? '';
 
-    expect(html).toContain('City of Boston · pulled');
+    // Said as when this site pulled the records, not as the city dataset's own date.
+    expect(line).toMatch(/^Pulled from City of Boston open data on [A-Z][a-z]{2} \d{1,2}, \d{4}\.$/);
     // The correction link is the panel's one call to action and has to be tappable.
     expect(html).toMatch(/href="#report-record"[^>]*min-h-\[44px\]/);
+  });
+
+  it('dates each row to the pull that fetched it, in the same words', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const summary = ledgerRow(await renderPanel(db), 'Building permits').querySelector('summary')?.textContent ?? '';
+
+    expect(summary).toMatch(/pulled [A-Z][a-z]{2} \d{1,2}, \d{4}/);
+    expect(summary).not.toContain('as of');
+  });
+
+  it('credits the city and Analyze Boston, states the license, and links each resource used', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const html = await renderPanel(db);
+    const sources = parse(html).querySelector('#records-sources');
+    const text = (sources?.textContent ?? '').replace(/\s+/g, ' ');
+
+    expect(sources?.querySelector('h3')?.textContent).toBe('Sources');
+    expect(text).toContain(
+      'Data from the City of Boston, published on Analyze Boston (data.boston.gov) under the Open Data Commons Public Domain Dedication and License (PDDL).',
+    );
+    const hrefs = Array.from(sources?.querySelectorAll('a') ?? []).map((link) => link.getAttribute('href'));
+    expect(hrefs).toContain('https://data.boston.gov/');
+    expect(hrefs).toContain('https://opendatacommons.org/licenses/pddl/');
+    // Resource-level links, not dataset pages: the assessor years, permits, and every 311 file.
+    expect(hrefs).toContain(`https://data.boston.gov/dataset/property-assessment/resource/${FY2026_RESOURCE_ID}`);
+    expect(hrefs).toContain(`https://data.boston.gov/dataset/property-assessment/resource/${FY2025_RESOURCE_ID}`);
+    expect(hrefs).toContain(`https://data.boston.gov/dataset/approved-building-permits/resource/${PERMITS_RESOURCE_ID}`);
+    for (const { resourceId } of LEGACY_311_RESOURCES) {
+      expect(hrefs).toContain(`https://data.boston.gov/dataset/311-service-requests/resource/${resourceId}`);
+    }
+    expect(hrefs).toContain(`https://data.boston.gov/dataset/311-service-requests/resource/${NEW_311_RESOURCE_ID}`);
+    expect(hrefs.some((href) => href?.endsWith('/dataset/311-service-requests'))).toBe(false);
+    // A bare year link names its dataset for a screen reader.
+    const year2024 = Array.from(sources?.querySelectorAll('a') ?? []).find((link) => link.textContent === '2024');
+    expect(year2024?.getAttribute('aria-label')).toBe('311 Service Requests 2024');
+    // Every source link opens the city's page without handing it this page as an opener.
+    for (const link of Array.from(sources?.querySelectorAll('a') ?? [])) {
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    }
   });
 
   it('keeps the record-error form folded until a reader asks for it', async () => {
@@ -418,7 +464,7 @@ suite('BuildingRecords.astro ledger', () => {
     expect(summary?.className).toContain('min-h-[44px]');
     // Everything a closed row has to answer lives in the summary, not behind the disclosure.
     expect(summary?.querySelector('h4')?.textContent).toContain('Building permits');
-    expect(summary?.textContent).toContain('as of');
+    expect(summary?.textContent).toContain('pulled ');
     expect(summary?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
   });
 
@@ -627,12 +673,15 @@ suite('BuildingRecords.astro ledger', () => {
     await seedFullBuilding(db);
 
     const report = parse(await renderPanel(db)).querySelector('#report-record');
-    const before = report?.previousElementSibling;
+    const sources = report?.previousElementSibling;
+    const notes = sources?.previousElementSibling;
 
     // The ledger's closing rule and the fold's opening rule used to sit 24px apart with
-    // nothing between them. Now the grouping note sits there.
-    expect(before?.className ?? '').not.toContain('border-b');
-    expect((before?.textContent ?? '').trim()).toContain(GROUPING_NOTE);
+    // nothing between them. Now the grouping note sits there, then the source list.
+    expect(sources?.id).toBe('records-sources');
+    expect(sources?.className ?? '').not.toContain('border-b');
+    expect(notes?.className ?? '').not.toContain('border-b');
+    expect((notes?.textContent ?? '').trim()).toContain(GROUPING_NOTE);
   });
 
   it('keeps the full lists one disclosure down rather than dropping them', async () => {
@@ -939,5 +988,15 @@ suite('BuildingRecords.astro request button states', () => {
     // The ledger below is the answer now, and the button never comes back.
     expect(text).not.toContain(REQUEST_BUTTON_LABEL);
     expect(text).not.toContain(REQUESTED_COPY);
+  });
+
+  it('cites only the assessor year on a seeded building', async () => {
+    const html = await renderPanel(await seededBuilding('bldg-state-8'), 'bldg-state-8');
+    const sources = parse(html).querySelector('#records-sources');
+    const hrefs = Array.from(sources?.querySelectorAll('a') ?? []).map((link) => link.getAttribute('href'));
+
+    expect(hrefs).toContain(`https://data.boston.gov/dataset/property-assessment/resource/${FY2026_RESOURCE_ID}`);
+    expect(hrefs.filter((href) => href?.includes('/resource/'))).toHaveLength(1);
+    expect(sources?.textContent ?? '').not.toContain('311 Service Requests');
   });
 });
