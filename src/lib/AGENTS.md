@@ -433,7 +433,11 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   first, the typed neighborhood or ZIP deciding between twins. That is the only tier allowed
   above reviewed buildings; everywhere else a reviewed building never sorts below an
   unreviewed one. Then whole-word street matches, then the typed place, review count, score,
-  and the house number as a number (not text). The house number comes from `st_num_lo` /
+  and the house number as a number (not text). An area search (`isAreaSearch`: only a place
+  and/or ZIP, such as "Brighton" or "02135") puts the newest approved review
+  (`NEWEST_REVIEW_FIRST`, the browse rule) between the typed place and review count, so its
+  reviewed buildings read most recently reviewed first; unreviewed ones tie on it and keep
+  the order above. An address search never reads that key. The house number comes from `st_num_lo` /
   `st_num_hi` when set, else from the front of `b.address`. The ORDER BY carries binds and
   must be bound after the WHERE's. Keep a full query (where + order + LIMIT/OFFSET) under
   D1's 100 bound parameters: `__tests__/searchFullAddress.test.ts` checks the widest query
@@ -506,10 +510,12 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   two islands. The review form's `AddressAutocomplete` sends no scope and gets any US
   address (people review buildings outside Boston). `HomeSearch` alone sends `scope=boston`:
   `autocompleteRequestBody` (`places.ts`) adds a location bias to `BOSTON_BOX`,
-  `bostonScopePredictions` drops every suggestion not in Massachusetts and puts Boston
-  first, and `matchPredictionsToBuildings` (`homeSearchMatch.ts`) resolves each suggestion
-  read-only through `findExistingBuilding`, refusing an address-key match when Google and
-  the building name different neighborhoods. `homeSearchItems.ts` (a leaf) orders the rows:
+  `matchPredictionsToBuildings` (`homeSearchMatch.ts`) resolves each suggestion read-only
+  through `findExistingBuilding`, refusing an address-key match when Google and the building
+  name different neighborhoods, and matching a suggestion outside Massachusetts by its exact
+  place id only (Boston's neighborhood names are towns elsewhere: "Brighton, MI"). Then
+  `bostonScopePredictions` keeps Massachusetts, Boston first, and drops every suggestion
+  from elsewhere that did not match one of our buildings. `homeSearchItems.ts` (a leaf) orders the rows:
   buildings we have ("See this building", with "Write a review" beside it), landlords, then
   "Other addresses". Never add the scope to the review form without the owner's say.
 - **`mapCluster.ts` decides how a marker cluster looks.** A dark neutral circle with a ring

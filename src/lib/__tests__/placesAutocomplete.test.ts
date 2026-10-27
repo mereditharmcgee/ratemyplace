@@ -156,6 +156,20 @@ describe('the Massachusetts filter and Boston-first order', () => {
     const result = bostonScopePredictions([otherTownMa, newHampshire, brightonMi, brightonMa, southCarolina, boston, brightonIa, noState]);
     expect(result).toEqual([brightonMa, boston, otherTownMa]);
   });
+
+  it('keeps a suggestion from elsewhere only when the predicate accepts it, after every Massachusetts row', () => {
+    const ours = new Set([southCarolina.placeId, noState.placeId]);
+    const result = bostonScopePredictions(
+      [southCarolina, otherTownMa, newHampshire, brightonMi, brightonMa, noState, boston],
+      (p) => ours.has(p.placeId),
+    );
+    expect(result).toEqual([brightonMa, boston, otherTownMa, southCarolina, noState]);
+  });
+
+  it('keeps every Massachusetts row whatever the predicate says', () => {
+    const result = bostonScopePredictions([otherTownMa, brightonMa], () => false);
+    expect(result).toEqual([brightonMa, otherTownMa]);
+  });
 });
 
 const routeSuite = sqliteAvailable ? describe : describe.skip;
@@ -241,6 +255,73 @@ routeSuite('GET /api/places/autocomplete', () => {
       },
       { ...otherTown, existing: null },
     ]);
+  });
+
+  // A reviewed building in another state, created through the review form with its Google
+  // place id, as every reviewed building outside Massachusetts is.
+  const elsewhereOurs = prediction('40 Sample Street', 'Elsewhere, CT, USA', 'gp-ct-ours');
+  const elsewhereNew = prediction('42 Sample Street', 'Elsewhere, CT, USA', 'gp-ct-new');
+
+  async function seedElsewhere() {
+    await insertBuilding(db, {
+      id: 'user-ct',
+      address: '40 Sample Street',
+      slug: '40-sample-street-elsewhere',
+      neighborhood: null,
+      city: 'Elsewhere',
+      state: 'CT',
+      zip_code: '06500',
+      google_place_id: 'gp-ct-ours',
+    });
+    await db
+      .prepare("INSERT INTO reviews (id, building_id, status, overall_score, move_out_year_new) VALUES ('r-ct', 'user-ct', 'approved', 3.7, NULL)")
+      .run();
+  }
+
+  it('the Boston scope keeps a building we have in another state, after Massachusetts, and drops the rest', async () => {
+    await seedOurs();
+    await seedElsewhere();
+    stubGoogle([elsewhereOurs, otherState, elsewhereNew, otherTown, ours]);
+    const res = await autocompleteGET(ctx('input=40+Sample&sessionToken=tok&scope=boston'));
+    expect(res.status).toBe(200);
+    const { predictions } = await res.json();
+    // otherState is "12 Example Road, Brighton, MI": the same street and number as our Boston
+    // building, which an address match would have opened. Outside Massachusetts only the
+    // place id counts, so it is not ours and is dropped like any other out-of-state row.
+    expect(predictions.map((p: { placeId: string }) => p.placeId)).toEqual(['gp-ours', 'gp-town', 'gp-ct-ours']);
+    expect(predictions[2]).toEqual({
+      ...elsewhereOurs,
+      existing: {
+        slug: '40-sample-street-elsewhere',
+        title: '40 Sample Street',
+        subtitle: 'Elsewhere, CT',
+        reviewCount: 1,
+        avgScore: 3.7,
+      },
+    });
+  });
+
+  it('the default scope still passes a building we have in another state through untouched', async () => {
+    await seedOurs();
+    await seedElsewhere();
+    stubGoogle([elsewhereOurs, elsewhereNew]);
+    const res = await autocompleteGET(ctx('input=40+Sample&sessionToken=tok'));
+    expect((await res.json()).predictions).toEqual([elsewhereOurs, elsewhereNew]);
+  });
+
+  it('when the building lookup fails, keeps Massachusetts and drops every other state', async () => {
+    await seedOurs();
+    await seedElsewhere();
+    stubGoogle([elsewhereOurs, ours]);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const original = db.prepare.bind(db);
+    vi.spyOn(db, 'prepare').mockImplementation(((sql: string) => {
+      if (sql.includes('rate_limits')) return original(sql);
+      throw new Error('D1 down');
+    }) as typeof db.prepare);
+    const res = await autocompleteGET(ctx('input=40+Sample&scope=boston'));
+    expect(res.status).toBe(200);
+    expect((await res.json()).predictions).toEqual([{ ...ours, existing: null }]);
   });
 
   it('still answers with the suggestions when the building lookup fails', async () => {
