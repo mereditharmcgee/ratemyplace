@@ -3,7 +3,7 @@ import reactRenderer from '@astrojs/react/server.js';
 import { describe, expect, it } from 'vitest';
 import BuildingPage from '../../pages/building/[slug].astro';
 import { NAMED_PARTY_MIN_REVIEWS } from '../scoring';
-import { getEarlyScoreTextColor } from '../scoring-colors';
+import { getEarlyScoreStyle, getScoreColor, getScoreTextColor } from '../scoring-colors';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 
@@ -93,6 +93,11 @@ function unitRecommendLine(root: HTMLElement): string {
   return text(root.querySelector('.unit-card .text-right p.text-xs'));
 }
 
+/** The score number on the first unit card. */
+function unitScore(root: HTMLElement): Element | null {
+  return root.querySelector('.unit-card [data-unit-score]');
+}
+
 suite('building page, one review', () => {
   it('shows the score as an early rating with its count beside it', async () => {
     const root = await renderPage(await seed([{ recommend: 'no', pests: true }]));
@@ -101,8 +106,13 @@ suite('building page, one review', () => {
     expect(text(header)).toContain('3.9 · from 1 review');
     expect(text(header)).toContain('Early rating');
     expect(header!.querySelector('a')?.getAttribute('href')).toBe('/methodology#early-ratings');
-    const number = header!.querySelector('span');
-    expect(number?.getAttribute('class')).toContain(getEarlyScoreTextColor(3.9));
+    const marker = header!.querySelector('[data-early-score-marker]');
+    expect(marker?.getAttribute('aria-hidden')).toBe('true');
+    expect(marker?.getAttribute('class')).toContain(getScoreColor(3.9).bg);
+    const number = marker!.nextElementSibling;
+    expect(number?.textContent).toBe('3.9');
+    expect(number?.getAttribute('class')).toContain(getEarlyScoreStyle(3.9).text);
+    expect(number?.getAttribute('class')).not.toContain(getScoreTextColor(3.9));
     expect(number?.getAttribute('class')).toContain('font-semibold');
   });
 
@@ -117,13 +127,13 @@ suite('building page, one review', () => {
     expect(commonIssueRows(root)).toEqual(['Pest issues: 1 of 1 review', 'Heat/hot water issues: 1 of 1 review']);
   });
 
-  it('draws the sub-scores in the breakdown lighter too', async () => {
+  it('mutes the sub-scores in the breakdown too', async () => {
     const root = await renderPage(await seed([{ recommend: 'yes' }]));
     const tiles = breakdownTileNumbers(root);
     expect(tiles.length).toBeGreaterThan(0);
     for (const tile of tiles) {
       expect(tile).toContain('font-semibold');
-      expect(tile).toContain(getEarlyScoreTextColor(4));
+      expect(tile).toContain(getEarlyScoreStyle(4).text);
     }
   });
 
@@ -140,6 +150,20 @@ suite('building page, one review', () => {
     const root = await renderPage(await seed([{ recommend: 'yes' }]));
     expect(breakdownRows(root)).toContain('Would recommend: 1 of 1 review');
     expect(unitRecommendLine(root)).toBe('1 of 1 would recommend');
+  });
+
+  it('mutes the unit card score like the header, with the band dot beside it', async () => {
+    const root = await renderPage(await seed([{ recommend: 'yes' }]));
+    const number = unitScore(root);
+    expect(number?.textContent).toBe('3.9');
+    expect(number?.getAttribute('class')).toContain(getEarlyScoreStyle(3.9).text);
+    expect(number?.getAttribute('class')).not.toContain(getScoreTextColor(3.9));
+    expect(number?.getAttribute('class')).toContain('font-semibold');
+    expect(number?.getAttribute('class')).not.toContain('font-bold');
+    const marker = number!.previousElementSibling;
+    expect(marker?.hasAttribute('data-early-score-marker')).toBe(true);
+    expect(marker?.getAttribute('aria-hidden')).toBe('true');
+    expect(marker?.getAttribute('class')).toContain(getScoreColor(3.9).bg);
   });
 });
 
@@ -174,6 +198,9 @@ suite('building page at the threshold', () => {
     const tiles = breakdownTileNumbers(root);
     expect(tiles.length).toBeGreaterThan(0);
     for (const tile of tiles) expect(tile).toContain('font-bold');
+    const unit = unitScore(root);
+    expect(unit?.getAttribute('class')).toContain(`font-bold ${getScoreTextColor(3.9)}`);
+    expect(root.querySelector('.unit-card [data-early-score-marker]')).toBeNull();
   });
 
   it('shows maybe answers as a count beside the percentage, outside it', async () => {

@@ -3,11 +3,11 @@
  *
  * A building score shows from its first approved review. Below NAMED_PARTY_MIN_REVIEWS, the
  * bar landlord and property manager scores wait for, it is an early rating: the review count
- * sits next to the score, the score is drawn lighter, and issue and recommend rates are
- * counts ("1 of 1 review") rather than percentages, because "100%" from one review reads as
- * a pattern. Display only: nothing here feeds a score, and the percentages it still prints
- * use the same formulas as calculateAggregatedScores / calculateBuildingAverages (the tests
- * hold them equal).
+ * sits next to the score, the score is muted (gray, with a dot in its band colour), and
+ * issue and recommend rates are counts ("1 of 1 review") rather than percentages, because
+ * "100%" from one review reads as a pattern. Display only: nothing here feeds a score, and
+ * the percentages it still prints use the same formulas as calculateAggregatedScores /
+ * calculateBuildingAverages (the tests hold them equal).
  *
  * "Maybe / It depends" is never a no. The recommend percentage counts yes and no answers
  * only, as it always has; a maybe is shown on its own as a count.
@@ -16,7 +16,7 @@
  * score modules, which import nothing (earlyRating.test.ts checks both).
  */
 import { NAMED_PARTY_MIN_REVIEWS } from './scoring';
-import { getEarlyScoreTextColor, getScoreTextColor } from './scoring-colors';
+import { getEarlyScoreStyle, getScoreTextColor } from './scoring-colors';
 
 export const EARLY_RATING_LABEL = 'Early rating';
 
@@ -56,15 +56,23 @@ export function mapReviewLine(reviewCount: number): string {
 }
 
 /**
- * Weight and colour classes for a headline score number. An early score keeps its band but
- * in a lighter weight, and a lighter shade where one still reads on Paper (see
- * getEarlyScoreTextColor); an established one is unchanged. The caller adds the size,
- * which must stay 24px or larger for the lighter shade (see getEarlyScoreTextColor).
+ * Weight and colour classes for a headline score number. An early score is muted: a lighter
+ * weight in neutral gray (see getEarlyScoreStyle), with its band carried by the dot from
+ * earlyScoreMarkerClass beside it. An established one is unchanged. The caller adds the size.
  */
 export function scoreNumberClass(score: number, reviewCount: number): string {
   return isEarlyRating(reviewCount)
-    ? `font-semibold ${getEarlyScoreTextColor(score)}`
+    ? `font-semibold ${getEarlyScoreStyle(score).text}`
     : `font-bold ${getScoreTextColor(score)}`;
+}
+
+/**
+ * The small band-coloured dot drawn beside an early score, so its band still reads while the
+ * number is gray. Decorative: render it with aria-hidden, since the number says the same
+ * thing. The caller places it.
+ */
+export function earlyScoreMarkerClass(score: number): string {
+  return `inline-block h-2.5 w-2.5 shrink-0 rounded-full ${getEarlyScoreStyle(score).marker}`;
 }
 
 // --- Rates ------------------------------------------------------------------------------

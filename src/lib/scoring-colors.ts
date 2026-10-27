@@ -22,19 +22,6 @@ export function getScoreTextColor(score: number): string {
   return 'text-red-700';
 }
 
-// Lighter shade of the same band for an early rating, a building score from fewer reviews
-// than NAMED_PARTY_MIN_REVIEWS (see earlyRating.ts). Same band boundaries as
-// getScoreTextColor, one step lighter where that still reads on the Paper page background
-// (#F6F4EE): emerald-600 and red-600. Mixed stays amber-700, because amber-600 is about
-// 2.9:1 on Paper; the lighter weight, count and label still mark it early. These shades
-// clear 3:1 on Paper, white and the score tints, not 4.5:1, so use them for large text
-// only (24px and up).
-export function getEarlyScoreTextColor(score: number): string {
-  if (score >= 4) return 'text-emerald-600';
-  if (score >= 3) return 'text-amber-700';
-  return 'text-red-600';
-}
-
 // Hex equivalents for non-Tailwind contexts (Google Maps markers, generated
 // images, PDFs). Values match the Tailwind classes in getScoreColor exactly.
 export const SCORE_HEX = {
@@ -51,6 +38,34 @@ export function getScoreHex(score: number | null): string {
   if (score >= 3) return SCORE_HEX.mixed;
   if (score >= 2) return SCORE_HEX.concerning;
   return SCORE_HEX.poor;
+}
+
+// The muted look of an early rating, a building score from fewer reviews than
+// NAMED_PARTY_MIN_REVIEWS (see earlyRating.ts). The number drops its band colour for a
+// neutral gray, and a small dot beside it carries the band, so a 1.4 still reads as Poor
+// without shouting it. Gray-600 is about 7.6:1 on white and 6.8:1 or better on Paper
+// (#F6F4EE) and the score tints, so it clears WCAG AA (4.5:1) at any text size.
+// The dot is the band's own fill from getScoreColor / SCORE_HEX, same boundaries.
+export const EARLY_SCORE_TEXT_HEX = '#4B5563'; // gray-600
+
+export interface EarlyScoreStyle {
+  /** Tailwind text class for the score number. */
+  text: string;
+  /** Tailwind background class for the band dot beside it. */
+  marker: string;
+  /** Hex of `text`, for non-Tailwind contexts (the map info window). */
+  textHex: string;
+  /** Hex of `marker`. */
+  markerHex: string;
+}
+
+export function getEarlyScoreStyle(score: number): EarlyScoreStyle {
+  return {
+    text: 'text-gray-600',
+    marker: getScoreColor(score).bg,
+    textHex: EARLY_SCORE_TEXT_HEX,
+    markerHex: getScoreHex(score),
+  };
 }
 
 // Soft-tinted background tier for score-detail cards. Matches the 4-tier
