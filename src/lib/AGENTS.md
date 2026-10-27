@@ -399,6 +399,24 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   toward hiding: a hidden business address costs a reader one lookup, a published home
   address cannot be taken back. `BANNED_WORDS` in the same file is scanned against the
   panel's templates by `__tests__/recordsPanelCopy.test.ts`.
+- **The owner of record list is three modules over one table, `building_owners`.**
+  `ownerOfRecord.ts` holds the rules, pure: `ownerKey` (the grouping key: case, spacing and
+  punctuation only, never the mailing address), `isEntityOwner` (the mailing-address gate's
+  entity words plus link-only words such as MANAGEMENT and LTD, kept apart so linking never
+  publishes a mailing address), `linkableOwnerKey` (an entity always; a person only at
+  `MIN_PARCELS_FOR_PERSON` distinct residential parcels; a condominium never) and
+  `ownerRowFromAssessment`, the one row builder both writers use. `owners.ts` is the write
+  side, run inside each assessor year's pull batch: the row is the newest stored fiscal year
+  (the row the panel shows), so each year writes only when no newer year is stored. It runs
+  in the Worker, so it stays runtime-agnostic, and it asks `sqlite_master` once per pull so a
+  pull before migration 0034 writes nothing and fails nothing. `ownerList.ts` is the read
+  side: the panel link (`ownerOfRecordHref`, only when this building's own row carries the
+  same key), the list (`loadOwnerList`, which applies the person rule to whatever name was
+  typed into the URL) and landlord search (`searchOwnerNames`, the same rule in SQL and again
+  in code). Its statements are exported so `ownerOfRecordStore.test.ts` checks their query
+  plans against `idx_building_owners_key`. List counts come from `ledgerModel` over
+  `getRecordsViews` (two statements for a whole page), so a row and the building's panel
+  show the same numbers. Every reader treats a missing table as no owner, never as a 500.
 - **`provenance.ts` is the panel's source list and its freshness rule.** `recordsCitations`
   turns the source ids a building has pulls for into resource-level Analyze Boston links
   (`<dataset page>/resource/<id>`), built only from the resource-id constants in

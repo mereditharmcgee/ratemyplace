@@ -87,6 +87,7 @@ npm run ops:metrics   # regenerate ops/METRICS.md from production (read-only)
 npm run records:check   # live Lanark fixture check (hits data.boston.gov), run by hand
 npm run records:seed -- --dry-run   # Boston bulk seed; --write / --apply --local / --apply --remote
 npm run records:suffix-backfill -- --remote   # after a SUFFIX_SPELLINGS change: generates re-key/respell/refresh SQL, applies nothing
+npm run records:owners-backfill -- --remote   # one-time fill of building_owners from stored assessor rows: writes SQL, applies nothing
 npm run records:worker        # run the records-scheduler Worker locally (stop `npm run dev` first)
 npm run records:worker:deploy # deploy the records-scheduler Worker — separate from the site deploy
 ```
@@ -363,6 +364,15 @@ Things that have already cost time. Read before debugging.
   pulls, so the building's records appear a minute or so after the approval, not with it. So
   "I clicked it and nothing happened" is expected for up to a minute on anything queued — but
   not on those two admin buttons, which either return a summary or fail in front of you.
+- **The owner of record list has its own table, `building_owners` (migration 0034).** The
+  owner name otherwise lives only inside assessor JSON payloads, and a name lookup across them
+  took 4.5 to 10 seconds on production. Each assessor year's pull batch writes the building's
+  owner row (`src/lib/records/owners.ts`, Worker code too); `/owner-of-record?name=`, the
+  panel's owner link and landlord search read it (`ownerList.ts`). The person rule (an
+  individual links only with two or more distinct residential parcels here) is applied on the
+  server to a typed name as well, and a refused name gets the same 404 as an unknown one. All
+  three readers treat a missing or empty table as "no owner names", never as an error.
+  `records:seed` writes no owner rows, so run `npm run records:owners-backfill` after a re-seed.
 - **Search is not reviewed-only any more, but browse and the map are.**
   `buildingSearchWhere` / `buildingSearchSelect` / `buildingSearchOrder` in
   `src/lib/searchSql.ts` are the only spelling of the query-mode buildings query, shared by
