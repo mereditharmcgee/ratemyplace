@@ -8,7 +8,7 @@ import { resolveBostonSubArea } from '../../locality';
  * name get a capital: "O'BRIEN" -> "O'Brien", 'MARTIN-LUTHER' -> 'Martin-Luther'. Digits
  * are left alone, so '5TH' stays '5th' rather than becoming '5Th'.
  */
-function titleWord(word: string): string {
+export function titleWord(word: string): string {
   return word
     .split(/(['’-])/)
     .map((part) => (part.length === 0 || /^['’-]$/.test(part) ? part : part[0].toUpperCase() + part.slice(1).toLowerCase()))
