@@ -158,7 +158,7 @@ describe('ledgerModel counts', () => {
     );
 
     expect(model.living.count).toBe('2');
-    expect(model.living.subCount).toBe('1 open');
+    expect(model.living.subCount).toBe('1 still open');
     expect(model.other.count).toBe(1);
     expect(model.other.line).toBe(
       '1 other 311 request at or near this address, about something like parking, trash pickup or streetlights, falls outside these groups. It is counted here, not listed.',
@@ -168,7 +168,7 @@ describe('ledgerModel counts', () => {
     expect(model.permits.subCount).toBe('1 open · $37.7K declared');
 
     expect(model.enforcement.count).toBe('1');
-    expect(model.enforcement.subCount).toBe('1 open');
+    expect(model.enforcement.subCount).toBe('1 still open');
 
     // Empty is not the same as unknown: the source answered, and it answered with nothing.
     expect(model.violations.count).toBe('0');
@@ -675,7 +675,7 @@ describe('ledgerModel ISD cases', () => {
     );
 
     expect(model.violations.count).toBe('2');
-    expect(model.violations.subCount).toBe('1 open');
+    expect(model.violations.subCount).toBe('1 still open');
     expect(model.violations.note).toBe('4 code lines in 2 cases');
     // The open case is listed first, under its own number; every line is still there.
     expect(model.violations.cases.map((entry) => entry.label)).toEqual(['Case V900002', 'Case V900001']);
@@ -731,7 +731,7 @@ describe('ledgerModel Public Works tickets', () => {
     );
 
     expect(model.enforcement.count).toBe('2');
-    expect(model.enforcement.subCount).toBe('1 open');
+    expect(model.enforcement.subCount).toBe('1 still open');
     expect(model.enforcement.note).toBe('3 violation lines on 2 tickets');
     expect(model.enforcement.cases.map((entry) => entry.label)).toEqual(['Ticket T-B', 'Ticket T-A']);
     expect(model.enforcement.showAll).toBe('Show all 2 tickets');

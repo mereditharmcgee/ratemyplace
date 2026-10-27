@@ -298,6 +298,14 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   in the emitted SQL goes through `lit()`; the file is applied with
   `wrangler d1 execute --file`, which binds nothing. Seeded rows have `source = 'seed'` and
   deterministic ids (`seed-<parcel>`), so re-running is an upsert.
+- **`seed/impliedUnits.ts` is the seed's land-use unit estimate (R2 is 2, R3 is 3), with two
+  readers.** The seed writes it into `buildings.unit_count` when the assessor leaves the count
+  blank, which the FY2026 file does for every residential parcel, and a seed match writes it
+  over a user row's count too. No column records who wrote a count, so `unitCountLabel` in
+  `buildingDetails.ts` labels a stored count "Units (estimated from land use)" when it equals
+  the estimate and the building's current assessor record (`getCurrentAssessment` in
+  `query.ts`, the row the facts strip shows) has no count. The facts strip prints the
+  assessor's own count only when there is one. Change the table here and both follow.
 - **`addressKey` / `streetKey` in `identity.ts`** are the lookup keys for seed matching and
   reviewer dedupe: base street name plus the assessor spelling of the suffix, and a
   house-number range. A change to the suffix table changes both, on purpose. Both return
@@ -510,10 +518,14 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   from elsewhere that did not match one of our buildings. `homeSearchItems.ts` (a leaf) orders the rows:
   buildings we have ("See this building", with "Write a review" beside it), landlords, then
   "Other addresses". Never add the scope to the review form without the owner's say.
-- **`mapCluster.ts` decides how a marker cluster looks.** The badge is filled with
-  `getScoreHex` of the plain mean of the clustered buildings' scores (unscored ones left
-  out; none scored → the no-score grey). It is a map colour only — never shown as a number,
-  not weighted, not recency-decayed — so it is not a fourth scoring path.
+- **`mapCluster.ts` decides how a marker cluster looks.** A dark neutral circle with a ring
+  and a whole-number count, labelled "N buildings", so it cannot be read as a score pin.
+  Never fill it with a score band colour: a reader once took a cluster's "2" in the
+  Concerning colour for a Concerning score. `mapCluster.test.ts` fails on any `SCORE_HEX`
+  value in the badge style, and no score of any kind is computed for a cluster. The map
+  legend shows the same circle as a "Group of buildings" row below the four score rows
+  (`CLUSTER_LEGEND_SWATCH_STYLE`); `buildingMapClusters.test.tsx` mounts the island on a
+  stubbed map to check the legend and the badge, since no Maps key exists off production.
 - **`admin/landlordMatch.ts` decides whether a tenant-typed landlord name is "the same
   landlord".** `classifyLandlordCandidates` preselects an existing landlord only when exactly
   one same-name landlord shares the building's state and city (Boston localities count as

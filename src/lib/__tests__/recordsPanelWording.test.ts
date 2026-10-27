@@ -16,10 +16,11 @@ import { PERMIT_COVERAGE_START } from '../records/sources/boston/permits';
  */
 
 describe('assessorUnitsText', () => {
-  it('says the assessor left the count blank, not that nobody recorded it', () => {
-    // Building details can show a unit count from elsewhere; this line is the assessor's field.
-    expect(assessorUnitsText(null)).toBe('units not recorded by the assessor');
-    expect(assessorUnitsText(undefined)).toBe('units not recorded by the assessor');
+  it('prints nothing when the assessor left the count blank', () => {
+    // The FY2026 file leaves it blank on every residential parcel, so a "not recorded" line was
+    // on every Boston page. Building details carries its own, labelled, count.
+    expect(assessorUnitsText(null)).toBeNull();
+    expect(assessorUnitsText(undefined)).toBeNull();
   });
 
   it('prints a recorded count, zero included, as recorded', () => {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
-import { getBuildingRecords, validatePayload } from '../records/query';
+import { getBuildingRecords, getCurrentAssessment, validatePayload } from '../records/query';
 import { pullBuildingRecords } from '../records/pull';
 import type { BuildingRowForIdentity } from '../records/identity';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
@@ -358,5 +358,76 @@ suite('getBuildingRecords', () => {
       expect(validatePayload('rentsmart', 'nope')).toBeNull();
       expect(validatePayload('rentsmart', [1, 2, 3])).toBeNull();
     });
+  });
+});
+
+suite('getCurrentAssessment', () => {
+  async function exampleBuilding(db: TestD1Database): Promise<string> {
+    return insertBuilding(db, { id: 'bldg-example', address: '12 Example Rd, Boston, MA 02134', zip_code: '02134' });
+  }
+
+  it('returns null when no assessor record is stored', async () => {
+    const db = await createDbWithAdmin();
+    const buildingId = await exampleBuilding(db);
+
+    expect(await getCurrentAssessment(db, buildingId)).toBeNull();
+  });
+
+  it('returns the row the facts strip shows: newest fiscal year, parcel id breaking a tie', async () => {
+    const db = await createDbWithAdmin();
+    const buildingId = await exampleBuilding(db);
+    const pullId = await insertPullRow(db, { buildingId, sourceId: FY2026_RESOURCE_ID });
+    for (const [sourceKey, fiscalYear, parcelId] of [
+      ['older', 'FY2025', '0200000050'],
+      ['z-first', 'FY2026', '0200000200'],
+      ['a-second', 'FY2026', '0200000100'],
+    ]) {
+      await insertBuildingRecord(db, {
+        buildingId,
+        pullId,
+        kind: 'assessment',
+        sourceKey,
+        payload: { fiscalYear, condominium: false, parcelId, landUse: 'R3', residentialUnits: null },
+      });
+    }
+
+    const current = await getCurrentAssessment(db, buildingId);
+    const view = await getBuildingRecords(db, buildingId);
+
+    expect(current?.parcelId).toBe('0200000100');
+    expect(current).toEqual(view!.assessments[0]);
+  });
+
+  it('skips an unreadable or invalid payload and reads only assessment rows', async () => {
+    const db = await createDbWithAdmin();
+    const buildingId = await exampleBuilding(db);
+    const pullId = await insertPullRow(db, { buildingId, sourceId: FY2026_RESOURCE_ID });
+    await insertBuildingRecord(db, { buildingId, pullId, kind: 'assessment', sourceKey: 'bad-json', rawPayload: '{not json' });
+    await insertBuildingRecord(db, {
+      buildingId,
+      pullId,
+      kind: 'assessment',
+      sourceKey: 'bad-shape',
+      payload: { fiscalYear: 'FY2027', condominium: 'yes' },
+    });
+    await insertBuildingRecord(db, {
+      buildingId,
+      pullId,
+      kind: 'permit',
+      sourceKey: 'permit-1',
+      payload: { permitNumber: 'P-1', issuedDate: '2020-01-01' },
+    });
+    await insertBuildingRecord(db, {
+      buildingId,
+      pullId,
+      kind: 'assessment',
+      sourceKey: 'good',
+      payload: { fiscalYear: 'FY2026', condominium: false, landUse: 'R2', residentialUnits: null },
+    });
+
+    const current = await getCurrentAssessment(db, buildingId);
+
+    expect(current?.fiscalYear).toBe('FY2026');
+    expect(current?.landUse).toBe('R2');
   });
 });
