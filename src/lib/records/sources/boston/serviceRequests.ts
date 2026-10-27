@@ -1,7 +1,8 @@
 // CKAN's SQL endpoint has no parameter binding, so this module is the repo's documented
 // exception to "parameterized queries always" (see AGENTS.md). The invariant that keeps
-// it safe: every interpolated value passes through `sqlLiteral`/`addressLikeClauses`, and
-// every identifier (table/column name) is a code constant, never user input.
+// it safe: every interpolated value passes through `sqlLiteral`/`addressLikeClauses` (ZIPs
+// through `zipEqualsClause`, a five-digit guard in front of `sqlLiteral`), and every identifier
+// (table/column name) is a code constant, never user input.
 //
 // Boston's 311 data ships as two incompatible systems glued together on the dataset page:
 // sixteen year-sliced "legacy" resources (2011-2026, one schema, address stored as free
@@ -14,8 +15,8 @@
 // replacing them with a partial 311 history. A retired resource id surfaces as an error on
 // every pull until someone fixes it by updating LEGACY_311_RESOURCES; it will not clear on
 // its own.
-import { addressLikeClauses, ckanSql, rangeAddressClause, rangeNumberClause, ROW_CAP, sqlLiteral, textOrNull } from '../../ckan';
-import { houseNumberTokenMatches, leadingToken } from '../../identity';
+import { addressLikeClauses, ckanSql, rangeAddressClause, rangeNumberClause, ROW_CAP, sqlLiteral, textOrNull, zipEqualsClause } from '../../ckan';
+import { houseNumberTokenMatches, leadingToken, recordZips } from '../../identity';
 import type { RecordRow, RecordSource, ServiceRequestClassification, ServiceRequestPayload, SourceResult } from '../../types';
 
 export const NEW_311_RESOURCE_ID = '254adca6-64ab-4c5c-9fc0-a6da622be185';
@@ -140,8 +141,10 @@ export const serviceRequestsSource: RecordSource = {
   pageUrl: SERVICE_REQUESTS_PAGE_URL,
   kinds: ['service_request'],
   async run(identity, fetchImpl): Promise<SourceResult> {
-    const zip = identity.zip;
-    const zipOk = zip != null && /^\d{5}$/.test(zip);
+    // The page's ZIP, plus the current-year parcel's when the two differ (`recordZips`): the city
+    // files 311 requests under the parcel's ZIP even where the page carries another one.
+    const zips = recordZips(identity);
+    const zipOk = zips.length > 0;
     // The as-written LIKE clauses, plus one regex clause for every number inside a range address
     // and every city record filed under a range that reaches it ('501-507 Example Ave' for
     // 503). The regex arm can find a range that starts below the address and ends below it too,
@@ -151,7 +154,7 @@ export const serviceRequestsSource: RecordSource = {
     // Qualifying by zip is why a same-named street in one neighborhood does not attach
     // 311 cases filed against a same-named street elsewhere in the city (see permits.ts).
     const legacyWhere = zipOk
-      ? `(("location_zipcode" IS NULL OR "location_zipcode" = ${sqlLiteral(zip)}) AND (${addressClauses.join(' OR ')}))`
+      ? `(("location_zipcode" IS NULL OR ${zipEqualsClause('location_zipcode', zips)}) AND (${addressClauses.join(' OR ')}))`
       : `(${addressClauses.join(' OR ')})`;
 
     const numberForms = Array.from(
@@ -164,7 +167,7 @@ export const serviceRequestsSource: RecordSource = {
     const newWhere =
       `upper("street_name") IN (${identity.streetForms.map(sqlLiteral).join(',')}) ` +
       `AND ${newRangeClause ? `(${numberMatch} OR ${newRangeClause})` : numberMatch}` +
-      (zipOk ? ` AND ("zip_code" IS NULL OR "zip_code" = ${sqlLiteral(zip)})` : '');
+      (zipOk ? ` AND ("zip_code" IS NULL OR ${zipEqualsClause('zip_code', zips)})` : '');
 
     const queries: string[] = [];
     const seen = new Set<string>();

@@ -361,8 +361,29 @@ export function buildIdentity(building: BuildingRowForIdentity): BuildingIdentit
     // Placeholder: parcel resolution (assessor) overwrites this before any source runs.
     condominium: false,
     zip: building.zip_code,
+    // Placeholder: the pull fills it in from the current-year assessor row (pull.ts).
+    parcelZip: null,
     samId: building.sam_id,
   };
+}
+
+const ZIP5 = /^\d{5}$/;
+
+/**
+ * The ZIPs the address-keyed feeds (311, ISD violations, Public Works tickets) are narrowed to:
+ * the page's own, plus the current-year parcel's when the pull has read one and it differs. A
+ * page whose ZIP disagrees with the assessor's would otherwise lose every record the city filed
+ * under the parcel's ZIP. It only ever widens: with no usable page ZIP it is empty, and the feeds
+ * stay unnarrowed as before, rather than being narrowed to the parcel's.
+ *
+ * Five digits only. That is the digits-only guard that lets the adapters interpolate these
+ * values (each still goes through `sqlLiteral`).
+ */
+export function recordZips(identity: Pick<BuildingIdentity, 'zip' | 'parcelZip'>): string[] {
+  const page = identity.zip;
+  if (page == null || !ZIP5.test(page)) return [];
+  const parcel = identity.parcelZip;
+  return parcel != null && ZIP5.test(parcel) && parcel !== page ? [page, parcel] : [page];
 }
 
 export { SUFFIX_SPELLINGS };

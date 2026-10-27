@@ -10,6 +10,19 @@ export function sqlLiteral(value: string): string {
 }
 
 /**
+ * `"<column>" = '<zip>'` for one ZIP, `"<column>" IN ('<zip>','<zip>')` for more (the list
+ * `recordZips` in identity.ts returns). One ZIP writes the query exactly as it was before the
+ * parcel's ZIP was accepted. Interpolation invariant: `column` is a code constant checked against
+ * a conservative shape, and every ZIP passes a five-digit guard (anything else throws) before it
+ * goes through `sqlLiteral`.
+ */
+export function zipEqualsClause(column: string, zips: readonly string[]): string {
+  if (!/^[a-z_]+$/.test(column)) throw new Error(`Unsafe column name for ZIP clause: ${column}`);
+  if (zips.length === 0 || zips.some((zip) => !/^\d{5}$/.test(zip))) throw new Error('ZIP clause needs one or more five-digit ZIPs');
+  return zips.length === 1 ? `"${column}" = ${sqlLiteral(zips[0])}` : `"${column}" IN (${zips.map(sqlLiteral).join(',')})`;
+}
+
+/**
  * Escape `!`, `%`, and `_` for a LIKE pattern using `!` as the escape character
  * (escaping `!` itself first, so a literal `!` in the input round-trips correctly).
  *

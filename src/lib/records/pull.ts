@@ -12,6 +12,7 @@
 import { errorMessage, truncateError } from './errors';
 import { buildIdentity, toNumericParcel, type BuildingRowForIdentity } from './identity';
 import { jurisdictionForCity, sourcesForCity } from './jurisdictions';
+import { zip5 } from './seed/sam';
 import { ASSESSOR_YEARS, resolveParcel, type ParcelResolution } from './sources/boston/assessor';
 import {
   NO_QUERY,
@@ -121,6 +122,20 @@ function replaceStatements(
     );
   }
   return statements;
+}
+
+/**
+ * The current-year parcel's ZIP from an assessor source's rows, as five digits, or null. Only the
+ * current fiscal year's row carries one (`parcelZip`). Normalized here, not when stored: the
+ * stored payload keeps the city's value as recorded, which can have lost its leading zero.
+ */
+function parcelZipFrom(rows: RecordRow[]): string | null {
+  for (const row of rows) {
+    if (row.kind !== 'assessment') continue;
+    const zip = zip5(row.payload.parcelZip);
+    if (zip) return zip;
+  }
+  return null;
 }
 
 /** The first non-empty SAM id in a source's rows. Only the violation feeds carry one. */
@@ -247,6 +262,16 @@ export async function pullBuildingRecords(
       continue;
     }
     summaries.push({ sourceId: source.id, label: source.label, status, rowCount: result.rows.length });
+
+    if (!identity.parcelZip) {
+      // The assessor years run first (`sourcesForCity`), so the current year's parcel ZIP is in
+      // hand before 311 and the violation feeds run. They accept it beside the page's ZIP, so a
+      // page whose ZIP disagrees with the assessor's still finds the records the city filed
+      // under the parcel's. Matching only: the building row is never changed. Set after the
+      // write, so the stored assessment shows the ZIP those queries used.
+      const parcelZip = parcelZipFrom(result.rows);
+      if (parcelZip) identity.parcelZip = parcelZip;
+    }
 
     if (!samIdKnown) {
       const samId = samIdFrom(result.rows);

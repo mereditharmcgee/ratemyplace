@@ -310,40 +310,35 @@ describe('the current-year assessor row carries the parcel’s own numbers and Z
 });
 
 describe('recordsMatchUncertainty', () => {
-  const parcel = (low: string | null, high: string | null, zip: string | null = '02135') => ({
+  const parcel = (low: string | null, high: string | null) => ({
     parcelStreetNumber: low,
     parcelStreetNumberHigh: high,
-    parcelZip: zip,
   });
 
-  it('is null when the address covers the parcel and the ZIPs agree', () => {
-    expect(recordsMatchUncertainty({ address: '31-39 Example Rd', zip: '02135', current: parcel('31', '39') })).toBeNull();
-    expect(recordsMatchUncertainty({ address: '10 Example Rd', zip: '02135', current: parcel('10', null) })).toBeNull();
+  it('is null when the address covers the parcel', () => {
+    expect(recordsMatchUncertainty({ address: '31-39 Example Rd', current: parcel('31', '39') })).toBeNull();
+    expect(recordsMatchUncertainty({ address: '10 Example Rd', current: parcel('10', null) })).toBeNull();
   });
 
   it('reads the address’s own reasons first', () => {
-    expect(recordsMatchUncertainty({ address: '10-15 Example Rd', zip: '02135', current: null })).toBe('mixed_parity');
-    expect(recordsMatchUncertainty({ address: '10-200 Example Rd', zip: '02135', current: null })).toBe('wide_range');
+    expect(recordsMatchUncertainty({ address: '10-15 Example Rd', current: null })).toBe('mixed_parity');
+    expect(recordsMatchUncertainty({ address: '10-200 Example Rd', current: null })).toBe('wide_range');
   });
 
   it('says parcel_wider when the parcel covers numbers the address does not', () => {
-    expect(recordsMatchUncertainty({ address: '211 Example Rd', zip: '02135', current: parcel('211', '219') })).toBe('parcel_wider');
-    expect(recordsMatchUncertainty({ address: '36 Example Rd', zip: '02135', current: parcel('40', '36') })).toBe('parcel_wider');
+    expect(recordsMatchUncertainty({ address: '211 Example Rd', current: parcel('211', '219') })).toBe('parcel_wider');
+    expect(recordsMatchUncertainty({ address: '36 Example Rd', current: parcel('40', '36') })).toBe('parcel_wider');
   });
 
-  it('says zip_differs when the page and the parcel disagree on the ZIP, reading a ZIP that lost its zero', () => {
-    expect(recordsMatchUncertainty({ address: '501 Sample Ave', zip: '02199', current: parcel('501', null, '2101') })).toBe('zip_differs');
-    expect(recordsMatchUncertainty({ address: '501 Sample Ave', zip: '02101', current: parcel('501', null, '2101') })).toBeNull();
-  });
-
-  it('names the ZIP before a wider parcel, since a wrong ZIP can hide every number', () => {
-    expect(recordsMatchUncertainty({ address: '501 Sample Ave', zip: '02199', current: parcel('501', '507', '02101') })).toBe('zip_differs');
+  it('does not treat a page ZIP that differs from the parcel’s as a reason, since the pull searches both', () => {
+    const differing = { ...parcel('501', null), parcelZip: '2101' };
+    expect(recordsMatchUncertainty({ address: '501 Sample Ave', current: differing })).toBeNull();
   });
 
   it('errs toward null when there is nothing stored to compare', () => {
-    expect(recordsMatchUncertainty({ address: null, zip: null, current: null })).toBeNull();
-    expect(recordsMatchUncertainty({ address: '211 Example Rd', zip: '02135', current: parcel(null, null, null) })).toBeNull();
-    expect(recordsMatchUncertainty({ address: 'Example Rd', zip: '02135', current: parcel('1', '9') })).toBeNull();
+    expect(recordsMatchUncertainty({ address: null, current: null })).toBeNull();
+    expect(recordsMatchUncertainty({ address: '211 Example Rd', current: parcel(null, null) })).toBeNull();
+    expect(recordsMatchUncertainty({ address: 'Example Rd', current: parcel('1', '9') })).toBeNull();
   });
 
   it('matches the address reason buildIdentity gives', () => {
@@ -381,7 +376,7 @@ describe('the ledger under an uncertain match', () => {
   const NOW = new Date('2026-10-27T12:00:00Z');
 
   it('replaces "none on record" on the address-keyed sources, never on permits', () => {
-    const ledger = ledgerModel(view({ matchUncertainty: 'zip_differs' }), NOW);
+    const ledger = ledgerModel(view({ matchUncertainty: 'parcel_wider' }), NOW);
     for (const section of [
       ledger.living,
       ledger.buildingRequests,
@@ -391,7 +386,7 @@ describe('the ledger under an uncertain match', () => {
     ]) {
       expect(section.count).toBe('0');
       expect(section.subCount).toBe(UNCERTAIN_MATCH_SUBCOUNT);
-      expect(section.matchNote).toBe(uncertainMatchCopy('zip_differs'));
+      expect(section.matchNote).toBe(uncertainMatchCopy('parcel_wider'));
     }
     expect(ledger.permits.subCount).toBe('none on record');
     expect(ledger.permits.matchNote).toBeNull();
@@ -442,11 +437,11 @@ describe('the ledger under an uncertain match', () => {
 describe('uncertain-match copy', () => {
   it('is registered for the banned-words scan', () => {
     expect(PANEL_COPY.UNCERTAIN_MATCH_SUBCOUNT).toBe(UNCERTAIN_MATCH_SUBCOUNT);
-    expect(Object.keys(PANEL_COPY).filter((k) => k.startsWith('uncertainMatchCopy()'))).toHaveLength(4);
+    expect(Object.keys(PANEL_COPY).filter((k) => k.startsWith('uncertainMatchCopy()'))).toHaveLength(3);
   });
 
   it('is short and plain: no em dashes, no exclamation points', () => {
-    for (const reason of ['wide_range', 'mixed_parity', 'parcel_wider', 'zip_differs'] as const) {
+    for (const reason of ['wide_range', 'mixed_parity', 'parcel_wider'] as const) {
       const copy = uncertainMatchCopy(reason);
       expect(copy).not.toMatch(/[—!]/);
       expect(copy.startsWith('City records could not be matched to this address with confidence.')).toBe(true);
@@ -480,10 +475,13 @@ sqliteSuite('getBuildingRecords reports an uncertain match from stored data only
     return buildingId;
   }
 
-  it('reads zip_differs from the page ZIP and the stored parcel ZIP', async () => {
+  it('reads parcel_wider from the stored parcel numbers, and nothing from a parcel ZIP that differs from the page', async () => {
     const db = createRecordsTestDb();
-    const id = await seed(db, '501 Sample Ave', '02199', { parcelStreetNumber: '501', parcelZip: '02101' });
-    expect((await getBuildingRecords(db, id))!.matchUncertainty).toBe('zip_differs');
+    const id = await seed(db, '501 Sample Ave', '02199', { parcelStreetNumber: '501', parcelStreetNumberHigh: '507', parcelZip: '02101' });
+    expect((await getBuildingRecords(db, id))!.matchUncertainty).toBe('parcel_wider');
+    const sameNumbers = createRecordsTestDb();
+    const other = await seed(sameNumbers, '501 Sample Ave', '02199', { parcelStreetNumber: '501', parcelZip: '02101' });
+    expect((await getBuildingRecords(sameNumbers, other))!.matchUncertainty).toBeNull();
   });
 
   it('reads nothing from an assessment stored before the parcel numbers were captured', async () => {
@@ -499,13 +497,16 @@ describe('query size stays under the endpoint URL limit', () => {
 
   it('for the widest range that still expands, on a street with three suffix spellings, in every source', async () => {
     const highest = 1000 + (MAX_RANGE_NUMBERS - 1) * 2;
-    const id = identity(`1000-${highest} Example Avenue`);
+    // With a parcel ZIP that differs from the page's, so every ZIP filter carries two values.
+    const id = { ...identity(`1000-${highest} Example Avenue`), parcelZip: '02134' };
     expect(id.matchNumbers).toHaveLength(MAX_RANGE_NUMBERS);
     const sqls: string[] = [];
     sqls.push(...(JSON.parse((await serviceRequestsSource.run(id, fixtureFetch([]))).query) as string[]));
     sqls.push((await violationsSource.run(id, fixtureFetch([]))).query);
     sqls.push((await enforcementSource.run(id, fixtureFetch([]))).query);
     sqls.push((await permitsSource.run({ ...id, parcelNumeric: '100000001' }, fixtureFetch([]))).query);
+    // Every 311 and violation-feed query carries the parcel ZIP; permits do not take it.
+    expect(sqls.slice(0, -1).every((sql) => sql.includes(`'02134'`))).toBe(true);
     const longest = Math.max(...sqls.map((sql) => `https://data.boston.gov/api/3/action/datastore_search_sql?sql=${encodeURIComponent(sql)}`.length));
     expect(longest).toBeLessThan(URL_BUDGET);
   });

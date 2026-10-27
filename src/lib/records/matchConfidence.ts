@@ -4,26 +4,27 @@
 // one was not, the panel says the records could not be matched with confidence instead of
 // "none on record", and says why.
 //
+// A page ZIP that disagrees with the parcel's is not a reason: the pull searches those feeds
+// under both ZIPs (`recordZips` in identity.ts), and the parcel ZIP this module could compare is
+// only ever stored by a pull that did.
+//
 // Read side only: derived from the stored address and the stored current-year assessment, so
 // it needs no column of its own and changes nothing that is written.
 import { parseStreetAddress } from '../enrichment/helpers';
 import { addressMatchUncertainty, expandHouseNumbers } from './identity';
-import { zip5 } from './seed/sam';
 import type { AddressMatchUncertainty, AssessmentPayload } from './types';
 
 /**
  * `wide_range` / `mixed_parity`: the address itself could not be expanded (see
  * `expandHouseNumbers`). `parcel_wider`: the city's parcel covers house numbers this address
- * does not, and the feeds file records under those numbers too. `zip_differs`: the page's ZIP and
- * the parcel's disagree, and the feeds are narrowed by the page's ZIP.
+ * does not, and the feeds file records under those numbers too.
  */
-export type RecordsMatchUncertainty = AddressMatchUncertainty | 'parcel_wider' | 'zip_differs';
+export type RecordsMatchUncertainty = AddressMatchUncertainty | 'parcel_wider';
 
 export interface MatchConfidenceInput {
   address: string | null;
-  zip: string | null;
   /** The current fiscal year's assessment, when one is stored. */
-  current: Pick<AssessmentPayload, 'parcelStreetNumber' | 'parcelStreetNumberHigh' | 'parcelZip'> | null;
+  current: Pick<AssessmentPayload, 'parcelStreetNumber' | 'parcelStreetNumberHigh'> | null;
 }
 
 function numberValue(value: string | null | undefined): number | null {
@@ -53,12 +54,6 @@ export function recordsMatchUncertainty(input: MatchConfidenceInput): RecordsMat
 
   const current = input.current;
   if (!current) return null;
-
-  // The ZIP first: the feeds are narrowed by the page's ZIP, so a wrong one can hide every
-  // record at every number, where a wider parcel hides only the numbers the page leaves out.
-  const pageZip = zip5(input.zip);
-  const parcelZip = zip5(current.parcelZip);
-  if (pageZip && parcelZip && pageZip !== parcelZip) return 'zip_differs';
 
   const span = addressSpan(input.address);
   const parcelValues = [numberValue(current.parcelStreetNumber), numberValue(current.parcelStreetNumberHigh)].filter(

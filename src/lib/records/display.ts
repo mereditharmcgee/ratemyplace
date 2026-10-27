@@ -371,7 +371,6 @@ const UNCERTAIN_MATCH_REASONS: Readonly<Record<RecordsMatchUncertainty, string>>
   wide_range: 'The address range is too wide to search one house number at a time.',
   mixed_parity: 'The address range has one odd and one even house number.',
   parcel_wider: "The city's parcel for this building covers more house numbers than this address.",
-  zip_differs: "The ZIP code on this page differs from the city's parcel record.",
 };
 
 /** The empty-state sentence for an address-keyed source when the match is uncertain, with the reason. */
@@ -690,5 +689,4 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   'uncertainMatchCopy() — wide_range': uncertainMatchCopy('wide_range'),
   'uncertainMatchCopy() — mixed_parity': uncertainMatchCopy('mixed_parity'),
   'uncertainMatchCopy() — parcel_wider': uncertainMatchCopy('parcel_wider'),
-  'uncertainMatchCopy() — zip_differs': uncertainMatchCopy('zip_differs'),
 };

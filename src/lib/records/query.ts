@@ -306,18 +306,17 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
     notes: row.resolution_notes,
   }));
 
-  // The building's own address and ZIP, for the match-confidence note. A failed read costs the
-  // panel only that note, never the records.
+  // The building's own address, for the match-confidence note. A failed read costs the panel
+  // only that note, never the records.
   let matchUncertainty: RecordsMatchUncertainty | null = null;
   try {
     const building = await db
-      .prepare('SELECT address, zip_code FROM buildings WHERE id = ?')
+      .prepare('SELECT address FROM buildings WHERE id = ?')
       .bind(buildingId)
-      .first<{ address: string | null; zip_code: string | null }>();
+      .first<{ address: string | null }>();
     const current = assessments[0] ?? null;
     matchUncertainty = recordsMatchUncertainty({
       address: building?.address ?? null,
-      zip: building?.zip_code ?? null,
       current: current && !current.condominium ? current : null,
     });
   } catch (error) {

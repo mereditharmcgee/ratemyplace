@@ -304,13 +304,21 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   the GET URL tops out near 8 KB (HTTP 414). The regex arm keeps the interpolation invariant
   by a digits-only guard on numbers and a plain-text guard on street spellings, with no
   backslash anywhere. Permits take the middle numbers only; their parcel arm covers the rest.
+- **The 311 and violation-feed ZIP filters also accept the parcel's ZIP.** The current-year
+  assessor row carries the parcel's own `ZIP_CODE`, and `pullBuildingRecords` copies it onto
+  `identity.parcelZip` (through `zip5`) once that row is stored. The assessor years run first in
+  `sourcesForCity`, so 311, ISD and Public Works see it; `recordZips` then lists the page ZIP
+  plus the parcel's when they differ, and `zipEqualsClause` writes `=` for one and `IN` for two.
+  It only widens: a page with no usable ZIP stays unnarrowed rather than narrowed to the
+  parcel's, and the building row is never changed. Permits keep the page ZIP (their parcel arm
+  covers the rest). The fixture runs its sources concurrently and never sets `parcelZip`.
 - **`matchConfidence.ts` decides when an address-keyed zero is not a finding.** A range too
-  wide to expand, a mixed-parity range, a current-year parcel (`parcelStreetNumber` /
-  `parcelStreetNumberHigh`, FY2026 only) that covers numbers the page's address does not, or a
-  page ZIP that disagrees with the parcel's: then each empty 311 group, Public Works and ISD
-  say "not matched with confidence" instead of "none on record" (a 311 group with requests
-  keeps its count). It reads only stored data, so it needs no column, and a payload stored
-  before October 2026 reads as no reason.
+  wide to expand, a mixed-parity range, or a current-year parcel (`parcelStreetNumber` /
+  `parcelStreetNumberHigh`, FY2026 only) that covers numbers the page's address does not:
+  then each empty 311 group, Public Works and ISD say "not matched with confidence" instead of
+  "none on record" (a 311 group with requests keeps its count). A page ZIP that differs from
+  the parcel's is not a reason, because the pull searches both. It reads only stored data, so
+  it needs no column, and a payload stored before October 2026 reads as no reason.
 - **`seed/` is the bulk pipeline, not a request path.** `scripts/records-seed-boston.ts`
   downloads the assessor and SAM resources once (`fetchAllRows` in `ckan.ts`), and the pure
   modules under `records/seed/` filter, collapse, format, match, and emit SQL. Every string

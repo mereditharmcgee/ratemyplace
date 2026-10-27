@@ -1,7 +1,8 @@
 // CKAN's SQL endpoint has no parameter binding, so this module is the repo's documented
 // exception to "parameterized queries always" (see AGENTS.md). The invariant that keeps
-// it safe: every interpolated value passes through `sqlLiteral`, and every identifier
-// (table/column name) is a code constant, never user input.
+// it safe: every interpolated value passes through `sqlLiteral` (ZIPs through `zipEqualsClause`,
+// a five-digit guard in front of `sqlLiteral`), and every identifier (table/column name) is a
+// code constant, never user input.
 //
 // Boston's violation and code-enforcement feeds store the street name with no directional
 // and no suffix (`violation_street` "Newton", `violation_suffix` "ST" for "W Newton St";
@@ -30,7 +31,8 @@
 // tolerating it only risks attaching a record with a genuinely different suffix or zip (a
 // false positive) — a risk already accepted elsewhere in this module and covered by the
 // same correction workflow.
-import { ckanSql, ROW_CAP, sqlLiteral, textOrNull } from '../../ckan';
+import { ckanSql, ROW_CAP, sqlLiteral, textOrNull, zipEqualsClause } from '../../ckan';
+import { recordZips } from '../../identity';
 import type { BuildingIdentity, EnforcementTicketPayload, RecordSource, SourceResult, ViolationPayload } from '../../types';
 
 type Row = Record<string, string | number | null>;
@@ -140,8 +142,12 @@ export function violationFeedSource(config: ViolationFeedConfig): RecordSource {
           `("violation_suffix" IS NULL OR "violation_suffix" = '' OR upper("violation_suffix") IN (${spellings.map(sqlLiteral).join(',')}))`,
         );
       }
-      if (identity.zip && /^\d{5}$/.test(identity.zip)) {
-        clauses.push(`("violation_zip" IS NULL OR "violation_zip" = '' OR "violation_zip" = ${sqlLiteral(identity.zip)})`);
+      // The page's ZIP, plus the current-year parcel's when the two differ (`recordZips`): a
+      // page whose ZIP disagrees with the assessor's would otherwise drop every case the city
+      // filed under the parcel's ZIP.
+      const zips = recordZips(identity);
+      if (zips.length > 0) {
+        clauses.push(`("violation_zip" IS NULL OR "violation_zip" = '' OR ${zipEqualsClause('violation_zip', zips)})`);
       }
       const sql =
         `SELECT ${columns.map((c) => `"${c}"`).join(',')} FROM "${config.resourceId}" ` +

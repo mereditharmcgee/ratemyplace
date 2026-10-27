@@ -9,7 +9,7 @@ function identityWithForms(addressFormsShort: string[], addressFormsLong: string
     buildingId: 'b', numbers: [], matchNumbers: [], span: null, enclosingLows: [], enclosingHighs: [], matchUncertainty: null,
     rangeForm: null, streetShort: '', streetLong: '', streetBase: '',
     streetForms: [], addressFormsShort, addressFormsLong, parcelId: null, parcelNumeric: null,
-    condominium: false, zip: null, samId: null,
+    condominium: false, zip: null, parcelZip: null, samId: null,
   };
 }
 

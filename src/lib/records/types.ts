@@ -182,7 +182,15 @@ export interface BuildingIdentity {
   /** Parcel id with leading zero stripped, or null. */
   parcelNumeric: string | null;
   condominium: boolean;
+  /** The building page's ZIP as stored, e.g. '02135'. */
   zip: string | null;
+  /**
+   * The current-year parcel's ZIP (the assessor's `ZIP_CODE`, five digits), set by the pull once
+   * that assessor row is stored; null before then and for a building with no parcel. Matching
+   * only: the address-keyed feeds accept it beside `zip` (`recordZips`), and the building row is
+   * never changed.
+   */
+  parcelZip: string | null;
   /** Boston SAM id when the building already has one. */
   samId: string | null;
 }
