@@ -51,6 +51,15 @@ describe('search page and results endpoint stay aligned', () => {
     expect(page, 'browse mode must not catch a rejected query').toMatch(/else\s+if\s*\(\s*!query\s*\)/);
   });
 
+  // D1 refuses a LIKE pattern over 50 bytes and fails the statement. The buildings query
+  // checks inside `searchSql.ts`; the landlord queries build their own pattern from the whole
+  // query, so a full address typed with its neighborhood, state and ZIP must skip them.
+  it('both surfaces skip the landlord match when the pattern is too long for D1', () => {
+    for (const [name, source] of [['search.astro', page], ['results.ts', endpoint]] as const) {
+      expect(source, `${name} must check the landlord pattern length`).toMatch(/fitsLikePattern\(/);
+    }
+  });
+
   // The page held eight: buildings and landlords, count and rows, in each of search and
   // browse mode. The two query-mode buildings queries lost theirs; the other six keep it.
   it('the page keeps browse mode and landlords reviewed-only', () => {

@@ -155,7 +155,7 @@ precision here — the imprecision is the point.
 ### `validation.ts` — use the shared primitives
 
 `isValidEmail`, `isSafeHttpUrl`, `validateReviewText`, `enforceMaxLength`,
-`escapeLikePattern`, `sanitizeText`, plus per-form validators (`validateReviewForm`,
+`escapeLikePattern`, `fitsLikePattern`, `sanitizeText`, plus per-form validators (`validateReviewForm`,
 `validateDisputeForm`, `validateBugReport`, `validateContactForm`, `validateSearch`).
 
 `isSafeHttpUrl` exists because a `javascript:` URL in a bug report could take over an admin
@@ -387,6 +387,13 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   must be bound after the WHERE's. Keep a full query (where + order + LIMIT/OFFSET) under
   D1's 100 bound parameters: `__tests__/searchFullAddress.test.ts` checks the widest query
   the parser allows, which is why places and ZIPs are capped.
+- **D1 refuses a LIKE pattern over 50 bytes** (UTF-8, wildcards and escapes included) and
+  fails the whole statement, which the search page then shows as no match. A full address
+  typed with its neighborhood, "Boston, MA" and ZIP is over that easily. `fitsLikePattern`
+  (`validation.ts`) is the check: `searchSql.ts` writes a pattern that does not fit as `0`
+  (no address word, neighborhood or landlord name is that long), and the landlord queries
+  on the search page and the results endpoint skip it. `searchFullAddress.test.ts` measures
+  every bind of a long query.
 - **Browse mode is Boston first, most recently reviewed.** Its query stays in the two call
   sites, but its ORDER BY is `BROWSE_BUILDINGS_ORDER` in `searchSql.ts`: Boston buildings
   (`BOSTON_CITY_SQL`, the same city test `has_records` uses, without the parcel check), then

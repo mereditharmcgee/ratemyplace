@@ -8,7 +8,7 @@
 // only its order from here (`BROWSE_BUILDINGS_ORDER`).
 import { isAreaSearch, parseSearchQuery, type HouseNumber, type ParsedSearch } from './searchQuery';
 import { recencyWeightedOverallSql } from './scoring-sql';
-import { escapeLikePattern } from './validation';
+import { escapeLikePattern, fitsLikePattern } from './validation';
 
 export interface SqlFragment {
   sql: string;
@@ -46,6 +46,19 @@ function wholeWord(value: string): string {
 }
 
 /**
+ * `column LIKE ?` with the pattern bound, or `0` when the pattern is longer than D1 accepts
+ * (`fitsLikePattern`): sent anyway, it fails the whole statement and the page shows no
+ * match. Every pattern here is one typed word or the whole query between wildcards, and no
+ * address word, neighborhood or landlord name is long enough to hold one that size, so the
+ * `0` loses no match.
+ */
+function like(column: string, pattern: string, binds: Array<string | number>): string {
+  if (!fitsLikePattern(pattern)) return '0';
+  binds.push(pattern);
+  return `${column} ${LIKE}`;
+}
+
+/**
  * Every term under one of its spellings: the typed spelling anywhere in the address (so
  * 'comm' finds "Commonwealth" and 'st' finds "St James"), every other spelling of its suffix
  * row only as a whole word (as substrings, 'la' found "Oakland" and 'st' found "Dorchester",
@@ -53,10 +66,12 @@ function wholeWord(value: string): string {
  */
 function termsClause(terms: readonly string[][]): SqlFragment | null {
   if (terms.length === 0) return null;
-  const binds: string[] = [];
+  const binds: Array<string | number> = [];
   const clauses = terms.map(([typed, ...alternatives]) => {
-    binds.push(contains(typed), ...alternatives.map(wholeWord));
-    const ors = [`b.address ${LIKE}`, ...alternatives.map(() => `${ADDRESS_WORDS} ${LIKE}`)];
+    const ors = [
+      like('b.address', contains(typed), binds),
+      ...alternatives.map((spelling) => like(ADDRESS_WORDS, wholeWord(spelling), binds)),
+    ];
     return `(${ors.join(' OR ')})`;
   });
   return { sql: clauses.join(' AND '), binds };
@@ -65,11 +80,10 @@ function termsClause(terms: readonly string[][]): SqlFragment | null {
 /** Every term as a whole word in one of its spellings, the typed one included: the street was named, not just touched. */
 function wholeWordsClause(terms: readonly string[][]): SqlFragment | null {
   if (terms.length === 0) return null;
-  const binds: string[] = [];
-  const clauses = terms.map((spellings) => {
-    binds.push(...spellings.map(wholeWord));
-    return `(${spellings.map(() => `${ADDRESS_WORDS} ${LIKE}`).join(' OR ')})`;
-  });
+  const binds: Array<string | number> = [];
+  const clauses = terms.map(
+    (spellings) => `(${spellings.map((spelling) => like(ADDRESS_WORDS, wholeWord(spelling), binds)).join(' OR ')})`,
+  );
   return { sql: clauses.join(' AND '), binds };
 }
 
@@ -119,9 +133,9 @@ function placeClause(parsed: ParsedSearch): SqlFragment | null {
  *   an Allston St address (ranked after the Allston buildings by `buildingSearchOrder`).
  * - Anything else that leaves no street word ("MA", "#3"): the words as typed, as before.
  *
- * Failing all of that, the whole query names a neighborhood or a landlord. The body is
- * parenthesized so a caller can compose it — `WHERE ${sql} AND ...` — without the trailing
- * ORs swallowing the added condition.
+ * Failing all of that, the whole query names a neighborhood or a landlord, when it is short
+ * enough for D1 to match at all (`like`). The body is parenthesized so a caller can compose
+ * it — `WHERE ${sql} AND ...` — without the trailing ORs swallowing the added condition.
  */
 export function buildingSearchWhere(query: string): SqlFragment {
   const parsed = parseSearchQuery(query);
@@ -152,11 +166,11 @@ export function buildingSearchWhere(query: string): SqlFragment {
     // the clause still has a bind rather than the literal `%%` pattern that matches every
     // row. Not a load guard — a one-letter query still matches most addresses in the city;
     // it only keeps the degenerate case from being spelled as "no filter at all".
-    addressClause = `b.address ${LIKE}`;
-    binds.push(whole);
+    addressClause = like('b.address', whole, binds);
   }
-  binds.push(whole, whole);
-  return { sql: `((${addressClause}) OR b.neighborhood ${LIKE} OR l.name ${LIKE})`, binds };
+  const neighborhood = like('b.neighborhood', whole, binds);
+  const landlord = like('l.name', whole, binds);
+  return { sql: `((${addressClause}) OR ${neighborhood} OR ${landlord})`, binds };
 }
 
 /**

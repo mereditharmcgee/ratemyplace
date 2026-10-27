@@ -2,7 +2,7 @@
 import BaseLayout from '../components/layout/BaseLayout.astro';
 import SearchResults from '../components/search/SearchResults';
 import EmptyState from '../components/ui/EmptyState.astro';
-import { escapeLikePattern, validateSearch } from '../lib/validation';
+import { escapeLikePattern, fitsLikePattern, validateSearch } from '../lib/validation';
 import { buildingSearchOrder, buildingSearchSelect, buildingSearchWhere } from '../lib/searchSql';
 import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../lib/scoring-sql';
 import { isSearchVariant } from '../lib/seo';
@@ -38,8 +38,10 @@ if (query && !searchRejected) {
   // paginated /api/search/results endpoint (otherwise SSR counts and Load-more
   // results diverge on queries containing % or _). The buildings query gets the
   // same treatment inside `buildingSearchWhere`; this pattern is the landlord
-  // queries' own.
+  // queries' own. D1 fails the statement on a LIKE pattern over 50 bytes, and no landlord
+  // name is that long, so a query too long for the pattern skips the landlord queries.
   const likePattern = `%${escapeLikePattern(query)}%`;
+  const landlordsSearchable = fitsLikePattern(likePattern);
   try {
     if (type === 'all' || type === 'buildings') {
       // Every matching building, reviewed or not — a searched address that exists in the
@@ -75,7 +77,7 @@ if (query && !searchRejected) {
       }
     }
 
-    if (type === 'all' || type === 'landlords') {
+    if ((type === 'all' || type === 'landlords') && landlordsSearchable) {
       const countResult = await db.prepare(`
         SELECT COUNT(*) as total FROM (
           SELECT l.id
