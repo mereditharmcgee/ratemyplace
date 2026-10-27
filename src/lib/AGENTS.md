@@ -269,10 +269,14 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   `Retry-After` on the cap branch is computed from the oldest counted row, so the number it
   gives is the real wait rather than a fixed guess. The numbers live here so the route, its
   tests, and the privacy-page copy cannot fork.
-- **`dedupe.ts` refuses rather than guesses — and the tier order is the route's, not the
-  module's.** `POST /api/buildings` runs three tiers: an exact Google **place id**, then
+- **`dedupe.ts` refuses rather than guesses — and the tier order lives in
+  `buildingResolve.ts`, not here.** `findExistingBuilding` runs three read-only tiers: an
+  exact Google **place id** (`findBuildingByPlaceId`, the one spelling of tier 1), then
   `findBuildingByAddress`, then an exact case-insensitive **(address, city)** for a manual
-  entry with no place id. Only the middle tier is in `dedupe.ts`, and inside it the order is
+  entry with no place id. `POST /api/buildings` and the `/review/new?placeId=` handoff both
+  call it, so the handoff and Continue cannot disagree about which page an address belongs
+  on; only POST writes (it stamps a matched address-tier row, and creates otherwise). Only
+  the middle tier is in `dedupe.ts`, and inside it the order is
   Boston address key plus range containment under the parity rule → ZIP tiebreak → survivor
   ranking: a user row before its seeded twin, then the narrower span, then the oldest.
   `findBuildingByAddress` itself returns **null** (the route creates a page) whenever it

@@ -361,6 +361,25 @@ Things that have already cost time. Read before debugging.
   a failed POST only where the callback merely stores the token —
   `src/components/records/RecordCorrectionForm.tsx` is that shape. Either way, gate a
   submitting callback on a press flag so an auto-solve cannot post on its own.
+- **`GET /review/new` never writes a `buildings` row.** The `?placeId=` handoff from the
+  homepage resolves read-only through `findExistingBuilding` (`src/lib/buildingResolve.ts`,
+  via `resolveReviewHandoff` in `src/lib/reviewHandoff.ts`). It either 302s to the existing
+  building (`?building=`, plus `&partOf=1` when the city's parcel spans a different number
+  range) or pre-fills the address step, whose Continue POSTs `/api/buildings`. Before
+  October 2026 it inserted on page load, with no address tier and no key columns, and 11
+  zero-review rows came from it. Island props on that page come only from
+  `loadReviewFormBuilding`'s four columns.
+- **Sign-in return paths go through `safeRedirectPath` (`src/lib/authRedirect.ts`).** That
+  covers `?redirect=` on `/auth/signin` and `/auth/signup`, and the `oauth_return_to`
+  cookie the Google flow carries (scoped to `/api/auth/google`, beside an unchanged
+  `oauth_state`). Any other reader of a return path must use it, or it is an open redirect.
+  A naive "resolve with `new URL` and take the pathname" turns `/.//evil.example` into
+  `//evil.example`, which a browser reads as another host.
+- **React islands import only leaf modules from `src/lib`.** `reviewPaths`,
+  `reviewSubmitOutcome` and `authRedirect` have no runtime imports, which
+  `clientLeafModules.test.ts` enforces. Importing a server module such as `reviewHandoff`,
+  `buildingResolve`, `places` or `records/*` into an island ships its module-level code to
+  every browser.
 - **`buildings.updated_at` feeds sitemap `lastmod`.** Do not bump it on a no-op write; a
   write-through that stamps nothing new would move a page's date for every crawler with no
   content change behind it. `POST /api/buildings` only stamps a matched row when it has

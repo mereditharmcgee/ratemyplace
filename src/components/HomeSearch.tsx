@@ -42,8 +42,9 @@ export default function HomeSearch() {
   const dbDebounceRef = useRef<NodeJS.Timeout>();
 
   // Google rows surface addresses we don't have yet. Clicking one navigates
-  // straight into /review/new?placeId=..., which resolves the address
-  // server-side and opens the review form at the unit-details step.
+  // straight into /review/new?placeId=..., which opens the building at unit
+  // details when we already have it, otherwise the address step pre-filled
+  // for one Continue.
   // Filter out Google rows that exactly match an existing DB building so
   // we don't show the same address twice.
   const items: DropdownItem[] = [
@@ -130,8 +131,8 @@ export default function HomeSearch() {
       window.location.href = `/${type === 'building' ? 'building' : 'landlord'}/${slug}`;
     } else {
       // Google "new address" row: hand off to /review/new with the placeId.
-      // The page resolves the place server-side and opens the form at the
-      // unit-details step.
+      // The page opens the building at unit details when we already have it,
+      // otherwise the address step pre-filled for one Continue.
       window.location.href = `/review/new?placeId=${encodeURIComponent(item.data.placeId)}`;
     }
   };
