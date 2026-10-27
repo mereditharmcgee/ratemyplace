@@ -50,7 +50,7 @@ export function HelpTooltip({ help, dimension }: HelpTooltipProps) {
         ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="ml-1.5 text-gray-400 hover:text-teal-700 focus:outline-none focus:text-teal-700 transition-colors"
+        className="ml-1.5 text-gray-500 hover:text-teal-700 focus:outline-none focus:text-teal-700 transition-colors"
         aria-label={`Help for ${dimension}`}
         aria-expanded={isOpen}
       >
@@ -84,7 +84,7 @@ export function HelpTooltip({ help, dimension }: HelpTooltipProps) {
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-gray-500 hover:text-gray-600"
               aria-label="Close help"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

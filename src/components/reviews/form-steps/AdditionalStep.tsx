@@ -59,7 +59,7 @@ export default function AdditionalStep({
 
       <div>
         <label htmlFor="review-landlord-name" className="block text-sm font-medium text-gray-700 mb-2">
-          Who was your landlord or property manager? <span className="text-gray-400">(optional)</span>
+          Who was your landlord or property manager? <span className="text-gray-600">(optional)</span>
         </label>
         <input
           id="review-landlord-name"
@@ -70,7 +70,7 @@ export default function AdditionalStep({
           maxLength={200}
           className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         />
-        <p className="text-sm text-gray-500 mt-1">This helps us link reviews to the right landlord. It won't be shown publicly on your review.</p>
+        <p className="text-sm text-gray-600 mt-1">This helps us link reviews to the right landlord. It won't be shown publicly on your review.</p>
 
         <label className="flex items-center gap-2 py-3 cursor-pointer">
           <input
@@ -89,7 +89,7 @@ export default function AdditionalStep({
         {review.hasSeparateManager && (
           <div className="mt-3">
             <label htmlFor="review-property-manager-name" className="block text-sm font-medium text-gray-700 mb-2">
-              Who manages the property? <span className="text-gray-400">(optional)</span>
+              Who manages the property? <span className="text-gray-600">(optional)</span>
             </label>
             <input
               id="review-property-manager-name"
@@ -100,14 +100,14 @@ export default function AdditionalStep({
               maxLength={200}
               className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
-            <p className="text-sm text-gray-500 mt-1">The company or person who handles day-to-day management (maintenance, rent collection, etc.)</p>
+            <p className="text-sm text-gray-600 mt-1">The company or person who handles day-to-day management (maintenance, rent collection, etc.)</p>
           </div>
         )}
       </div>
 
       <div role="group" aria-labelledby="review-housing-vouchers-label">
         <span id="review-housing-vouchers-label" className="block text-sm font-medium text-gray-700 mb-2">
-          {supplementaryItems.housingVouchers.text} <span className="text-gray-400">(optional)</span>
+          {supplementaryItems.housingVouchers.text} <span className="text-gray-600">(optional)</span>
         </span>
         <div className="flex gap-4">
           {supplementaryItems.housingVouchers.options.map((opt) => (
@@ -127,7 +127,7 @@ export default function AdditionalStep({
 
       <div role="group" aria-labelledby="review-safely-lit-label">
         <span id="review-safely-lit-label" className="block text-sm font-medium text-gray-700 mb-2">
-          {supplementaryItems.safelyLit.text} <span className="text-gray-400">(optional)</span>
+          {supplementaryItems.safelyLit.text} <span className="text-gray-600">(optional)</span>
         </span>
         <div className="flex gap-4">
           {supplementaryItems.safelyLit.options.map((opt) => (
@@ -167,7 +167,7 @@ export default function AdditionalStep({
 
       <div role="group" aria-labelledby="review-issues-label">
         <span id="review-issues-label" className="block text-sm font-medium text-gray-700 mb-3">
-          Did you experience any of these issues? <span className="text-gray-400">(check all that apply)</span>
+          Did you experience any of these issues? <span className="text-gray-600">(check all that apply)</span>
         </span>
         <div className="space-y-2">
           <label className="flex items-center gap-2 py-3 cursor-pointer">
@@ -186,7 +186,7 @@ export default function AdditionalStep({
 
           {review.hadPestIssues && (
             <div className="ml-6 mt-1 mb-2">
-              <p className="text-xs text-gray-500 mb-2">What pests did you encounter?</p>
+              <p className="text-xs text-gray-600 mb-2">What pests did you encounter?</p>
               <div className="flex flex-wrap gap-2">
                 {pestTypeOptions.map((pest) => (
                   <label
@@ -237,7 +237,7 @@ export default function AdditionalStep({
 
       <div>
         <label htmlFor="review-title" className="block text-sm font-medium text-gray-700 mb-2">
-          Review Title <span className="text-gray-400">(optional)</span>
+          Review Title <span className="text-gray-600">(optional)</span>
         </label>
         <input
           id="review-title"
@@ -248,14 +248,14 @@ export default function AdditionalStep({
           maxLength={100}
           className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         />
-        <p className="text-sm text-gray-500 mt-1">{review.reviewTitle.length}/100 characters</p>
+        <p className="text-sm text-gray-600 mt-1">{review.reviewTitle.length}/100 characters</p>
       </div>
 
       <div>
         <label htmlFor="review-comments" className="block text-sm font-medium text-gray-700 mb-2">
-          Additional Comments <span className="text-gray-400">(optional)</span>
+          Additional Comments <span className="text-gray-600">(optional)</span>
         </label>
-        <p className="text-sm text-gray-500 mb-2">
+        <p className="text-sm text-gray-600 mb-2">
           Things you might want to mention: move-in/move-out experience, how maintenance requests were handled,
           neighborhood pros and cons, parking situation, noise levels at different times, tips for future tenants,
           or anything the ratings don't capture.
@@ -269,7 +269,7 @@ export default function AdditionalStep({
           maxLength={1000}
           className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         />
-        <p className="text-sm text-gray-500 mt-1">{review.comments.length}/1000 characters</p>
+        <p className="text-sm text-gray-600 mt-1">{review.comments.length}/1000 characters</p>
       </div>
 
       <div className="flex justify-between">

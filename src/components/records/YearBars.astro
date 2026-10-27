@@ -87,7 +87,7 @@ const ariaLabel =
     </div>
     <div class="mt-1 flex gap-px" aria-hidden="true">
       {series.map((entry) => (
-        <span class="max-w-8 flex-1 whitespace-nowrap text-center text-[10px] leading-none text-gray-400">{axisLabel(entry.year)}</span>
+        <span class="max-w-8 flex-1 whitespace-nowrap text-center text-[10px] leading-none text-gray-500">{axisLabel(entry.year)}</span>
       ))}
     </div>
     {missingInSeries.length > 0 && missingNote && <p class="mt-2 text-xs text-gray-500">{missingNote}</p>}

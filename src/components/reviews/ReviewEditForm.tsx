@@ -201,7 +201,7 @@ export default function ReviewEditForm({ review }: Props) {
   const renderRatingScale = () => (
     <div className="flex justify-between items-center text-xs text-gray-500 mb-4 px-2">
       <span className="text-red-700 font-medium">1 = Strongly Disagree</span>
-      <span className="text-gray-400">3 = Neutral</span>
+      <span className="text-gray-600">3 = Neutral</span>
       <span className="text-emerald-700 font-medium">5 = Strongly Agree</span>
     </div>
   );
@@ -214,9 +214,9 @@ export default function ReviewEditForm({ review }: Props) {
         <div className="mb-3">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <span className="text-xs text-gray-400 font-mono mr-2">{item.code}</span>
+              <span className="text-xs text-gray-600 font-mono mr-2">{item.code}</span>
               <span className="font-medium text-gray-900">{item.dimension}</span>
-              {item.required && <span className="text-red-500 ml-1">*</span>}
+              {item.required && <span className="text-red-700 ml-1">*</span>}
               <HelpTooltip help={item.help} dimension={item.dimension} />
             </div>
           </div>
@@ -232,10 +232,10 @@ export default function ReviewEditForm({ review }: Props) {
               className={`w-10 h-10 rounded-full text-sm font-medium transition-all ${
                 value === rating
                   ? rating <= 2
-                    ? 'bg-red-500 text-white'
+                    ? 'bg-red-600 text-white'
                     : rating === 3
                       ? 'bg-amber-400 text-slate-900'
-                      : 'bg-emerald-500 text-white'
+                      : 'bg-emerald-700 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -247,7 +247,7 @@ export default function ReviewEditForm({ review }: Props) {
               type="button"
               onClick={() => setScores({ ...scores, [item.key]: null })}
               className={`px-3 h-10 rounded-full text-sm font-medium transition-all ${
-                value === null ? 'bg-gray-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                value === null ? 'bg-gray-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
               N/A
@@ -297,7 +297,7 @@ export default function ReviewEditForm({ review }: Props) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Unit Number <span className="text-gray-400">(optional)</span>
+              Unit Number <span className="text-gray-600">(optional)</span>
             </label>
             <input
               type="text"
@@ -306,14 +306,14 @@ export default function ReviewEditForm({ review }: Props) {
               placeholder="e.g., 2A, 301"
               className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-600 mt-1">
               For our moderation team only. Never shown publicly.
             </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Square Footage <span className="text-gray-400">(optional)</span>
+              Square Footage <span className="text-gray-600">(optional)</span>
             </label>
             <input
               type="number"
@@ -356,10 +356,10 @@ export default function ReviewEditForm({ review }: Props) {
 
           <div className="col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Monthly Rent <span className="text-gray-400">(optional)</span>
+              Monthly Rent <span className="text-gray-600">(optional)</span>
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600">$</span>
               <input
                 type="number"
                 value={rentAmount}
@@ -378,7 +378,7 @@ export default function ReviewEditForm({ review }: Props) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">
-            Amenities <span className="text-gray-400">(select all that apply)</span>
+            Amenities <span className="text-gray-600">(select all that apply)</span>
           </label>
           <div className="grid grid-cols-2 gap-2">
             {amenityOptions.map((amenity) => (
@@ -410,7 +410,7 @@ export default function ReviewEditForm({ review }: Props) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">
-            Utilities Included in Rent <span className="text-gray-400">(select all that apply)</span>
+            Utilities Included in Rent <span className="text-gray-600">(select all that apply)</span>
           </label>
           <div className="grid grid-cols-2 gap-2">
             {utilityOptions.map((utility) => (
@@ -444,10 +444,10 @@ export default function ReviewEditForm({ review }: Props) {
         {utilitiesIncluded.length < utilityOptions.length && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Estimated Monthly Utility Cost <span className="text-gray-400">(for utilities not included)</span>
+              Estimated Monthly Utility Cost <span className="text-gray-600">(for utilities not included)</span>
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600">$</span>
               <input
                 type="number"
                 value={estimatedMonthlyUtilities}
@@ -456,7 +456,7 @@ export default function ReviewEditForm({ review }: Props) {
                 className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-600 mt-1">
               Approximate monthly cost for utilities you paid separately
             </p>
           </div>
@@ -482,10 +482,10 @@ export default function ReviewEditForm({ review }: Props) {
           {laundryType === 'coin_op' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cost per Load (wash + dry) <span className="text-gray-400">(optional)</span>
+                Cost per Load (wash + dry) <span className="text-gray-600">(optional)</span>
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600">$</span>
                 <input
                   type="number"
                   step="0.25"
@@ -495,7 +495,7 @@ export default function ReviewEditForm({ review }: Props) {
                   className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-600 mt-1">
                 Total cost for one wash + one dry cycle
               </p>
             </div>
@@ -506,7 +506,7 @@ export default function ReviewEditForm({ review }: Props) {
       {/* Parking */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Parking Situation <span className="text-gray-400">(optional)</span>
+          Parking Situation <span className="text-gray-600">(optional)</span>
         </label>
         <select
           value={parkingType}
@@ -523,7 +523,7 @@ export default function ReviewEditForm({ review }: Props) {
       {/* Pets */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-3">
-          Pets Allowed <span className="text-gray-400">(select all that apply)</span>
+          Pets Allowed <span className="text-gray-600">(select all that apply)</span>
         </label>
         <div className="grid grid-cols-2 gap-2">
           {petTypeOptions.map((pet) => (
@@ -583,7 +583,7 @@ export default function ReviewEditForm({ review }: Props) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Who was your landlord or property manager? <span className="text-gray-400">(optional)</span>
+            Who was your landlord or property manager? <span className="text-gray-600">(optional)</span>
           </label>
           <input
             type="text"
@@ -593,7 +593,7 @@ export default function ReviewEditForm({ review }: Props) {
             maxLength={200}
             className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
-          <p className="text-sm text-gray-500 mt-1">This helps us link reviews to the right landlord. It won't be shown publicly on your review.</p>
+          <p className="text-sm text-gray-600 mt-1">This helps us link reviews to the right landlord. It won't be shown publicly on your review.</p>
 
           <label className="flex items-center gap-2 mt-3 cursor-pointer">
             <input
@@ -611,7 +611,7 @@ export default function ReviewEditForm({ review }: Props) {
           {hasSeparateManager && (
             <div className="mt-3">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Who manages the property? <span className="text-gray-400">(optional)</span>
+                Who manages the property? <span className="text-gray-600">(optional)</span>
               </label>
               <input
                 type="text"
@@ -621,7 +621,7 @@ export default function ReviewEditForm({ review }: Props) {
                 maxLength={200}
                 className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
-              <p className="text-sm text-gray-500 mt-1">The company or person who handles day-to-day management (maintenance, rent collection, etc.)</p>
+              <p className="text-sm text-gray-600 mt-1">The company or person who handles day-to-day management (maintenance, rent collection, etc.)</p>
             </div>
           )}
         </div>
@@ -652,7 +652,7 @@ export default function ReviewEditForm({ review }: Props) {
           </label>
           {hadPestIssues && (
             <div className="col-span-2">
-              <p className="text-xs text-gray-500 mb-2">What pests did you encounter?</p>
+              <p className="text-xs text-gray-600 mb-2">What pests did you encounter?</p>
               <div className="flex flex-wrap gap-2">
                 {pestTypeOptions.map((pest) => (
                   <label
@@ -784,7 +784,7 @@ export default function ReviewEditForm({ review }: Props) {
       {/* Housing Vouchers */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">
-          {supplementaryItems.housingVouchers.text} <span className="text-gray-400">(optional)</span>
+          {supplementaryItems.housingVouchers.text} <span className="text-gray-600">(optional)</span>
         </label>
         <div className="flex gap-4">
           {supplementaryItems.housingVouchers.options.map((opt) => (
@@ -804,7 +804,7 @@ export default function ReviewEditForm({ review }: Props) {
       {/* Safely Lit at Night */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">
-          {supplementaryItems.safelyLit.text} <span className="text-gray-400">(optional)</span>
+          {supplementaryItems.safelyLit.text} <span className="text-gray-600">(optional)</span>
         </label>
         <div className="flex gap-4">
           {supplementaryItems.safelyLit.options.map((opt) => (
@@ -847,7 +847,7 @@ export default function ReviewEditForm({ review }: Props) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Review Title <span className="text-gray-400">(optional)</span>
+            Review Title <span className="text-gray-600">(optional)</span>
           </label>
           <input
             type="text"
@@ -861,7 +861,7 @@ export default function ReviewEditForm({ review }: Props) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Additional Comments <span className="text-gray-400">(optional)</span>
+            Additional Comments <span className="text-gray-600">(optional)</span>
           </label>
           <textarea
             value={reviewText}
@@ -871,7 +871,7 @@ export default function ReviewEditForm({ review }: Props) {
             maxLength={1000}
             className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
-          <p className="text-sm text-gray-500 mt-1">{reviewText.length}/1000 characters</p>
+          <p className="text-sm text-gray-600 mt-1">{reviewText.length}/1000 characters</p>
         </div>
       </div>
 

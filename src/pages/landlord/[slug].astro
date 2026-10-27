@@ -88,7 +88,7 @@ const hasNamedPartyBreakdown = scores?.avg_landlord != null;
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Header -->
     <div class="mb-8">
-      <nav class="text-sm text-gray-500 mb-4">
+      <nav class="text-sm text-gray-600 mb-4">
         <a href="/" class="hover:text-teal-700">Home</a>
         <span class="mx-2">/</span>
         <a href="/search" class="hover:text-teal-700">Search</a>
@@ -106,13 +106,13 @@ const hasNamedPartyBreakdown = scores?.avg_landlord != null;
             </div>
             <div class="min-w-0">
               <h1 class="text-2xl md:text-3xl font-bold text-gray-900 break-words">{landlord.name}</h1>
-              <p class="text-sm text-gray-500">Landlord</p>
+              <p class="text-sm text-gray-600">Landlord</p>
             </div>
           </div>
           {landlord.description && (
             <p class="text-gray-600 mt-2 max-w-2xl">{landlord.description}</p>
           )}
-          <div class="mt-4 flex flex-wrap gap-4 text-sm text-gray-500">
+          <div class="mt-4 flex flex-wrap gap-4 text-sm text-gray-600">
             {landlord.website && (
               <a href={landlord.website} target="_blank" rel="noopener noreferrer" class="hover:text-teal-700 flex items-center gap-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -145,7 +145,7 @@ const hasNamedPartyBreakdown = scores?.avg_landlord != null;
             <div>
               <div class={`text-4xl font-bold ${getScoreTextColor(scores.avg_overall)}`}>{scores.avg_overall.toFixed(1)}</div>
               <StarRating rating={scores.avg_overall} />
-              <p class="text-sm text-gray-500 mt-1">
+              <p class="text-sm text-gray-600 mt-1">
                 {scores.review_count} review{scores.review_count !== 1 ? 's' : ''} across {scores.building_count} building{scores.building_count !== 1 ? 's' : ''}
               </p>
             </div>
@@ -154,17 +154,17 @@ const hasNamedPartyBreakdown = scores?.avg_landlord != null;
               <p class="text-sm text-gray-600">
                 {approvedReviewCount} approved review{approvedReviewCount !== 1 ? 's' : ''}
               </p>
-              <p class="text-sm text-gray-400">
+              <p class="text-sm text-gray-600">
                 Aggregate score appears after {NAMED_PARTY_MIN_REVIEWS} approved reviews
               </p>
             </div>
           ) : namedPartyScoreState === 'unavailable' ? (
             <div class="max-w-xs text-right">
               <p class="text-sm text-gray-600">{approvedReviewCount} approved reviews</p>
-              <p class="text-sm text-gray-400">Overall score unavailable</p>
+              <p class="text-sm text-gray-600">Overall score unavailable</p>
             </div>
           ) : (
-            <p class="text-gray-400">No reviews yet</p>
+            <p class="text-gray-600">No reviews yet</p>
           )}
         </div>
       </div>
@@ -197,7 +197,7 @@ const hasNamedPartyBreakdown = scores?.avg_landlord != null;
                       {building.avg_overall ? (
                         <BuildingScoreSummary score={building.avg_overall} reviewCount={building.review_count} />
                       ) : (
-                        <span class="text-sm text-gray-400">No reviews</span>
+                        <span class="text-sm text-gray-500">No reviews</span>
                       )}
                     </div>
                   </div>
@@ -257,7 +257,7 @@ const hasNamedPartyBreakdown = scores?.avg_landlord != null;
             <ul class="space-y-2 text-sm">
               <li class="flex justify-between">
                 <span class="text-gray-600">Deposit issues</span>
-                <span class="text-yellow-600 font-medium">{Math.round(scores.pct_deposit_issues)}%</span>
+                <span class="text-yellow-700 font-medium">{Math.round(scores.pct_deposit_issues)}%</span>
               </li>
             </ul>
           </div>

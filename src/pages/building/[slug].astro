@@ -263,7 +263,7 @@ const meta = buildingPageMeta(
             <p class="text-teal-800 font-medium">Review submitted!</p>
             <p class="text-teal-700 text-sm">Your review has been submitted and is pending moderation. It will appear on this page once approved.</p>
           </div>
-          <button onclick="document.getElementById('submitted-banner').remove()" class="text-teal-400 hover:text-teal-600">
+          <button onclick="document.getElementById('submitted-banner').remove()" class="text-teal-700 hover:text-teal-800">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -286,7 +286,7 @@ const meta = buildingPageMeta(
 
     <!-- Header -->
     <div class="mb-8">
-      <nav class="text-sm text-gray-500 mb-4">
+      <nav class="text-sm text-gray-600 mb-4">
         {/* py-1 makes each link a 28px-tall target (bare text measured 17px); the matching
             negative margin keeps the header where it was. */}
         <a href="/" class="-my-1 inline-block py-1 hover:text-teal-700">Home</a>
@@ -303,7 +303,7 @@ const meta = buildingPageMeta(
             {localityLine({ address: building.address, neighborhood: building.neighborhood, city: building.city }, building.state)} {building.zip_code}
           </p>
           {(building.landlord_name || building.property_manager_name) && (
-            <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
+            <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
               {/* Each name link is padded to a 28px-tall hit area (bare text measured 17px
                   tall), with a matching negative margin so the row keeps its height. */}
               {building.landlord_name && (
@@ -334,12 +334,12 @@ const meta = buildingPageMeta(
               <div class="flex items-baseline justify-end gap-2">
                 <span aria-hidden="true" data-early-score-marker class={`${earlyScoreMarkerClass(scores.avg_overall)} self-center`}></span>
                 <span class={`text-3xl ${scoreNumberClass(scores.avg_overall, scores.review_count)}`}>{scores.avg_overall.toFixed(1)}</span>
-                <span class="text-sm text-gray-500 whitespace-nowrap">· {scoreBasisText(scores.review_count)}</span>
+                <span class="text-sm text-gray-600 whitespace-nowrap">· {scoreBasisText(scores.review_count)}</span>
               </div>
               <div class="flex justify-end opacity-60">
                 <StarRating rating={scores.avg_overall} />
               </div>
-              <p class="text-xs text-gray-500 mt-1">
+              <p class="text-xs text-gray-600 mt-1">
                 <a href={EARLY_RATING_HREF} class="inline-block py-1 underline decoration-gray-300 underline-offset-2 hover:text-teal-700">{EARLY_RATING_LABEL}</a>
               </p>
             </div>
@@ -347,7 +347,7 @@ const meta = buildingPageMeta(
             <div class="text-right">
               <div class={`text-4xl ${scoreNumberClass(scores.avg_overall, scores.review_count)}`}>{scores.avg_overall.toFixed(1)}</div>
               <StarRating rating={scores.avg_overall} />
-              <p class="text-sm text-gray-500 mt-1">
+              <p class="text-sm text-gray-600 mt-1">
                 {scores.review_count} review{scores.review_count !== 1 ? 's' : ''}
               </p>
             </div>
@@ -395,13 +395,13 @@ const meta = buildingPageMeta(
               {scores.pct_pest_issues > 0 && (
                 <li class="flex justify-between gap-3">
                   <span class="text-gray-600">Pest issues</span>
-                  <span class="text-red-600 font-medium whitespace-nowrap">{issueRateText(rates.issues.pest, rates.reviewCount)}</span>
+                  <span class="text-red-700 font-medium whitespace-nowrap">{issueRateText(rates.issues.pest, rates.reviewCount)}</span>
                 </li>
               )}
               {scores.pct_heat_issues > 0 && (
                 <li class="flex justify-between gap-3">
                   <span class="text-gray-600">Heat/hot water issues</span>
-                  <span class="text-orange-600 font-medium whitespace-nowrap">{issueRateText(rates.issues.heat, rates.reviewCount)}</span>
+                  <span class="text-orange-700 font-medium whitespace-nowrap">{issueRateText(rates.issues.heat, rates.reviewCount)}</span>
                 </li>
               )}
               {scores.pct_water_issues > 0 && (
@@ -413,7 +413,7 @@ const meta = buildingPageMeta(
               {scores.pct_deposit_issues > 0 && (
                 <li class="flex justify-between gap-3">
                   <span class="text-gray-600">Deposit issues</span>
-                  <span class="text-yellow-600 font-medium whitespace-nowrap">{issueRateText(rates.issues.deposit, rates.reviewCount)}</span>
+                  <span class="text-yellow-700 font-medium whitespace-nowrap">{issueRateText(rates.issues.deposit, rates.reviewCount)}</span>
                 </li>
               )}
             </ul>
@@ -499,7 +499,7 @@ const meta = buildingPageMeta(
                         </div>
 
                         <svg
-                          class="w-5 h-5 text-gray-400 chevron-icon transition-transform"
+                          class="w-5 h-5 text-gray-500 chevron-icon transition-transform"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"

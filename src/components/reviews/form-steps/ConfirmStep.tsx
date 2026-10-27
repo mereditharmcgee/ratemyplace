@@ -286,7 +286,7 @@ export default function ConfirmStep({
         </button>
       </div>
 
-      <p aria-live="polite" className="text-sm text-gray-500 text-right min-h-5">
+      <p aria-live="polite" className="text-sm text-gray-600 text-right min-h-5">
         {waiting ? TURNSTILE_WAITING_COPY : ''}
       </p>
     </div>

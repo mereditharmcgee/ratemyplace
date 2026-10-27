@@ -63,11 +63,11 @@ function groupCounts(building: OwnerListBuilding): Array<{ title: string; counts
 const pagerLink = 'inline-flex min-h-[44px] items-center px-3 py-2 text-sm font-medium text-teal-700 hover:underline';
 ---
 
-<p class="text-xs uppercase tracking-wide text-gray-500">{OWNER_OF_RECORD_LABEL}</p>
+<p class="text-xs uppercase tracking-wide text-gray-600">{OWNER_OF_RECORD_LABEL}</p>
 <h1 class="mt-1 text-2xl sm:text-3xl font-bold text-gray-900 break-words">{owner}</h1>
 <p class="mt-1 text-sm text-gray-600">{ownerBuildingCountText(total)}</p>
 <p class="mt-4 text-sm text-gray-600">{OWNER_LIST_INTRO}</p>
-<p class="mt-1 text-xs text-gray-500">{OWNER_LIST_RECORDS_NOTE}</p>
+<p class="mt-1 text-xs text-gray-600">{OWNER_LIST_RECORDS_NOTE}</p>
 
 <ol class="mt-6 grid gap-4">
   {buildings.map((building) => (
@@ -107,7 +107,7 @@ const pagerLink = 'inline-flex min-h-[44px] items-center px-3 py-2 text-sm font-
     ) : (
       <span></span>
     )}
-    <span class="text-sm text-gray-500">{ownerListPageText(page, pageCount)}</span>
+    <span class="text-sm text-gray-600">{ownerListPageText(page, pageCount)}</span>
     {page < pageCount ? (
       <a href={ownerListHref(ownerKey, page + 1)} rel="next" class={`-mr-3 ${pagerLink}`}>{OWNER_LIST_NEXT_LABEL}</a>
     ) : (
