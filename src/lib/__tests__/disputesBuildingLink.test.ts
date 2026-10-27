@@ -60,7 +60,7 @@ async function disputesDb(reviews: ReviewSeed[]): Promise<TestD1Database> {
     ALTER TABLE reviews ADD COLUMN review_text TEXT;
     ALTER TABLE reviews ADD COLUMN comments TEXT;
   `);
-  db.exec(readFileSync(join(process.cwd(), 'migrations', '0034_review_move_in_given.sql'), 'utf8'));
+  db.exec(readFileSync(join(process.cwd(), 'migrations', '0035_review_move_in_given.sql'), 'utf8'));
   await db.prepare("INSERT INTO users (id, email) VALUES ('tenant-1', 'tenant@example.com')").run();
   await insertBuilding(db, { id: BUILDING_ID, slug: SLUG, address: '12 Example Rd, Boston, MA 02135' });
   for (const r of reviews) {
@@ -183,7 +183,7 @@ describe.skipIf(!sqliteAvailable)('POST /api/disputes with a building page link'
     await flushBackground();
   });
 
-  it('matches a review written before migration 0034 by its dates as stored', async () => {
+  it('matches a review written before migration 0035 by its dates as stored', async () => {
     const db = await disputesDb([pastTenant, { ...currentTenant, id: 'rev-old', move_in_season: 'winter', move_in_year: 2026 }]);
     const response = await POST(context(db, { ...base, reviewUrl: PAGE, reviewDates: 'Winter 2026 · Current' }));
     expect(response.status).toBe(201);
@@ -199,7 +199,7 @@ describe.skipIf(!sqliteAvailable)('POST /api/disputes with a building page link'
     expect(await disputedReviewIds(db)).toEqual([]);
   });
 
-  // A skipped move-in shows no move-in (and before migration 0034 it was stored as winter of
+  // A skipped move-in shows no move-in (and before migration 0035 it was stored as winter of
   // the current year), so many current tenants share one range. The title, or the first words
   // of the review, picks between them.
   const titled: ReviewSeed = { ...currentTenant, id: 'rev-titled', review_title: 'Quiet street, slow repairs', comments: 'The heat took a week.' };

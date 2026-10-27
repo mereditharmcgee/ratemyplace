@@ -7,7 +7,7 @@ import type { MoveInGiven, Season } from './types';
  *
  * The form asks for a month and a year. Only the season of the month is stored, never the
  * month itself. `reviews.move_in_season` and `move_in_year` are NOT NULL (migration 0001), so
- * a part the reviewer skipped still needs a value there; `move_in_given` (migration 0034)
+ * a part the reviewer skipped still needs a value there; `move_in_given` (migration 0035)
  * records which parts were given, and public pages show only those (`givenMoveIn`).
  *
  * The placeholder for a skipped part is what the submit route has always stored, winter and
@@ -71,7 +71,7 @@ export function moveInFromAnswer(monthRaw: unknown, yearRaw: unknown, now: Date)
  * A body without either key leaves the move-in alone. The edit form shows the stored year
  * but cannot show the stored season as a month, so a blank month means "season not changed",
  * not "month skipped": with the stored year nothing changes, and with a new year a season the
- * reviewer gave is kept. A review written before migration 0034 (`move_in_given` NULL) gets
+ * reviewer gave is kept. A review written before migration 0035 (`move_in_given` NULL) gets
  * the new year only, because its season may be the old winter placeholder and carrying it
  * over would invent a date. Clearing the year stores the move-in as skipped.
  */

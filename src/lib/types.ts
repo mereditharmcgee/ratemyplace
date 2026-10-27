@@ -38,7 +38,7 @@ export type Season = 'winter' | 'spring' | 'summer' | 'fall';
 
 /**
  * Which parts of the optional move-in question a reviewer answered (`reviews.move_in_given`,
- * migration 0034). `move_in_year` and `move_in_season` are NOT NULL, so a part the reviewer
+ * migration 0035). `move_in_year` and `move_in_season` are NOT NULL, so a part the reviewer
  * skipped still holds a placeholder there; this says which stored values were given.
  * NULL on reviews written before the column existed: those are shown as stored.
  */

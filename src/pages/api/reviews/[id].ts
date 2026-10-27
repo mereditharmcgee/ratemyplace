@@ -16,7 +16,7 @@ export interface ReviewDetail {
   city: string;
   move_in_year: number;
   move_in_season: string;
-  /** Which move-in parts the reviewer gave; NULL on reviews written before migration 0034. */
+  /** Which move-in parts the reviewer gave; NULL on reviews written before migration 0035. */
   move_in_given: MoveInGiven | null;
   move_out_season: string | null;
   move_out_year_new: string | null;

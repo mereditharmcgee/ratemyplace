@@ -37,7 +37,7 @@ const MOVE_OUT_2020_OR_EARLIER = '2020_or_earlier';
  * a year is not a date, so it is left out.
  *
  * Callers pass only the move-in parts the reviewer gave (`givenMoveIn`). Reviews written
- * before `move_in_given` existed (migration 0034) say nothing about that: when the move-in
+ * before `move_in_given` existed (migration 0035) say nothing about that: when the move-in
  * was skipped, the submit route stored winter of the current year (the columns are NOT
  * NULL), so a stored move-in can fall after the move-out year. A range that runs backwards
  * is impossible, so the move-in is left out and only the move-out shows. A placeholder

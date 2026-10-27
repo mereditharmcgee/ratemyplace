@@ -9,9 +9,9 @@ import { getCurrentYear } from '../privacy';
 
 /**
  * A skipped move-in is stored as blank and shown as blank. These run the real submit and edit
- * routes against every migration in migrations/, 0034 included, so the INSERT and UPDATE are
+ * routes against every migration in migrations/, 0035 included, so the INSERT and UPDATE are
  * checked against the schema production has, NOT NULL move-in columns and all, and then
- * render the stored rows on a review card. Reviews written before 0034 stay as stored.
+ * render the stored rows on a review card. Reviews written before 0035 stay as stored.
  */
 
 vi.mock('../turnstile', () => ({
@@ -24,7 +24,7 @@ import { POST } from '../../pages/api/reviews';
 import { PATCH } from '../../pages/api/reviews/[id]';
 
 const MIGRATIONS = join(process.cwd(), 'migrations');
-const MOVE_IN_MIGRATION = '0034_review_move_in_given.sql';
+const MOVE_IN_MIGRATION = '0035_review_move_in_given.sql';
 const year = getCurrentYear();
 
 function migrationFiles(): string[] {
@@ -109,7 +109,7 @@ async function card(db: TestD1Database, id: string): Promise<string> {
 
 const suite = sqliteAvailable ? describe : describe.skip;
 
-suite('migration 0034', () => {
+suite('migration 0035', () => {
   it('adds a nullable move_in_given column and leaves existing reviews NULL', async () => {
     const before = migrationFiles().filter((file) => file < MOVE_IN_MIGRATION).pop() as string;
     const db = schemaDb({ through: before });
@@ -225,7 +225,7 @@ suite('PATCH /api/reviews/[id] move-in', () => {
     return 'old';
   }
 
-  it('leaves a review written before 0034 exactly as stored when the move-in is not changed', async () => {
+  it('leaves a review written before 0035 exactly as stored when the move-in is not changed', async () => {
     const db = schemaDb();
     await seed(db);
     const id = await oldReview(db, 'winter', year);
@@ -255,7 +255,7 @@ suite('PATCH /api/reviews/[id] move-in', () => {
     expect(await card(db, id)).toContain(`Fall ${year - 4} · Current`);
   });
 
-  it('stores only the new year on a review written before 0034 when the edit changes only the year', async () => {
+  it('stores only the new year on a review written before 0035 when the edit changes only the year', async () => {
     const db = schemaDb();
     await seed(db);
     const id = await oldReview(db, 'winter', year);

@@ -5,7 +5,7 @@ import { formatMoveIn, givenMoveIn, reviewSeasonChipProps, reviewTenancyLabel } 
 /**
  * The move-in question on the review form is optional. A skipped move-in is stored as blank
  * (`move_in_given = 'none'`), not as winter of the current year, and public pages show only
- * the parts the reviewer gave. Reviews written before migration 0034 (`move_in_given` NULL)
+ * the parts the reviewer gave. Reviews written before migration 0035 (`move_in_given` NULL)
  * are shown exactly as stored.
  */
 
@@ -110,7 +110,7 @@ describe('moveInFromEdit (edited review)', () => {
       .toEqual({ season: 'winter', year: 2024, given: 'year_only' });
   });
 
-  it('stores a new year without a month as year only on a review written before 0034', () => {
+  it('stores a new year without a month as year only on a review written before 0035', () => {
     // The stored season may be the old winter placeholder, so it is not carried over.
     expect(moveInFromEdit({ move_in_month: null, move_in_year: 2021 }, oldRow, NOW))
       .toEqual({ season: 'winter', year: 2021, given: 'year_only' });
@@ -165,7 +165,7 @@ describe('givenMoveIn and formatMoveIn', () => {
     expect(formatMoveIn(review)).toBeNull();
   });
 
-  it('shows a review written before migration 0034 as stored', () => {
+  it('shows a review written before migration 0035 as stored', () => {
     expect(formatMoveIn({ move_in_season: 'winter', move_in_year: 2026, move_in_given: null })).toBe('Winter 2026');
     expect(formatMoveIn({ move_in_season: 'summer', move_in_year: 2024 })).toBe('Summer 2024');
   });
@@ -183,7 +183,7 @@ describe('season chip props', () => {
     expect(reviewTenancyLabel({ move_in_season: 'winter', move_in_year: 2026, move_in_given: 'none', move_out_year_new: 'current', is_current_tenant: 1 })).toBe('Current');
     expect(reviewTenancyLabel({ move_in_season: 'winter', move_in_year: 2023, move_in_given: 'year_only', move_out_year_new: '2025', is_current_tenant: 0 })).toBe('2023 · 2025');
     expect(reviewTenancyLabel({ move_in_season: 'fall', move_in_year: 2023, move_in_given: 'season_and_year', move_out_year_new: 'current', is_current_tenant: 1 })).toBe('Fall 2023 · Current');
-    // Written before 0034: shown as stored, including the old placeholder.
+    // Written before 0035: shown as stored, including the old placeholder.
     expect(reviewTenancyLabel({ move_in_season: 'winter', move_in_year: 2026, move_in_given: null, move_out_year_new: 'current', is_current_tenant: 1 })).toBe('Winter 2026 · Current');
     expect(reviewTenancyLabel({ move_in_season: 'winter', move_in_year: 2026, move_out_year_new: '2025', is_current_tenant: 0 })).toBe('2025');
   });

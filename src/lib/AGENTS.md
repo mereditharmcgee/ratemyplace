@@ -178,7 +178,7 @@ precision here — the imprecision is the point.
 
 The move-in question is optional, but `reviews.move_in_season` and `move_in_year` are NOT
 NULL, so a skipped part holds a placeholder (winter, the current year). `move_in_given`
-(migration 0034) says which parts the reviewer gave, `moveIn.ts` decides what the submit
+(migration 0035) says which parts the reviewer gave, `moveIn.ts` decides what the submit
 and edit routes store, and `givenMoveIn()` is the one reader: anything that shows a move-in
 goes through it (or `reviewSeasonChipProps` / `formatMoveIn`), never the two columns
 directly. NULL means the review predates the column and is shown as stored. The module is
