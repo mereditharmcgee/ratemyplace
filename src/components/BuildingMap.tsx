@@ -4,7 +4,13 @@ import { getEarlyScoreStyle, getScoreColor, getScoreHex } from '../lib/scoring-c
 import { displayLocality } from '../lib/locality';
 import { isEarlyRating, mapReviewLine } from '../lib/earlyRating';
 import { initialMapView, shouldPanToUser, type InitialMapView, type LatLngBox, type LatLngPoint } from '../lib/mapView';
-import { clusterBadgeSize, clusterBadgeStyle, clusterTitle } from '../lib/mapCluster';
+import {
+  CLUSTER_LEGEND_LABEL,
+  CLUSTER_LEGEND_SWATCH_STYLE,
+  clusterBadgeSize,
+  clusterBadgeStyle,
+  clusterTitle,
+} from '../lib/mapCluster';
 
 interface Building {
   id: string;
@@ -549,6 +555,11 @@ export default function BuildingMap({
               <span>{getScoreColor(score).label} ({range})</span>
             </div>
           ))}
+        </div>
+        {/* The cluster badge, below a rule so it does not read as a fifth score band. */}
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200">
+          <span aria-hidden="true" className="w-3 h-3 rounded-full" style={CLUSTER_LEGEND_SWATCH_STYLE}></span>
+          <span>{CLUSTER_LEGEND_LABEL}</span>
         </div>
       </div>
 

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   CLUSTER_COLORS,
+  CLUSTER_LEGEND_LABEL,
+  CLUSTER_LEGEND_SWATCH_STYLE,
   clusterBadgeSize,
   clusterBadgeStyle,
   clusterTitle,
@@ -89,12 +91,39 @@ describe('clusterBadgeSize', () => {
 });
 
 describe('clusterTitle', () => {
-  it('names the count of buildings and nothing about scores', () => {
-    expect(clusterTitle(12)).toBe('12 buildings. Click to zoom in.');
-    expect(clusterTitle(2)).toBe('2 buildings. Click to zoom in.');
+  it('is the count of buildings and nothing else', () => {
+    expect(clusterTitle(12)).toBe('12 buildings');
+    expect(clusterTitle(2)).toBe('2 buildings');
+    expect(clusterTitle(250)).toBe('250 buildings');
   });
 
   it('uses the singular for one building', () => {
-    expect(clusterTitle(1)).toBe('1 building. Click to zoom in.');
+    expect(clusterTitle(1)).toBe('1 building');
+  });
+
+  it('says nothing about scores or zooming', () => {
+    for (const count of [1, 2, 12, 250]) {
+      expect(clusterTitle(count)).not.toMatch(/zoom|click|score|average|good|mixed|concerning|poor/i);
+    }
+  });
+});
+
+describe('legend swatch', () => {
+  it('is labelled "Group of buildings"', () => {
+    expect(CLUSTER_LEGEND_LABEL).toBe('Group of buildings');
+  });
+
+  it('matches the badge: its fill, a white border and its ring', () => {
+    expect(CLUSTER_LEGEND_SWATCH_STYLE.background).toBe(CLUSTER_COLORS.fill);
+    expect(CLUSTER_LEGEND_SWATCH_STYLE.boxShadow).toContain(CLUSTER_COLORS.border);
+    expect(CLUSTER_LEGEND_SWATCH_STYLE.boxShadow).toContain(CLUSTER_COLORS.ring);
+  });
+
+  it('contains no score band colour, as a hex or as rgb', () => {
+    const css = Object.values(CLUSTER_LEGEND_SWATCH_STYLE).join('; ').toLowerCase();
+    for (const hex of BAND_HEXES) {
+      expect(css).not.toContain(hex);
+      expect(css).not.toContain(rgbTriplet(hex));
+    }
   });
 });

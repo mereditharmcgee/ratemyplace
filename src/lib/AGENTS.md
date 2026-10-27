@@ -508,7 +508,10 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   and a whole-number count, labelled "N buildings", so it cannot be read as a score pin.
   Never fill it with a score band colour: a reader once took a cluster's "2" in the
   Concerning colour for a Concerning score. `mapCluster.test.ts` fails on any `SCORE_HEX`
-  value in the badge style, and no score of any kind is computed for a cluster.
+  value in the badge style, and no score of any kind is computed for a cluster. The map
+  legend shows the same circle as a "Group of buildings" row below the four score rows
+  (`CLUSTER_LEGEND_SWATCH_STYLE`); `buildingMapClusters.test.tsx` mounts the island on a
+  stubbed map to check the legend and the badge, since no Maps key exists off production.
 - **`admin/landlordMatch.ts` decides whether a tenant-typed landlord name is "the same
   landlord".** `classifyLandlordCandidates` preselects an existing landlord only when exactly
   one same-name landlord shares the building's state and city (Boston localities count as

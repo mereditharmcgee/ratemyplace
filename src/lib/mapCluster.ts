@@ -1,6 +1,7 @@
 // How a marker cluster on /map looks, as pure decisions so they can be unit tested without
 // Google Maps. `BuildingMap.tsx` is the glue: its clusterer renderer asks these for the
-// badge's size, style and accessible name, and draws it.
+// badge's size, style and accessible name, and draws it, and its legend shows the same
+// circle as a swatch beside the four score rows.
 //
 // A cluster shows how many buildings it holds, never a score. It is a dark neutral circle
 // with a ring and a whole-number count, so it cannot be mistaken for a score pin (a coloured
@@ -53,7 +54,20 @@ export function clusterBadgeStyle(size: number): string {
   ].join('; ');
 }
 
-/** Hover title and accessible name for a cluster badge. */
+/** Hover title and accessible name for a cluster badge: the count, nothing else. */
 export function clusterTitle(count: number): string {
-  return `${count} ${count === 1 ? 'building' : 'buildings'}. Click to zoom in.`;
+  return `${count} ${count === 1 ? 'building' : 'buildings'}`;
 }
+
+/** Label of the map legend's cluster row, below the four score rows. */
+export const CLUSTER_LEGEND_LABEL = 'Group of buildings';
+
+/**
+ * Inline style for the legend's cluster swatch, a 12px circle beside the score swatches:
+ * the badge's fill, a thin white border and the badge's ring, scaled down. Box shadows take
+ * no layout space, so the swatch lines up with the score rows above it.
+ */
+export const CLUSTER_LEGEND_SWATCH_STYLE = {
+  background: CLUSTER_COLORS.fill,
+  boxShadow: `0 0 0 1px ${CLUSTER_COLORS.border}, 0 0 0 3px ${CLUSTER_COLORS.ring}`,
+} as const;
