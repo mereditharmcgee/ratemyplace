@@ -20,6 +20,7 @@ import {
 import { HelpTooltip } from './HelpTooltip';
 import type { ReviewDetail } from '../../pages/api/reviews/[id]';
 import { localityLine } from '../../lib/locality';
+import { formatMoveIn, givenMoveIn, MOVE_IN_NOT_GIVEN } from '../../lib/privacy';
 
 interface Props {
   review: ReviewDetail;
@@ -86,12 +87,11 @@ export default function ReviewEditForm({ review }: Props) {
     review.estimated_monthly_utilities?.toString() || ''
   );
 
-  // Move-in month/year (user-provided, to correct the hardcoded legacy defaults)
-  const [moveInMonth, setMoveInMonth] = useState(
-    (review as any).move_in_month?.toString() || ''
-  );
+  // Move-in month/year. Only the season is stored, so the month starts blank; the route keeps
+  // the stored season when the year is left as it was. A skipped move-in starts blank too.
+  const [moveInMonth, setMoveInMonth] = useState('');
   const [moveInYear, setMoveInYear] = useState(
-    (review as any).move_in_year?.toString() || ''
+    givenMoveIn(review).year?.toString() || ''
   );
 
   // Tenure & move-out
@@ -279,7 +279,7 @@ export default function ReviewEditForm({ review }: Props) {
           {localityLine({ address: review.building_address, neighborhood: review.neighborhood, city: review.city })}
         </div>
         <div className="text-xs text-gray-400 mt-1">
-          Move-in: {review.move_in_season} {review.move_in_year}
+          Move-in: {formatMoveIn(review) ?? MOVE_IN_NOT_GIVEN}
           {review.is_current_tenant ? ' (Current tenant)' : (review as any).move_out_year_new && ` - Move-out: ${(review as any).move_out_season} ${(review as any).move_out_year_new}`}
         </div>
       </div>

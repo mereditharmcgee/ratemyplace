@@ -110,8 +110,11 @@ describe('PATCH /api/reviews/[id] owner notice', () => {
   function patchDb(status: string, options: { owner?: string; updateFails?: boolean } = {}) {
     const { owner = 'u1', updateFails = false } = options;
     return fakeD1((call: FakeCall) => {
-      if (call.sql.startsWith('SELECT user_id, building_id, unit_type, status FROM reviews')) {
-        return { user_id: owner, building_id: 'b1', unit_type: '1br', status };
+      if (call.sql.startsWith('SELECT user_id, building_id, unit_type, status,')) {
+        return {
+          user_id: owner, building_id: 'b1', unit_type: '1br', status,
+          move_in_season: 'fall', move_in_year: 2023, move_in_given: 'season_and_year',
+        };
       }
       if (call.sql.includes('UPDATE reviews SET') && updateFails) throw new Error('D1_ERROR: update failed');
       if (call.sql.includes('SELECT slug FROM buildings')) return { slug: 'b1-slug' };

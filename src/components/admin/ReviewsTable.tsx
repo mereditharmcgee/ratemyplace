@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getScoreColor as getScoreColorPair, getScoreTextColor } from '../../lib/scoring-colors';
 import type { LandlordGeo } from '../../lib/admin/landlordMatch';
 import LandlordLinkPanel from './LandlordLinkPanel';
+import { formatMoveIn, MOVE_IN_NOT_GIVEN } from '../../lib/privacy';
 
 interface Review {
   id: string;
@@ -413,7 +414,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                           </div>
                           <div className="flex justify-between col-span-1">
                             <dt className="text-gray-500">Move-in:</dt>
-                            <dd className="text-gray-900">{detail.move_in_season} {detail.move_in_year}</dd>
+                            <dd className="text-gray-900">{formatMoveIn(detail) ?? MOVE_IN_NOT_GIVEN}</dd>
                           </div>
                           <div className="flex justify-between col-span-1">
                             <dt className="text-gray-500">Unit type:</dt>

@@ -1,6 +1,6 @@
 # `migrations/` — D1 Schema Changes
 
-Cloudflare D1 (SQLite). 34 migrations, `0001` through `0034`.
+Cloudflare D1 (SQLite). 35 migrations, `0001` through `0035`.
 
 ---
 
@@ -139,6 +139,28 @@ Worker needs `npm run records:worker:deploy`), and a one-time
 reads and writes SQL files under `.cache/owners-backfill/` for a human to apply. The seed
 (`records:seed`) writes assessor rows without owner rows: after a re-seed, run the owners
 backfill again (it is an upsert and safe to repeat).
+
+**`0035` (review move-in given) was APPLIED TO PRODUCTION 2026-10-27, by hand, before the code that writes it deployed.** It
+is one `ALTER TABLE reviews ADD COLUMN move_in_given TEXT CHECK (...)`: nullable, no
+default, so every existing review reads NULL and is shown as stored. `move_in_year` and
+`move_in_season` stay NOT NULL; a skipped part still gets a placeholder there, and the new
+column says which parts the reviewer gave. The review submit and edit routes write the
+column and the dispute route selects it, so code deployed before the column exists fails
+review submission. Code deployed before `0035` ignores the column, so applying it first is
+safe. There is no `ADD COLUMN IF NOT EXISTS`; the file holds that one statement, so a
+second run fails with `duplicate column name: move_in_given` and changes nothing. Check
+first:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --command \
+  "SELECT name, type, \"notnull\" FROM pragma_table_info('reviews') WHERE name = 'move_in_given'"
+```
+
+No rows means it has not run; then apply it once:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --file migrations/0035_review_move_in_given.sql
+```
 
 **`app_settings` keys in use.** The table is a key/value store for operator switches; the
 records pipeline owns four, defined once in `SETTING_KEYS` in `src/lib/records/settings.ts`:

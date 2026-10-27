@@ -3,6 +3,8 @@ import { getDB } from '../../../lib/db';
 import { calculateOverallScore, ALL_SCORE_FIELDS } from '../../../lib/scoring';
 import { validateReviewText } from '../../../lib/validation';
 import { queueOwnerNotice } from '../../../lib/ownerNotify';
+import { moveInFromEdit } from '../../../lib/moveIn';
+import type { MoveInGiven } from '../../../lib/types';
 
 export interface ReviewDetail {
   id: string;
@@ -14,6 +16,8 @@ export interface ReviewDetail {
   city: string;
   move_in_year: number;
   move_in_season: string;
+  /** Which move-in parts the reviewer gave; NULL on reviews written before migration 0035. */
+  move_in_given: MoveInGiven | null;
   move_out_season: string | null;
   move_out_year_new: string | null;
   is_current_tenant: boolean;
@@ -154,9 +158,19 @@ export async function PATCH(context: APIContext): Promise<Response> {
     const db = getDB(context);
 
     // Verify ownership
-    const existing = await db.prepare('SELECT user_id, building_id, unit_type, status FROM reviews WHERE id = ?')
+    const existing = await db.prepare(
+      'SELECT user_id, building_id, unit_type, status, move_in_season, move_in_year, move_in_given FROM reviews WHERE id = ?'
+    )
       .bind(id)
-      .first<{ user_id: string; building_id: string; unit_type: string | null; status: string }>();
+      .first<{
+        user_id: string;
+        building_id: string;
+        unit_type: string | null;
+        status: string;
+        move_in_season: string;
+        move_in_year: number;
+        move_in_given: MoveInGiven | null;
+      }>();
 
     if (!existing) {
       return new Response(JSON.stringify({ error: 'Review not found' }), {
@@ -247,6 +261,14 @@ export async function PATCH(context: APIContext): Promise<Response> {
     // Handle would_recommend - canonical text column only
     const wouldRecommendNew = body.would_recommend_new || null;
 
+    // Move-in: what the reviewer gave on the edit form, or the stored values when unchanged.
+    // A cleared move-in is stored as skipped, never as an invented date.
+    const moveIn = moveInFromEdit(body, existing, new Date()) ?? {
+      season: existing.move_in_season,
+      year: existing.move_in_year,
+      given: existing.move_in_given ?? null,
+    };
+
     // unit_number is stored for moderation only — never displayed on public pages.
     await db.prepare(`
       UPDATE reviews SET
@@ -262,6 +284,9 @@ export async function PATCH(context: APIContext): Promise<Response> {
         laundry_cost_per_load = ?,
         estimated_monthly_utilities = ?,
         tenure_months = ?,
+        move_in_year = ?,
+        move_in_season = ?,
+        move_in_given = ?,
         move_out_year_new = ?,
         is_current_tenant = ?,
         unit_structural = ?,
@@ -326,6 +351,9 @@ export async function PATCH(context: APIContext): Promise<Response> {
       body.laundry_cost_per_load ? parseFloat(body.laundry_cost_per_load) : null,
       body.estimated_monthly_utilities ? parseInt(body.estimated_monthly_utilities) : null,
       body.tenure_months ? parseInt(body.tenure_months) : null,
+      moveIn.year,
+      moveIn.season,
+      moveIn.given,
       body.move_out_year_new || null,
       body.move_out_year_new === 'current' ? 1 : 0,
       // Unit scores (10)
