@@ -2,9 +2,10 @@
 // `api/search/results.ts` (Load more) both build from these, which is what keeps their
 // counts, rows, and order in step — a parity that used to be a comment.
 //
-// Scope: the query-mode buildings query only. Browse mode (no query) and every landlord
-// query stay reviewed-only and keep their own SQL, because a landing page listing 38,000
-// unreviewed seeded buildings is not a product.
+// Scope: the query-mode buildings query, plus the ORDER BY of browse mode. Browse mode (no
+// query) and every landlord query stay reviewed-only and keep their own SQL, because a
+// landing page listing 38,000 unreviewed seeded buildings is not a product; browse takes
+// only its order from here (`BROWSE_BUILDINGS_ORDER`).
 import { normalizeSearchQuery } from './searchQuery';
 import { recencyWeightedOverallSql } from './scoring-sql';
 import { escapeLikePattern } from './validation';
@@ -71,6 +72,18 @@ export function buildingSearchWhere(query: string): SqlFragment {
 }
 
 /**
+ * "Is this building in Boston?", as a SQL condition on the buildings alias `b`. The one
+ * spelling of the city test: `has_records` (below) and the browse order
+ * (`BROWSE_BUILDINGS_ORDER`) both interpolate it, so the two cannot disagree about which
+ * buildings are in Boston. It is NULL when `b.city` is NULL, so a caller that needs 0 or 1
+ * wraps it in `COALESCE(..., 0)`. Why it restates `jurisdictionForCity` rather than calling
+ * it: see `buildingSearchSelect`. `searchBrowseOrder.test.ts` checks the two agree on the
+ * city spellings stored today.
+ */
+export const BOSTON_CITY_SQL =
+  "(LOWER(TRIM(b.city)) = 'boston' OR LOWER(REPLACE(TRIM(b.city), ' ', '')) LIKE 'boston,__')";
+
+/**
  * Column list for a buildings result row. Explicit — never `b.*` (admin_notes, owner_*).
  *
  * `has_records` restates in SQL the city test `jurisdictionForCity` applies in TypeScript:
@@ -94,7 +107,7 @@ export function buildingSearchSelect(currentYear: number): string {
     COUNT(r.id) AS review_count,
     ${recencyWeightedOverallSql('r', currentYear)} AS avg_overall,
     l.name AS landlord_name,
-    COALESCE(b.parcel_id IS NOT NULL AND (LOWER(TRIM(b.city)) = 'boston' OR LOWER(REPLACE(TRIM(b.city), ' ', '')) LIKE 'boston,__'), 0) AS has_records`;
+    COALESCE(b.parcel_id IS NOT NULL AND ${BOSTON_CITY_SQL}, 0) AS has_records`;
 }
 
 /**
@@ -105,3 +118,24 @@ export function buildingSearchSelect(currentYear: number): string {
  * stated in the SQL and survives a later change to the tiebreakers behind it.
  */
 export const BUILDING_SEARCH_ORDER = 'ORDER BY (COUNT(r.id) > 0) DESC, COUNT(r.id) DESC, avg_overall DESC, b.address ASC, b.id ASC';
+
+/**
+ * Browse mode (no query): Boston first, most recently reviewed. Boston buildings come first,
+ * each group ordered by its newest approved review, newest first, then by building id.
+ *
+ * - Boston is `BOSTON_CITY_SQL`, the city half of `has_records`, not the whole flag: a Boston
+ *   building with no parcel id is still a Boston building. `COALESCE` puts a NULL city with
+ *   everything else rather than in a third group.
+ * - "Newest review" is `MAX(r.created_at)` over the joined rows, and both call sites join
+ *   reviews `ON ... AND r.status = 'approved'`, so a pending or rejected review never moves a
+ *   building. `created_at` (submission) rather than an approval time because reviews carry
+ *   no approval time: `moderated_at` is never written, and `updated_at` moves again on any
+ *   later moderation-note save or edit, which would reshuffle the list for nothing a reader
+ *   can see. The value orders rows only; it is never selected or shown.
+ * - `b.id` is unique, so the order is total and LIMIT/OFFSET pages neither repeat nor skip
+ *   a row. Browse rows are reviewed-only (`HAVING COUNT(r.id) > 0`), so the MAX is never NULL.
+ *
+ * Shared by `search.astro` (first page) and `api/search/results.ts` (Load more); the
+ * review alias is fixed at `r` and the buildings alias at `b`, as in both.
+ */
+export const BROWSE_BUILDINGS_ORDER = `ORDER BY COALESCE(${BOSTON_CITY_SQL}, 0) DESC, MAX(r.created_at) DESC, b.id ASC`;
