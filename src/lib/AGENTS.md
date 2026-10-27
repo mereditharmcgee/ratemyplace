@@ -63,10 +63,11 @@ Use the helpers — never hardcode a threshold or a color:
 
 A building score shows from its first approved review. Below `NAMED_PARTY_MIN_REVIEWS` it is
 an **early rating** everywhere a building score appears (building page, search cards,
-landlord and property manager building lists, map info window): the count sits beside the
-score ("from 1 review"), `scoreNumberClass` mutes it to gray with an `earlyScoreMarkerClass`
-band dot beside it, and issue and recommend rates are counts ("1 of 1 review") instead of
-percentages. Import the constant; never type 3.
+landlord and property manager building lists, map info window, homepage dropdown): the count
+sits beside the score ("from 1 review"), `scoreNumberClass` mutes it to gray with an
+`earlyScoreMarkerClass` band dot beside it, and issue and recommend rates are counts ("1 of 1
+review") instead of percentages. A unit row on the building page goes by the unit's own
+review count, as `unitRecommendText` does. Import the constant; never type 3.
 
 The percentages it still prints use the formulas in `calculateAggregatedScores` /
 `calculateBuildingAverages`, and `earlyRating.test.ts` holds them equal. It changes no score.

@@ -9,7 +9,6 @@ import PostSubmitVerification from '../../components/profile/PostSubmitVerificat
 import BuildingRecords from '../../components/BuildingRecords.astro';
 import { calculateBuildingAverages, getRecencyWeight, getReviewYear } from '../../lib/scoring';
 import { currentReviewYear } from '../../lib/scoring-sql';
-import { getScoreTextColor } from '../../lib/scoring-colors';
 import {
   EARLY_RATING_HREF,
   EARLY_RATING_LABEL,
@@ -446,7 +445,11 @@ const meta = buildingPageMeta(
 
                         <div class="text-right">
                           <div class="flex items-center gap-1">
-                            <span class={`text-lg font-bold ${getScoreTextColor(unitStats.avgScore)}`}>{unitStats.avgScore.toFixed(1)}</span>
+                            {/* Early or not by the unit's own count, as unitRecommendText below is. */}
+                            {isEarlyRating(unitStats.reviewCount) && (
+                              <span aria-hidden="true" data-early-score-marker class={`${earlyScoreMarkerClass(unitStats.avgScore)} mr-0.5`}></span>
+                            )}
+                            <span data-unit-score class={`text-lg ${scoreNumberClass(unitStats.avgScore, unitStats.reviewCount)}`}>{unitStats.avgScore.toFixed(1)}</span>
                             <StarRating rating={unitStats.avgScore} size="sm" />
                           </div>
                           {unitRecommendText(unitStats.recommend, unitStats.reviewCount) && (

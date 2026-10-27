@@ -93,6 +93,11 @@ function unitRecommendLine(root: HTMLElement): string {
   return text(root.querySelector('.unit-card .text-right p.text-xs'));
 }
 
+/** The score number on the first unit card. */
+function unitScore(root: HTMLElement): Element | null {
+  return root.querySelector('.unit-card [data-unit-score]');
+}
+
 suite('building page, one review', () => {
   it('shows the score as an early rating with its count beside it', async () => {
     const root = await renderPage(await seed([{ recommend: 'no', pests: true }]));
@@ -146,6 +151,20 @@ suite('building page, one review', () => {
     expect(breakdownRows(root)).toContain('Would recommend: 1 of 1 review');
     expect(unitRecommendLine(root)).toBe('1 of 1 would recommend');
   });
+
+  it('mutes the unit card score like the header, with the band dot beside it', async () => {
+    const root = await renderPage(await seed([{ recommend: 'yes' }]));
+    const number = unitScore(root);
+    expect(number?.textContent).toBe('3.9');
+    expect(number?.getAttribute('class')).toContain(getEarlyScoreStyle(3.9).text);
+    expect(number?.getAttribute('class')).not.toContain(getScoreTextColor(3.9));
+    expect(number?.getAttribute('class')).toContain('font-semibold');
+    expect(number?.getAttribute('class')).not.toContain('font-bold');
+    const marker = number!.previousElementSibling;
+    expect(marker?.hasAttribute('data-early-score-marker')).toBe(true);
+    expect(marker?.getAttribute('aria-hidden')).toBe('true');
+    expect(marker?.getAttribute('class')).toContain(getScoreColor(3.9).bg);
+  });
 });
 
 suite('building page, two reviews', () => {
@@ -179,6 +198,9 @@ suite('building page at the threshold', () => {
     const tiles = breakdownTileNumbers(root);
     expect(tiles.length).toBeGreaterThan(0);
     for (const tile of tiles) expect(tile).toContain('font-bold');
+    const unit = unitScore(root);
+    expect(unit?.getAttribute('class')).toContain(`font-bold ${getScoreTextColor(3.9)}`);
+    expect(root.querySelector('.unit-card [data-early-score-marker]')).toBeNull();
   });
 
   it('shows maybe answers as a count beside the percentage, outside it', async () => {
