@@ -2,10 +2,25 @@ import type { APIContext } from 'astro';
 import { getEnv } from '../../../lib/runtime';
 import { getDB } from '../../../lib/db';
 import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
+import { logError } from '../../../lib/logger';
+import {
+  autocompleteRequestBody,
+  autocompleteScopeFrom,
+  bostonScopePredictions,
+  parseAutocompleteSuggestions,
+  PLACES_AUTOCOMPLETE_URL,
+  type GoogleAutocompleteResponse,
+} from '../../../lib/places';
+import { matchPredictionsToBuildings, type MatchedPrediction } from '../../../lib/homeSearchMatch';
 
+// Two callers. The review form's AddressAutocomplete sends no scope and gets any US address,
+// exactly as before. The homepage's HomeSearch sends `scope=boston`: Google is biased to
+// Boston's box, results outside Massachusetts are dropped, Boston comes first, and each
+// suggestion carries the building page it already has, if any (`existing`).
 export async function GET(context: APIContext): Promise<Response> {
   const input = context.url.searchParams.get('input') || '';
   const sessionToken = context.url.searchParams.get('sessionToken') || '';
+  const scope = autocompleteScopeFrom(context.url.searchParams.get('scope'));
 
   if (!input || input.length < 3) {
     return new Response(JSON.stringify({ predictions: [] }), {
@@ -14,7 +29,8 @@ export async function GET(context: APIContext): Promise<Response> {
   }
 
   // Rate limit — this proxies a paid Google API, so cap per-IP abuse (120/min).
-  const rateLimit = await checkRateLimit(getDB(context), getClientIP(context), 'places-autocomplete', 120, 60);
+  const db = getDB(context);
+  const rateLimit = await checkRateLimit(db, getClientIP(context), 'places-autocomplete', 120, 60);
   if (!rateLimit.allowed) {
     return new Response(JSON.stringify({ error: 'Too many requests. Please slow down.', predictions: [] }), {
       status: rateLimit.error ? 503 : 429,
@@ -34,18 +50,10 @@ export async function GET(context: APIContext): Promise<Response> {
 
   try {
     // Use Places API (New) - Autocomplete
-    const body: Record<string, any> = {
-      input,
-      includedPrimaryTypes: ['street_address', 'subpremise', 'premise'],
-      includedRegionCodes: ['us'],
-    };
-
-    if (sessionToken) {
-      body.sessionToken = sessionToken;
-    }
+    const body = autocompleteRequestBody(input, { sessionToken, scope });
 
     const response = await fetch(
-      'https://places.googleapis.com/v1/places:autocomplete', {
+      PLACES_AUTOCOMPLETE_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -56,7 +64,7 @@ export async function GET(context: APIContext): Promise<Response> {
       }
     );
 
-    const data = await response.json();
+    const data = (await response.json()) as GoogleAutocompleteResponse;
 
     if (data.error) {
       console.error('Places API error:', JSON.stringify(data.error));
@@ -66,20 +74,29 @@ export async function GET(context: APIContext): Promise<Response> {
       });
     }
 
-    // Map new API response to our expected format
-    const predictions = (data.suggestions || [])
-      .filter((s: any) => s.placePrediction)
-      .map((s: any) => {
-        const p = s.placePrediction;
-        return {
-          placeId: p.placeId,
-          description: p.text?.text || '',
-          mainText: p.structuredFormat?.mainText?.text || '',
-          secondaryText: p.structuredFormat?.secondaryText?.text || '',
-        };
-      });
+    const predictions = parseAutocompleteSuggestions(data);
 
-    return new Response(JSON.stringify({ predictions }), {
+    if (scope !== 'boston') {
+      return new Response(JSON.stringify({ predictions }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const scoped = bostonScopePredictions(predictions);
+    let matched: MatchedPrediction[];
+    try {
+      matched = await matchPredictionsToBuildings(db, scoped);
+    } catch (error) {
+      // The suggestions still work without the match: the review handoff resolves the
+      // building on click. Never log the input, an address or a place id.
+      logError('places_autocomplete_match_error', {
+        endpoint: '/api/places/autocomplete',
+        error: error instanceof Error ? error.name : 'unknown',
+      });
+      matched = scoped.map((p) => ({ ...p, existing: null }));
+    }
+
+    return new Response(JSON.stringify({ predictions: matched }), {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
