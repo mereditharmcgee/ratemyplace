@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'url';
 import path from 'path';
-import { test, expect } from './fixtures';
-import { installTurnstileStub } from './test-harness';
+import { test, expect, clearRateLimits } from './fixtures';
+import { executeLocalD1, installTurnstileStub, TURNSTILE_SCRIPT } from './test-harness';
 
 // Derive Page type from the fixture to avoid importing from @playwright/test directly
 type Page = Parameters<Parameters<typeof test>[1]>[0]['authedPage'];
@@ -329,5 +329,215 @@ test.describe('Concurrent Submissions', () => {
     // Cleanup — do NOT sign out (would invalidate the shared session)
     await ctx1.close();
     await ctx2.close();
+  });
+});
+
+// ── Review form funnel (October 2026) ─────────────────────────────────────────
+// The address step's "Existing properties" click, the return to the form after
+// sign-in, the read-only ?placeId= handoff, a failed submit retried, and the
+// Turnstile load failure. Google Places, Google OAuth and real Turnstile cannot
+// run here; their unit tests and the production checks in the PR cover them.
+test.describe('Review form funnel', () => {
+  const SEED_EMAIL = 'user@test.ratemyplace.local';
+  const SEED_PASSWORD = 'TestPassword123!';
+  const BUILDING_FORM_URL = /\/review\/new\?building=building-30$/;
+
+  function buildingCount(): number {
+    return JSON.parse(executeLocalD1('SELECT COUNT(*) AS n FROM buildings'))[0].results[0].n;
+  }
+
+  function setPlaceId(): void {
+    executeLocalD1("UPDATE buildings SET google_place_id = 'e2e-place-30' WHERE id = 'building-30'");
+  }
+
+  test.afterAll(() => {
+    executeLocalD1("UPDATE buildings SET admin_notes = NULL, owner_name = NULL, google_place_id = NULL WHERE id = 'building-30'");
+  });
+
+  async function walkToConfirm(page: Page) {
+    await page.goto('/review/new?building=building-30');
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('select').first()).toBeVisible({ timeout: 15000 });
+    await page.locator('button[type="button"]', { hasText: 'Continue' }).click();
+    await expect(page.locator('text=Rate Your Unit').first()).toBeVisible({ timeout: 10000 });
+    expect(await rateAllItemsInStep(page, 4)).toBe(10);
+    await page.locator('button[type="button"]', { hasText: 'Continue' }).click();
+    await expect(page.locator('text=Rate the Building').first()).toBeVisible({ timeout: 10000 });
+    await page.locator('button[type="button"]', { hasText: 'Continue' }).click();
+    await expect(page.locator('text=Rate Your Landlord').first()).toBeVisible({ timeout: 10000 });
+    await page.locator('button[type="button"]', { hasText: 'Continue' }).click();
+    await expect(page.locator('text=How long did you live').first()).toBeVisible({ timeout: 10000 });
+    await page.locator('button[type="button"]', { hasText: 'Review & Submit' }).click();
+    await expect(page.locator('text=Review Summary').first()).toBeVisible({ timeout: 10000 });
+    await page.locator('input[type="checkbox"]').check();
+  }
+
+  async function signIn(page: Page, email = SEED_EMAIL) {
+    await page.fill('input[name="email"]', email);
+    await page.fill('input[name="password"]', SEED_PASSWORD);
+    await page.click('button[type="submit"]');
+  }
+
+  test('no admin fields reach the review form HTML', async ({ authedPage }) => {
+    executeLocalD1(
+      "UPDATE buildings SET admin_notes = 'SENTINEL-E2E-NOTE', owner_name = 'SENTINEL-E2E-OWNER', google_place_id = 'e2e-place-30' WHERE id = 'building-30'"
+    );
+    const html = await (await authedPage.request.get('/review/new?building=building-30')).text();
+    expect(html).toContain('45 Melnea Cass Blvd');
+    expect(html).not.toContain('SENTINEL-E2E-NOTE');
+    expect(html).not.toContain('SENTINEL-E2E-OWNER');
+    expect(html).not.toContain('admin_notes');
+
+    const handoff = await authedPage.request.get('/review/new?placeId=e2e-place-30', { maxRedirects: 0 });
+    expect(handoff.status()).toBe(302);
+    const location = new URL(handoff.headers()['location'], 'http://localhost:8788');
+    expect(location.pathname + location.search).toBe('/review/new?building=building-30');
+    executeLocalD1("UPDATE buildings SET admin_notes = NULL, owner_name = NULL WHERE id = 'building-30'");
+  });
+
+  test('an "Existing properties" row opens that building at unit details', async ({ authedPage }) => {
+    await authedPage.goto('/review/new');
+    await authedPage.waitForLoadState('networkidle');
+    await authedPage.fill('input[placeholder="Start typing your address..."]', '45 Melnea');
+    await expect(authedPage.locator('text=Existing properties')).toBeVisible({ timeout: 10000 });
+    await authedPage.locator('button', { hasText: /45 Melnea Cass Blvd/ }).first().click();
+    await authedPage.waitForURL(BUILDING_FORM_URL, { timeout: 15000 });
+    await expect(authedPage.locator('#review-bedrooms')).toBeVisible({ timeout: 15000 });
+    await expect(authedPage.locator('text=45 Melnea Cass Blvd').first()).toBeVisible();
+  });
+
+  test('password sign-in returns to the review form', async ({ page }) => {
+    clearRateLimits();
+    await page.goto('/review/new?building=building-30');
+    await page.waitForURL(/\/auth\/signin\?redirect=/, { timeout: 10000 });
+    await signIn(page);
+    await page.waitForURL(BUILDING_FORM_URL, { timeout: 15000 });
+  });
+
+  test('sign-up from that page returns to the review form too', async ({ page }) => {
+    clearRateLimits();
+    await page.goto('/review/new?building=building-30');
+    await page.waitForURL(/\/auth\/signin\?redirect=/, { timeout: 10000 });
+    await page.locator('main a[href^="/auth/signup?redirect="]').click();
+    await page.waitForURL(/\/auth\/signup\?redirect=/, { timeout: 10000 });
+    await page.fill('input[name="email"]', `funnel-${Date.now()}@test.local`);
+    await page.fill('input[name="password"]', SEED_PASSWORD);
+    await page.fill('input[name="confirmPassword"]', SEED_PASSWORD);
+    await page.click('button[type="submit"]');
+    await page.waitForURL(BUILDING_FORM_URL, { timeout: 15000 });
+  });
+
+  const HOSTILE = [
+    '//evil.example/',
+    '/.//evil.example',
+    '/..//evil.example',
+    '/a/..//evil.example',
+    '/x/../..//evil.example',
+    '/%2e//evil.example',
+    '/%2e%2e//evil.example',
+    '/%2e/%2e//evil.example',
+    '/%2F%2Fevil.example',
+    '/\\evil.example',
+    'https://evil.example',
+  ];
+
+  test('a signed-in visitor with an off-site redirect stays on this site', async ({ authedPage }) => {
+    for (const value of HOSTILE) {
+      await authedPage.goto('/auth/signin?redirect=' + encodeURIComponent(value));
+      const landed = new URL(authedPage.url());
+      expect(landed.origin, value).toBe('http://localhost:8788');
+      expect(landed.pathname, value).toBe('/');
+    }
+  });
+
+  test('off-site redirects are dropped from the sign-in page', async ({ page }) => {
+    for (const value of HOSTILE) {
+      await page.goto('/auth/signin?redirect=' + encodeURIComponent(value));
+      await expect(page.locator('#signin-form'), value).toHaveAttribute('data-redirect', '/');
+      await expect(page.locator('main a[href^="/api/auth/google"]'), value).toHaveAttribute('href', '/api/auth/google');
+    }
+  });
+
+  test('signing in with a dot-segment redirect lands at home', async ({ page }) => {
+    clearRateLimits();
+    await page.goto('/auth/signin?redirect=%2F.%2F%2Fevil.example');
+    await signIn(page);
+    await page.waitForURL((url) => url.pathname === '/', { timeout: 15000 });
+    const landed = new URL(page.url());
+    expect(landed.origin).toBe('http://localhost:8788');
+    expect(landed.pathname).toBe('/');
+  });
+
+  test('a handoff for a known place id redirects and writes nothing', async ({ authedPage }) => {
+    setPlaceId();
+    const before = buildingCount();
+    await authedPage.goto('/review/new?placeId=e2e-place-30');
+    await authedPage.waitForURL(BUILDING_FORM_URL, { timeout: 15000 });
+    await expect(authedPage.locator('#review-bedrooms')).toBeVisible({ timeout: 15000 });
+    await expect(authedPage.locator('text=45 Melnea Cass Blvd').first()).toBeVisible();
+    expect(buildingCount()).toBe(before);
+  });
+
+  test('an unresolvable handoff writes nothing', async ({ authedPage }) => {
+    const before = buildingCount();
+    await authedPage.goto('/review/new?placeId=ChIJe2eNoSuchPlace0000000');
+    // No Places key locally, so the lookup is unavailable and the search box is offered.
+    await expect(authedPage.getByText(/search for (your address|it) below/i)).toBeVisible();
+    await expect(authedPage.locator('input[placeholder="Start typing your address..."]')).toBeVisible();
+    await authedPage.goto('/review/new?placeId=..%2F..%2Fx');
+    await expect(authedPage.getByText(/could not look up that address/i)).toBeVisible();
+    expect(buildingCount()).toBe(before);
+  });
+
+  test('a failed submit is retried without losing answers', async ({ authedPage }) => {
+    test.setTimeout(90000);
+    clearRateLimits();
+    let posts = 0;
+    await authedPage.route('**/api/reviews', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      posts += 1;
+      if (posts === 1) {
+        return route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Failed to submit review' }),
+        });
+      }
+      return route.continue();
+    });
+
+    await walkToConfirm(authedPage);
+    const submit = authedPage.locator('button[type="button"]', { hasText: /Submit Review|Submitting/ });
+    await expect(submit).toBeEnabled({ timeout: 10000 });
+    await submit.click();
+
+    await expect(authedPage.getByText('Failed to submit review')).toBeVisible({ timeout: 10000 });
+    await expect.poll(() => authedPage.evaluate(() => (window as unknown as { __e2eTurnstileResets: number }).__e2eTurnstileResets)).toBe(1);
+    await expect(submit).toBeEnabled({ timeout: 10000 });
+    await expect(authedPage.getByText('10/10')).toBeVisible();
+
+    await submit.click();
+    await authedPage.waitForURL(/\/building\/45-melnea-cass-blvd/, { timeout: 30000 });
+    expect(posts).toBe(2);
+  });
+
+  test('a Turnstile load failure offers Try again, which recovers without a second api.js', async ({ authedPage }) => {
+    test.setTimeout(60000);
+    await authedPage.unroute(TURNSTILE_SCRIPT);
+    await authedPage.route(TURNSTILE_SCRIPT, (route) => route.abort());
+
+    await walkToConfirm(authedPage);
+    await expect(authedPage.getByText(/Bot verification didn't load/)).toBeVisible({ timeout: 12000 });
+    const tryAgain = authedPage.getByRole('button', { name: 'Try again' });
+    await expect(tryAgain).toBeVisible();
+    // The page guard removed the tag that failed to load.
+    await expect(authedPage.locator('script[src*="turnstile/v0/api.js"]')).toHaveCount(0);
+
+    await authedPage.unroute(TURNSTILE_SCRIPT);
+    await installTurnstileStub(authedPage);
+    await tryAgain.click();
+    await expect(authedPage.locator('button[type="button"]', { hasText: 'Submit Review' })).toBeEnabled({ timeout: 10000 });
+    await expect(authedPage.locator('script[src*="turnstile/v0/api.js"]')).toHaveCount(1);
+    // Do not submit.
   });
 });

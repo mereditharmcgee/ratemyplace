@@ -11,11 +11,15 @@ export interface ManualAddress {
 
 interface Props {
   selectedPlace: PlaceData | null;
+  /** What the search box starts with: the handoff place's street, when there is one. */
+  searchInitialValue?: string;
   loading: boolean;
   error: string | null;
   manualMode: boolean;
   manualAddress: ManualAddress;
   onPlaceSelect: (place: PlaceDetails) => void;
+  /** An "Existing properties" row was picked: open that building's review form. */
+  onExistingBuildingSelect: (buildingId: string) => void;
   onConfirm: () => void;
   onEnterManual: () => void;
   onManualAddressChange: (addr: ManualAddress) => void;
@@ -25,11 +29,13 @@ interface Props {
 
 export default function AddressStep({
   selectedPlace,
+  searchInitialValue,
   loading,
   error,
   manualMode,
   manualAddress,
   onPlaceSelect,
+  onExistingBuildingSelect,
   onConfirm,
   onEnterManual,
   onManualAddressChange,
@@ -136,8 +142,10 @@ export default function AddressStep({
         </label>
         <AddressAutocomplete
           onPlaceSelect={onPlaceSelect}
+          onExistingBuildingSelect={(id) => onExistingBuildingSelect(id)}
           onManualEntry={onEnterManual}
           placeholder="Start typing your address..."
+          initialValue={searchInitialValue}
         />
         <p className="text-sm text-gray-500 mt-2">
           Enter the street address of the building you want to review

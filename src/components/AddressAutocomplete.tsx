@@ -29,7 +29,11 @@ interface DbMatch {
 
 interface Props {
   onPlaceSelect: (place: PlaceDetails) => void;
-  onExistingBuildingSelect?: (buildingId: string, slug: string) => void;
+  /**
+   * Required: an "Existing properties" row the reader can click must go somewhere. It was
+   * optional, the review form never passed it, and the click did nothing for months.
+   */
+  onExistingBuildingSelect: (buildingId: string, slug: string) => void;
   onManualEntry?: () => void;
   placeholder?: string;
   initialValue?: string;
@@ -154,9 +158,7 @@ export default function AddressAutocomplete({
     setDbMatches([]);
     setPredictions([]);
 
-    if (onExistingBuildingSelect) {
-      onExistingBuildingSelect(match.id, match.slug);
-    }
+    onExistingBuildingSelect(match.id, match.slug);
   };
 
   const handleSelectPrediction = async (prediction: Prediction) => {

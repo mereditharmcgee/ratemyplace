@@ -1,5 +1,6 @@
 import type { APIContext } from 'astro';
 import { getEnv } from '../../../lib/runtime';
+import { rememberOAuthReturn, safeRedirectPath, signinErrorPath } from '../../../lib/authRedirect';
 
 // Initiates Google OAuth flow
 export async function GET(context: APIContext): Promise<Response> {
@@ -7,7 +8,9 @@ export async function GET(context: APIContext): Promise<Response> {
 
   if (!clientId) {
     console.error('GOOGLE_CLIENT_ID not configured');
-    return context.redirect('/auth/signin?error=oauth_not_configured');
+    return context.redirect(
+      signinErrorPath('oauth_not_configured', safeRedirectPath(context.url.searchParams.get('redirect')))
+    );
   }
 
   // Generate state for CSRF protection
@@ -21,6 +24,11 @@ export async function GET(context: APIContext): Promise<Response> {
     sameSite: 'lax',
     maxAge: 60 * 10 // 10 minutes
   });
+
+  // Where to land after the round trip. Its own cookie, scoped to /api/auth/google so only
+  // the callback sees it, leaves oauth_state and its comparison exactly as they were. An
+  // unsafe or missing path clears any stale one instead.
+  rememberOAuthReturn(context.cookies, context.url.searchParams.get('redirect'), import.meta.env.PROD);
 
   // Build Google OAuth URL
   const redirectUri = new URL('/api/auth/google/callback', context.url.origin).toString();

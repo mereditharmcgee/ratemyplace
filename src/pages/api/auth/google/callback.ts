@@ -3,6 +3,7 @@ import { initializeLucia } from '../../../../lib/auth';
 import { getDB } from '../../../../lib/db';
 import { getEnv } from '../../../../lib/runtime';
 import { generateIdFromEntropySize } from 'lucia';
+import { signinErrorPath, takeOAuthReturn } from '../../../../lib/authRedirect';
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -20,6 +21,10 @@ interface GoogleUserInfo {
 }
 
 export async function GET(context: APIContext): Promise<Response> {
+  // Read and delete the return path first, so every exit below (success or error) both
+  // honours it and leaves no cookie behind. Re-validated on the way out of the jar.
+  const returnTo = takeOAuthReturn(context.cookies);
+
   const code = context.url.searchParams.get('code');
   const state = context.url.searchParams.get('state');
   const error = context.url.searchParams.get('error');
@@ -27,21 +32,21 @@ export async function GET(context: APIContext): Promise<Response> {
   // Handle OAuth errors
   if (error) {
     console.error('Google OAuth error:', error);
-    return context.redirect('/auth/signin?error=oauth_denied');
+    return context.redirect(signinErrorPath('oauth_denied', returnTo));
   }
 
   // Verify state to prevent CSRF
   const storedState = context.cookies.get('oauth_state')?.value;
   if (!state || !storedState || state !== storedState) {
     console.error('OAuth state mismatch');
-    return context.redirect('/auth/signin?error=invalid_state');
+    return context.redirect(signinErrorPath('invalid_state', returnTo));
   }
 
   // Clear state cookie
   context.cookies.delete('oauth_state', { path: '/' });
 
   if (!code) {
-    return context.redirect('/auth/signin?error=no_code');
+    return context.redirect(signinErrorPath('no_code', returnTo));
   }
 
   const clientId = getEnv(context).GOOGLE_CLIENT_ID;
@@ -49,7 +54,7 @@ export async function GET(context: APIContext): Promise<Response> {
 
   if (!clientId || !clientSecret) {
     console.error('Google OAuth credentials not configured');
-    return context.redirect('/auth/signin?error=oauth_not_configured');
+    return context.redirect(signinErrorPath('oauth_not_configured', returnTo));
   }
 
   try {
@@ -71,7 +76,7 @@ export async function GET(context: APIContext): Promise<Response> {
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       console.error('Token exchange failed:', errorText);
-      return context.redirect('/auth/signin?error=token_exchange_failed');
+      return context.redirect(signinErrorPath('token_exchange_failed', returnTo));
     }
 
     const tokens: GoogleTokenResponse = await tokenResponse.json();
@@ -83,13 +88,13 @@ export async function GET(context: APIContext): Promise<Response> {
 
     if (!userInfoResponse.ok) {
       console.error('Failed to get user info');
-      return context.redirect('/auth/signin?error=userinfo_failed');
+      return context.redirect(signinErrorPath('userinfo_failed', returnTo));
     }
 
     const googleUser: GoogleUserInfo = await userInfoResponse.json();
 
     if (!googleUser.email) {
-      return context.redirect('/auth/signin?error=no_email');
+      return context.redirect(signinErrorPath('no_email', returnTo));
     }
 
     // Require a Google-verified email before trusting it. Google's userinfo can
@@ -98,7 +103,7 @@ export async function GET(context: APIContext): Promise<Response> {
     // — and take over — that victim's existing password account below, and would
     // seed new accounts with email_verified=1 they never proved.
     if (googleUser.email_verified !== true) {
-      return context.redirect('/auth/signin?error=unverified_email');
+      return context.redirect(signinErrorPath('unverified_email', returnTo));
     }
 
     const db = getDB(context);
@@ -118,7 +123,7 @@ export async function GET(context: APIContext): Promise<Response> {
       if (user) {
         // Check if account is already linked to a different Google account
         if (user.google_id && user.google_id !== googleUser.sub) {
-          return context.redirect('/auth/signin?error=account_conflict');
+          return context.redirect(signinErrorPath('account_conflict', returnTo));
         }
         // Link Google account to existing user
         await db.prepare(
@@ -149,9 +154,9 @@ export async function GET(context: APIContext): Promise<Response> {
 
     context.cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
 
-    return context.redirect('/');
+    return context.redirect(returnTo);
   } catch (error) {
     console.error('Google OAuth callback error:', error);
-    return context.redirect('/auth/signin?error=oauth_failed');
+    return context.redirect(signinErrorPath('oauth_failed', returnTo));
   }
 }
