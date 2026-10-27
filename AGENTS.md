@@ -252,7 +252,9 @@ Things that have already cost time. Read before debugging.
   npm advisory not listed in `audit-allowlist.json`; each entry carries the reason it does
   not apply to this deployment and an expiry date, after which CI fails again. Added
   2026-09-09 for the Astro AVIF advisory (GHSA-26w7-cxv4-gfx2), which needs Astro 7 to
-  fix. Never add an entry without a reason and a date.
+  fix; extended 2026-10-27 to 2027-06-30. Never add an entry without a reason and a date.
+  The Astro upgrade is not a version bump: Astro 6+ needs `@astrojs/cloudflare` 13+, which
+  dropped Cloudflare Pages, so it means moving the site to a Worker with static assets.
 - **There is a second deployable.** `workers/records-scheduler/` is a Cron Worker that runs
   the records queue; Pages has no cron triggers. Pushing `main` deploys the site and nothing
   else, so a change to `src/lib/records/scheduler.ts` or `queue.ts` is live in the admin
