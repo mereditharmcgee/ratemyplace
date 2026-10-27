@@ -95,6 +95,9 @@ suite('stored move-out round trip', () => {
     expect(await stored(db, id)).toEqual({ move_out_year_new: null, is_current_tenant: 0 });
   });
 
+  // This documents what the edit route does today, to show the NULL past-tenant state is
+  // reachable. It is not a requirement: dropping a stored move-out on a partial edit is a
+  // known gap, and a fix that keeps it should change this expectation.
   it('stores a past tenant with no move-out when an edit sends none', async () => {
     const db = schemaDb();
     await seed(db);
