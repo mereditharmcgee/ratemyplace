@@ -40,19 +40,26 @@ describe('getScoreTextColor', () => {
 });
 
 describe('getEarlyScoreTextColor', () => {
-  it('uses the same band boundaries as getScoreTextColor, one shade lighter', () => {
+  it('uses the same band boundaries as getScoreTextColor, one shade lighter where it reads on Paper', () => {
     expect(getEarlyScoreTextColor(4.5)).toBe('text-emerald-600');
     expect(getEarlyScoreTextColor(4)).toBe('text-emerald-600');
-    expect(getEarlyScoreTextColor(3.9)).toBe('text-amber-600');
-    expect(getEarlyScoreTextColor(3)).toBe('text-amber-600');
     expect(getEarlyScoreTextColor(2.9)).toBe('text-red-600');
     expect(getEarlyScoreTextColor(1.4)).toBe('text-red-600');
   });
 
+  // amber-600 is about 2.9:1 on the Paper page background (#F6F4EE), under the 3:1 large-text
+  // minimum, and the building page header sits on Paper. Mixed keeps the established shade;
+  // the lighter weight, count and label still mark the score as early.
+  it('keeps the Mixed band at amber-700', () => {
+    expect(getEarlyScoreTextColor(3.9)).toBe('text-amber-700');
+    expect(getEarlyScoreTextColor(3)).toBe('text-amber-700');
+    expect(getEarlyScoreTextColor(3.5)).toBe(getScoreTextColor(3.5));
+  });
+
   it('changes band exactly where getScoreTextColor does', () => {
+    const hue = (cls: string) => cls.replace(/-[67]00$/, '');
     for (const score of [1, 1.9, 2, 2.9, 3, 3.9, 4, 5]) {
-      const established = getScoreTextColor(score).replace('-700', '');
-      expect(getEarlyScoreTextColor(score).replace('-600', '')).toBe(established);
+      expect(hue(getEarlyScoreTextColor(score))).toBe(hue(getScoreTextColor(score)));
     }
   });
 });

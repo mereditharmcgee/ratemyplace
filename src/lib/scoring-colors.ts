@@ -24,11 +24,14 @@ export function getScoreTextColor(score: number): string {
 
 // Lighter shade of the same band for an early rating, a building score from fewer reviews
 // than NAMED_PARTY_MIN_REVIEWS (see earlyRating.ts). Same band boundaries as
-// getScoreTextColor, one step lighter, so the band still reads but the number carries less
-// weight. The 600 shades clear 3:1 on white, so use them for large text only (24px and up).
+// getScoreTextColor, one step lighter where that still reads on the Paper page background
+// (#F6F4EE): emerald-600 and red-600. Mixed stays amber-700, because amber-600 is about
+// 2.9:1 on Paper; the lighter weight, count and label still mark it early. These shades
+// clear 3:1 on Paper, white and the score tints, not 4.5:1, so use them for large text
+// only (24px and up).
 export function getEarlyScoreTextColor(score: number): string {
   if (score >= 4) return 'text-emerald-600';
-  if (score >= 3) return 'text-amber-600';
+  if (score >= 3) return 'text-amber-700';
   return 'text-red-600';
 }
 

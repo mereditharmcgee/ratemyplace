@@ -57,7 +57,8 @@ export function mapReviewLine(reviewCount: number): string {
 
 /**
  * Weight and colour classes for a headline score number. An early score keeps its band but
- * in a lighter shade and weight; an established one is unchanged. The caller adds the size,
+ * in a lighter weight, and a lighter shade where one still reads on Paper (see
+ * getEarlyScoreTextColor); an established one is unchanged. The caller adds the size,
  * which must stay 24px or larger for the lighter shade (see getEarlyScoreTextColor).
  */
 export function scoreNumberClass(score: number, reviewCount: number): string {

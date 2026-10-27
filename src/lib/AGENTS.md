@@ -55,8 +55,10 @@ Use the helpers — never hardcode a threshold or a color:
 - `getScoreTextColor(score)` → Tailwind class for a colored score number
 - `getScoreBgTint(score)` → soft-tinted background for score detail tiles
 - `getScoreHex(score)` / `SCORE_HEX` → hex for non-Tailwind contexts (Maps markers, OG images)
-- `getEarlyScoreTextColor(score)` → the same band one shade lighter, for an early rating;
-  large text (24px and up) only, since the lighter shades clear 3:1, not 4.5:1
+- `getEarlyScoreTextColor(score)` → the same band for an early rating, one shade lighter
+  where that still reads on Paper (emerald-600, red-600); Mixed stays amber-700 because
+  amber-600 is about 2.9:1 on Paper. Large text (24px and up) only, since these clear 3:1
+  on Paper, white and the score tints, not 4.5:1
 
 ### `earlyRating.ts` is how a thin score is displayed, not computed
 
