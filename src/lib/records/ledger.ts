@@ -36,6 +36,7 @@ import {
   showAllLabel,
   statusText,
   stillOpenLabel,
+  stillOpenSubCount,
   ticketLinesNote,
   yearSpanLabel,
   type PermitSummary,
@@ -277,7 +278,7 @@ function requestsSection(
     status,
     hasRows,
     count: countable ? String(rows.length) : NO_COUNT,
-    subCount: matchNote ? UNCERTAIN_MATCH_SUBCOUNT : countable ? openSubCount(open.length, rows.length) : '',
+    subCount: matchNote ? UNCERTAIN_MATCH_SUBCOUNT : countable ? stillOpenSubCount(open.length, rows.length) : '',
     span: countable ? yearSpanLabel(observedYears(years)) : null,
     note: null,
     // 311's cap applies before grouping, so every group carries the note when it bites.
@@ -393,6 +394,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
     status: permitStatus,
     hasRows: view.permits.length > 0,
     count: permitsCountable ? String(summary.count) : NO_COUNT,
+    // "N open", not "N still open": an open permit is an active permit.
     subCount: permitsCountable
       ? openSubCount(openPermits.length, summary.count) +
         (summary.declaredTotal === null ? '' : ` · ${formatDollarsCompact(summary.declaredTotal)} declared`)
@@ -438,7 +440,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
     subCount: enforcementMatchNote
       ? UNCERTAIN_MATCH_SUBCOUNT
       : enforcementCountable
-        ? openSubCount(openTickets, tickets.length)
+        ? stillOpenSubCount(openTickets, tickets.length)
         : '',
     span: enforcementCountable ? yearSpanLabel(observedYears(enforcementYears)) : null,
     note: enforcementCountable ? ticketLinesNote(view.enforcement.length, tickets.length) : null,
@@ -474,7 +476,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
     subCount: violationsMatchNote
       ? UNCERTAIN_MATCH_SUBCOUNT
       : violationsCountable
-        ? openSubCount(openCases, cases.length)
+        ? stillOpenSubCount(openCases, cases.length)
         : '',
     span: violationsCountable ? yearSpanLabel(observedYears(violationYears)) : null,
     note: violationsCountable ? caseLinesNote(view.violations.length, cases.length) : null,

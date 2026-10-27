@@ -1,0 +1,18 @@
+-- Records which parts of the optional move-in question a reviewer answered, so a skipped
+-- move-in is shown as blank instead of a made-up date.
+--
+-- reviews.move_in_year and reviews.move_in_season are NOT NULL (0001). Making them nullable
+-- would mean rebuilding the reviews table, so this adds one nullable column instead:
+--   'season_and_year'  month and year given (only the month's season is stored)
+--   'year_only'        year given, month skipped; move_in_season holds a placeholder
+--   'none'             skipped; both columns hold placeholders (winter, the current year)
+--   NULL               written before this column existed; shown as stored
+--
+-- Additive only: no default, so every existing review reads NULL and is shown exactly as
+-- before. It does not touch reviews.updated_at or buildings.updated_at.
+--
+-- Apply by hand, once, BEFORE the code that writes it deploys (see migrations/AGENTS.md):
+--   npx wrangler d1 execute ratemyplace-db --remote --file migrations/0034_review_move_in_given.sql
+-- SQLite has no ADD COLUMN IF NOT EXISTS. This file is one statement, so a second run fails
+-- with "duplicate column name: move_in_given" and changes nothing.
+ALTER TABLE reviews ADD COLUMN move_in_given TEXT CHECK (move_in_given IN ('season_and_year', 'year_only', 'none'));

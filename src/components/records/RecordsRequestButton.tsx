@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   FILL_QUEUED_COPY,
+  REFRESH_ALREADY_DONE_COPY,
+  REFRESH_BUTTON_LABEL,
+  REFRESH_REQUESTED_COPY,
   REQUESTED_COPY,
   REQUEST_ALREADY_PULLED_COPY,
   REQUEST_BUTTON_HELP,
@@ -15,6 +18,10 @@ import {
 // a widget. It posts the token to /api/records/request, which enqueues one pull for the
 // companion Worker. Every string comes from display.ts so the banned-words scan sees it.
 //
+// On a `stale` building (records in, newest pull over 30 days old) the same island is the
+// "Ask for newer records" button under the pull date. Only its words change: the press,
+// Turnstile and the POST are the same code path, and the route decides what the press does.
+//
 // Window.turnstile is declared once, ambiently, in src/env.d.ts, so this file uses it
 // without redeclaring it — as every other form that renders a widget explicitly does.
 // Never add a per-component `declare global` for it.
@@ -27,12 +34,20 @@ const POLL_TICKS = 100;
 
 interface Props {
   buildingId: string;
-  initialState: 'never_pulled' | 'fill_queued';
+  initialState: 'never_pulled' | 'fill_queued' | 'stale';
 }
 
 type Phase = 'idle' | 'verifying' | 'sending' | 'requested' | 'already_pulled';
 
+/** The words each page state gives the island. Only `stale` differs, and only in its copy. */
+function copyFor(initialState: Props['initialState']) {
+  return initialState === 'stale'
+    ? { label: REFRESH_BUTTON_LABEL, help: null, requested: REFRESH_REQUESTED_COPY, alreadyPulled: REFRESH_ALREADY_DONE_COPY }
+    : { label: REQUEST_BUTTON_LABEL, help: REQUEST_BUTTON_HELP, requested: REQUESTED_COPY, alreadyPulled: REQUEST_ALREADY_PULLED_COPY };
+}
+
 export default function RecordsRequestButton({ buildingId, initialState }: Props) {
+  const copy = copyFor(initialState);
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
   const turnstileRef = useRef<HTMLDivElement>(null);
@@ -201,8 +216,8 @@ export default function RecordsRequestButton({ buildingId, initialState }: Props
   const busy = phase === 'verifying' || phase === 'sending';
   const statusText = terminal
     ? phase === 'requested'
-      ? REQUESTED_COPY
-      : REQUEST_ALREADY_PULLED_COPY
+      ? copy.requested
+      : copy.alreadyPulled
     : busy
       ? REQUEST_VERIFYING_COPY
       : '';
@@ -210,9 +225,9 @@ export default function RecordsRequestButton({ buildingId, initialState }: Props
   return (
     <div>
       {!terminal && initialState === 'fill_queued' && <p className="text-sm text-gray-600">{FILL_QUEUED_COPY}</p>}
-      {!terminal && (
+      {!terminal && copy.help && (
         <p className={`text-sm text-gray-600 ${initialState === 'fill_queued' ? 'mt-1' : ''}`}>
-          {REQUEST_BUTTON_HELP}
+          {copy.help}
         </p>
       )}
       {/* Disabled rather than unmounted while the request is in flight: unmounting the control
@@ -227,9 +242,9 @@ export default function RecordsRequestButton({ buildingId, initialState }: Props
             awaitingTokenRef.current = true;
             setPhase('verifying');
           }}
-          className="mt-3 inline-flex min-h-[44px] items-center rounded-[4px] border border-teal-700 px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 disabled:opacity-60"
+          className={`${copy.help ? 'mt-3' : 'mt-2'} inline-flex min-h-[44px] items-center rounded-[4px] border border-teal-700 px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 disabled:opacity-60`}
         >
-          {REQUEST_BUTTON_LABEL}
+          {copy.label}
         </button>
       )}
       {/* One live region for the whole island, always mounted: a paragraph that appears at the

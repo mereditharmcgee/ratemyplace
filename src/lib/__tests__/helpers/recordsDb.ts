@@ -103,6 +103,8 @@ export function createRecordsStubDb(): TestD1Database {
  * above stands in for, so the stub has to exist before this runs — `createRecordsTestDb`
  * is the only correct order. The other two indexes are over tables 0029 and 0031 create.
  * 0033's index is over `records_queue`, which 0031 creates, so it follows for the same reason.
+ * 0034's `building_owners` references `buildings`, which the stub creates. A test that needs
+ * the database as it was before 0034 ran drops the table after this.
  */
 export function applyRecordsMigrations(db: TestD1Database): void {
   for (const file of [
@@ -111,6 +113,7 @@ export function applyRecordsMigrations(db: TestD1Database): void {
     '0031_boston_coverage.sql',
     '0032_records_queue_indexes.sql',
     '0033_records_queue_reason_requested.sql',
+    '0034_building_owners.sql',
   ]) {
     db.exec(readFileSync(join(process.cwd(), 'migrations', file), 'utf8'));
   }
@@ -210,20 +213,22 @@ export async function insertBuilding(db: TestD1Database, overrides: Partial<Buil
  * A finished pull row for one source, so the coverage reads can see it. The id folds in
  * `status` so one building can hold both an `ok` and an `error` row for the same source.
  * `trigger_reason` is fixed: nothing asserts it, and any value the union allows will do.
+ * `retrievedAt` (unix seconds) defaults to the column's own `unixepoch()`, a fresh pull.
  */
 export async function insertPull(
   db: TestD1Database,
   buildingId: string,
   sourceId: string,
   status: 'ok' | 'empty' | 'error' = 'ok',
+  retrievedAt?: number,
 ): Promise<void> {
   await db
     .prepare(
       'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, ' +
-        'row_count, error_message, triggered_by, correction_id, trigger_reason) ' +
-        "VALUES (?, ?, 'boston', ?, 'label', 'q', ?, 0, NULL, NULL, NULL, 'admin')",
+        'row_count, error_message, triggered_by, correction_id, trigger_reason, retrieved_at) ' +
+        "VALUES (?, ?, 'boston', ?, 'label', 'q', ?, 0, NULL, NULL, NULL, 'admin', COALESCE(?, unixepoch()))",
     )
-    .bind(`${buildingId}-${sourceId}-${status}`, buildingId, sourceId, status)
+    .bind(`${buildingId}-${sourceId}-${status}`, buildingId, sourceId, status, retrievedAt ?? null)
     .run();
 }
 

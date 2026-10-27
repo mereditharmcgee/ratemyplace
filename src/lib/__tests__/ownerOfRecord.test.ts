@@ -1,0 +1,233 @@
+import { describe, it, expect } from 'vitest';
+import {
+  MIN_PARCELS_FOR_PERSON,
+  isEntityOwner,
+  isResidentialAssessment,
+  linkableOwnerKey,
+  ownerKey,
+  ownerRowFromAssessment,
+} from '../records/ownerOfRecord';
+import { showMailingAddress } from '../records/display';
+
+describe('ownerKey', () => {
+  it('normalizes case, spacing and punctuation, nothing else', () => {
+    expect(ownerKey('  Example Realty,  L.P. ')).toBe('EXAMPLE REALTY LP');
+    expect(ownerKey('EXAMPLE REALTY LP')).toBe('EXAMPLE REALTY LP');
+    expect(ownerKey('Sample Holdings L.L.C.')).toBe('SAMPLE HOLDINGS LLC');
+    expect(ownerKey('SAMPLE HOLDINGS LLC')).toBe('SAMPLE HOLDINGS LLC');
+    expect(ownerKey('Doe, Jane')).toBe('DOE JANE');
+  });
+
+  it('keeps a different recorded spelling as a different owner', () => {
+    expect(ownerKey('12 EXAMPLE ROAD LLC')).not.toBe(ownerKey('12 EXAMPLE RD LLC'));
+    expect(ownerKey('EXAMPLE PROPERTIES')).not.toBe(ownerKey('EXAMPLE PROPERTIES INC'));
+  });
+
+  it('is null for a blank or missing name', () => {
+    expect(ownerKey(null)).toBeNull();
+    expect(ownerKey(undefined)).toBeNull();
+    expect(ownerKey('')).toBeNull();
+    expect(ownerKey(' . , ')).toBeNull();
+  });
+});
+
+describe('isEntityOwner', () => {
+  it.each([
+    'SAMPLE HOLDINGS LLC',
+    'EXAMPLE REALTY LP',
+    'EXAMPLE PARTNERS LLP',
+    'EXAMPLE WIDGETS INC',
+    'EXAMPLE CORP',
+    'EXAMPLE REALTY TRUST',
+    'EXAMPLE REALTY TR',
+    'EXAMPLE HOLDINGS TRUST',
+    'EXAMPLE MANAGEMENT TRUST',
+    'EXAMPLE CONDOMINIUM TRUST',
+    'EXAMPLE REALTY',
+    'EXAMPLE ASSOCIATES',
+    'EXAMPLE PROPERTIES',
+    'EXAMPLE MANAGEMENT',
+    'EXAMPLE MGMT',
+    'EXAMPLE COMPANY',
+    'Example Realty, L.P.',
+  ])('treats %s as an entity', (name) => {
+    expect(isEntityOwner(name)).toBe(true);
+  });
+
+  it.each([
+    'DOE JANE',
+    'DOE JANE TR',
+    'DOE JOHN TRUSTEE',
+    'PRINCE JOHN',
+    'CHURCH MARY E',
+  ])('treats %s as a person', (name) => {
+    expect(isEntityOwner(name)).toBe(false);
+  });
+
+  // Many owner-occupied homes are held in a family, nominee or revocable trust, so a name
+  // whose only entity words are TRUST, FAMILY, NOMINEE or a trustee suffix is a person here.
+  it.each([
+    'DOE FAMILY TRUST',
+    'DOE FAMILY TR',
+    'Doe Family Trust',
+    'DOE JANE REVOCABLE TRUST',
+    'DOE JANE TRUSTEE OF THE DOE TRUST',
+    'THE DOE 2019 IRREVOCABLE TRUST',
+    '12 EXAMPLE RD NOMINEE TRUST',
+    'DOE NOMINEE TRS',
+    'EXAMPLE TRUST',
+  ])('treats the personal trust %s as a person', (name) => {
+    expect(isEntityOwner(name)).toBe(false);
+  });
+
+  it('matches whole words only', () => {
+    expect(isEntityOwner('MANAGEMENTSON JANE')).toBe(false);
+    expect(isEntityOwner('LTDOVICH JANE')).toBe(false);
+  });
+
+  it('keeps every other name the mailing-address gate calls an entity', () => {
+    for (const name of ['SAMPLE HOLDINGS LLC', 'EXAMPLE HOUSING AUTHORITY', 'EXAMPLE UNIVERSITY', 'CITY OF EXAMPLE', 'EXAMPLE REALTY TRUST']) {
+      expect(showMailingAddress(name)).toBe(true);
+      expect(isEntityOwner(name)).toBe(true);
+    }
+  });
+
+  it('never calls a name an entity that the gate and the link-only words both refuse', () => {
+    for (const name of ['DOE JANE', 'DOE JANE TR', 'PRINCE JOHN', 'CHURCH MARY E']) {
+      expect(showMailingAddress(name)).toBe(false);
+      expect(isEntityOwner(name)).toBe(false);
+    }
+    // Taking a trust word out cannot join the words either side into an entity phrase.
+    expect(showMailingAddress('EXAMPLE CITY TRUST OF DOE')).toBe(true);
+    expect(isEntityOwner('EXAMPLE CITY TRUST OF DOE')).toBe(false);
+  });
+
+  it('leaves the mailing-address gate as it was for a personal trust', () => {
+    // The person rule for trusts is about linking only. Which tax mailing addresses show is
+    // the gate's decision, and this rule does not move it.
+    expect(showMailingAddress('DOE FAMILY TRUST')).toBe(true);
+    expect(showMailingAddress('DOE FAMILY TR')).toBe(true);
+    expect(showMailingAddress('DOE JANE TR')).toBe(false);
+  });
+
+  it('does not widen the mailing-address gate', () => {
+    // A link-only token makes a name linkable without publishing its tax mailing address.
+    expect(isEntityOwner('EXAMPLE MANAGEMENT')).toBe(true);
+    expect(showMailingAddress('EXAMPLE MANAGEMENT')).toBe(false);
+  });
+});
+
+describe('isResidentialAssessment', () => {
+  it.each([
+    ['R1', null],
+    ['R2', null],
+    ['R3', 'THREE-FAM DWELLING'],
+    ['R4', null],
+    ['RC', null],
+    ['A', 'APT 7-30 UNITS'],
+    ['a', 'apt 31-99 units'],
+  ])('counts land use %s (%s) as residential', (landUse, landUseDescription) => {
+    expect(isResidentialAssessment({ landUse, landUseDescription })).toBe(true);
+  });
+
+  it.each([
+    ['A', 'DORMITORY bd'],
+    ['A', null],
+    ['C', 'COMMERCIAL'],
+    ['CD', 'RESIDENTIAL CONDO'],
+    ['E', 'EXEMPT'],
+    [null, null],
+  ])('does not count land use %s (%s)', (landUse, landUseDescription) => {
+    expect(isResidentialAssessment({ landUse, landUseDescription })).toBe(false);
+  });
+});
+
+describe('linkableOwnerKey', () => {
+  const entity = { owner: 'Sample Holdings, L.L.C.', condominium: false };
+  const person = { owner: 'DOE JANE', condominium: false };
+
+  it('links an entity owner whatever the parcel count', () => {
+    expect(linkableOwnerKey(entity, 0)).toBe('SAMPLE HOLDINGS LLC');
+    expect(linkableOwnerKey(entity, 1)).toBe('SAMPLE HOLDINGS LLC');
+  });
+
+  it('links a person only at two or more residential parcels', () => {
+    expect(MIN_PARCELS_FOR_PERSON).toBe(2);
+    expect(linkableOwnerKey(person, 0)).toBeNull();
+    expect(linkableOwnerKey(person, 1)).toBeNull();
+    expect(linkableOwnerKey(person, 2)).toBe('DOE JANE');
+  });
+
+  it('holds a personal trust to the person rule, and links a business trust at any count', () => {
+    const familyTrust = { owner: 'Doe Family Trust', condominium: false };
+    expect(linkableOwnerKey(familyTrust, 0)).toBeNull();
+    expect(linkableOwnerKey(familyTrust, 1)).toBeNull();
+    expect(linkableOwnerKey(familyTrust, 2)).toBe('DOE FAMILY TRUST');
+    expect(linkableOwnerKey({ owner: '12 EXAMPLE RD NOMINEE TRUST', condominium: false }, 1)).toBeNull();
+    expect(linkableOwnerKey({ owner: 'EXAMPLE REALTY TRUST', condominium: false }, 0)).toBe('EXAMPLE REALTY TRUST');
+  });
+
+  it('never links a condominium parcel, which shows no single owner', () => {
+    expect(linkableOwnerKey({ ...entity, condominium: true }, 5)).toBeNull();
+    expect(linkableOwnerKey({ ...person, condominium: true }, 5)).toBeNull();
+  });
+
+  it('never links a missing owner', () => {
+    expect(linkableOwnerKey({ owner: null, condominium: false }, 5)).toBeNull();
+    expect(linkableOwnerKey({ owner: '  ', condominium: false }, 5)).toBeNull();
+  });
+
+  it('gates a typed key the same way, since a key normalizes to itself', () => {
+    for (const name of ['Sample Holdings, L.L.C.', 'Example Realty, L.P.', 'Doe, Jane']) {
+      const key = ownerKey(name);
+      expect(ownerKey(key)).toBe(key);
+    }
+    const typedPerson = { owner: 'doe jane', condominium: false };
+    expect(linkableOwnerKey(typedPerson, 1)).toBeNull();
+    expect(linkableOwnerKey(typedPerson, 2)).toBe('DOE JANE');
+    expect(linkableOwnerKey({ owner: 'sample holdings llc', condominium: false }, 0)).toBe('SAMPLE HOLDINGS LLC');
+  });
+});
+
+describe('ownerRowFromAssessment', () => {
+  const assessment = {
+    fiscalYear: 'FY2026',
+    parcelId: '0100001000',
+    owner: '  Example Realty, L.P. ',
+    condominium: false,
+    landUse: 'R3',
+    landUseDescription: 'THREE-FAM DWELLING',
+  };
+
+  it('keeps the owner as recorded beside its key and both flags', () => {
+    expect(ownerRowFromAssessment('b-1', assessment)).toEqual({
+      buildingId: 'b-1',
+      fiscalYear: 'FY2026',
+      parcelId: '0100001000',
+      owner: 'Example Realty, L.P.',
+      ownerKey: 'EXAMPLE REALTY LP',
+      isEntity: 1,
+      residential: 1,
+    });
+    expect(ownerRowFromAssessment('b-2', { ...assessment, owner: 'DOE JANE', landUse: 'C', landUseDescription: 'COMMERCIAL' })).toMatchObject({
+      ownerKey: 'DOE JANE',
+      isEntity: 0,
+      residential: 0,
+    });
+    expect(ownerRowFromAssessment('b-3', { ...assessment, owner: 'DOE FAMILY TRUST' })).toMatchObject({
+      ownerKey: 'DOE FAMILY TRUST',
+      isEntity: 0,
+      residential: 1,
+    });
+  });
+
+  it('has no row for a condominium or a blank owner', () => {
+    expect(ownerRowFromAssessment('b-1', { ...assessment, condominium: true })).toBeNull();
+    expect(ownerRowFromAssessment('b-1', { ...assessment, owner: null })).toBeNull();
+    expect(ownerRowFromAssessment('b-1', { ...assessment, owner: ' , ' })).toBeNull();
+  });
+
+  it('stores a blank parcel id as null, so the person rule never counts it', () => {
+    expect(ownerRowFromAssessment('b-1', { ...assessment, parcelId: '  ' })?.parcelId).toBeNull();
+  });
+});

@@ -1,0 +1,43 @@
+---
+// Owner-of-record names that match a landlord search, each linking to its owner of record list.
+// Server-rendered under the search results: the names come from the City of Boston assessor
+// through `building_owners`, they are a different thing from the landlords reviewers named, and
+// they carry no score. Which names may appear is decided in `searchOwnerNames`
+// (`lib/records/ownerList.ts`), never here.
+import {
+  OWNER_OF_RECORD_LABEL,
+  OWNER_SEARCH_NOTE,
+  ownerBuildingCountText,
+  ownerSearchMoreText,
+} from '../../lib/records/display';
+import { ownerListHref, type OwnerNameMatch } from '../../lib/records/ownerList';
+
+interface Props {
+  matches: OwnerNameMatch[];
+  total: number;
+}
+
+const { matches, total } = Astro.props;
+---
+
+{matches.length > 0 && (
+  <section class="mb-10 lg:max-w-3xl" aria-labelledby="owner-of-record-matches">
+    <h2 id="owner-of-record-matches" class="text-xl font-semibold text-gray-900">{OWNER_OF_RECORD_LABEL} ({total})</h2>
+    <p class="mt-1 mb-4 text-sm text-gray-600">{OWNER_SEARCH_NOTE}</p>
+    <ul class="grid gap-4">
+      {matches.map((match) => (
+        <li>
+          <a
+            href={ownerListHref(match.key)}
+            class="block bg-white border border-gray-200 rounded-[6px] p-6 hover:shadow-md transition-shadow">
+            <h3 class="text-lg font-semibold text-gray-900 break-words">{match.owner}</h3>
+            <p class="text-gray-600">{ownerBuildingCountText(match.buildings)}</p>
+          </a>
+        </li>
+      ))}
+    </ul>
+    {total > matches.length && (
+      <p class="mt-3 text-sm text-gray-500">{ownerSearchMoreText(matches.length, total)}</p>
+    )}
+  </section>
+)}

@@ -528,6 +528,33 @@ suite('admin records queue routes', () => {
       expect(await pendingReasons(db, 'never')).toEqual(['follower']);
     });
 
+    it('counts an old pull and a pull being refreshed as already pulled, and queues neither', async () => {
+      const db = createRecordsTestDb();
+      const old = Math.floor(Date.now() / 1000) - 45 * 86_400;
+      // Records in, more than 30 days old: `stale` to the panel, still "already pulled" here.
+      await insertBuilding(db, { id: 'old', parcel_id: '2102098010' });
+      await reviewed(db, 'old');
+      await insertPull(db, 'old', DEEPER_SOURCE_IDS[0], 'ok', old);
+      // Records in, with a refresh row pending: `refresh_requested` to the panel.
+      await insertBuilding(db, { id: 'refreshing', parcel_id: '2102098011' });
+      await reviewed(db, 'refreshing');
+      await insertPull(db, 'refreshing', DEEPER_SOURCE_IDS[0], 'ok', old);
+      await db
+        .prepare("INSERT INTO records_queue (building_id, reason, priority, requested_at) VALUES ('refreshing', 'refresh', 1, ?)")
+        .bind(NOW)
+        .run();
+
+      const response = await BACKFILL(createContext(db, { body: {} }));
+      expect(await data<RecordsQueueBackfillResult>(response)).toEqual({
+        enqueued: 0,
+        skipped: 2,
+        examined: 2,
+        skippedByState: { pulled: 2 },
+      });
+      expect(await pendingReasons(db, 'old')).toEqual([]);
+      expect(await pendingReasons(db, 'refreshing')).toEqual(['refresh']);
+    });
+
     it('queues a reviewed Boston building with no parcel, since the pull resolves the parcel itself', async () => {
       const db = createRecordsTestDb();
       // The common reviewed building: a Google Places row with no parcel yet.

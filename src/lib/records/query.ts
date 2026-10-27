@@ -160,6 +160,14 @@ function byDateDesc<T>(dateOf: (row: T) => string | null, keyOf: (row: T) => str
   };
 }
 
+/**
+ * Newest fiscal year first. Two assessor rows can share a fiscal year (a condo parcel and its
+ * master parcel); the parcel id breaks that tie so the panel's 'current' row is not
+ * engine-order luck. Shared with `getCurrentAssessment`, so the building page reads the same
+ * row the facts strip shows.
+ */
+const byAssessmentOrder = byDateDesc<AssessmentPayload>((r) => r.fiscalYear, (r) => r.parcelId ?? '');
+
 interface PullRow {
   source_id: string;
   source_label: string;
@@ -192,9 +200,121 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
 
   if (pulls.results.length === 0) return null;
 
+  const recordRows = await db
+    .prepare('SELECT kind, payload FROM building_records WHERE building_id = ? ORDER BY kind, source_key')
+    .bind(buildingId)
+    .all<RecordRowStorage>();
+
+  const correctionRows = await db
+    .prepare(
+      "SELECT record_kind, resolved_at, resolution_notes FROM record_corrections " +
+        "WHERE building_id = ? AND status = 'resolved' AND resolution = 'source_mismatch_noted' AND resolution_notes IS NOT NULL " +
+        'ORDER BY resolved_at DESC, rowid DESC',
+    )
+    .bind(buildingId)
+    .all<CorrectionRow>();
+
+  // The building's own address, for the match-confidence note. A failed read costs the panel
+  // only that note, never the records.
+  let address: string | null = null;
+  try {
+    const building = await db
+      .prepare('SELECT address FROM buildings WHERE id = ?')
+      .bind(buildingId)
+      .first<{ address: string | null }>();
+    address = building?.address ?? null;
+  } catch (error) {
+    logError('building_records_match_confidence_failed', {
+      buildingId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  return assembleRecordsView(buildingId, pulls.results, recordRows.results, correctionRows.results, address);
+}
+
+/** The most buildings `getRecordsViews` reads at once: well under D1's 100 bound parameters with the kinds added. */
+export const MAX_VIEWS_PER_READ = 50;
+
+/**
+ * The panel's view for several buildings at once, for a list that shows each one's record
+ * counts (the owner of record list). Two statements for the whole list rather than three per
+ * building: every pull row of the given buildings, then their stored rows of the given kinds.
+ * Each view is assembled exactly as `getBuildingRecords` assembles one, so a count read off it
+ * through `ledgerModel` is the count the building's own panel shows. Corrections are not read:
+ * they annotate rows, they never change a count. A building with no pull row has no entry,
+ * which is `getBuildingRecords` answering null.
+ */
+export async function getRecordsViews(
+  db: RecordsDb,
+  buildingIds: readonly string[],
+  kinds: readonly RecordKind[],
+): Promise<Map<string, BuildingRecordsView>> {
+  const views = new Map<string, BuildingRecordsView>();
+  const ids = Array.from(new Set(buildingIds));
+  if (ids.length === 0) return views;
+  if (ids.length > MAX_VIEWS_PER_READ) throw new Error(`getRecordsViews reads at most ${MAX_VIEWS_PER_READ} buildings at once`);
+  const idList = ids.map(() => '?').join(',');
+
+  const pulls = await db
+    .prepare(
+      `SELECT building_id, source_id, source_label, status, error_message, retrieved_at FROM record_pulls WHERE building_id IN (${idList}) ` +
+        'ORDER BY building_id, retrieved_at ASC, rowid ASC',
+    )
+    .bind(...ids)
+    .all<PullRow & { building_id: string }>();
+  if (pulls.results.length === 0) return views;
+
+  const records =
+    kinds.length === 0
+      ? { results: [] as Array<RecordRowStorage & { building_id: string }> }
+      : await db
+          .prepare(
+            `SELECT building_id, kind, payload FROM building_records WHERE building_id IN (${idList}) ` +
+              `AND kind IN (${kinds.map(() => '?').join(',')}) ORDER BY building_id, kind, source_key`,
+          )
+          .bind(...ids, ...kinds)
+          .all<RecordRowStorage & { building_id: string }>();
+
+  const pullsById = groupBy(pulls.results, (row) => row.building_id);
+  const recordsById = groupBy(records.results, (row) => row.building_id);
+  for (const id of ids) {
+    const buildingPulls = pullsById.get(id);
+    if (!buildingPulls) continue;
+    const view = assembleRecordsView(id, buildingPulls, recordsById.get(id) ?? [], [], null);
+    if (view) views.set(id, view);
+  }
+  return views;
+}
+
+function groupBy<T>(rows: readonly T[], keyOf: (row: T) => string): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    const group = groups.get(key);
+    if (group) group.push(row);
+    else groups.set(key, [row]);
+  }
+  return groups;
+}
+
+/**
+ * Stored rows to the typed, validated view. `pulls` must be oldest first with rowid breaking a
+ * tie, and `recordRows` ordered by kind and source key, as both readers above select them.
+ */
+function assembleRecordsView(
+  buildingId: string,
+  pulls: readonly PullRow[],
+  recordRows: readonly RecordRowStorage[],
+  correctionRows: readonly CorrectionRow[],
+  /** The building's address for the match-confidence note, or null to show none. */
+  address: string | null,
+): BuildingRecordsView | null {
+  if (pulls.length === 0) return null;
+
   let pulledAt = 0;
   const sources: Record<string, SourceStatus> = {};
-  for (const row of pulls.results) {
+  for (const row of pulls) {
     if (row.retrieved_at > pulledAt) pulledAt = row.retrieved_at;
     const existing = sources[row.source_id];
     if (!existing || row.retrieved_at >= existing.retrievedAt) {
@@ -218,12 +338,7 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
   const rentsmart: RentSmartPayload[] = [];
   const invalidKinds = new Set<RecordKind>();
 
-  const recordRows = await db
-    .prepare('SELECT kind, payload FROM building_records WHERE building_id = ? ORDER BY kind, source_key')
-    .bind(buildingId)
-    .all<RecordRowStorage>();
-
-  for (const row of recordRows.results) {
+  for (const row of recordRows) {
     let parsed: unknown;
     try {
       parsed = JSON.parse(row.payload);
@@ -282,49 +397,24 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
     logError('building_record_invalid_payload', { buildingId, kind });
   }
 
-  // Two assessor rows can share a fiscal year (a condo parcel and its master parcel);
-  // the parcel id breaks that tie so the panel's 'current' row is not engine-order luck.
-  assessments.sort(byDateDesc((r) => r.fiscalYear, (r) => r.parcelId ?? ''));
+  assessments.sort(byAssessmentOrder);
   permits.sort(byDateDesc((r) => r.issuedDate, (r) => r.permitNumber));
   violations.sort(byDateDesc((r) => r.statusDate, (r) => r.caseNumber));
   enforcement.sort(byDateDesc((r) => r.statusDate, (r) => r.caseNumber));
   serviceRequests.sort(byDateDesc((r) => r.openedAt, (r) => r.caseId));
   rentsmart.sort(byDateDesc((r) => r.date, (r) => r.rowId));
 
-  const correctionRows = await db
-    .prepare(
-      "SELECT record_kind, resolved_at, resolution_notes FROM record_corrections " +
-        "WHERE building_id = ? AND status = 'resolved' AND resolution = 'source_mismatch_noted' AND resolution_notes IS NOT NULL " +
-        'ORDER BY resolved_at DESC, rowid DESC',
-    )
-    .bind(buildingId)
-    .all<CorrectionRow>();
-
-  const corrections: CorrectionNote[] = correctionRows.results.map((row) => ({
+  const corrections: CorrectionNote[] = correctionRows.map((row) => ({
     recordKind: row.record_kind,
     resolvedAt: row.resolved_at,
     notes: row.resolution_notes,
   }));
 
-  // The building's own address, for the match-confidence note. A failed read costs the panel
-  // only that note, never the records.
-  let matchUncertainty: RecordsMatchUncertainty | null = null;
-  try {
-    const building = await db
-      .prepare('SELECT address FROM buildings WHERE id = ?')
-      .bind(buildingId)
-      .first<{ address: string | null }>();
-    const current = assessments[0] ?? null;
-    matchUncertainty = recordsMatchUncertainty({
-      address: building?.address ?? null,
-      current: current && !current.condominium ? current : null,
-    });
-  } catch (error) {
-    logError('building_records_match_confidence_failed', {
-      buildingId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  const current = assessments[0] ?? null;
+  const matchUncertainty: RecordsMatchUncertainty | null =
+    address === null
+      ? null
+      : recordsMatchUncertainty({ address, current: current && !current.condominium ? current : null });
 
   return {
     pulledAt,
@@ -339,4 +429,31 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
     corrections,
     matchUncertainty,
   };
+}
+
+/**
+ * The building's current assessor record, the row the facts strip shows, or null when none is
+ * stored or none validates. For the building page's own details, which sit outside the panel:
+ * it reads only the assessment rows, and an unreadable payload is skipped here (the panel's
+ * own read logs it).
+ */
+export async function getCurrentAssessment(db: RecordsDb, buildingId: string): Promise<AssessmentPayload | null> {
+  const rows = await db
+    .prepare("SELECT payload FROM building_records WHERE building_id = ? AND kind = 'assessment'")
+    .bind(buildingId)
+    .all<{ payload: string }>();
+
+  const assessments: AssessmentPayload[] = [];
+  for (const row of rows.results) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(row.payload);
+    } catch {
+      continue;
+    }
+    const payload = validatePayload('assessment', parsed);
+    if (payload !== null) assessments.push(payload);
+  }
+  assessments.sort(byAssessmentOrder);
+  return assessments[0] ?? null;
 }

@@ -36,6 +36,14 @@ export interface Building {
 
 export type Season = 'winter' | 'spring' | 'summer' | 'fall';
 
+/**
+ * Which parts of the optional move-in question a reviewer answered (`reviews.move_in_given`,
+ * migration 0035). `move_in_year` and `move_in_season` are NOT NULL, so a part the reviewer
+ * skipped still holds a placeholder there; this says which stored values were given.
+ * NULL on reviews written before the column existed: those are shown as stored.
+ */
+export type MoveInGiven = 'season_and_year' | 'year_only' | 'none';
+
 export type UnitType = 'studio' | '1br' | '2br' | '3br' | '4br+' | 'house';
 
 export type ReviewStatus = 'pending' | 'approved' | 'rejected' | 'flagged';
@@ -47,6 +55,7 @@ export interface Review {
 
   move_in_year: number;
   move_in_season: Season;
+  move_in_given?: MoveInGiven | null;
   move_out_year_new?: string;
   move_out_season?: Season;
   is_current_tenant: boolean;

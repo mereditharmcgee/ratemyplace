@@ -1,0 +1,36 @@
+---
+// The owner of record list: `/owner-of-record?name=<owner key>&page=<n>`. Linked from the
+// records panel's owner of record; landlord search links here too. noindex and out of the
+// sitemap (`pageIndexing.test.ts`): it is a view of assessor data, not a page to rank.
+//
+// The rules live in `lib/records/ownerList.ts`. A name the rules do not allow (a person with
+// fewer than two residential parcels here), a name with no buildings, a blank name and a
+// failed read all get the site's ordinary 404, so the URL cannot be used to learn whether a
+// private person owns a property.
+import BaseLayout from '../components/layout/BaseLayout.astro';
+import OwnerList from '../components/records/OwnerList.astro';
+import { loadOwnerList } from '../lib/records/ownerList';
+import { OWNER_OF_RECORD_LABEL, OWNER_LIST_INTRO } from '../lib/records/display';
+
+const name = Astro.url.searchParams.get('name');
+const requestedPage = Number.parseInt(Astro.url.searchParams.get('page') ?? '1', 10);
+
+const result = await loadOwnerList(Astro.locals.runtime.env.DB, name, requestedPage, new Date());
+if (!result.found) {
+  return Astro.rewrite('/404');
+}
+const pageTitle = `${result.owner}, ${OWNER_OF_RECORD_LABEL}`;
+---
+
+<BaseLayout title={pageTitle} description={OWNER_LIST_INTRO} noindex>
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <OwnerList
+      ownerKey={result.key}
+      owner={result.owner}
+      total={result.total}
+      page={result.page}
+      pageCount={result.pageCount}
+      buildings={result.buildings}
+    />
+  </div>
+</BaseLayout>

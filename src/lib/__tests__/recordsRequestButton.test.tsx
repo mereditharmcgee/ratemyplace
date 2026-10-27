@@ -4,8 +4,12 @@ import userEvent from '@testing-library/user-event';
 import RecordsRequestButton from '../../components/records/RecordsRequestButton';
 import {
   FILL_QUEUED_COPY,
+  REFRESH_ALREADY_DONE_COPY,
+  REFRESH_BUTTON_LABEL,
+  REFRESH_REQUESTED_COPY,
   REQUESTED_COPY,
   REQUEST_ALREADY_PULLED_COPY,
+  REQUEST_BUTTON_HELP,
   REQUEST_BUTTON_LABEL,
   REQUEST_FAILED_COPY,
   REQUEST_VERIFYING_COPY,
@@ -313,5 +317,79 @@ describe('RecordsRequestButton', () => {
     expect((screen.getByRole('button', { name: REQUEST_BUTTON_LABEL }) as HTMLButtonElement).disabled).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
     vi.useRealTimers();
+  });
+});
+
+/**
+ * The same island on a building whose records are in and over 30 days old. Only the words
+ * change; the press, the widget and the POST are the never-pulled path, pinned above.
+ */
+describe('RecordsRequestButton on a stale building', () => {
+  const pressRefresh = () => userEvent.click(screen.getByRole('button', { name: REFRESH_BUTTON_LABEL }));
+
+  it('renders "Ask for newer records" with no help line and no fill line', () => {
+    render(<RecordsRequestButton buildingId="b1" initialState="stale" />);
+    expect(screen.getByRole('button', { name: REFRESH_BUTTON_LABEL })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: REQUEST_BUTTON_LABEL })).toBeNull();
+    expect(screen.queryByText(REQUEST_BUTTON_HELP)).toBeNull();
+    expect(screen.queryByText(FILL_QUEUED_COPY)).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('');
+  });
+
+  it('posts the same body to the same route, once, and says a new pull is queued', async () => {
+    stubTurnstile('tok');
+    const fetchMock = vi.fn(async () => jsonResponse(202, { data: { status: 'queued' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RecordsRequestButton buildingId="b1" initialState="stale" />);
+
+    await pressRefresh();
+
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe(REFRESH_REQUESTED_COPY));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api/records/request');
+    expect(JSON.parse(String(init.body))).toEqual({ buildingId: 'b1', turnstileToken: 'tok' });
+    expect(screen.queryByRole('button', { name: REFRESH_BUTTON_LABEL })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('status'));
+    expect(window.turnstile?.remove).toHaveBeenCalledWith('widget-1');
+  });
+
+  it('treats already_queued like queued', async () => {
+    stubTurnstile();
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(202, { data: { status: 'already_queued' } })));
+    render(<RecordsRequestButton buildingId="b1" initialState="stale" />);
+    await pressRefresh();
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe(REFRESH_REQUESTED_COPY));
+  });
+
+  it('on a 409 says the records were pulled again since the page loaded', async () => {
+    stubTurnstile();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse(409, { error: 'City records for this building have already been retrieved.' })),
+    );
+    render(<RecordsRequestButton buildingId="b1" initialState="stale" />);
+    await pressRefresh();
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe(REFRESH_ALREADY_DONE_COPY));
+  });
+
+  it('shows the daily-cap message on a 429 and offers the button again, without resetting the widget', async () => {
+    const widget = stubTurnstile();
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(429, { error: 'The daily limit for city-records requests has been reached. Please try again later.' }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RecordsRequestButton buildingId="b1" initialState="stale" />);
+
+    await pressRefresh();
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe(
+        'The daily limit for city-records requests has been reached. Please try again later.',
+      ),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(widget.reset).not.toHaveBeenCalled();
+    expect((screen.getByRole('button', { name: REFRESH_BUTTON_LABEL }) as HTMLButtonElement).disabled).toBe(false);
   });
 });

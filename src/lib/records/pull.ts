@@ -9,10 +9,15 @@
 // that changes is one added error pull row. That is what makes a re-pull safe to trigger
 // from anywhere: the worst case is a stale source, never a building whose records were
 // half-replaced.
+//
+// Each assessor year's batch also carries the building's owner-of-record row
+// (`building_owners`, written by `owners.ts`), so the owner row is never newer or older than
+// the assessor rows it was read from.
 import { errorMessage, truncateError } from './errors';
 import { buildIdentity, toNumericParcel, type BuildingRowForIdentity } from './identity';
 import { jurisdictionForCity, sourcesForCity } from './jurisdictions';
 import { zip5 } from './seed/sam';
+import { ownerRolloverStatement, ownerStatements, ownersTableExists } from './owners';
 import { ASSESSOR_YEARS, resolveParcel, type ParcelResolution } from './sources/boston/assessor';
 import {
   NO_QUERY,
@@ -251,6 +256,10 @@ export async function pullBuildingRecords(
 
   const summaries: PullSourceSummary[] = [];
   let samIdKnown = Boolean(building.sam_id?.trim());
+  // Asked once per pull, and only when an assessor year has something to write: before
+  // migration 0034 runs there is no owners table, and the pull must work exactly as before.
+  let ownersTable: boolean | null = null;
+  const hasOwnersTable = async (): Promise<boolean> => (ownersTable ??= await ownersTableExists(db));
 
   for (const source of sources) {
     const pullId = crypto.randomUUID();
@@ -283,11 +292,18 @@ export async function pullBuildingRecords(
     // under the parcel's. Matching only: the building row is never changed. Read before the
     // write so a failed write does not lose it; applied below according to what got stored.
     const freshParcelZip = isCurrentAssessor(source) ? parcelZipFrom(result.rows) : null;
+    // An assessor year writes the building's owner-of-record row in its own batch, so the
+    // owner row rolls back with the year's rows if the write fails.
+    const ownerWrites =
+      source.ownsSourceKey && source.kinds.includes('assessment') && (await hasOwnersTable())
+        ? ownerStatements(db, building.id, source.ownsSourceKey, result.rows)
+        : [];
     // One batch: the provenance row and the rows it vouches for land together or not at all.
     try {
       await db.batch([
         pullRowStatement(db, { ...base, query: result.query, status, rowCount: result.rows.length, errorMessage: null }),
         ...replaceStatements(db, building.id, pullId, source, result.rows),
+        ...ownerWrites,
       ]);
     } catch (err) {
       // The batch rolled back, so `pullId` was never persisted and this source's previous
@@ -334,6 +350,7 @@ export async function pullBuildingRecords(
       )
       .bind(building.id, ...fiscalYears)
       .run();
+    if (await hasOwnersTable()) await ownerRolloverStatement(db, building.id, fiscalYears).run();
   }
 
   return {

@@ -1,0 +1,117 @@
+---
+// The owner of record list: every RateMyPlace building the assessor records under one owner
+// name, each with its city record counts in the panel's three groups. Same rule as the panel:
+// counts of records as the city recorded them, no score, no reading of what they mean. The
+// counts are the panel's own (`ownerRecordCounts` reads the building's ledger), so a row and
+// the building's page cannot disagree.
+//
+// Which names get a list at all is decided on the server in `lib/records/ownerList.ts`
+// (`loadOwnerList`); this template only renders a list it was handed.
+import {
+  OWNER_OF_RECORD_LABEL,
+  OWNER_LIST_INTRO,
+  OWNER_LIST_RECORDS_NOTE,
+  OWNER_LIST_NOT_PULLED_COPY,
+  OWNER_LIST_PREVIOUS_LABEL,
+  OWNER_LIST_NEXT_LABEL,
+  OWNER_COUNT_LABELS,
+  assessorYearText,
+  ownerBuildingCountText,
+  ownerListPageText,
+  recordedAsText,
+} from '../../lib/records/display';
+import { RECORD_GROUPS, type RecordGroup, type RecordGroupId } from '../../lib/records/recordGroups';
+import { ownerListHref, type OwnerListBuilding } from '../../lib/records/ownerList';
+import { localityLine } from '../../lib/locality';
+
+interface Props {
+  ownerKey: string;
+  owner: string;
+  total: number;
+  page: number;
+  pageCount: number;
+  buildings: OwnerListBuilding[];
+}
+
+const { ownerKey, owner, total, page, pageCount, buildings } = Astro.props;
+
+const groups = Object.fromEntries(RECORD_GROUPS.map((group) => [group.id, group])) as Record<RecordGroupId, RecordGroup>;
+
+/** The counts each group shows on a row, in the order the building page lists them. */
+function groupCounts(building: OwnerListBuilding): Array<{ title: string; counts: Array<[string, string]> }> {
+  const c = building.counts;
+  return [
+    { title: groups.living.title, counts: [[OWNER_COUNT_LABELS.requests, c.living]] },
+    {
+      title: groups.building.title,
+      counts: [
+        [OWNER_COUNT_LABELS.isdCases, c.isdCases],
+        [OWNER_COUNT_LABELS.requests, c.buildingRequests],
+        [OWNER_COUNT_LABELS.permits, c.permits],
+      ],
+    },
+    {
+      title: groups.upkeep.title,
+      counts: [
+        [OWNER_COUNT_LABELS.publicWorksTickets, c.publicWorksTickets],
+        [OWNER_COUNT_LABELS.requests, c.upkeepRequests],
+      ],
+    },
+  ];
+}
+
+const pagerLink = 'inline-flex min-h-[44px] items-center px-3 py-2 text-sm font-medium text-teal-700 hover:underline';
+---
+
+<p class="text-xs uppercase tracking-wide text-gray-500">{OWNER_OF_RECORD_LABEL}</p>
+<h1 class="mt-1 text-2xl sm:text-3xl font-bold text-gray-900 break-words">{owner}</h1>
+<p class="mt-1 text-sm text-gray-600">{ownerBuildingCountText(total)}</p>
+<p class="mt-4 text-sm text-gray-600">{OWNER_LIST_INTRO}</p>
+<p class="mt-1 text-xs text-gray-500">{OWNER_LIST_RECORDS_NOTE}</p>
+
+<ol class="mt-6 grid gap-4">
+  {buildings.map((building) => (
+    <li class="bg-white rounded-[6px] border border-gray-200 p-4 sm:p-5" data-owner-list-row>
+      <a href={`/building/${building.slug}`} class="-my-1 inline-block py-1 text-lg font-semibold text-teal-700 hover:underline break-words">{building.address}</a>
+      {localityLine(building, building.state) !== '' && (
+        <p class="text-sm text-gray-600">{localityLine(building, building.state)}</p>
+      )}
+      <p class="mt-1 text-xs text-gray-500 break-words">
+        {assessorYearText(building.fiscalYear)}{building.owner !== owner && ` · ${recordedAsText(building.owner)}`}
+      </p>
+      {building.counts.pulled ? (
+        <dl class="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
+          {groupCounts(building).map((group) => (
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-gray-500">{group.title}</dt>
+              {group.counts.map(([label, count]) => (
+                <dd class="mt-1 flex justify-between gap-3 text-sm text-gray-700">
+                  <span>{label}</span>
+                  <span class="font-medium tabular-nums text-gray-900">{count}</span>
+                </dd>
+              ))}
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p class="mt-3 text-sm text-gray-600">{OWNER_LIST_NOT_PULLED_COPY}</p>
+      )}
+    </li>
+  ))}
+</ol>
+
+{pageCount > 1 && (
+  <nav aria-label="Pages" class="mt-6 flex flex-wrap items-center justify-between gap-2">
+    {page > 1 ? (
+      <a href={ownerListHref(ownerKey, page - 1)} rel="prev" class={`-ml-3 ${pagerLink}`}>{OWNER_LIST_PREVIOUS_LABEL}</a>
+    ) : (
+      <span></span>
+    )}
+    <span class="text-sm text-gray-500">{ownerListPageText(page, pageCount)}</span>
+    {page < pageCount ? (
+      <a href={ownerListHref(ownerKey, page + 1)} rel="next" class={`-mr-3 ${pagerLink}`}>{OWNER_LIST_NEXT_LABEL}</a>
+    ) : (
+      <span></span>
+    )}
+  </nav>
+)}
