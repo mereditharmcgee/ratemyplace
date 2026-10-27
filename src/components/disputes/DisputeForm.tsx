@@ -8,6 +8,7 @@ interface Props {
 export default function DisputeForm({ siteUrl }: Props) {
   // Form fields
   const [reviewUrl, setReviewUrl] = useState('');
+  const [reviewDates, setReviewDates] = useState('');
   const [landlordName, setLandlordName] = useState('');
   const [landlordEmail, setLandlordEmail] = useState('');
   const [landlordPhone, setLandlordPhone] = useState('');
@@ -88,7 +89,7 @@ export default function DisputeForm({ siteUrl }: Props) {
     const errors: Record<string, string> = {};
 
     if (!reviewUrl.trim()) {
-      errors.reviewUrl = 'Review URL is required';
+      errors.reviewUrl = 'Building page link is required';
     }
 
     if (!landlordName.trim()) {
@@ -141,6 +142,7 @@ export default function DisputeForm({ siteUrl }: Props) {
         },
         body: JSON.stringify({
           reviewUrl,
+          reviewDates: reviewDates.trim() || undefined,
           landlordName,
           landlordEmail,
           landlordPhone,
@@ -176,6 +178,7 @@ export default function DisputeForm({ siteUrl }: Props) {
   // Reset form for another submission
   const handleSubmitAnother = () => {
     setReviewUrl('');
+    setReviewDates('');
     setLandlordName('');
     setLandlordEmail('');
     setLandlordPhone('');
@@ -236,27 +239,48 @@ export default function DisputeForm({ siteUrl }: Props) {
         </div>
       )}
 
-      {/* Review URL */}
-      <div>
-        <label htmlFor="reviewUrl" className="block text-sm font-medium text-gray-700 mb-2">
-          Review URL <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          id="reviewUrl"
-          value={reviewUrl}
-          onChange={(e) => setReviewUrl(e.target.value)}
-          placeholder="https://..."
-          className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
-            fieldErrors.reviewUrl ? 'border-red-300' : 'border-gray-300'
-          }`}
-        />
-        {fieldErrors.reviewUrl && (
-          <p className="mt-1 text-sm text-red-700">{fieldErrors.reviewUrl}</p>
-        )}
-        <p className="mt-1 text-sm text-gray-500">
-          Paste the URL of the review you want to dispute
-        </p>
+      {/* Which review: reviews have no link of their own, so the building page link plus the
+          dates on the review card name it. The API also still takes a #review-{id} link. */}
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="reviewUrl" className="block text-sm font-medium text-gray-700 mb-2">
+            Building page link <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            id="reviewUrl"
+            value={reviewUrl}
+            onChange={(e) => setReviewUrl(e.target.value)}
+            placeholder={`${siteUrl}/building/...`}
+            className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
+              fieldErrors.reviewUrl ? 'border-red-300' : 'border-gray-300'
+            }`}
+          />
+          {fieldErrors.reviewUrl && (
+            <p className="mt-1 text-sm text-red-700">{fieldErrors.reviewUrl}</p>
+          )}
+          <p className="mt-1 text-sm text-gray-500">
+            Copy it from your browser's address bar on the building page.
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="reviewDates" className="block text-sm font-medium text-gray-700 mb-2">
+            Dates shown on the review
+          </label>
+          <input
+            type="text"
+            id="reviewDates"
+            value={reviewDates}
+            onChange={(e) => setReviewDates(e.target.value)}
+            placeholder="Fall 2023 · Current"
+            maxLength={100}
+            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500"
+          />
+          <p className="mt-1 text-sm text-gray-500">
+            Needed if the page has more than one review. Copy them from the review.
+          </p>
+        </div>
       </div>
 
       {/* Landlord Information */}

@@ -1,5 +1,74 @@
 import { describe, it, expect } from 'vitest';
-import { extractReviewIdFromUrl, validateDisputeForm, DISPUTE_REASONS } from '../disputes';
+import {
+  extractReviewIdFromUrl,
+  extractBuildingSlugFromUrl,
+  normalizeReviewDates,
+  validateDisputeForm,
+  DISPUTE_REASONS,
+} from '../disputes';
+
+// ═══════════════════════════════════════════════════
+// extractBuildingSlugFromUrl
+// ═══════════════════════════════════════════════════
+
+describe('extractBuildingSlugFromUrl', () => {
+  const siteUrl = 'https://ratemyplace.org';
+
+  it('reads the slug from a building page link', () => {
+    expect(extractBuildingSlugFromUrl('https://ratemyplace.org/building/12-example-rd-boston', siteUrl))
+      .toBe('12-example-rd-boston');
+  });
+
+  it('ignores a trailing slash, query and fragment', () => {
+    expect(extractBuildingSlugFromUrl('https://ratemyplace.org/building/12-example-rd-boston/?tab=records#records', siteUrl))
+      .toBe('12-example-rd-boston');
+  });
+
+  it('accepts surrounding whitespace from a paste', () => {
+    expect(extractBuildingSlugFromUrl('  https://ratemyplace.org/building/12-example-rd-boston \n', siteUrl))
+      .toBe('12-example-rd-boston');
+  });
+
+  it('rejects another origin', () => {
+    expect(extractBuildingSlugFromUrl('https://evil.example/building/12-example-rd-boston', siteUrl)).toBeNull();
+  });
+
+  it('rejects pages that are not a building page', () => {
+    expect(extractBuildingSlugFromUrl('https://ratemyplace.org/landlord/acme', siteUrl)).toBeNull();
+    expect(extractBuildingSlugFromUrl('https://ratemyplace.org/building/', siteUrl)).toBeNull();
+    expect(extractBuildingSlugFromUrl('https://ratemyplace.org/building/a/b', siteUrl)).toBeNull();
+    expect(extractBuildingSlugFromUrl('https://ratemyplace.org/building/%27or%201=1', siteUrl)).toBeNull();
+  });
+
+  it('rejects text that is not a URL', () => {
+    expect(extractBuildingSlugFromUrl('12 Example Rd', siteUrl)).toBeNull();
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// normalizeReviewDates
+// ═══════════════════════════════════════════════════
+
+describe('normalizeReviewDates', () => {
+  it('reduces a card range to lowercase words', () => {
+    expect(normalizeReviewDates('Fall 2023 · Current')).toBe('fall 2023 current');
+  });
+
+  it('matches however the range is punctuated or capitalised', () => {
+    const want = normalizeReviewDates('Summer 2021 · 2023');
+    for (const typed of ['SUMMER 2021 · 2023', 'summer 2021 - 2023', 'Summer 2021 – 2023', 'Summer 2021 to 2023', ' summer  2021,2023 ']) {
+      expect(normalizeReviewDates(typed)).toBe(want);
+    }
+  });
+
+  it('keeps the "2020 or earlier" bucket intact', () => {
+    expect(normalizeReviewDates('Spring 2015 · 2020 or earlier')).toBe('spring 2015 2020 or earlier');
+  });
+
+  it('is empty for blank input', () => {
+    expect(normalizeReviewDates('  · ')).toBe('');
+  });
+});
 
 // ═══════════════════════════════════════════════════
 // extractReviewIdFromUrl
