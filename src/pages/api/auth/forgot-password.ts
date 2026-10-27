@@ -1,8 +1,9 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
-import { getEnv, fireAndForget } from '../../../lib/runtime';
+import { getEnv } from '../../../lib/runtime';
 import { createPasswordResetToken } from '../../../lib/tokens';
 import { sendPasswordResetEmail } from '../../../lib/email';
+import { trackSend } from '../../../lib/trackSend';
 import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { logError } from '../../../lib/logger';
 import { verifyTurnstile } from '../../../lib/turnstile';
@@ -106,11 +107,14 @@ export async function POST(context: APIContext): Promise<Response> {
     // Create password reset token
     const token = await createPasswordResetToken(db, user.id);
 
-    // Send email — Phase 18 PERF-02: fire-and-forget; DB token write already committed.
-    // Returns successResponse regardless (existing enumeration prevention preserved).
+    // Send email — Phase 18 PERF-02: in the background; DB token write already committed.
+    // Returns successResponse regardless (existing enumeration prevention preserved); a
+    // failed send is recorded on /admin by trackSend, never surfaced to the caller.
     const siteUrl = getEnv(context).SITE_URL || context.url.origin;
-    fireAndForget(
+    trackSend(
       context,
+      'password_reset',
+      user.email,
       sendPasswordResetEmail(getEnv(context).RESEND_API_KEY, siteUrl, user.email, token),
     );
 

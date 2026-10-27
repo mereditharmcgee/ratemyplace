@@ -1,12 +1,13 @@
 import type { APIContext } from 'astro';
 import { initializeLucia } from '../../../lib/auth';
 import { getDB } from '../../../lib/db';
-import { getEnv, fireAndForget } from '../../../lib/runtime';
+import { getEnv } from '../../../lib/runtime';
 import { hashPassword } from '../../../lib/password';
 import { generateIdFromEntropySize } from 'lucia';
 import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { createVerificationToken } from '../../../lib/tokens';
 import { sendVerificationEmail } from '../../../lib/email';
+import { trackSend } from '../../../lib/trackSend';
 import { logError } from '../../../lib/logger';
 import { verifyTurnstile } from '../../../lib/turnstile';
 import { isValidEmail } from '../../../lib/validation';
@@ -115,8 +116,10 @@ export async function POST(context: APIContext): Promise<Response> {
     const token = await createVerificationToken(db, userId);
     const siteUrl = getEnv(context).SITE_URL || context.url.origin;
     // DB write (token row) already committed above — DB-then-email ordering preserved.
-    fireAndForget(
+    trackSend(
       context,
+      'verification',
+      email.toLowerCase(),
       sendVerificationEmail(getEnv(context).RESEND_API_KEY, siteUrl, email.toLowerCase(), token),
     );
 

@@ -1,7 +1,8 @@
 import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../../lib/db';
-import { getEnv, fireAndForget } from '../../../lib/runtime';
+import { getEnv } from '../../../lib/runtime';
 import { sendDisputeResolutionEmail } from '../../../lib/email';
+import { trackSend } from '../../../lib/trackSend';
 import { createAuditLog } from '../../../lib/audit';
 import { getClientIP } from '../../../lib/rateLimit';
 import { createNotification } from '../../../lib/notifications';
@@ -132,25 +133,21 @@ export const PATCH: APIRoute = async (context: APIContext) => {
     // dismissed or partially-upheld disputes used to read as the system being
     // unresponsive (audit CG1).
     //
-    // fireAndForget so the admin's PATCH returns immediately instead of
-    // blocking on Resend's response time. Errors are logged structurally
-    // inside the helper.
+    // trackSend runs it in the background so the admin's PATCH returns immediately
+    // instead of blocking on Resend, and records a failed or unconfigured send on /admin.
     if (resolutionOutcome === 'uphold' || resolutionOutcome === 'dismiss' || resolutionOutcome === 'partially_valid') {
-      const apiKey = getEnv(context).RESEND_API_KEY;
-      if (apiKey) {
-        fireAndForget(
-          context,
-          sendDisputeResolutionEmail(
-            apiKey,
-            dispute.landlord_email as string,
-            dispute.landlord_name as string,
-            resolutionOutcome,
-            resolutionNotes
-          )
-        );
-      } else {
-        console.warn('RESEND_API_KEY not configured - skipping dispute resolution email');
-      }
+      trackSend(
+        context,
+        'dispute_resolution',
+        dispute.landlord_email as string,
+        sendDisputeResolutionEmail(
+          getEnv(context).RESEND_API_KEY,
+          dispute.landlord_email as string,
+          dispute.landlord_name as string,
+          resolutionOutcome,
+          resolutionNotes
+        )
+      );
     }
 
     return new Response(
