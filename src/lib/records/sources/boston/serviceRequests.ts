@@ -14,7 +14,8 @@
 // replacing them with a partial 311 history. A retired resource id surfaces as an error on
 // every pull until someone fixes it by updating LEGACY_311_RESOURCES; it will not clear on
 // its own.
-import { addressLikeClauses, ckanSql, ROW_CAP, sqlLiteral, textOrNull } from '../../ckan';
+import { addressLikeClauses, ckanSql, rangeAddressClause, rangeNumberClause, ROW_CAP, sqlLiteral, textOrNull } from '../../ckan';
+import { houseNumberTokenMatches, leadingToken } from '../../identity';
 import type { RecordRow, RecordSource, ServiceRequestClassification, ServiceRequestPayload, SourceResult } from '../../types';
 
 export const NEW_311_RESOURCE_ID = '254adca6-64ab-4c5c-9fc0-a6da622be185';
@@ -82,11 +83,13 @@ const LEGACY_COLUMNS = [
   'case_title', 'subject', 'reason', 'type', 'location', 'source',
 ];
 
-// street_name, street_number, and zip_code drive the WHERE clause only; ServiceRequestPayload
-// has no field for them (mirrors permits.ts not selecting parcel_id for the same reason).
+// street_name and zip_code drive the WHERE clause only; ServiceRequestPayload has no field for
+// them (mirrors permits.ts not selecting parcel_id for the same reason). street_number is selected
+// but not stored: a row the range arm found is kept only when its number reaches the address
+// (`houseNumberTokenMatches`), and that check needs the number itself.
 const NEW_COLUMNS = [
   'case_id', 'open_date', 'close_date', 'case_status', 'closure_reason',
-  'case_topic', 'assigned_department', 'service_name', 'full_address', 'report_source',
+  'case_topic', 'assigned_department', 'service_name', 'full_address', 'report_source', 'street_number',
 ];
 
 function mapLegacyRow(row: Row): ServiceRequestPayload | null {
@@ -139,19 +142,28 @@ export const serviceRequestsSource: RecordSource = {
   async run(identity, fetchImpl): Promise<SourceResult> {
     const zip = identity.zip;
     const zipOk = zip != null && /^\d{5}$/.test(zip);
-    const addressClauses = addressLikeClauses('location', identity);
+    // The as-written LIKE clauses, plus one regex clause for every number inside a range address
+    // and every city record filed under a range that reaches it ('501-507 Example Ave' for
+    // 503). The regex arm can find a range that starts below the address and ends below it too,
+    // so every row is checked with `houseNumberTokenMatches` before it is kept.
+    const rangeClause = rangeAddressClause('location', identity, { enclosing: true });
+    const addressClauses = [...addressLikeClauses('location', identity), ...(rangeClause ? [rangeClause] : [])];
     // Qualifying by zip is why a same-named street in one neighborhood does not attach
     // 311 cases filed against a same-named street elsewhere in the city (see permits.ts).
     const legacyWhere = zipOk
       ? `(("location_zipcode" IS NULL OR "location_zipcode" = ${sqlLiteral(zip)}) AND (${addressClauses.join(' OR ')}))`
       : `(${addressClauses.join(' OR ')})`;
 
-    const numberForms = identity.rangeForm ? [...identity.numbers, identity.rangeForm] : identity.numbers;
+    const numberForms = Array.from(
+      new Set([...identity.matchNumbers, ...identity.numbers, ...(identity.rangeForm ? [identity.rangeForm] : [])]),
+    );
+    const newRangeClause = rangeNumberClause('street_number', identity, { enclosing: true });
+    const numberMatch = `upper("street_number") IN (${numberForms.map(sqlLiteral).join(',')})`;
     // upper() on street_number matches the upper() on street_name above; the new-system
     // street_number and zip_code columns are both text (verified live 2026-09-06/07).
     const newWhere =
       `upper("street_name") IN (${identity.streetForms.map(sqlLiteral).join(',')}) ` +
-      `AND upper("street_number") IN (${numberForms.map(sqlLiteral).join(',')})` +
+      `AND ${newRangeClause ? `(${numberMatch} OR ${newRangeClause})` : numberMatch}` +
       (zipOk ? ` AND ("zip_code" IS NULL OR "zip_code" = ${sqlLiteral(zip)})` : '');
 
     const queries: string[] = [];
@@ -169,6 +181,7 @@ export const serviceRequestsSource: RecordSource = {
       queries.push(sql);
       const legacyRows = await ckanSql<Row>(sql, fetchImpl);
       for (const row of legacyRows) {
+        if (!houseNumberTokenMatches(leadingToken(textOrNull(row.location)), identity)) continue;
         const payload = mapLegacyRow(row);
         if (!payload || seen.has(payload.caseId)) continue;
         seen.add(payload.caseId);
@@ -182,6 +195,7 @@ export const serviceRequestsSource: RecordSource = {
     queries.push(newSql);
     const newRows = await ckanSql<Row>(newSql, fetchImpl);
     for (const row of newRows) {
+      if (!houseNumberTokenMatches(textOrNull(row.street_number), identity)) continue;
       const payload = mapNewRow(row);
       if (!payload || seen.has(payload.caseId)) continue;
       seen.add(payload.caseId);

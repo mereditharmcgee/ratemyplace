@@ -268,6 +268,24 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   identity that the short and long forms do not already prefix-cover, because the feeds
   spell suffixes differently (permits write `RADFORD LN` where the assessor writes
   `RADFORD LA`; legacy 311 writes `VFW PKWY` for the assessor's `VFW PW`).
+- **Range addresses match every number on their side of the street.** `buildIdentity`
+  keeps `numbers` as written (parcel resolution keys on them, so a middle number can never
+  pull in a neighbouring parcel) and adds `matchNumbers`, every same-parity number between a
+  plain range's endpoints, capped at `MAX_RANGE_NUMBERS`. The address-keyed feeds also find a
+  city record filed under a wider range that contains the address: the violation feeds pair
+  `enclosingLows` with `enclosingHighs` in two `IN` lists, and 311 adds one regex clause
+  (`rangeAddressClause` / `rangeNumberClause` in `ckan.ts`) whose rows are then checked by
+  `houseNumberTokenMatches`, since a range that starts below the address can end below it too.
+  One regex, not one LIKE per number: each LIKE re-runs `upper()` over a whole 311 year, and
+  the GET URL tops out near 8 KB (HTTP 414). The regex arm keeps the interpolation invariant
+  by a digits-only guard on numbers and a plain-text guard on street spellings, with no
+  backslash anywhere. Permits take the middle numbers only; their parcel arm covers the rest.
+- **`matchConfidence.ts` decides when an address-keyed zero is not a finding.** A range too
+  wide to expand, a mixed-parity range, a current-year parcel (`parcelStreetNumber` /
+  `parcelStreetNumberHigh`, FY2026 only) that covers numbers the page's address does not, or a
+  page ZIP that disagrees with the parcel's: then 311, Public Works and ISD say "not matched
+  with confidence" instead of "none on record". It reads only stored data, so it needs no
+  column, and a payload stored before October 2026 reads as no reason.
 - **`seed/` is the bulk pipeline, not a request path.** `scripts/records-seed-boston.ts`
   downloads the assessor and SAM resources once (`fetchAllRows` in `ckan.ts`), and the pure
   modules under `records/seed/` filter, collapse, format, match, and emit SQL. Every string

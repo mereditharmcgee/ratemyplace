@@ -5,6 +5,7 @@
 // (a source's mapping can change after rows were written).
 import { logError } from '../logger';
 import { sourcesForCity, type Jurisdiction } from './jurisdictions';
+import { recordsMatchUncertainty, type RecordsMatchUncertainty } from './matchConfidence';
 import type {
   AssessmentPayload,
   EnforcementTicketPayload,
@@ -55,6 +56,11 @@ export interface BuildingRecordsView {
   /** Kinds with at least one payload that failed validation, sorted. */
   invalidKinds: RecordKind[];
   corrections: CorrectionNote[];
+  /**
+   * Why the address-keyed feeds may have missed records for this building, or null. Optional so a
+   * hand-built view in a test reads as "no reason given". See `matchConfidence.ts`.
+   */
+  matchUncertainty?: RecordsMatchUncertainty | null;
 }
 
 /** Dataset pages keyed by source id (CKAN resource id), one map per jurisdiction. Built lazily, once each. */
@@ -300,6 +306,27 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
     notes: row.resolution_notes,
   }));
 
+  // The building's own address and ZIP, for the match-confidence note. A failed read costs the
+  // panel only that note, never the records.
+  let matchUncertainty: RecordsMatchUncertainty | null = null;
+  try {
+    const building = await db
+      .prepare('SELECT address, zip_code FROM buildings WHERE id = ?')
+      .bind(buildingId)
+      .first<{ address: string | null; zip_code: string | null }>();
+    const current = assessments[0] ?? null;
+    matchUncertainty = recordsMatchUncertainty({
+      address: building?.address ?? null,
+      zip: building?.zip_code ?? null,
+      current: current && !current.condominium ? current : null,
+    });
+  } catch (error) {
+    logError('building_records_match_confidence_failed', {
+      buildingId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   return {
     pulledAt,
     sources,
@@ -311,5 +338,6 @@ export async function getBuildingRecords(db: RecordsDb, buildingId: string): Pro
     rentsmart,
     invalidKinds: invalid,
     corrections,
+    matchUncertainty,
   };
 }

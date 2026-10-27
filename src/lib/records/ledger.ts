@@ -23,6 +23,8 @@ import {
   permitSummary,
   rentSmartDisagreement,
   splitServiceRequests,
+  uncertainMatchCopy,
+  UNCERTAIN_MATCH_SUBCOUNT,
   yearSpanLabel,
   type PermitSummary,
 } from './display';
@@ -63,6 +65,12 @@ export interface LedgerSection {
   cappedNote: string | null;
   /** The rows behind the count, in the order the section lists them. */
   rows: RecordRow[];
+  /**
+   * Set only on an address-keyed source (311, Public Works, ISD) that found nothing for a
+   * building whose match is uncertain: the sentence the section shows instead of its "no records"
+   * line. Null everywhere else.
+   */
+  matchNote: string | null;
 }
 
 export interface RequestsSection extends LedgerSection {
@@ -125,6 +133,18 @@ function openFirst<T extends { status: string | null }>(rows: readonly T[]): T[]
   return [...rows.filter((row) => isOpenStatus(row.status)), ...rows.filter((row) => !isOpenStatus(row.status))];
 }
 
+/**
+ * An address-keyed source that answered with nothing, for a building whose match is uncertain,
+ * cannot say "none on record": the search did not cover every number the building goes by.
+ */
+function uncertainZero(
+  uncertainty: BuildingRecordsView['matchUncertainty'],
+  countable: boolean,
+  total: number,
+): string | null {
+  return uncertainty && countable && total === 0 ? uncertainMatchCopy(uncertainty) : null;
+}
+
 function closedTrailing(closedAt: string | null): string | null {
   return closedAt ? ` · closed ${formatRecordDate(closedAt)}` : null;
 }
@@ -147,11 +167,16 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
     trailing,
   });
 
+  const requestsMatchNote = uncertainZero(view.matchUncertainty, requestsCountable, housing.length);
   const requests: RequestsSection = {
     status: requestStatus,
     hasRows: view.serviceRequests.length > 0,
     count: requestsCountable ? String(housing.length) : NO_COUNT,
-    subCount: requestsCountable ? openSubCount(openRequests.length, housing.length) : '',
+    subCount: requestsMatchNote
+      ? UNCERTAIN_MATCH_SUBCOUNT
+      : requestsCountable
+        ? openSubCount(openRequests.length, housing.length)
+        : '',
     span: requestsCountable ? yearSpanLabel(observedYears(requestYears)) : null,
     note:
       requestsCountable && otherCount > 0
@@ -160,6 +185,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
     cappedNote: cappedNote(view.serviceRequests.length, CAPPED_REQUESTS_COPY),
     rows: housing.map((row) => requestRow(row, closedTrailing(row.closedAt))),
     openRows: openRequests.map((row) => requestRow(row, null)),
+    matchNote: requestsMatchNote,
     otherCount,
     years: requestYears,
     types: countByKey(housing, (row) => row.type ?? row.title, 6),
@@ -195,6 +221,8 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
       status: row.status,
       trailing: null,
     })),
+    // Permits key on the parcel as well as the address, so their zero is not an address match.
+    matchNote: null,
     summary,
     years: permitYears,
     types: countByKey(view.permits, (row) => row.description ?? row.permitType ?? row.workType, 6),
@@ -206,11 +234,16 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
   const openEnforcement = view.enforcement.filter((row) => isOpenStatus(row.status));
   const enforcementYears = countByYear(view.enforcement, (row) => row.statusDate, { to: currentYear });
 
+  const enforcementMatchNote = uncertainZero(view.matchUncertainty, enforcementCountable, view.enforcement.length);
   const enforcement: EnforcementSection = {
     status: enforcementStatus,
     hasRows: view.enforcement.length > 0,
     count: enforcementCountable ? String(view.enforcement.length) : NO_COUNT,
-    subCount: enforcementCountable ? openSubCount(openEnforcement.length, view.enforcement.length) : '',
+    subCount: enforcementMatchNote
+      ? UNCERTAIN_MATCH_SUBCOUNT
+      : enforcementCountable
+        ? openSubCount(openEnforcement.length, view.enforcement.length)
+        : '',
     span: enforcementCountable ? yearSpanLabel(observedYears(enforcementYears)) : null,
     note: null,
     cappedNote: cappedNote(view.enforcement.length, CAPPED_ROWS_COPY),
@@ -220,6 +253,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
       status: row.status,
       trailing: null,
     })),
+    matchNote: enforcementMatchNote,
     types: countByKey(view.enforcement, (row) => row.description, 6),
   };
 
@@ -229,11 +263,16 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
   const openViolations = view.violations.filter((row) => isOpenStatus(row.status));
   const violationYears = countByYear(view.violations, (row) => row.statusDate, { to: currentYear });
 
+  const violationsMatchNote = uncertainZero(view.matchUncertainty, violationsCountable, view.violations.length);
   const violations: ViolationsSection = {
     status: violationStatus,
     hasRows: view.violations.length > 0,
     count: violationsCountable ? String(view.violations.length) : NO_COUNT,
-    subCount: violationsCountable ? openSubCount(openViolations.length, view.violations.length) : '',
+    subCount: violationsMatchNote
+      ? UNCERTAIN_MATCH_SUBCOUNT
+      : violationsCountable
+        ? openSubCount(openViolations.length, view.violations.length)
+        : '',
     span: violationsCountable ? yearSpanLabel(observedYears(violationYears)) : null,
     note: null,
     cappedNote: cappedNote(view.violations.length, CAPPED_ROWS_COPY),
@@ -243,6 +282,7 @@ export function ledgerModel(view: BuildingRecordsView, now: Date): LedgerModel {
       status: row.status,
       trailing: null,
     })),
+    matchNote: violationsMatchNote,
     years: violationYears,
   };
 

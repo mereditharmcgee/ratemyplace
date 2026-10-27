@@ -6,7 +6,8 @@ import { SourceError, type BuildingIdentity, type RecordRow } from '../records/t
 /** Minimal BuildingIdentity stub — addressLikeClauses only reads the two address-form fields. */
 function identityWithForms(addressFormsShort: string[], addressFormsLong: string[] = []): BuildingIdentity {
   return {
-    buildingId: 'b', numbers: [], rangeForm: null, streetShort: '', streetLong: '', streetBase: '',
+    buildingId: 'b', numbers: [], matchNumbers: [], span: null, enclosingLows: [], enclosingHighs: [], matchUncertainty: null,
+    rangeForm: null, streetShort: '', streetLong: '', streetBase: '',
     streetForms: [], addressFormsShort, addressFormsLong, parcelId: null, parcelNumeric: null,
     condominium: false, zip: null, samId: null,
   };

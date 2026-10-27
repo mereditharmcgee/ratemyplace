@@ -18,6 +18,7 @@
 import { ROW_CAP } from './ckan';
 import { PERMIT_COVERAGE_START } from './sources/boston/permits';
 import type { YearCount } from './charts';
+import type { RecordsMatchUncertainty } from './matchConfidence';
 import type {
   AssessmentPayload,
   PermitPayload,
@@ -243,6 +244,27 @@ export function rentSmartDisagreement(rows: RentSmartPayload[], housingRequestCo
 export const NO_VIOLATIONS_CAVEAT =
   "This section lists what the city's violation feed holds for this address. An empty list is a fact about the feed, not confirmation that the building meets code.";
 
+/**
+ * The small line under an address-keyed source's count when it found nothing and the match is
+ * uncertain (`matchConfidence.ts`). Replaces "none on record", which would claim a search that
+ * did not cover every number the building goes by.
+ */
+export const UNCERTAIN_MATCH_SUBCOUNT = 'not matched with confidence';
+
+const UNCERTAIN_MATCH_LEAD = 'City records could not be matched to this address with confidence.';
+
+const UNCERTAIN_MATCH_REASONS: Readonly<Record<RecordsMatchUncertainty, string>> = {
+  wide_range: 'The address range is too wide to search one house number at a time.',
+  mixed_parity: 'The address range has one odd and one even house number.',
+  parcel_wider: "The city's parcel for this building covers more house numbers than this address.",
+  zip_differs: "The ZIP code on this page differs from the city's parcel record.",
+};
+
+/** The empty-state sentence for an address-keyed source when the match is uncertain, with the reason. */
+export function uncertainMatchCopy(reason: RecordsMatchUncertainty): string {
+  return `${UNCERTAIN_MATCH_LEAD} ${UNCERTAIN_MATCH_REASONS[reason]}`;
+}
+
 /** A source nobody has queried has no finding to report — not an empty one, none at all. */
 export const NEVER_PULLED_COPY = 'Not retrieved yet.';
 
@@ -433,4 +455,9 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   'formatRecordDate() — no date': formatRecordDate(null),
   'formatPullDate() — no date': formatPullDate(Number.NaN),
   'rentSmartDisagreement()': rentSmartDisagreement([SAMPLE_RENTSMART_ROW], 0) ?? '',
+  UNCERTAIN_MATCH_SUBCOUNT,
+  'uncertainMatchCopy() — wide_range': uncertainMatchCopy('wide_range'),
+  'uncertainMatchCopy() — mixed_parity': uncertainMatchCopy('mixed_parity'),
+  'uncertainMatchCopy() — parcel_wider': uncertainMatchCopy('parcel_wider'),
+  'uncertainMatchCopy() — zip_differs': uncertainMatchCopy('zip_differs'),
 };

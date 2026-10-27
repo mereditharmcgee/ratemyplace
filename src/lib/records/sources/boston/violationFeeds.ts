@@ -12,9 +12,10 @@
 // That is a known, accepted residual — the correction workflow exists for exactly this case.
 //
 // Ranges are stored split (`violation_stno`/`violation_sthigh`) rather than hyphenated, so
-// matching goes through `identity.numbers` against both columns; `identity.rangeForm` is
-// never sent to this feed. `violation_sthigh` has a second, unrelated meaning: for a
-// lettered number like "120A" the feed stores `violation_stno` "120" and `violation_sthigh`
+// matching goes through `identity.matchNumbers` (every same-parity number of a range address)
+// against both columns, plus one arm for a stored range that encloses the address
+// (`enclosingLows` x `enclosingHighs`); `identity.rangeForm` is never sent to this feed.
+// `violation_sthigh` has a second, unrelated meaning: for a lettered number like "120A" the feed stores `violation_stno` "120" and `violation_sthigh`
 // "A" — `buildAddress` below tells the two apart by whether `sthigh` is purely alphabetic.
 //
 // Matching on `violation_sthigh` against `identity.numbers` also means a stored range row
@@ -121,10 +122,17 @@ export function violationFeedSource(config: ViolationFeedConfig): RecordSource {
     kinds: [config.kind],
     async run(identity, fetchImpl): Promise<SourceResult> {
       const bareStreet = bareStreetName(identity);
-      const numbersSql = identity.numbers.map(sqlLiteral).join(',');
+      const numbersSql = identity.matchNumbers.map(sqlLiteral).join(',');
+      // A stored range that starts below the address and ends above it ('501'/'507' for 503)
+      // has neither end among the address's numbers. Pairing a same-parity low below with a
+      // same-parity high above is exact containment with no casts, and both lists are digits.
+      const enclosing =
+        identity.enclosingLows.length > 0 && identity.enclosingHighs.length > 0
+          ? ` OR ("violation_stno" IN (${identity.enclosingLows.map(sqlLiteral).join(',')}) AND "violation_sthigh" IN (${identity.enclosingHighs.map(sqlLiteral).join(',')}))`
+          : '';
       const clauses = [
         `upper("violation_street") = ${sqlLiteral(bareStreet)}`,
-        `("violation_stno" IN (${numbersSql}) OR "violation_sthigh" IN (${numbersSql}))`,
+        `("violation_stno" IN (${numbersSql}) OR "violation_sthigh" IN (${numbersSql})${enclosing})`,
       ];
       const spellings = suffixSpellings(identity);
       if (spellings.length > 0) {

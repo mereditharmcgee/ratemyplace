@@ -55,6 +55,72 @@ export function addressLikeClauses(column: string, identity: BuildingIdentity): 
 }
 
 /**
+ * Street spellings that can sit inside a POSIX regex as plain text: uppercase letters, digits,
+ * spaces, apostrophes and hyphens, none of which is a regex metacharacter outside a bracket
+ * expression. No backslash can ever be needed, which matters because CKAN's statement splitter
+ * misreads a backslash before a quote (see `escapeLikeForCkan`).
+ */
+const REGEX_SAFE_STREET = /^[A-Z0-9 '-]+$/;
+
+/** Digits only, so a number can be written into a regex alternation without escaping. */
+const DIGITS = /^\d+$/;
+
+function alternation(values: readonly string[]): string {
+  return values.join('|');
+}
+
+export interface RangeClauseOptions {
+  /**
+   * Also find city records filed under a range that starts below the address
+   * (`identity.enclosingLows`). Such a range may end below the address as well, so a caller that
+   * sets this must keep only rows whose house-number token passes `houseNumberTokenMatches`.
+   */
+  enclosing: boolean;
+}
+
+/**
+ * One regex clause, `upper("<column>") ~ '^(...) (<street spellings>)'`, for a free-text
+ * address column. It finds what the as-written LIKE clauses cannot: every number inside a range
+ * address (the 33 of a 31-35 address), a city record filed as a range that starts on one of the
+ * address's numbers ('501-507 EXAMPLE AV' for 501), and, with `enclosing`, one that starts below
+ * it ('501-507' for 503). One regex rather than one LIKE per number: each
+ * LIKE re-runs `upper()` over the whole resource, and 50 of them took eight seconds against a
+ * ten-second budget (measured live 2026-10-27), where this clause adds about 0.2 seconds.
+ *
+ * Interpolation invariant: every number passes a digits-only guard and every street spelling
+ * the `REGEX_SAFE_STREET` guard before the whole pattern goes through `sqlLiteral`. Null when
+ * there is nothing to add or no spelling passes, which leaves the LIKE clauses as they were.
+ */
+export function rangeAddressClause(column: string, identity: BuildingIdentity, options: RangeClauseOptions): string | null {
+  if (!/^[a-z_]+$/.test(column)) throw new Error(`Unsafe column name for regex clause: ${column}`);
+  const streets = identity.streetForms.filter((s) => REGEX_SAFE_STREET.test(s));
+  const own = identity.matchNumbers.filter((n) => DIGITS.test(n));
+  const lows = options.enclosing ? identity.enclosingLows.filter((n) => DIGITS.test(n)) : [];
+  if (streets.length === 0 || (own.length === 0 && lows.length === 0)) return null;
+  const arms: string[] = [];
+  if (own.length > 0) arms.push(`(${alternation(own)})(-[0-9]+[A-Z]?)?`);
+  if (lows.length > 0) arms.push(`(${alternation(lows)})-[0-9]+[A-Z]?`);
+  const pattern = `^(${arms.join('|')}) (${alternation(streets)})`;
+  return `upper("${column}") ~ ${sqlLiteral(pattern)}`;
+}
+
+/**
+ * The same idea for a column that holds the house number alone (311's new-system
+ * `street_number`): a record filed as a range starting on one of the address's numbers or, with
+ * `enclosing`, below it. Plain numbers are matched by the caller's exact `IN` list. Callers that
+ * set `enclosing` filter with `houseNumberTokenMatches`. Digits-only guard, then `sqlLiteral`.
+ */
+export function rangeNumberClause(column: string, identity: BuildingIdentity, options: RangeClauseOptions): string | null {
+  if (!/^[a-z_]+$/.test(column)) throw new Error(`Unsafe column name for regex clause: ${column}`);
+  const starts = [
+    ...identity.matchNumbers.filter((n) => DIGITS.test(n)),
+    ...(options.enclosing ? identity.enclosingLows.filter((n) => DIGITS.test(n)) : []),
+  ];
+  if (starts.length === 0) return null;
+  return `upper("${column}") ~ ${sqlLiteral(`^(${alternation(starts)})[A-Z]?-`)}`;
+}
+
+/**
  * '6,720,200' | '6780500' | '$6,649,200.00 ' -> integer dollars; null when absent.
  * Assumes non-negative assessor values; a leading minus or accounting parentheses are not interpreted.
  */

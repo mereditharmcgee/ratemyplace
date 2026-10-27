@@ -69,7 +69,7 @@ describe('serviceRequestsSource', () => {
     const q = queries.find((sql) => sql.includes(NEW_311_RESOURCE_ID));
     expect(q).toBeDefined();
     expect(q).toContain(`upper("street_name") IN ('LANARK RD','LANARK ROAD')`);
-    expect(q).toContain(`upper("street_number") IN ('23','27','23-27')`);
+    expect(q).toContain(`upper("street_number") IN ('23','25','27','23-27')`);
     expect(q).toContain(`("zip_code" IS NULL OR "zip_code" = '02135')`);
     expect(q).toContain(`ORDER BY "open_date" DESC, "case_id" LIMIT 500`);
   });
