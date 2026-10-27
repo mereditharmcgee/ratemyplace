@@ -27,7 +27,7 @@ export default function PostSubmitVerification({ reviewId }: Props) {
       <div className="mt-3 pt-3 border-t border-teal-200">
         <p className="text-teal-800 font-medium mb-1">Strengthen your review with verification</p>
         <p className="text-teal-700 text-sm mb-3">
-          Verified reviews display a trust badge and carry more weight in building scores. Upload proof of tenancy to get verified.
+          Verified reviews display a trust badge. Upload proof of tenancy to get verified.
         </p>
         <div className="bg-blue-50 border border-blue-200 rounded-[6px] px-3 py-2 mb-3">
           <p className="text-xs text-blue-800">

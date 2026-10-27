@@ -1,6 +1,9 @@
 ---
 /**
- * Blue "Verified" badge for a review whose tenant proved residency with a document.
+ * Blue "Residency verified" badge for a review whose tenant proved residency with a
+ * document (`is_verified = 1`). The label names what was checked: the upload accepts a
+ * lease, a utility bill, a rent receipt or mail, so it says residency rather than lease.
+ * It stays on one line and does not shrink, so a long review title wraps instead.
  *
  * The explanation is anchored to the nearest positioned ancestor, not to the badge, so
  * put `relative` on the row the badge sits in. The tooltip starts at that row's left
@@ -30,7 +33,7 @@ const textSizeClasses = {
 ---
 
 <span
-  class="inline-flex items-center gap-1 text-blue-600 group cursor-help rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+  class="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-blue-600 group cursor-help rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
   tabindex="0"
 >
   <svg
@@ -45,7 +48,7 @@ const textSizeClasses = {
       clip-rule="evenodd"
     />
   </svg>
-  {showText && <span class={`font-medium ${textSizeClasses[size]}`}>Verified</span>}
+  {showText && <span class={`font-medium ${textSizeClasses[size]}`}>Residency verified</span>}
   <span
     class="absolute bottom-full left-0 mb-2 w-max max-w-[min(16rem,100%)] whitespace-normal text-left px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none z-10"
     data-verified-tooltip
