@@ -11,6 +11,27 @@ export function getEnv(context: APIContext): App.Platform['env'] {
   return runtime.env;
 }
 
+let envUnreadableLogged = false;
+
+/**
+ * The runtime env, or undefined when it cannot be read: no runtime at all (the Astro container
+ * in unit tests), or the Astro 6+ Cloudflare adapter, whose `locals.runtime.env` is a getter
+ * that throws a migration error. Only for render paths that must never throw and have a safe
+ * default for every value they read — BaseLayout's head. Anything that needs a binding uses
+ * `getEnv`, which throws on purpose.
+ */
+export function maybeEnv(locals: App.Locals): App.Platform['env'] | undefined {
+  try {
+    return locals.runtime?.env;
+  } catch (err) {
+    if (!envUnreadableLogged) {
+      envUnreadableLogged = true; // once per isolate: BaseLayout calls this on every page
+      logError('maybeEnv: runtime env unreadable', { error: err instanceof Error ? err.message : String(err) });
+    }
+    return undefined;
+  }
+}
+
 /**
  * Hash a recipient email for privacy-preserving log correlation.
  *

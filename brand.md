@@ -1,6 +1,6 @@
 # RateMyPlace Brand Handbook
 
-> **Status:** v1.4 · Living document
+> **Status:** v1.5 · Living document
 > **Repo path:** `/brand.md`
 > **Scope:** Codify the existing visual system with a small number of deliberate upgrades that shift the site from "AI-default" to "made by someone with a point of view." This is not a redesign. Every rule below is implementable against the current Astro + Tailwind 4 codebase without structural change.
 >
@@ -509,16 +509,19 @@ These files exist in the repo under `brand/` and are the canonical source for ev
 | `brand/social/ig-highlight.png` | Regenerate with final mark | Instagram highlight cover (1080×1920). |
 | `brand/social/ig-post-template.html` | Editable | Post template, three variants (stat, quote, educational). Logo slot now uses final mark. |
 | `brand/social/ig-story-template.html` | Editable | Story / highlight cover template. |
-| `brand/social/og-default.png` | Regenerate with final mark | Default OG image (1200×630) with editorial lockup top-left. |
-| `brand/social/og-homepage.png` | Regenerate with final mark | Homepage OG image with tagline. |
+| `brand/social/og-default.png` | **Final** | Default link-preview image (1200×630): centred full lockup, tagline, primary message. Rendered from `brand/social/og-default.html` by `npm run og:render`; served copy `public/brand/social/og-default.png`, byte-identical (checked by `ogImage.test.ts`). |
+| `brand/social/og-default.html` | **Editable** | Template for `og-default.png`. |
+| `brand/social/og-homepage.png` | Not made | Not made: the homepage uses `og-default.png`, which already carries the tagline. |
 
 ### OG image rules
 
 - Dimensions 1200×630 (the standard).
 - Paper background by default.
-- Full lockup top-left.
-- Large Instrument Serif headline (48–60px).
-- One-line Inter secondary text at 18px.
+- Full lockup centred, at least 360px drawn width (120px in a 400px feed card), clear space of half the mark's height.
+- Instrument Serif headline at 128px.
+- Inter secondary line at 32px, two lines at most.
+- Lockup and text inside the centre 630×630 square and at least 15px from the top and bottom.
+- No eyebrow unless its copy is true of every page and it is at least 36px.
 - No photographs. No gradients beyond the mark's own.
 
 ---
@@ -538,7 +541,7 @@ When applying this handbook to the existing codebase, execute in this order. Eac
 - [ ] **Season chip**. Extract into `src/components/ui/SeasonChip.astro`, apply on all review surfaces.
 - [ ] **Spacing**. Change `py-16` → `py-20` on marketing sections (homepage, about, methodology). Leave app surfaces at `py-12`.
 - [ ] **Logo**. Replace `public/favicon.svg` with `brand/logo-mark.svg` (the final three-color mark). Ensure `--color-warm-lamp: #F5E6A8` is added to `@theme` for any inline SVG needs. Mark-only and lockup variants go in `brand/` per the asset table in §11.
-- [ ] **OG image**. Replace existing OG image with `brand/social/og-default.png`. Ensure `BaseLayout.astro` references it with correct `og:image` tag.
+- [x] **OG image**. Replace existing OG image with `brand/social/og-default.png`. Ensure `BaseLayout.astro` references it with correct `og:image` tag.
 
 Estimated effort: one focused day of work by one engineer, or one Claude Code session.
 
@@ -553,6 +556,7 @@ Estimated effort: one focused day of work by one engineer, or one Claude Code se
 | 1.2 | April 20, 2026 | **Logo finalized.** Mark is now a hand-drawn vector urban apartment building with three floors, nine-window grid, flush-right door with two-step stoop, and amber lit window at dead center of the middle floor. Section 6 rewritten with full usage spec (variants, committed colors, minimum sizes, clear space, don'ts). **Warm Lamp `#F5E6A8` added to palette** as an icon-only restricted color. Assets table (§11) updated: `logo-mark.svg` is final; ink-only, reverse, and lockup variants scheduled for Claude Design polish pass. Placeholder asset flags removed. |
 | 1.3 | April 26, 2026 | **Logo asset set complete.** Claude Design polish pass delivered four final SVG variants: `logo-mark-ink.svg` (monochrome, transparent window cutouts), `logo-mark-reverse.svg` (paper silhouette on dark, amber lit window preserved), `logo-lockup.svg` (editorial, Instrument Serif), and `logo-lockup-utility.svg` (Inter Bold). All four marked Final in §11. Ready for site migration. |
 | 1.4 | June 2026 | **Synced to brand bible v1.0.** Added two reverse lockups, `logo-lockup-reverse.svg` (silhouette mark plus white wordmark) and `logo-lockup-reverse-teal.svg` (full-color teal building plus white wordmark), to the variants table in §6 and the assets registry in §11. Fixed the §7.6 stat citation from `slate-500` to `slate-600` so it clears WCAG AA at 11px. Updated §1 to name the brand bible v1.0 as the canonical brand document, with this handbook as its code-level companion. Refreshed the stale reverse-variant note in §6. Removed em dashes throughout for voice consistency with the bible. |
+| 1.5 | October 2026 | Default OG image shipped; OG rules revised for feed-card legibility and square crops. |
 
 ---
 

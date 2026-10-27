@@ -2,13 +2,21 @@
 import '../../../src/styles/global.css';
 import Header from './Header.astro';
 import Footer from './Footer.astro';
+import { maybeEnv } from '../../lib/runtime';
+import { DEFAULT_DESCRIPTION, headMeta, siteOriginFrom } from '../../lib/seo';
 
 interface Props {
   title: string;
   description?: string;
+  /** robots noindex, with no canonical and no og:url. Never on a sitemap page (pageIndexing.test.ts). */
+  noindex?: boolean;
 }
 
-const { title, description = 'Tenant housing reviews - Real experiences from real renters' } = Astro.props;
+const { title, description = DEFAULT_DESCRIPTION, noindex = false } = Astro.props;
+// maybeEnv, not getEnv: this renders every page, including in the unit-test container with no
+// runtime and under the Astro 6+ adapter, so it must not throw. siteOriginFrom falls back to
+// https://ratemyplace.org.
+const meta = headMeta({ title, description, pathname: Astro.url.pathname, siteOrigin: siteOriginFrom(maybeEnv(Astro.locals)), noindex });
 ---
 
 <!doctype html>
@@ -16,18 +24,30 @@ const { title, description = 'Tenant housing reviews - Real experiences from rea
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content={description} />
+    <title>{meta.title}</title>
+    <meta name="description" content={meta.description} />
+    {meta.robots && <meta name="robots" content={meta.robots} />}
+    {meta.url && <link rel="canonical" href={meta.url} />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta property="og:title" content={`${title} | RateMyPlace`} />
-    <meta property="og:description" content={description} />
-    <meta property="og:image" content="/brand/social/og-default.png" />
+    <meta property="og:site_name" content={meta.siteName} />
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
+    {meta.url && <meta property="og:url" content={meta.url} />}
+    <meta property="og:title" content={meta.title} />
+    <meta property="og:description" content={meta.description} />
+    <meta property="og:image" content={meta.image.url} />
+    <meta property="og:image:type" content={meta.image.type} />
+    <meta property="og:image:width" content={String(meta.image.width)} />
+    <meta property="og:image:height" content={String(meta.image.height)} />
+    <meta property="og:image:alt" content={meta.image.alt} />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="/brand/social/og-default.png" />
+    <meta name="twitter:title" content={meta.title} />
+    <meta name="twitter:description" content={meta.description} />
+    <meta name="twitter:image" content={meta.image.url} />
+    <meta name="twitter:image:alt" content={meta.image.alt} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
-    <title>{title} | RateMyPlace</title>
   </head>
   <body class="min-h-screen bg-paper flex flex-col">
     <Header />

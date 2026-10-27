@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireAndForget, recipientHash } from '../runtime';
+import { fireAndForget, maybeEnv, recipientHash } from '../runtime';
 import type { APIContext } from 'astro';
 
 // Helper to build a minimal APIContext-shaped object for tests.
@@ -116,5 +116,40 @@ describe('recipientHash', () => {
     const result = recipientHash('user@example.com');
     expect(result).not.toBeInstanceOf(Promise);
     expect(typeof result).toBe('string');
+  });
+});
+
+describe('maybeEnv', () => {
+  it('returns the runtime env when there is one', () => {
+    const env = { SITE_URL: 'x' };
+    const locals = { user: null, session: null, runtime: { env } } as unknown as App.Locals;
+    expect(maybeEnv(locals)).toBe(env);
+  });
+
+  it('returns undefined with no runtime at all (the unit-test container)', () => {
+    expect(maybeEnv({ user: null, session: null } as unknown as App.Locals)).toBeUndefined();
+  });
+
+  it('returns undefined, without throwing, when the env getter throws (Astro 6+ adapter)', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const locals = {
+      user: null,
+      session: null,
+      runtime: {
+        get env(): never {
+          throw new Error('Astro.locals.runtime.env has been removed in Astro v6.');
+        },
+      },
+    } as unknown as App.Locals;
+    try {
+      expect(() => maybeEnv(locals)).not.toThrow();
+      expect(maybeEnv(locals)).toBeUndefined();
+      // Logged once per isolate, not once per page: two calls, exactly one line. This is the
+      // only test in the file that reaches the throwing path, so the module flag starts unset.
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(errorSpy.mock.calls[0][0] as string).event).toBe('maybeEnv: runtime env unreadable');
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });

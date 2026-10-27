@@ -89,6 +89,13 @@ const apiKey = getEnv(context).RESEND_API_KEY;
 `getEnv(context: APIContext)` throws a clear error outside Wrangler. **Never write
 `(context.locals as any).runtime`** — v1.5.0 removed 89 such casts across the codebase.
 
+`maybeEnv(locals)` is the exception, and only for render paths that must never throw and
+have a safe default for every value they read — today, BaseLayout's head, which reads
+`SITE_URL` and falls back to `https://ratemyplace.org`. It returns `undefined` when there is
+no runtime (the Astro container in unit tests) and when the Astro 6+ Cloudflare adapter's
+`locals.runtime.env` getter throws its migration error, and logs that once per isolate.
+Everything else keeps using `getEnv`, which throws on purpose.
+
 `fireAndForget(context, promise)` registers work with `ctx.waitUntil` so the Worker isolate
 stays alive after the response is sent, and swallows rejections into structured logs. An
 unhandled rejection inside `waitUntil` crashes the isolate in production, so the internal
@@ -359,8 +366,22 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   either call site stops using the fragments.
 - **`buildingMeta.ts` decides the records-page title.** `buildingPageMeta` swaps in the
   records-flavored title and description only when a building has zero approved reviews, a
-  Boston jurisdiction (`jurisdictionForCity`) and a parcel id, and avoids a doubled
-  ", Boston" when the address already carries it. Reviewed pages keep the review metadata.
+  Boston jurisdiction (`jurisdictionForCity`) and a parcel id. Reviewed pages keep the review
+  metadata. The records title is `<address>, <neighbourhood>, Boston` (`bostonPlace`): the
+  neighbourhood is named only when `bostonLocalityName` recognises it, in its display
+  spelling; East Boston and South Boston drop the suffix; a blank, street-word, junk or
+  out-of-city value ("St. Elizabeth's", "Chestnut Hill") falls back to `<address>, Boston`;
+  and a Boston locality the address already carries is never named twice. Before October 2026
+  711 seeded URLs shared a title; twin parcels at one address and ZIP (about 120 groups) still
+  share one by design, because the parcel id stays out of the metadata.
+- **`seo.ts` builds every page's head** (BaseLayout is the only caller). The canonical and
+  `og:url` come from `SITE_URL` through `siteOriginFrom`, which never throws and falls back to
+  `https://ratemyplace.org`; the query string is dropped and the trailing slash stripped, the
+  sitemap's form. A `noindex` page (BaseLayout's prop) gets `robots: noindex, follow` and
+  carries neither tag, so a private URL is never advertised; `isSearchVariant` noindexes
+  `/search` with any parameter. `DEFAULT_OG_IMAGE` is the committed PNG, guarded by
+  `__tests__/ogImage.test.ts`. Every page must be classified as a sitemap page, an indexable
+  dynamic route or noindex — `__tests__/pageIndexing.test.ts` fails on a new page until it is.
 - **`sitemap.ts` owns the allowlist and the chunking.** `STATIC_SITEMAP_PATHS` is the
   hand-kept list of public pages (property-manager pages are deliberately absent);
   `SITEMAP_CHUNK` is 10,000 URLs per chunk; `buildingChunkCount` has no floor of 1, so an
@@ -369,12 +390,14 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
 - **`bostonLocalities.ts` is the one Boston locality vocabulary.** `BOSTON_LOCALITY_NAMES`
   holds the 26 names in display form — every USPS city name for a Boston-only ZIP plus the
   neighborhood names people type, minus `CHESTNUT HILL`, whose 02467 also covers Newton and
-  Brookline. Three consumers derive from it and none restates it: `locality.ts`
+  Brookline. Four consumers derive from it and none restates it: `locality.ts`
   (`BOSTON_NEIGHBORHOODS`, normalized and minus 'boston', behind the `isBostonLocality`
   predicate — Google Places routinely hands back the neighborhood as the locality),
-  `records/identity.ts` (`TRAILING_LOCALITIES`, uppercased, for the trailing-locality
-  stripper), and `records/dedupe.ts` (`CITY_CANDIDATES`, the bind list for its `city IN (…)`
-  candidate predicate). Add a name here and nowhere else. `BOSTON_SUB_AREAS` in the same
+  `locality.ts` again (`bostonLocalityName`, the display spelling of any value
+  `isBostonLocality` accepts, for records-page titles), `records/identity.ts`
+  (`TRAILING_LOCALITIES`, uppercased, for the trailing-locality stripper), and
+  `records/dedupe.ts` (`CITY_CANDIDATES`, the bind list for its `city IN (…)` candidate
+  predicate). Add a name here and nowhere else. `BOSTON_SUB_AREAS` in the same
   file maps sub-area names Google hands back as the locality (Aberdeen, Oak Square, Cleveland
   Circle, Savin Hill, …) to the neighborhood they sit in; `displayLocality` and
   `resolveBostonSubArea` in `locality.ts`, `titleCaseNeighborhood` in

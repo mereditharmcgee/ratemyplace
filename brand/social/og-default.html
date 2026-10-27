@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!--
+  Source for public/brand/social/og-default.png (1200x630), the default link-preview image.
+  Rendered by scripts/og/render-og.mjs (npm run og:render). The committed PNG is the source
+  of truth: re-render only on purpose, and get the owner's sign-off on the result.
+
+  Brand: brand.md section 2 (tagline, never reworded), 4 (colour), 5 (type), 6 (full lockup:
+  120px minimum width, clear space of half the mark's height), 10 (primary message).
+
+  Layout: the lockup, headline and secondary line all sit inside the centre 630x630 square
+  (x 285-915), because some platforms show a square thumbnail, and clear the 15px that X
+  trims off the top and bottom for its 2:1 card. The render script fails if they do not.
+
+  The LOCKUP comment in .lockup is replaced at render time with brand/logo-lockup.svg,
+  inlined rather than loaded as an img (an SVG image cannot use web fonts, so its wordmark
+  falls back to Times). The script then crops the SVG's viewBox to the drawn mark and
+  wordmark so the lockup centres optically; the width below is therefore the drawn width.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=block" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #F6F4EE;      /* Paper, brand.md section 4 */
+    --ink: #0F172A;        /* Ink, slate-900 */
+    --graphite: #334155;   /* Graphite, slate-700 */
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .frame {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center;
+    padding: 48px 285px; /* 285px a side leaves the centre 630px square */
+  }
+  /* 380px drawn width: about 127px in a 400px-wide feed card, above the 120px minimum. */
+  .lockup svg { display: block; width: 380px; height: auto; }
+  h1 {
+    margin-top: 52px; /* clear space: at least half the mark's height (about 98px here) */
+    font-family: "Instrument Serif", Georgia, serif;
+    font-weight: 400;
+    font-size: 128px; line-height: 0.98; letter-spacing: -0.01em;
+    white-space: nowrap;
+    color: var(--ink);
+  }
+  .sub {
+    margin-top: 28px;
+    font-size: 32px; font-weight: 400; line-height: 1.3;
+    text-wrap: balance;
+    color: var(--graphite);
+  }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div class="lockup"><!--LOCKUP--></div>
+    <h1>Know before<br />you sign.</h1>
+    <p class="sub">A public record of rental housing, from the people who know it best.</p>
+  </div>
+</body>
+</html>
