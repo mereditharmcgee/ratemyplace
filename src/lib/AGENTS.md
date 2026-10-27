@@ -55,6 +55,28 @@ Use the helpers — never hardcode a threshold or a color:
 - `getScoreTextColor(score)` → Tailwind class for a colored score number
 - `getScoreBgTint(score)` → soft-tinted background for score detail tiles
 - `getScoreHex(score)` / `SCORE_HEX` → hex for non-Tailwind contexts (Maps markers, OG images)
+- `getEarlyScoreTextColor(score)` → the same band for an early rating, one shade lighter
+  where that still reads on Paper (emerald-600, red-600); Mixed stays amber-700 because
+  amber-600 is about 2.9:1 on Paper. Large text (24px and up) only, since these clear 3:1
+  on Paper, white and the score tints, not 4.5:1
+
+### `earlyRating.ts` is how a thin score is displayed, not computed
+
+A building score shows from its first approved review. Below `NAMED_PARTY_MIN_REVIEWS` it is
+an **early rating** everywhere a building score appears (building page, search cards,
+landlord and property manager building lists, map info window): the count sits beside the
+score ("from 1 review"), `scoreNumberClass` draws it lighter, and issue and recommend rates
+are counts ("1 of 1 review") instead of percentages. Import the constant; never type 3.
+
+The percentages it still prints use the formulas in `calculateAggregatedScores` /
+`calculateBuildingAverages`, and `earlyRating.test.ts` holds them equal. It changes no score.
+A "Maybe / It depends" answer is never a no: the recommend percentage counts yes and no only
+(as it always has), a maybe is shown on its own as a count, and a lone maybe produces no
+recommend figure at all rather than "0%". The methodology paragraph `#early-ratings` says so
+and its test pins the wording that matters.
+
+The search and map islands import it, so its only runtime imports are `./scoring` and
+`./scoring-colors`, which import nothing; its test fails if that changes.
 
 ### `surveyItems.ts` is the canonical survey definition
 
@@ -91,7 +113,8 @@ const apiKey = getEnv(context).RESEND_API_KEY;
 
 `maybeEnv(locals)` is the exception, and only for render paths that must never throw and
 have a safe default for every value they read — today, BaseLayout's head, which reads
-`SITE_URL` and falls back to `https://ratemyplace.org`. It returns `undefined` when there is
+`SITE_URL` and falls back to `https://ratemyplace.org`, and the sign-in and sign-up pages'
+review note (`reviewSignin.ts`), which reads `DB` and drops the address without it. It returns `undefined` when there is
 no runtime (the Astro container in unit tests) and when the Astro 6+ Cloudflare adapter's
 `locals.runtime.env` getter throws its migration error, and logs that once per isolate.
 Everything else keeps using `getEnv`, which throws on purpose.
@@ -283,9 +306,10 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
 - **`matchConfidence.ts` decides when an address-keyed zero is not a finding.** A range too
   wide to expand, a mixed-parity range, a current-year parcel (`parcelStreetNumber` /
   `parcelStreetNumberHigh`, FY2026 only) that covers numbers the page's address does not, or a
-  page ZIP that disagrees with the parcel's: then 311, Public Works and ISD say "not matched
-  with confidence" instead of "none on record". It reads only stored data, so it needs no
-  column, and a payload stored before October 2026 reads as no reason.
+  page ZIP that disagrees with the parcel's: then each empty 311 group, Public Works and ISD
+  say "not matched with confidence" instead of "none on record" (a 311 group with requests
+  keeps its count). It reads only stored data, so it needs no column, and a payload stored
+  before October 2026 reads as no reason.
 - **`seed/` is the bulk pipeline, not a request path.** `scripts/records-seed-boston.ts`
   downloads the assessor and SAM resources once (`fetchAllRows` in `ckan.ts`), and the pure
   modules under `records/seed/` filter, collapse, format, match, and emit SQL. Every string
@@ -366,6 +390,15 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   `streetKey`.** It removes a comma-less trailing "Boston" / neighborhood / "MA" / ZIP tail
   that `normalizeStreet`'s comma rule cannot see. `streetKey` takes a street it has already
   been handed, so adding the stripper there would change seed keys.
+- **`recordGroups.ts` sorts 311 into the panel's three groups at render time** (living
+  conditions, building safety and code, property upkeep, in that order), by the request type
+  the city recorded. It never changes the pull-time `classification` in
+  `sources/boston/serviceRequests.ts`, which the daily fixture check and the breaker read, so
+  editing the table needs no Worker deploy and cannot pause the fill. A request the pull
+  calls `housing` always lands in a group; a type in no group is counted, never listed. The
+  methodology page renders the same table, so add a type there and nowhere else. ISD
+  violations are counted by case number and Public Works tickets by ticket number
+  (`ledger.ts`), not by code line.
 - **`display.ts` holds a privacy gate.** `showMailingAddress` publishes a tax mailing
   address only for an owner that reads as an entity, and `mailingAddressLine` holds the
   addressee to the same test — an entity can list a person as its `C/O ATT`. It errs
@@ -382,6 +415,15 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   every Boston building, reviewed ones first; browse mode, the landlord queries and the map
   keep their `HAVING COUNT(r.id) > 0`. `__tests__/recordsSearchParity.test.ts` fails if
   either call site stops using the fragments.
+- **Browse mode is Boston first, most recently reviewed.** Its query stays in the two call
+  sites, but its ORDER BY is `BROWSE_BUILDINGS_ORDER` in `searchSql.ts`: Boston buildings
+  (`BOSTON_CITY_SQL`, the same city test `has_records` uses, without the parcel check), then
+  the rest, each by newest approved review `created_at`, then `b.id` so Load more pages never
+  overlap. The reviews row has no approval time (`moderated_at` is never written, `updated_at`
+  moves on later moderation saves); it exists only in the admin `audit_logs` table, which a
+  public query should not join, and submission and approval are days apart at most. Hence
+  submission time. It orders rows only and is never shown.
+  `__tests__/searchBrowseOrder.test.ts` pins the order against SQLite.
 - **`buildingMeta.ts` decides the records-page title.** `buildingPageMeta` swaps in the
   records-flavored title and description only when a building has zero approved reviews, a
   Boston jurisdiction (`jurisdictionForCity`) and a parcel id. Reviewed pages keep the review
@@ -429,6 +471,16 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   and `shouldPanToUser` pans to the reader only when they are inside the fitted box.
   `BuildingMap.tsx` fits once (`didFitRef`) and never again on refetch, and skips viewport
   refetches until the first unbounded load lands so that one fit sees every building.
+- **The homepage dropdown has its own Places scope.** `GET /api/places/autocomplete` serves
+  two islands. The review form's `AddressAutocomplete` sends no scope and gets any US
+  address (people review buildings outside Boston). `HomeSearch` alone sends `scope=boston`:
+  `autocompleteRequestBody` (`places.ts`) adds a location bias to `BOSTON_BOX`,
+  `bostonScopePredictions` drops every suggestion not in Massachusetts and puts Boston
+  first, and `matchPredictionsToBuildings` (`homeSearchMatch.ts`) resolves each suggestion
+  read-only through `findExistingBuilding`, refusing an address-key match when Google and
+  the building name different neighborhoods. `homeSearchItems.ts` (a leaf) orders the rows:
+  buildings we have ("See this building", with "Write a review" beside it), landlords, then
+  "Other addresses". Never add the scope to the review form without the owner's say.
 - **`mapCluster.ts` decides how a marker cluster looks.** The badge is filled with
   `getScoreHex` of the plain mean of the clustered buildings' scores (unscored ones left
   out; none scored → the no-score grey). It is a map colour only — never shown as a number,

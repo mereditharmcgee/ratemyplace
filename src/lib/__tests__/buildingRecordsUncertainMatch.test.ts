@@ -56,7 +56,7 @@ async function renderFor(address: string, assessorRow: Record<string, unknown> =
 }
 
 function rowText(fragment: HTMLElement, heading: string): string {
-  const match = Array.from(fragment.querySelectorAll('summary h3')).find((node) =>
+  const match = Array.from(fragment.querySelectorAll('summary h4')).find((node) =>
     (node.textContent ?? '').trim().startsWith(heading),
   );
   if (!match) throw new Error(`no "${heading}" ledger row`);
@@ -66,25 +66,37 @@ function rowText(fragment: HTMLElement, heading: string): string {
 suite('BuildingRecords.astro under an uncertain match', () => {
   it('says the records could not be matched with confidence on a mixed-parity address', async () => {
     const panel = await renderFor('10-15 Example Rd');
-    const violations = rowText(panel, 'ISD violations');
+    const violations = rowText(panel, 'ISD violation cases');
     expect(violations).toContain(UNCERTAIN_MATCH_SUBCOUNT);
     expect(violations).toContain(uncertainMatchCopy('mixed_parity'));
     expect(violations).not.toContain('none on record');
     expect(violations).not.toContain('No violations on record.');
     expect(violations).not.toContain(NO_VIOLATIONS_CAVEAT);
-    expect(rowText(panel, 'Code enforcement tickets')).toContain(uncertainMatchCopy('mixed_parity'));
-    expect(rowText(panel, '311 housing requests')).toContain(uncertainMatchCopy('mixed_parity'));
+    const tickets = rowText(panel, 'Public Works code enforcement tickets');
+    expect(tickets).toContain(uncertainMatchCopy('mixed_parity'));
+    expect(tickets).not.toContain('No code enforcement tickets on record.');
+    // Each 311 group prints its own empty state, so each one gives way to the match note.
+    for (const [heading, emptyCopy] of [
+      ['311 living conditions requests', 'No living conditions requests on record.'],
+      ['311 building and code requests', 'No building and code requests on record.'],
+      ['311 property upkeep requests', 'No property upkeep requests on record.'],
+    ]) {
+      const requests = rowText(panel, heading);
+      expect(requests).toContain(UNCERTAIN_MATCH_SUBCOUNT);
+      expect(requests).toContain(uncertainMatchCopy('mixed_parity'));
+      expect(requests).not.toContain(emptyCopy);
+    }
     // Permits are keyed on the parcel too, so their empty state is unchanged.
     expect(rowText(panel, 'Building permits')).toContain('none on record');
   });
 
   it('says so for a single address on a wider parcel, read from the stored current-year row', async () => {
-    const violations = rowText(await renderFor('16 Example Rd'), 'ISD violations');
+    const violations = rowText(await renderFor('16 Example Rd'), 'ISD violation cases');
     expect(violations).toContain(uncertainMatchCopy('parcel_wider'));
   });
 
   it('keeps "none on record" when the address covers the whole parcel', async () => {
-    const violations = rowText(await renderFor('10-20 Example Rd'), 'ISD violations');
+    const violations = rowText(await renderFor('10-20 Example Rd'), 'ISD violation cases');
     expect(violations).toContain('none on record');
     expect(violations).toContain('No violations on record.');
     expect(violations).not.toContain(UNCERTAIN_MATCH_SUBCOUNT);

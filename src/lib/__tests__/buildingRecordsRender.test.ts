@@ -14,7 +14,8 @@ import {
   DECLARED_VALUATION_CAVEAT,
   FILL_QUEUED_COPY,
   NO_VIOLATIONS_CAVEAT,
-  OTHER_REQUESTS_COPY,
+  GROUPING_LINK_TEXT,
+  GROUPING_NOTE,
   REQUESTED_COPY,
   REQUEST_BUTTON_LABEL,
   REQUEST_PARKED_COPY,
@@ -115,11 +116,11 @@ function parse(html: string): HTMLElement {
 
 /**
  * The ledger row for a given source, so a count or an empty state can be attributed to the
- * right one. Each row is a `<details>` whose `<summary>` carries the `h3`.
+ * right one. Each row is a `<details>` whose `<summary>` carries the `h4` (the groups are `h3`).
  */
 function ledgerRow(html: string, heading: string): HTMLDetailsElement {
   const fragment = parse(html);
-  const headings = Array.from(fragment.querySelectorAll('summary h3'));
+  const headings = Array.from(fragment.querySelectorAll('summary h4'));
   const match = headings.find((node) => (node.textContent ?? '').trim().startsWith(heading));
   if (!match) throw new Error(`Rendered panel has no "${heading}" ledger row`);
   const row = match.closest('details');
@@ -210,7 +211,7 @@ suite('BuildingRecords.astro rendered output', () => {
       .run();
 
     const html = await renderPanel(db);
-    const violations = sectionText(html, 'ISD violations');
+    const violations = sectionText(html, 'ISD violation cases');
 
     expect(violations).toContain('Not retrieved yet');
     // "No violations on record" is a finding. Nobody looked, so there is no finding.
@@ -345,11 +346,21 @@ suite('BuildingRecords.astro ledger', () => {
 
     const html = await renderPanel(db);
 
-    // Three housing-classified requests, two of them still open; the rest are counted and named.
-    const requests = summaryText(html, '311 housing requests');
-    expect(requests).toContain('2 open');
-    expect(requests).toContain('5 other requests not shown');
-    expect(requests).toContain('2024–2026');
+    // Two living-conditions requests, one still open. The two trash-storage requests are
+    // property upkeep, and the four requests in no group are counted once, under the groups.
+    const living = summaryText(html, '311 living conditions requests');
+    expect(living).toContain('1 open');
+    expect(living).toContain('2024–2026');
+    expect(living).not.toContain('not shown');
+    const upkeep = summaryText(html, '311 property upkeep requests');
+    expect(upkeep).toContain('2 open');
+    expect(upkeep).toContain('2024');
+    expect(summaryText(html, '311 building and code requests')).toContain('none on record');
+    expect(parse(html).textContent).toContain('4 other 311 requests at or near this address');
+
+    // Two Public Works tickets, though the feed holds three violation lines.
+    const tickets = summaryText(html, 'Public Works code enforcement tickets');
+    expect(tickets).toContain('3 violation lines on 2 tickets');
 
     // Two permits after the duplicate row is deduped, one open, $36,500 + $1,200 declared.
     const permits = summaryText(html, 'Building permits');
@@ -366,17 +377,23 @@ suite('BuildingRecords.astro ledger', () => {
     const html = await renderPanel(db);
 
     // "0 open" would read the same for an empty source and a fully closed one.
-    expect(summaryText(html, 'ISD violations')).toContain('none on record');
+    expect(summaryText(html, 'ISD violation cases')).toContain('none on record');
   });
 
-  it('opens the 311 row by default and leaves the other three closed', async () => {
+  it('opens the living conditions row by default and leaves the others closed', async () => {
     const db = await createDbWithAdmin();
     await seedFullBuilding(db);
 
     const html = await renderPanel(db);
 
-    expect(ledgerRow(html, '311 housing requests').hasAttribute('open')).toBe(true);
-    for (const heading of ['Building permits', 'Code enforcement tickets', 'ISD violations']) {
+    expect(ledgerRow(html, '311 living conditions requests').hasAttribute('open')).toBe(true);
+    for (const heading of [
+      'ISD violation cases',
+      '311 building and code requests',
+      'Building permits',
+      'Public Works code enforcement tickets',
+      '311 property upkeep requests',
+    ]) {
       expect(ledgerRow(html, heading).hasAttribute('open')).toBe(false);
     }
   });
@@ -390,7 +407,7 @@ suite('BuildingRecords.astro ledger', () => {
     // The one class worth pinning: the row is the tap target on a phone, and 44px is the floor.
     expect(summary?.className).toContain('min-h-[44px]');
     // Everything a closed row has to answer lives in the summary, not behind the disclosure.
-    expect(summary?.querySelector('h3')?.textContent).toContain('Building permits');
+    expect(summary?.querySelector('h4')?.textContent).toContain('Building permits');
     expect(summary?.textContent).toContain('as of');
     expect(summary?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
   });
@@ -399,12 +416,12 @@ suite('BuildingRecords.astro ledger', () => {
     const db = await createDbWithAdmin();
     await seedFullBuilding(db);
 
-    const requests = ledgerRow(await renderPanel(db), '311 housing requests');
+    const requests = ledgerRow(await renderPanel(db), '311 living conditions requests');
 
     expect(requests.textContent).toContain('Requests by year opened');
     expect(requests.textContent).toContain('What was reported');
     const chart = requests.querySelector('[role="img"]');
-    expect(chart?.getAttribute('aria-label')).toContain('3 requests across 2024 to 2026');
+    expect(chart?.getAttribute('aria-label')).toContain('2 requests across 2024 to 2026');
     // Every year in the span draws, including 2025, which has nothing in it.
     expect(requests.innerHTML).toContain('title="2025: 0"');
     expect(requests.innerHTML).toContain('title="2026: 1"');
@@ -414,21 +431,21 @@ suite('BuildingRecords.astro ledger', () => {
     const db = await createDbWithAdmin();
     await seedFullBuilding(db);
 
-    const requests = ledgerRow(await renderPanel(db), '311 housing requests');
-    const heading = Array.from(requests.querySelectorAll('h4')).find((node) =>
+    const requests = ledgerRow(await renderPanel(db), '311 living conditions requests');
+    const heading = Array.from(requests.querySelectorAll('h5')).find((node) =>
       (node.textContent ?? '').trim().startsWith('Still open'),
     );
 
-    expect(heading?.textContent?.trim()).toBe('Still open in city records (2)');
+    expect(heading?.textContent?.trim()).toBe('Still open in city records (1)');
     // The explanation sits directly under the heading it explains.
     expect(heading?.nextElementSibling?.textContent?.trim()).toBe(STILL_OPEN_NOTE);
     expect(requests.textContent).not.toMatch(/open now/i);
     // Each open row says when it was filed: the year only, never a finer date than the row shows.
     const openList = heading?.nextElementSibling?.nextElementSibling;
     const openLabels = Array.from(openList?.querySelectorAll('li') ?? []).map((li) => li.lastElementChild?.textContent?.trim());
-    expect(openLabels).toHaveLength(2);
+    expect(openLabels).toHaveLength(1);
     for (const label of openLabels) expect(label).toMatch(/^Still open in city records, filed \d{4}$/);
-    expect(requests.textContent).toContain('Show all 3 requests');
+    expect(requests.textContent).toContain('Show all 2 requests');
     // The full list keeps the closed dates the summary rows leave out.
     expect(requests.textContent).toContain('closed Dec 20, 2024');
   });
@@ -437,7 +454,7 @@ suite('BuildingRecords.astro ledger', () => {
     const db = await createDbWithAdmin();
     await seedFullBuilding(db, [OPEN_VIOLATION_ROUTE]);
 
-    const violations = sectionText(await renderPanel(db), 'ISD violations');
+    const violations = sectionText(await renderPanel(db), 'ISD violation cases');
 
     expect(violations).toContain(STILL_OPEN_NOTE);
     expect(violations).toContain('Still open in city records');
@@ -456,7 +473,7 @@ suite('BuildingRecords.astro ledger', () => {
     const html = await renderPanel(db);
 
     // The fixture's code enforcement tickets are all closed.
-    expect(sectionText(html, 'Code enforcement tickets')).not.toContain(STILL_OPEN_NOTE);
+    expect(sectionText(html, 'Public Works code enforcement tickets')).not.toContain(STILL_OPEN_NOTE);
   });
 
   it("keeps an open permit's status as the city recorded it", async () => {
@@ -479,26 +496,73 @@ suite('BuildingRecords.astro ledger', () => {
     const html = await renderPanel(db);
 
     expect(sectionText(html, 'Building permits')).toContain('Show all 2 permits');
-    expect(sectionText(html, 'Code enforcement tickets')).toMatch(/Show all \d+ tickets/);
+    expect(sectionText(html, 'Public Works code enforcement tickets')).toMatch(/Show all \d+ tickets/);
   });
 
-  it('keeps the caveats and the classification note inside their rows', async () => {
+  it('keeps the caveats inside their rows and says once how 311 requests are grouped', async () => {
     const db = await createDbWithAdmin();
     await seedFullBuilding(db);
 
     const html = await renderPanel(db);
+    const text = parse(html).textContent ?? '';
 
     expect(sectionText(html, 'Building permits')).toContain(DECLARED_VALUATION_CAVEAT);
-    const requests = sectionText(html, '311 housing requests');
-    expect(requests).toContain('How requests are classified');
-    expect(requests).toContain(OTHER_REQUESTS_COPY);
+    // Said once for all three 311 rows, outside every disclosure, with the full list a link away.
+    expect(text.split(GROUPING_NOTE)).toHaveLength(2);
+    expect(sectionText(html, '311 living conditions requests')).not.toContain(GROUPING_NOTE);
+    const link = Array.from(parse(html).querySelectorAll('a')).find(
+      (node) => (node.textContent ?? '').trim() === GROUPING_LINK_TEXT,
+    );
+    expect(link?.getAttribute('href')).toBe('/methodology#public-records-are-not-scored');
+    expect(text).not.toContain('not shown');
+  });
+
+  it('shows the three groups in the order the owner set, each with its rows', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const fragment = parse(await renderPanel(db));
+    const groups = Array.from(fragment.querySelectorAll('section[aria-labelledby] > h3')).map((node) => (node.textContent ?? '').trim());
+    expect(groups).toEqual(['Living conditions', 'Building safety and code', 'Property upkeep']);
+
+    const rowsIn = (title: string) => {
+      const heading = Array.from(fragment.querySelectorAll('section[aria-labelledby] > h3')).find(
+        (node) => (node.textContent ?? '').trim() === title,
+      );
+      return Array.from(heading?.closest('section')?.querySelectorAll('summary h4') ?? []).map((node) =>
+        (node.textContent ?? '').trim(),
+      );
+    };
+    expect(rowsIn('Living conditions')).toEqual(['311 living conditions requests']);
+    expect(rowsIn('Building safety and code')).toEqual([
+      'ISD violation cases',
+      '311 building and code requests',
+      'Building permits',
+    ]);
+    expect(rowsIn('Property upkeep')).toEqual(['Public Works code enforcement tickets', '311 property upkeep requests']);
+  });
+
+  it('lists ISD lines under their case number and Public Works lines under their ticket', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db, [OPEN_VIOLATION_ROUTE]);
+
+    const html = await renderPanel(db);
+
+    const violations = sectionText(html, 'ISD violation cases');
+    expect(violations).toContain('Case V100001');
+    expect(violations).toContain('Case V100002');
+    expect(summaryText(html, 'ISD violation cases')).toContain('1 open');
+    const tickets = sectionText(html, 'Public Works code enforcement tickets');
+    expect(tickets).toContain('Ticket T1');
+    expect(tickets).toContain('Ticket T2');
+    expect(tickets).toContain('Show all 2 tickets');
   });
 
   it('says an empty violations list is a fact about the feed, not a clearance', async () => {
     const db = await createDbWithAdmin();
     await seedFullBuilding(db);
 
-    const violations = sectionText(await renderPanel(db), 'ISD violations');
+    const violations = sectionText(await renderPanel(db), 'ISD violation cases');
 
     expect(violations).toContain('No violations on record.');
     expect(violations).toContain(NO_VIOLATIONS_CAVEAT);
@@ -521,7 +585,12 @@ suite('BuildingRecords.astro ledger', () => {
       // And no status carries a score band: the panel does not say an open record is bad news.
       expect(node.className).not.toMatch(/red|amber|orange|emerald|green|yellow/);
     }
-    for (const heading of ['311 housing requests', 'Code enforcement tickets', 'ISD violations']) {
+    for (const heading of [
+      '311 living conditions requests',
+      '311 property upkeep requests',
+      'Public Works code enforcement tickets',
+      'ISD violation cases',
+    ]) {
       expect(ledgerRow(html, heading).innerHTML).not.toMatch(/(bg|text|border)-(red|green|amber|emerald|yellow|orange)-\d/);
     }
   });
@@ -534,7 +603,7 @@ suite('BuildingRecords.astro ledger', () => {
       .bind(BUILDING_ID, VIOLATIONS_RESOURCE_ID)
       .run();
 
-    const violations = ledgerRow(await renderPanel(db), 'ISD violations');
+    const violations = ledgerRow(await renderPanel(db), 'ISD violation cases');
 
     // Nobody looked, so there is no count — not a zero, which would be a finding.
     expect(violations.querySelector('summary')?.textContent).toContain('—');
@@ -668,7 +737,7 @@ suite('BuildingRecords.astro request button states', () => {
     // assessor pull but no assessment rows, so the strip is the empty-record line.
     const factsIndex = text.indexOf('No assessor record on file.');
     const labelIndex = text.indexOf(REQUEST_BUTTON_LABEL);
-    const ledgerIndex = text.indexOf('311 housing requests');
+    const ledgerIndex = text.indexOf('311 living conditions requests');
     expect(factsIndex).toBeGreaterThan(-1);
     expect(labelIndex).toBeGreaterThan(factsIndex);
     expect(ledgerIndex).toBeGreaterThan(labelIndex);

@@ -382,13 +382,36 @@ describe('the ledger under an uncertain match', () => {
 
   it('replaces "none on record" on the address-keyed sources, never on permits', () => {
     const ledger = ledgerModel(view({ matchUncertainty: 'zip_differs' }), NOW);
-    for (const section of [ledger.requests, ledger.enforcement, ledger.violations]) {
+    for (const section of [
+      ledger.living,
+      ledger.buildingRequests,
+      ledger.upkeepRequests,
+      ledger.enforcement,
+      ledger.violations,
+    ]) {
       expect(section.count).toBe('0');
       expect(section.subCount).toBe(UNCERTAIN_MATCH_SUBCOUNT);
       expect(section.matchNote).toBe(uncertainMatchCopy('zip_differs'));
     }
     expect(ledger.permits.subCount).toBe('none on record');
     expect(ledger.permits.matchNote).toBeNull();
+  });
+
+  it('words each 311 group on its own: a group with requests keeps its count, an empty one does not claim none', () => {
+    const heat: ServiceRequestPayload = {
+      caseId: 'R1', system: 'new', openedAt: '2025-01-02', closedAt: null, status: 'Closed', closureReason: null,
+      title: null, subject: 'Inspectional Services', reason: 'Housing', type: 'Heat - Excessive  Insufficient',
+      location: null, source: null, classification: 'housing',
+    };
+    const ledger = ledgerModel(view({ matchUncertainty: 'mixed_parity', serviceRequests: [heat] }), NOW);
+    expect(ledger.living.count).toBe('1');
+    expect(ledger.living.subCount).toBe('all closed');
+    expect(ledger.living.matchNote).toBeNull();
+    for (const section of [ledger.buildingRequests, ledger.upkeepRequests]) {
+      expect(section.count).toBe('0');
+      expect(section.subCount).toBe(UNCERTAIN_MATCH_SUBCOUNT);
+      expect(section.matchNote).toBe(uncertainMatchCopy('mixed_parity'));
+    }
   });
 
   it('leaves a section with records alone', () => {

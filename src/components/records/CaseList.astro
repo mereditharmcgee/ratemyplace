@@ -1,0 +1,43 @@
+---
+// ISD violations and Public Works tickets, listed under the number the city files them by.
+// One inspection can cite several code lines on one case, and nobody can ask the city about a
+// record without its number, so the number heads each group and the lines sit under it.
+//
+// The cases arrive already built by `ledger.ts`: this component picks no field and composes
+// no label. A line's status is the city's word, except that an open line reads "Still open in
+// city records", the same as everywhere else on the panel.
+import { formatRecordDate } from '../../lib/records/display';
+import type { RecordCase } from '../../lib/records/ledger';
+import StatusToken from './StatusToken.astro';
+
+interface Props {
+  cases: RecordCase[];
+  /** The row-cap note, when the stored rows filled a CKAN page. Null when they did not. */
+  cappedNote?: string | null;
+}
+
+const { cases, cappedNote = null } = Astro.props;
+---
+
+<ul class="divide-y divide-gray-100 text-sm mt-2">
+  {cases.map((entry) => (
+    <li class="py-2">
+      <p class="flex flex-wrap items-baseline justify-between gap-x-3">
+        <span class="font-medium text-gray-900">{entry.label}</span>
+        <span class="text-xs text-gray-500">{formatRecordDate(entry.date)}</span>
+      </p>
+      <ul class="mt-1 space-y-1">
+        {entry.lines.map((line) => (
+          <li class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-x-2 gap-y-0.5">
+            <span class="text-gray-700">{line.label}</span>
+            <span class="text-xs sm:text-right">
+              <StatusToken status={line.status} label={line.statusLabel} />
+              {line.trailing && <span class="text-gray-500">{line.trailing}</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </li>
+  ))}
+</ul>
+{cappedNote && <p class="text-xs text-gray-500 mt-2">{cappedNote}</p>}

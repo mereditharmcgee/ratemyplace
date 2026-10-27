@@ -1,7 +1,9 @@
 // Boston's bounding box, wide enough for Hyde Park to Charlestown and the harbor islands.
-// Verified against the city boundary 2026-09-09. Two consumers: the seed pipeline drops SAM
+// Verified against the city boundary 2026-09-09. Three consumers: the seed pipeline drops SAM
 // rows outside it (never-geocoded rows carry 0,0, and a handful carry a coordinate from the
-// wrong side of the state), and the map fits its first view to the markers inside it.
+// wrong side of the state), the map fits its first view to the markers inside it, and the
+// homepage search biases Google's address suggestions toward it (`places.ts`, as a bias,
+// not a restriction).
 //
 // A leaf module with no imports: `records/seed/sam.ts` runs inside the scheduler Worker, so
 // anything it pulls in must stay runtime-agnostic.

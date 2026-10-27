@@ -103,8 +103,8 @@ test.describe('Dispute Submission (E2E-08)', () => {
     // Submit without filling any fields
     await page.locator('button[type="submit"]').click();
 
-    // Assert validation error for required Review URL field
-    await expect(page.locator('text=Review URL is required')).toBeVisible();
+    // Assert validation error for the required building page link field
+    await expect(page.locator('text=Building page link is required')).toBeVisible();
 
     // Assert success message is NOT visible — form was not submitted
     await expect(page.locator('text=Dispute submitted successfully')).not.toBeVisible();

@@ -5,6 +5,7 @@ import { validateSearch, escapeLikePattern } from '../../../lib/validation';
 import { BUILDING_SEARCH_ORDER, buildingSearchSelect, buildingSearchWhere } from '../../../lib/searchSql';
 import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../../../lib/scoring-sql';
 import type { SearchResultsResponse } from '../../../lib/api-types';
+import { BROWSE_BUILDINGS_ORDER } from '../../../lib/searchSql';
 
 export async function GET(context: APIContext): Promise<Response> {
   const db = getDB(context);
@@ -80,10 +81,12 @@ export async function GET(context: APIContext): Promise<Response> {
            GROUP BY b.id
            HAVING COUNT(r.id) > 0`;
         countSql = `SELECT COUNT(*) as total FROM (SELECT b.id ${from})`;
+        // Boston first, most recently reviewed: the same ORDER BY search.astro renders the
+        // first page with, ending on the unique b.id so OFFSET pages never overlap.
         rowsSql = `SELECT b.slug, b.address, b.neighborhood, b.city, b.state,
                 COUNT(r.id) as review_count, ${recencyWeightedOverallSql('r', currentYear)} as avg_overall, l.name as landlord_name
          ${from}
-         ORDER BY COUNT(r.id) DESC, avg_overall DESC, b.id ASC
+         ${BROWSE_BUILDINGS_ORDER}
          LIMIT ? OFFSET ?`;
         binds = [];
       }
