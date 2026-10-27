@@ -16,8 +16,20 @@ export interface SqlFragment {
 
 const LIKE = "LIKE ? ESCAPE '\\'";
 
+/**
+ * The address as space-delimited words, with a leading and trailing space and commas and
+ * periods read as spaces. An alternative spelling is matched against this as `% <spelling> %`,
+ * so it only ever hits a whole word: 'lane' finds "Radford La" but not the `la` in "Lanark"
+ * or the `ln` in "Lincoln".
+ */
+const ADDRESS_WORDS = "(' ' || REPLACE(REPLACE(b.address, ',', ' '), '.', ' ') || ' ')";
+
 function contains(value: string): string {
   return `%${escapeLikePattern(value)}%`;
+}
+
+function wholeWord(value: string): string {
+  return `% ${escapeLikePattern(value)} %`;
 }
 
 /**
@@ -26,6 +38,11 @@ function contains(value: string): string {
  * "comm"); failing that, the whole query names a neighborhood or a landlord. Table aliases
  * are fixed: `b` buildings, `l` landlords.
  *
+ * The typed spelling of a term matches anywhere in the address, so 'st' still finds "St James"
+ * and 'comm' finds "Commonwealth". Every other spelling of its suffix row matches only as a
+ * whole word (`ADDRESS_WORDS`): as substrings, 'la' found "Oakland" and 'st' found
+ * "Dorchester", which turned 'lane' and 'dorchester street' into most of the city.
+ *
  * The whole body is parenthesized so a caller can compose it — `WHERE ${sql} AND ...` —
  * without the trailing ORs swallowing the added condition.
  */
@@ -33,9 +50,10 @@ export function buildingSearchWhere(query: string): SqlFragment {
   const whole = contains(query.trim());
   const terms = normalizeSearchQuery(query);
   const binds: string[] = [];
-  const clauses = terms.map((spellings) => {
-    for (const spelling of spellings) binds.push(contains(spelling));
-    return `(${spellings.map(() => `b.address ${LIKE}`).join(' OR ')})`;
+  const clauses = terms.map(([typed, ...alternatives]) => {
+    binds.push(contains(typed), ...alternatives.map(wholeWord));
+    const ors = [`b.address ${LIKE}`, ...alternatives.map(() => `${ADDRESS_WORDS} ${LIKE}`)];
+    return `(${ors.join(' OR ')})`;
   });
   let addressClause: string;
   if (clauses.length > 0) {

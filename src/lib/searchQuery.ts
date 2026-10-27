@@ -20,7 +20,8 @@ const MAX_TERMS = 8;
  * Each inner array is one term: the typed spelling first, then every other spelling of its
  * suffix row. A caller ORs within a term and ANDs across them, so 'comm ave' matches
  * 'Commonwealth Avenue' while 'st' still matches 'St James' — the old behavior of
- * rewriting each abbreviation to its long form could only do one of those.
+ * rewriting each abbreviation to its long form could only do one of those. Index 0 is the
+ * typed spelling: `searchSql.ts` matches it as a substring and the rest as whole words.
  *
  * A single-character alphabetic term is dropped: it is almost always debris from an
  * apostrophe ("St Mary's" -> "st mary s") and as a LIKE clause it matches everything.
