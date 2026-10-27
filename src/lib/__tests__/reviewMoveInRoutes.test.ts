@@ -244,6 +244,27 @@ suite('PATCH /api/reviews/[id] move-in', () => {
     expect(await stored(db, id)).toEqual({ move_in_season: 'fall', move_in_year: year - 2, move_in_given: null });
   });
 
+  it('keeps the season the reviewer gave when the edit changes only the year', async () => {
+    const db = schemaDb();
+    await seed(db);
+    const id = await submit(db, { move_in_month: '10', move_in_year: String(year - 3) });
+    expect(await stored(db, id)).toEqual({ move_in_season: 'fall', move_in_year: year - 3, move_in_given: 'season_and_year' });
+
+    await edit(db, id, { move_in_month: null, move_in_year: year - 4 });
+    expect(await stored(db, id)).toEqual({ move_in_season: 'fall', move_in_year: year - 4, move_in_given: 'season_and_year' });
+    expect(await card(db, id)).toContain(`Fall ${year - 4} · Current`);
+  });
+
+  it('stores only the new year on a review written before 0034 when the edit changes only the year', async () => {
+    const db = schemaDb();
+    await seed(db);
+    const id = await oldReview(db, 'winter', year);
+    await edit(db, id, { move_in_month: null, move_in_year: year - 1 });
+    expect(await stored(db, id)).toEqual({ move_in_season: 'winter', move_in_year: year - 1, move_in_given: 'year_only' });
+    expect(await card(db, id)).not.toContain(`Winter ${year - 1}`);
+    expect(await card(db, id)).toContain(`${year - 1} · Current`);
+  });
+
   it('stores a cleared move-in as not given', async () => {
     const db = schemaDb();
     await seed(db);

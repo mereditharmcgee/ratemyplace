@@ -22,6 +22,12 @@ export interface MoveInToStore {
 
 const PLACEHOLDER_SEASON: Season = 'winter';
 const EARLIEST_MOVE_IN_YEAR = 1900;
+const SEASONS: readonly Season[] = ['winter', 'spring', 'summer', 'fall'];
+
+function asSeason(raw: unknown): Season | null {
+  const season = typeof raw === 'string' ? raw.toLowerCase() : '';
+  return (SEASONS as readonly string[]).includes(season) ? (season as Season) : null;
+}
 
 /** A move-in month from a form field or JSON body: an integer 1-12, or null when absent or malformed. */
 export function parseMoveInMonth(raw: unknown): number | null {
@@ -63,8 +69,11 @@ export function moveInFromAnswer(monthRaw: unknown, yearRaw: unknown, now: Date)
  * The move-in to store when a reviewer edits their review, or null to leave it as stored.
  *
  * A body without either key leaves the move-in alone. The edit form shows the stored year
- * but cannot show the stored season as a month, so a blank month with the stored year means
- * "not changed", not "month skipped". Clearing the year stores the move-in as skipped.
+ * but cannot show the stored season as a month, so a blank month means "season not changed",
+ * not "month skipped": with the stored year nothing changes, and with a new year a season the
+ * reviewer gave is kept. A review written before migration 0034 (`move_in_given` NULL) gets
+ * the new year only, because its season may be the old winter placeholder and carrying it
+ * over would invent a date. Clearing the year stores the move-in as skipped.
  */
 export function moveInFromEdit(
   body: unknown,
@@ -85,5 +94,9 @@ export function moveInFromEdit(
   const year = hasYear ? parseMoveInYear(fields.move_in_year, now) : storedYear;
 
   if (month === null && year === storedYear) return null;
+  if (month === null && year !== null && stored.move_in_given === 'season_and_year') {
+    const season = asSeason(stored.move_in_season);
+    if (season) return { season, year, given: 'season_and_year' };
+  }
   return toStore(month, year, now);
 }

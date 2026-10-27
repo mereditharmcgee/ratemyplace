@@ -91,9 +91,44 @@ describe('moveInFromEdit (edited review)', () => {
       .toEqual({ season: 'winter', year: 2026, given: 'none' });
   });
 
-  it('stores a new year without a month as year only', () => {
-    expect(moveInFromEdit({ move_in_month: null, move_in_year: 2021 }, seasonAndYear, NOW))
+  it('keeps a season the reviewer gave when only the year changes', () => {
+    expect(moveInFromEdit({ move_in_month: null, move_in_year: 2022 }, seasonAndYear, NOW))
+      .toEqual({ season: 'fall', year: 2022, given: 'season_and_year' });
+    expect(moveInFromEdit({ move_in_month: null, move_in_year: '2021' }, seasonAndYear, NOW))
+      .toEqual({ season: 'fall', year: 2021, given: 'season_and_year' });
+    expect(moveInFromEdit(
+      { move_in_month: null, move_in_year: 2022 },
+      { move_in_season: 'Summer', move_in_year: 2023, move_in_given: 'season_and_year' },
+      NOW,
+    )).toEqual({ season: 'summer', year: 2022, given: 'season_and_year' });
+  });
+
+  it('stores a new year without a month as year only when no season was given', () => {
+    expect(moveInFromEdit({ move_in_month: null, move_in_year: 2021 }, yearOnly, NOW))
       .toEqual({ season: 'winter', year: 2021, given: 'year_only' });
+    expect(moveInFromEdit({ move_in_month: null, move_in_year: 2024 }, skipped, NOW))
+      .toEqual({ season: 'winter', year: 2024, given: 'year_only' });
+  });
+
+  it('stores a new year without a month as year only on a review written before 0034', () => {
+    // The stored season may be the old winter placeholder, so it is not carried over.
+    expect(moveInFromEdit({ move_in_month: null, move_in_year: 2021 }, oldRow, NOW))
+      .toEqual({ season: 'winter', year: 2021, given: 'year_only' });
+    expect(moveInFromEdit({ move_in_month: null, move_in_year: 2024 }, oldPlaceholder, NOW))
+      .toEqual({ season: 'winter', year: 2024, given: 'year_only' });
+  });
+
+  it('stores year only when a stored season is not a season', () => {
+    expect(moveInFromEdit(
+      { move_in_month: null, move_in_year: 2022 },
+      { move_in_season: 'autumn', move_in_year: 2023, move_in_given: 'season_and_year' },
+      NOW,
+    )).toEqual({ season: 'winter', year: 2022, given: 'year_only' });
+  });
+
+  it('stores a cleared year as not given even when a season was given', () => {
+    expect(moveInFromEdit({ move_in_month: null, move_in_year: '' }, seasonAndYear, NOW))
+      .toEqual({ season: 'winter', year: 2026, given: 'none' });
   });
 
   it('stores a picked month and year', () => {
