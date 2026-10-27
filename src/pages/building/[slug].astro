@@ -14,7 +14,7 @@ import { getScoreTextColor } from '../../lib/scoring-colors';
 import { humanize } from '../../lib/format';
 import { BUILDING_DETAIL_FIELDS, hasBuildingDetails, type BuildingDetailFields } from '../../lib/buildingDetails';
 import { localityLine } from '../../lib/locality';
-import { resolveUnitType } from '../../lib/reviewDisplay';
+import { NO_CHECKLIST_ISSUES_COPY, resolveUnitType } from '../../lib/reviewDisplay';
 import { buildingPageMeta } from '../../lib/buildingMeta';
 import { NO_REVIEWS_CARD_TITLE, NO_REVIEWS_CARD_BODY, NO_REVIEWS_BREAKDOWN_COPY } from '../../lib/records/display';
 
@@ -353,7 +353,7 @@ const meta = buildingPageMeta(
               )}
             </ul>
             {scores.pct_pest_issues === 0 && scores.pct_heat_issues === 0 && scores.pct_water_issues === 0 && scores.pct_deposit_issues === 0 && (
-              <p class="text-gray-500 text-sm">No issues reported</p>
+              <p class="text-gray-500 text-sm">{NO_CHECKLIST_ISSUES_COPY}</p>
             )}
           </div>
         )}

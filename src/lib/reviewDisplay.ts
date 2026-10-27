@@ -56,3 +56,10 @@ export function bedroomsLabel(bedrooms: unknown): string | null {
   if (unitTypeFromBedrooms(value) === 'studio') return 'Studio';
   return `${value} bed${value === '1' ? '' : 's'}`;
 }
+
+/**
+ * Shown in the building page's "Common issues reported" box when no review checked any of
+ * the four yes/no issue questions. It names those questions, so it does not read as "these
+ * reviews describe no problems" next to a review whose ratings or text describe some.
+ */
+export const NO_CHECKLIST_ISSUES_COPY = 'No reviewer marked pest, heat, plumbing or deposit issues.';
