@@ -2,7 +2,12 @@ import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../../../../lib/db';
 import { logError } from '../../../../../lib/logger';
 import type { RecordsQueueBackfillResult, RecordsQueueBackfillSkip } from '../../../../../lib/api-types';
-import { hasDeeperPull, pendingQueueReason, recordsRequestState } from '../../../../../lib/records/coverage';
+import {
+  hasDeeperPull,
+  pendingQueueReason,
+  recordsRequestState,
+  type RecordsRequestState,
+} from '../../../../../lib/records/coverage';
 import { jurisdictionForCity } from '../../../../../lib/records/jurisdiction';
 import { enqueue } from '../../../../../lib/records/queue';
 import { json, readJsonBody } from './_json';
@@ -55,6 +60,21 @@ import { json, readJsonBody } from './_json';
  * `readJsonBody` runs the content-type guard before `request.json()`; the body itself carries
  * nothing this endpoint reads.
  */
+/**
+ * The receipt's word for a skipped state. A building whose records are in counts as "already
+ * pulled" whether they are fresh, old (`stale`) or being pulled again (`refresh_requested`):
+ * none of the three is this endpoint's work, and the panel's receipt labels stay as they were.
+ */
+function skipReason(state: Exclude<RecordsRequestState, 'never_pulled'>): RecordsQueueBackfillSkip {
+  switch (state) {
+    case 'stale':
+    case 'refresh_requested':
+      return 'pulled';
+    default:
+      return state;
+  }
+}
+
 export const POST: APIRoute = async (context: APIContext) => {
   if (!context.locals.user?.isAdmin) {
     return json({ error: 'Admin access required' }, 403);
@@ -90,7 +110,7 @@ export const POST: APIRoute = async (context: APIContext) => {
       // Outside Boston was filtered above, so `ineligible` here means no parcel (see docblock).
       const parcelless = state === 'ineligible' && !(await hasDeeperPull(db, building.id));
       if (state !== 'never_pulled' && !parcelless) {
-        skip(state);
+        skip(skipReason(state));
         continue;
       }
       if (parcelless && (await pendingQueueReason(db, building.id)) !== null) {

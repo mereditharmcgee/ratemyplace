@@ -1,11 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { APIContext } from 'astro';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding, insertPull, pendingReasons } from './helpers/recordsDb';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
-import { MAX_ATTEMPTS, enqueue } from '../records/queue';
-import { recordsRequestState } from '../records/coverage';
+import { MAX_ATTEMPTS, completeRow, enqueue, planRefresh } from '../records/queue';
+import { DEEPER_SOURCE_IDS, recordsRequestState } from '../records/coverage';
+import { REFRESH_BUTTON_LABEL, REQUEST_BUTTON_LABEL } from '../records/display';
 import {
   REQUEST_CAP_WINDOW_SECONDS,
   REQUEST_DAILY_CAP,
@@ -222,6 +225,160 @@ suite('POST /api/records/request', () => {
     expect(res.status).toBe(202);
     expect(await res.json()).toEqual({ data: { status: 'already_queued' } });
     expect(await pendingReasons(db, id)).toEqual(['button']);
+  });
+});
+
+/**
+ * "Ask for newer records": the same route on a building whose deeper records are in. It may
+ * queue one `button` row once the newest deeper pull is more than 30 days old, and nothing
+ * else: one pending row per building, the same daily cap, no pull inside the request.
+ */
+suite('POST /api/records/request on a building whose records are in', () => {
+  const DAY = 86_400;
+  let db: TestD1Database;
+  let id: string;
+  const good = (buildingId: string) => ({ buildingId, turnstileToken: 'good' });
+
+  /** Moves every pull row for the building back by `days`, as time passing would. */
+  async function agePulls(days: number): Promise<void> {
+    await db
+      .prepare('UPDATE record_pulls SET retrieved_at = retrieved_at - ? WHERE building_id = ?')
+      .bind(days * DAY, id)
+      .run();
+  }
+
+  async function count(sql: string): Promise<number> {
+    return (await db.prepare(sql).first<{ n: number }>())?.n ?? 0;
+  }
+
+  beforeEach(async () => {
+    db = createRecordsTestDb();
+    id = await insertBuilding(db, { parcel_id: '2102396000' });
+    await insertPull(db, id, FY2026_RESOURCE_ID);
+    await insertPull(db, id, PERMITS_RESOURCE_ID);
+  });
+  afterEach(() => vi.clearAllMocks());
+
+  it('409 while the newest deeper pull is 30 days old or less, with no row written', async () => {
+    for (const days of [0, 29]) {
+      if (days) await agePulls(days);
+      const res = await POST(createContext(db, { ip: `203.0.113.${20 + days}`, body: good(id) }));
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: 'City records for this building have already been retrieved.' });
+    }
+    expect(await count('SELECT COUNT(*) AS n FROM records_queue')).toBe(0);
+  });
+
+  it('202 queued once the pull is older than 30 days, then already_queued, with one button row', async () => {
+    await agePulls(45);
+    expect(await recordsRequestState(db, id)).toBe('stale');
+
+    const first = await POST(createContext(db, { body: good(id) }));
+    expect(first.status).toBe(202);
+    expect(await first.json()).toEqual({ data: { status: 'queued' } });
+    expect(await recordsRequestState(db, id)).toBe('refresh_requested');
+
+    // A second press, and one from another address, find the row and add nothing.
+    for (const ip of ['203.0.113.10', '198.51.100.7']) {
+      const again = await POST(createContext(db, { ip, body: good(id) }));
+      expect(again.status).toBe(202);
+      expect(await again.json()).toEqual({ data: { status: 'already_queued' } });
+    }
+    expect(await pendingReasons(db, id)).toEqual(['button']);
+    expect(await count('SELECT COUNT(*) AS n FROM records_queue')).toBe(1);
+  });
+
+  it('never pulls inside the request: no pull row and no record row is written', async () => {
+    await agePulls(45);
+    const pulls = await count('SELECT COUNT(*) AS n FROM record_pulls');
+    const records = await count('SELECT COUNT(*) AS n FROM building_records');
+
+    const res = await POST(createContext(db, { body: good(id) }));
+
+    expect(res.status).toBe(202);
+    expect(await count('SELECT COUNT(*) AS n FROM record_pulls')).toBe(pulls);
+    expect(await count('SELECT COUNT(*) AS n FROM building_records')).toBe(records);
+  });
+
+  it('spends one slot of the same daily cap, and is refused once the cap is reached', async () => {
+    await agePulls(45);
+    const since = Math.floor(Date.now() / 1000) - REQUEST_CAP_WINDOW_SECONDS;
+    expect((await buttonRequestsSince(db, since)).count).toBe(0);
+    await POST(createContext(db, { body: good(id) }));
+    expect((await buttonRequestsSince(db, since)).count).toBe(1);
+
+    const other = await insertBuilding(db, { id: 'other', parcel_id: '2102396999' });
+    await insertPull(db, other, PERMITS_RESOURCE_ID, 'ok', Math.floor(Date.now() / 1000) - 45 * DAY);
+    await fillDailyCap(db);
+    const res = await POST(createContext(db, { ip: '198.51.100.8', body: good(other) }));
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({
+      error: 'The daily limit for city-records requests has been reached. Please try again later.',
+    });
+    expect(await pendingReasons(db, other)).toEqual([]);
+  });
+
+  it('answers already_queued with no write against a pending planner refresh row', async () => {
+    await agePulls(45);
+    await enqueue(db, { buildingId: id, reason: 'refresh', now: Math.floor(Date.now() / 1000) });
+
+    const res = await POST(createContext(db, { body: good(id) }));
+
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ data: { status: 'already_queued' } });
+    // Still the planner's row: not replaced by a button row, and no cap slot spent.
+    expect(await pendingReasons(db, id)).toEqual(['refresh']);
+    expect(await count("SELECT COUNT(*) AS n FROM records_queue WHERE reason = 'button'")).toBe(0);
+  });
+
+  it('replaces a pending fill row on an old pull with a button row', async () => {
+    await agePulls(45);
+    await enqueue(db, { buildingId: id, reason: 'fill', now: 1_000 });
+
+    const res = await POST(createContext(db, { body: good(id) }));
+
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ data: { status: 'queued' } });
+    expect(await pendingReasons(db, id)).toEqual(['button']);
+  });
+
+  it('puts the building on the monthly refresh cycle once the queued pull finishes', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const plan = (at: number) => planRefresh(db, { now: at, deeperSourceIds: DEEPER_SOURCE_IDS });
+    await agePulls(45);
+    // No review, no follower, no earlier press: the monthly cycle does not know this building.
+    expect(await plan(now)).toBe(0);
+
+    await POST(createContext(db, { body: good(id) }));
+    // What the Worker does with the row: the pull writes fresh rows, then the row completes.
+    const row = await db
+      .prepare('SELECT id FROM records_queue WHERE building_id = ? AND done_at IS NULL')
+      .bind(id)
+      .first<{ id: number }>();
+    await db.prepare('UPDATE record_pulls SET retrieved_at = ? WHERE building_id = ?').bind(now, id).run();
+    await completeRow(db, row!.id, now);
+    expect(await recordsRequestState(db, id, now)).toBe('pulled');
+
+    expect(await plan(now)).toBe(0);
+    expect(await plan(now + 31 * DAY)).toBe(1);
+    expect(await pendingReasons(db, id)).toEqual(['refresh']);
+  });
+});
+
+/** The public pages that describe the button name both of its labels and the refresh rule. */
+describe('public copy about the records button', () => {
+  const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
+
+  it('the privacy page names both labels', () => {
+    const privacy = read('src/pages/privacy.astro');
+    expect(privacy).toContain(`"${REQUEST_BUTTON_LABEL}"`);
+    expect(privacy).toContain(`"${REFRESH_BUTTON_LABEL}"`);
+  });
+
+  it('the methodology page says a reader request puts a building on the monthly cycle', () => {
+    const methodology = read('src/pages/methodology.astro');
+    expect(methodology).toContain("a reader's request for newer records, which puts it on the monthly cycle above");
+    expect(methodology).toContain('once a building\'s records are more than 30 days old');
   });
 });
 

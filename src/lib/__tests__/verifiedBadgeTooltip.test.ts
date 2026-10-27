@@ -89,6 +89,14 @@ describe('VerifiedBadge tooltip', () => {
     expect(classesOf(tip)).toContain('group-hover:opacity-100');
     expect(classesOf(tip)).toContain('group-focus:opacity-100');
   });
+
+  it('keeps the two-word label on one line, so a long title wraps instead', async () => {
+    const root = await renderBadge();
+    const badge = root.querySelector('[data-verified-tooltip]')!.parentElement!;
+    expect(classesOf(badge)).toEqual(expect.arrayContaining(['shrink-0', 'whitespace-nowrap']));
+    // The tooltip still wraps inside its capped width.
+    expect(classesOf(root.querySelector('[data-verified-tooltip]')!)).toContain('whitespace-normal');
+  });
 });
 
 describe('ReviewCard anchors each Verified tooltip inside the card', () => {
@@ -97,8 +105,8 @@ describe('ReviewCard anchors each Verified tooltip inside the card', () => {
     const article = root.querySelector('article')!;
     const tips = Array.from(root.querySelectorAll('[data-verified-tooltip]'));
 
-    // Header (next to the title) and footer (next to the recommend pill).
-    expect(tips).toHaveLength(2);
+    // One badge, next to the title. The footer no longer repeats it.
+    expect(tips).toHaveLength(1);
 
     for (const tip of tips) {
       let anchor: Element | null = tip.parentElement;

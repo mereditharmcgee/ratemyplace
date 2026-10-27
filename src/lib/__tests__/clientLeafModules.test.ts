@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 const LEAF_MODULES = [
   'src/lib/authRedirect.ts',
   'src/lib/homeSearchItems.ts',
+  'src/lib/mapCluster.ts',
   // The review edit form and the admin reviews table format the move-in with it.
   'src/lib/privacy.ts',
   'src/lib/reviewPaths.ts',

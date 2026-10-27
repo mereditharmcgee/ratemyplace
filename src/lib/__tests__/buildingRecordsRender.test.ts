@@ -17,7 +17,10 @@ import {
   PERMIT_COVERAGE_NOTE,
   GROUPING_LINK_TEXT,
   GROUPING_NOTE,
+  REFRESH_BUTTON_LABEL,
+  REFRESH_REQUESTED_COPY,
   REQUESTED_COPY,
+  REQUEST_BUTTON_HELP,
   REQUEST_BUTTON_LABEL,
   REQUEST_PARKED_COPY,
   SHOW_LESS_LABEL,
@@ -391,12 +394,25 @@ suite('BuildingRecords.astro ledger', () => {
     expect(html).toContain('Assessor FY2026 · parcel 2102098000');
     expect(html).toContain('Built');
     expect(html).toContain('1920');
-    // Says whose field is blank, so it does not read against a unit count in Building details.
-    expect(html).toContain('Last remodel 1980 · units not recorded by the assessor');
+    // The assessor left the unit count blank, so the sub-line says nothing about units.
+    expect(html).toContain('Last remodel 1980</span>');
+    expect(html).not.toContain('units not recorded');
     expect(html).toContain('Land use');
     expect(html).toContain('APT 7-30 UNITS');
     // Compact, not the long form, so the four cells fit across a phone.
     expect(html).toContain('$6.72M');
+  });
+
+  it('adds the unit count to the built sub-line when the assessor recorded one', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+    await db
+      .prepare("UPDATE building_records SET payload = json_set(payload, '$.residentialUnits', 12) WHERE kind = 'assessment'")
+      .run();
+
+    const html = await renderPanel(db);
+
+    expect(html).toContain('Last remodel 1980 · units 12');
   });
 
   it('draws a sparkline across the fiscal years and states the range under it', async () => {
@@ -418,11 +434,11 @@ suite('BuildingRecords.astro ledger', () => {
     // Two living-conditions requests, one still open. The two trash-storage requests are
     // property upkeep, and the four requests in no group are counted once, under the groups.
     const living = summaryText(html, '311 living conditions requests');
-    expect(living).toContain('1 open');
+    expect(living).toContain('1 still open');
     expect(living).toContain('2024–2026');
     expect(living).not.toContain('not shown');
     const upkeep = summaryText(html, '311 property upkeep requests');
-    expect(upkeep).toContain('2 open');
+    expect(upkeep).toContain('2 still open');
     expect(upkeep).toContain('2024');
     expect(summaryText(html, '311 building and code requests')).toContain('none on record');
     expect(parse(html).textContent).toContain('4 other 311 requests at or near this address');
@@ -433,7 +449,9 @@ suite('BuildingRecords.astro ledger', () => {
 
     // Two permits after the duplicate row is deduped, one open, $36,500 + $1,200 declared.
     const permits = summaryText(html, 'Building permits');
+    // An open permit is an active permit, so permits keep "open" rather than "still open".
     expect(permits).toContain('1 open · $37.7K declared');
+    expect(permits).not.toContain('still open');
     // The coverage label is the years the permits actually fall in (2019 and 2021) — not the
     // feed's documented coverage window the bars are drawn across, which runs 2006 to 2026.
     expect(permits).toContain('2019–2021');
@@ -764,7 +782,7 @@ suite('BuildingRecords.astro ledger', () => {
     const violations = sectionText(html, 'ISD violation cases');
     expect(violations).toContain('Case V100001');
     expect(violations).toContain('Case V100002');
-    expect(summaryText(html, 'ISD violation cases')).toContain('1 open');
+    expect(summaryText(html, 'ISD violation cases')).toContain('1 still open');
     const tickets = sectionText(html, 'Public Works code enforcement tickets');
     expect(tickets).toContain('Ticket T1');
     expect(tickets).toContain('Ticket T2');
@@ -1016,14 +1034,63 @@ suite('BuildingRecords.astro request button states', () => {
       .run();
   }
 
-  it('notes an old pull beside its date once the deeper records are in', async () => {
+  it('notes an old pull beside its date once the deeper records are in, and offers newer records under it', async () => {
     const db = await seededBuilding('bldg-state-6');
     await insertPull(db, 'bldg-state-6', PERMITS_RESOURCE_ID);
     await agePulls(db, 'bldg-state-6', 45);
 
-    const text = panelText(await renderPanel(db, 'bldg-state-6'));
+    const html = await renderPanel(db, 'bldg-state-6');
+    const text = panelText(html);
 
     expect(text).toContain(STALE_PULL_NOTE);
+    expect(text).toContain(REFRESH_BUTTON_LABEL);
+    expect(text).not.toContain(REQUEST_BUTTON_LABEL);
+    expect(text).not.toContain(REFRESH_REQUESTED_COPY);
+
+    // Where it sits: in the panel header, right after the pull-date line that carries the
+    // note, and before the facts strip and the ledger.
+    const panel = parse(html);
+    const line = panel.querySelector('#public-records h2')?.nextElementSibling;
+    expect(line?.textContent ?? '').toContain(STALE_PULL_NOTE);
+    const header = line?.parentElement;
+    expect(header?.textContent ?? '').toContain(REFRESH_BUTTON_LABEL);
+    expect(text.indexOf(REFRESH_BUTTON_LABEL)).toBeLessThan(text.indexOf('311 living conditions requests'));
+    // No help line on the refresh button: the note above it already says why.
+    expect(text).not.toContain(REQUEST_BUTTON_HELP);
+  });
+
+  it('says a new pull is queued, with no button, once a refresh row is pending', async () => {
+    const db = await seededBuilding('bldg-state-9');
+    await insertPull(db, 'bldg-state-9', PERMITS_RESOURCE_ID);
+    await agePulls(db, 'bldg-state-9', 45);
+    await enqueue(db, { buildingId: 'bldg-state-9', reason: 'button', now: Math.floor(Date.now() / 1000) });
+
+    const html = await renderPanel(db, 'bldg-state-9');
+    const text = panelText(html);
+
+    expect(text).toContain(REFRESH_REQUESTED_COPY);
+    // The records shown are still the old pull until the new one lands.
+    expect(text).toContain(STALE_PULL_NOTE);
+    expect(text).not.toContain(REFRESH_BUTTON_LABEL);
+    expect(text).not.toContain(REQUEST_BUTTON_LABEL);
+    // Not the never-pulled wording: these records are on the page.
+    expect(text).not.toContain(REQUESTED_COPY);
+    const header = parse(html).querySelector('#public-records h2')?.parentElement;
+    expect(header?.textContent ?? '').toContain(REFRESH_REQUESTED_COPY);
+  });
+
+  it('offers no refresh on a pull 30 days old or less', async () => {
+    const db = await seededBuilding('bldg-state-10');
+    await insertPull(db, 'bldg-state-10', PERMITS_RESOURCE_ID);
+    await agePulls(db, 'bldg-state-10', 29);
+
+    const html = await renderPanel(db, 'bldg-state-10');
+    const text = panelText(html);
+
+    expect(html).toContain('id="public-records"');
+    expect(text).not.toContain(REFRESH_BUTTON_LABEL);
+    expect(text).not.toContain(STALE_PULL_NOTE);
+    expect(text).not.toContain(REFRESH_REQUESTED_COPY);
   });
 
   it('leaves the stale note off a page that still offers the button', async () => {
@@ -1035,6 +1102,7 @@ suite('BuildingRecords.astro request button states', () => {
     // The button already says what this page can do about its records.
     expect(text).toContain(REQUEST_BUTTON_LABEL);
     expect(text).not.toContain(STALE_PULL_NOTE);
+    expect(text).not.toContain(REFRESH_BUTTON_LABEL);
   });
 
   it('cites only the assessor year on a seeded building', async () => {

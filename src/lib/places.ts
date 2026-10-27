@@ -126,8 +126,9 @@ export const AUTOCOMPLETE_PRIMARY_TYPES: readonly string[] = ['street_address', 
 
 /**
  * `default` is any US address: the review form, where people still review buildings
- * outside Boston. `boston` is the homepage: biased to Boston's box, Massachusetts only,
- * Boston first. Only an explicit `scope=boston` selects it.
+ * outside Boston. `boston` is the homepage: biased to Boston's box, Massachusetts only
+ * (plus any suggestion that is a building we already have), Boston first. Only an explicit
+ * `scope=boston` selects it.
  */
 export type AutocompleteScope = 'default' | 'boston';
 
@@ -160,7 +161,7 @@ export function bostonBiasRectangle(): { low: LatLng; high: LatLng } {
  * The autocomplete request. The default scope is byte-for-byte the body the endpoint has
  * always sent. The Boston scope adds a location bias, not a restriction: a restriction
  * would also drop Massachusetts addresses outside the box, and only out-of-state results
- * are dropped (by `bostonScopePredictions`, after the response).
+ * we have no building for are dropped (by `bostonScopePredictions`, after the response).
  */
 export function autocompleteRequestBody(
   input: string,
@@ -259,11 +260,21 @@ export function isBostonPrediction(p: AutocompletePrediction): boolean {
 }
 
 /**
- * The homepage's Google rows: Massachusetts only, Boston first, Google's order otherwise.
- * A prediction whose state cannot be read is dropped too: the rule is "keep what is in
- * Massachusetts", not "drop what is visibly elsewhere".
+ * The homepage's Google rows: Massachusetts, Boston first, Google's order otherwise.
+ * A prediction whose state cannot be read counts as outside Massachusetts: the rule is
+ * "keep what is in Massachusetts", not "drop what is visibly elsewhere".
+ *
+ * A prediction from outside Massachusetts is kept only when `keepElsewhere` says so, and goes
+ * after every Massachusetts row, in Google's order. The homepage keeps one that is a building
+ * we already have (`existing` set by `matchPredictionsToBuildings`, by exact place id only
+ * outside Massachusetts), since most reviewed buildings are outside the state. With no
+ * predicate, everything outside Massachusetts is dropped.
  */
-export function bostonScopePredictions<T extends AutocompletePrediction>(predictions: T[]): T[] {
+export function bostonScopePredictions<T extends AutocompletePrediction>(
+  predictions: T[],
+  keepElsewhere: (p: T) => boolean = () => false,
+): T[] {
   const inState = predictions.filter(isMassachusettsPrediction);
-  return [...inState.filter(isBostonPrediction), ...inState.filter((p) => !isBostonPrediction(p))];
+  const elsewhere = predictions.filter((p) => !isMassachusettsPrediction(p) && keepElsewhere(p));
+  return [...inState.filter(isBostonPrediction), ...inState.filter((p) => !isBostonPrediction(p)), ...elsewhere];
 }
