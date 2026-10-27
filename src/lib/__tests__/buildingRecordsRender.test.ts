@@ -18,6 +18,7 @@ import {
   REQUESTED_COPY,
   REQUEST_BUTTON_LABEL,
   REQUEST_PARKED_COPY,
+  STILL_OPEN_NOTE,
 } from '../records/display';
 import { ROW_CAP } from '../records/ckan';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
@@ -237,15 +238,35 @@ suite('BuildingRecords.astro rendered output', () => {
  */
 suite('BuildingRecords.astro ledger', () => {
   /** Two assessor years plus permits, 311 (legacy and new), and code enforcement. */
-  async function seedFullBuilding(db: TestD1Database): Promise<void> {
+  async function seedFullBuilding(db: TestD1Database, extraRoutes: FixtureRoute[] = []): Promise<void> {
     await seedPulledBuilding(db, lanark2026 as AssessorRow[], [
       { resourceId: FY2025_RESOURCE_ID, records: lanark2025 as AssessorRow[] },
       { resourceId: PERMITS_RESOURCE_ID, records: permitsPositive as AssessorRow[] },
       { resourceId: LEGACY_2024_RESOURCE_ID, records: legacy311 as AssessorRow[] },
       { resourceId: NEW_311_RESOURCE_ID, records: new311 as AssessorRow[] },
       { resourceId: ENFORCEMENT_RESOURCE_ID, records: enforcementRows as AssessorRow[] },
+      ...extraRoutes,
     ]);
   }
+
+  /** One open and one closed ISD violation, synthetic, so the violations row has an open case to word. */
+  const OPEN_VIOLATION_ROUTE: FixtureRoute = {
+    resourceId: VIOLATIONS_RESOURCE_ID,
+    records: [
+      {
+        case_no: 'V100001', code: '780', value: null, description: 'Example code line A',
+        status: 'Open', status_dttm: '2017-05-09 09:00:00',
+        violation_stno: '12', violation_sthigh: null, violation_street: 'Example', violation_suffix: 'RD',
+        contact_addr1: null, sam_id: null,
+      },
+      {
+        case_no: 'V100002', code: '110', value: null, description: 'Example code line B',
+        status: 'Closed', status_dttm: '2017-05-09 09:00:00',
+        violation_stno: '12', violation_sthigh: null, violation_street: 'Example', violation_suffix: 'RD',
+        contact_addr1: null, sam_id: null,
+      },
+    ],
+  };
 
   function summaryText(html: string, heading: string): string {
     return ledgerRow(html, heading).querySelector('summary')?.textContent ?? '';
@@ -389,16 +410,66 @@ suite('BuildingRecords.astro ledger', () => {
     expect(requests.innerHTML).toContain('title="2026: 1"');
   });
 
-  it('lists what is open now above the full list', async () => {
+  it('lists the requests still open in city records above the full list, and says what open means', async () => {
     const db = await createDbWithAdmin();
     await seedFullBuilding(db);
 
     const requests = ledgerRow(await renderPanel(db), '311 housing requests');
+    const heading = Array.from(requests.querySelectorAll('h4')).find((node) =>
+      (node.textContent ?? '').trim().startsWith('Still open'),
+    );
 
-    expect(requests.textContent).toContain('Open now (2)');
+    expect(heading?.textContent?.trim()).toBe('Still open in city records (2)');
+    // The explanation sits directly under the heading it explains.
+    expect(heading?.nextElementSibling?.textContent?.trim()).toBe(STILL_OPEN_NOTE);
+    expect(requests.textContent).not.toMatch(/open now/i);
+    // Each open row says when it was filed: the year only, never a finer date than the row shows.
+    const openList = heading?.nextElementSibling?.nextElementSibling;
+    const openLabels = Array.from(openList?.querySelectorAll('li') ?? []).map((li) => li.lastElementChild?.textContent?.trim());
+    expect(openLabels).toHaveLength(2);
+    for (const label of openLabels) expect(label).toMatch(/^Still open in city records, filed \d{4}$/);
     expect(requests.textContent).toContain('Show all 3 requests');
     // The full list keeps the closed dates the summary rows leave out.
     expect(requests.textContent).toContain('closed Dec 20, 2024');
+  });
+
+  it('words open ISD violations the same way and keeps closed ones as recorded', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db, [OPEN_VIOLATION_ROUTE]);
+
+    const violations = sectionText(await renderPanel(db), 'ISD violations');
+
+    expect(violations).toContain(STILL_OPEN_NOTE);
+    expect(violations).toContain('Still open in city records');
+    // The feed carries a status date, not a filing date, so no "filed" year is claimed.
+    expect(violations).not.toContain('filed');
+    expect(violations).toContain('Closed');
+    // Both rows are still listed.
+    expect(violations).toContain('Example code line A');
+    expect(violations).toContain('Example code line B');
+  });
+
+  it('leaves the explanation off a section with no open case', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const html = await renderPanel(db);
+
+    // The fixture's code enforcement tickets are all closed.
+    expect(sectionText(html, 'Code enforcement tickets')).not.toContain(STILL_OPEN_NOTE);
+  });
+
+  it("keeps an open permit's status as the city recorded it", async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const permits = ledgerRow(await renderPanel(db), 'Building permits');
+    const statuses = Array.from(permits.querySelectorAll('li')).map((li) => li.lastElementChild?.textContent?.trim());
+
+    // An open permit is an active permit, so it keeps the city's word.
+    expect(statuses).toContain('Open');
+    expect(permits.textContent).not.toContain('Still open in city records');
+    expect(permits.textContent).not.toContain(STILL_OPEN_NOTE);
   });
 
   it('keeps the full lists one disclosure down rather than dropping them', async () => {
@@ -433,22 +504,26 @@ suite('BuildingRecords.astro ledger', () => {
     expect(violations).toContain(NO_VIOLATIONS_CAVEAT);
   });
 
-  it('marks an open record with an outlined token and never a score colour', async () => {
+  it('prints every status as plain text, never as something that looks like a button', async () => {
     const db = await createDbWithAdmin();
-    await seedFullBuilding(db);
+    await seedFullBuilding(db, [OPEN_VIOLATION_ROUTE]);
 
-    const requests = ledgerRow(await renderPanel(db), '311 housing requests');
-    const open = Array.from(requests.querySelectorAll('span')).find(
-      (node) => (node.textContent ?? '').trim() === 'Open' && node.className.includes('rounded-full'),
-    );
+    const html = await renderPanel(db);
+    const statusSpans = Array.from(parse(html).querySelectorAll('li > span:last-child > span:first-child'));
+    const statuses = statusSpans.map((node) => (node.textContent ?? '').trim());
 
-    expect(open).toBeTruthy();
-    // The exact grey is a design choice, not a contract — pinning `border-gray-400` failed
-    // every time the shade was nudged. What has to hold is that the token carries no score
-    // band: an outline says "find this in the list", not "this is bad news".
-    const className = open?.className ?? '';
-    expect(className).not.toMatch(/red|amber|orange|emerald|green/);
-    expect(requests.innerHTML).not.toMatch(/(bg|text|border)-(red|green|amber|emerald|yellow|orange)-\d/);
+    // The open and closed rows of every section are all here.
+    expect(statuses).toEqual(expect.arrayContaining(['Open', 'Closed', 'Still open in city records']));
+    expect(statuses.some((text) => /^Still open in city records, filed \d{4}$/.test(text))).toBe(true);
+    for (const node of statusSpans) {
+      // An outlined "Open" was read as a button that did nothing when tapped.
+      expect(node.className).not.toMatch(/rounded|border|\bbg-|cursor-pointer|px-|py-|inline-flex/);
+      // And no status carries a score band: the panel does not say an open record is bad news.
+      expect(node.className).not.toMatch(/red|amber|orange|emerald|green|yellow/);
+    }
+    for (const heading of ['311 housing requests', 'Code enforcement tickets', 'ISD violations']) {
+      expect(ledgerRow(html, heading).innerHTML).not.toMatch(/(bg|text|border)-(red|green|amber|emerald|yellow|orange)-\d/);
+    }
   });
 
   it('shows a dash rather than a count for a source that has never been pulled', async () => {
