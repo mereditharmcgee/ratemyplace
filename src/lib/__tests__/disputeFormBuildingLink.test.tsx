@@ -4,8 +4,9 @@ import DisputeForm from '../../components/disputes/DisputeForm';
 import { DISPUTE_REASONS } from '../disputes';
 
 // Reviews have no link of their own, so the dispute form asks for the building page link and,
-// when the page has several reviews, the dates shown on the review. Both go to the API, and
-// the API's own message (for example "add the dates") is what the reader sees on a 400.
+// when the page has several reviews, the dates shown on the review (and, when two show the same
+// dates, its title or first words). All go to the API, and the API's own message (for example
+// "add the dates") is what the reader sees on a 400.
 
 type RenderOptions = Parameters<NonNullable<Window['turnstile']>['render']>[1];
 
@@ -31,11 +32,14 @@ afterEach(() => {
   delete (window as { turnstile?: unknown }).turnstile;
 });
 
-function fillAndSubmit({ link, dates }: { link: string; dates?: string }) {
+function fillAndSubmit({ link, dates, words }: { link: string; dates?: string; words?: string }) {
   render(<DisputeForm siteUrl="https://ratemyplace.org" />);
   fireEvent.change(screen.getByLabelText(/Building page link/), { target: { value: link } });
   if (dates !== undefined) {
     fireEvent.change(screen.getByLabelText('Dates shown on the review'), { target: { value: dates } });
+  }
+  if (words !== undefined) {
+    fireEvent.change(screen.getByLabelText('Review title or first words'), { target: { value: words } });
   }
   fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: 'Example Holdings LLC' } });
   fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: 'owner@example.com' } });
@@ -55,13 +59,27 @@ describe('DisputeForm building page link', () => {
     expect(sent.reviewDates).toBe('Fall 2023 · Current');
   });
 
-  it('leaves the dates out when none are given', async () => {
+  it('leaves the dates and words out when none are given', async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 201 }));
-    fillAndSubmit({ link: 'https://ratemyplace.org/building/12-example-rd-boston' });
+    fillAndSubmit({ link: 'https://ratemyplace.org/building/12-example-rd-boston', words: '   ' });
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
     const sent = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect('reviewDates' in sent).toBe(false);
+    expect('reviewWords' in sent).toBe(false);
+  });
+
+  it('sends the title or first words of the review', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 201 }));
+    fillAndSubmit({
+      link: 'https://ratemyplace.org/building/12-example-rd-boston',
+      dates: 'Fall 2023 · Current',
+      words: ' Quiet street, slow repairs ',
+    });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(sent.reviewWords).toBe('Quiet street, slow repairs');
   });
 
   it('shows the API message when the page needs dates', async () => {

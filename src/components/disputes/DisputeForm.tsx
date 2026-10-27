@@ -9,6 +9,7 @@ export default function DisputeForm({ siteUrl }: Props) {
   // Form fields
   const [reviewUrl, setReviewUrl] = useState('');
   const [reviewDates, setReviewDates] = useState('');
+  const [reviewWords, setReviewWords] = useState('');
   const [landlordName, setLandlordName] = useState('');
   const [landlordEmail, setLandlordEmail] = useState('');
   const [landlordPhone, setLandlordPhone] = useState('');
@@ -143,6 +144,7 @@ export default function DisputeForm({ siteUrl }: Props) {
         body: JSON.stringify({
           reviewUrl,
           reviewDates: reviewDates.trim() || undefined,
+          reviewWords: reviewWords.trim() || undefined,
           landlordName,
           landlordEmail,
           landlordPhone,
@@ -179,6 +181,7 @@ export default function DisputeForm({ siteUrl }: Props) {
   const handleSubmitAnother = () => {
     setReviewUrl('');
     setReviewDates('');
+    setReviewWords('');
     setLandlordName('');
     setLandlordEmail('');
     setLandlordPhone('');
@@ -240,7 +243,8 @@ export default function DisputeForm({ siteUrl }: Props) {
       )}
 
       {/* Which review: reviews have no link of their own, so the building page link plus the
-          dates on the review card name it. The API also still takes a #review-{id} link. */}
+          dates on the review card name it, and its title or first words when two cards show
+          the same dates. The API also still takes a #review-{id} link. */}
       <div className="space-y-4">
         <div>
           <label htmlFor="reviewUrl" className="block text-sm font-medium text-gray-700 mb-2">
@@ -279,6 +283,23 @@ export default function DisputeForm({ siteUrl }: Props) {
           />
           <p className="mt-1 text-sm text-gray-500">
             Needed if the page has more than one review. Copy them from the review.
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="reviewWords" className="block text-sm font-medium text-gray-700 mb-2">
+            Review title or first words
+          </label>
+          <input
+            type="text"
+            id="reviewWords"
+            value={reviewWords}
+            onChange={(e) => setReviewWords(e.target.value)}
+            maxLength={200}
+            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500"
+          />
+          <p className="mt-1 text-sm text-gray-500">
+            Needed if two reviews show the same dates.
           </p>
         </div>
       </div>

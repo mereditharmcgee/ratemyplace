@@ -101,9 +101,10 @@ export const POST: APIRoute = async (context: APIContext) => {
     }
 
     // Which review: a review link names it by id; a building page link names it by the
-    // dates on its card (or is the page's only review). See lib/disputeTarget.ts.
+    // dates on its card, then its title or first words when two cards share those dates
+    // (or is the page's only review). See lib/disputeTarget.ts.
     const siteUrl = new URL(request.url).origin;
-    const target = await resolveDisputedReview(db, reviewUrl, body.reviewDates, siteUrl);
+    const target = await resolveDisputedReview(db, reviewUrl, body.reviewDates, siteUrl, body.reviewWords);
 
     if (!target.ok) {
       return new Response(

@@ -10,7 +10,8 @@ import { flushBackground } from './helpers/flush';
 /**
  * Reviews have no public link of their own, so the dispute form also takes a building page
  * link. The route picks the review from it: the only approved review on the page, or the one
- * whose card shows the dates the landlord gave. It never guesses between two.
+ * whose card shows the dates the landlord gave. When two cards show the same dates, the
+ * review's title or first words tell them apart. It never guesses between two.
  */
 
 vi.mock('../turnstile', () => ({
@@ -41,6 +42,9 @@ type ReviewSeed = {
   move_in_year: number;
   move_out_year_new: string;
   is_current_tenant?: number;
+  review_title?: string | null;
+  review_text?: string | null;
+  comments?: string | null;
 };
 
 async function disputesDb(reviews: ReviewSeed[]): Promise<TestD1Database> {
@@ -51,16 +55,22 @@ async function disputesDb(reviews: ReviewSeed[]): Promise<TestD1Database> {
     ALTER TABLE reviews ADD COLUMN move_in_season TEXT;
     ALTER TABLE reviews ADD COLUMN move_in_year INTEGER;
     ALTER TABLE reviews ADD COLUMN is_current_tenant INTEGER DEFAULT 0;
+    ALTER TABLE reviews ADD COLUMN review_title TEXT;
+    ALTER TABLE reviews ADD COLUMN review_text TEXT;
+    ALTER TABLE reviews ADD COLUMN comments TEXT;
   `);
   await db.prepare("INSERT INTO users (id, email) VALUES ('tenant-1', 'tenant@example.com')").run();
   await insertBuilding(db, { id: BUILDING_ID, slug: SLUG, address: '12 Example Rd, Boston, MA 02135' });
   for (const r of reviews) {
     await db
       .prepare(
-        'INSERT INTO reviews (id, user_id, building_id, status, move_in_season, move_in_year, move_out_year_new, is_current_tenant) ' +
-          "VALUES (?, 'tenant-1', ?, ?, ?, ?, ?, ?)",
+        'INSERT INTO reviews (id, user_id, building_id, status, move_in_season, move_in_year, move_out_year_new, is_current_tenant, review_title, review_text, comments) ' +
+          "VALUES (?, 'tenant-1', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       )
-      .bind(r.id, BUILDING_ID, r.status ?? 'approved', r.move_in_season, r.move_in_year, r.move_out_year_new, r.is_current_tenant ?? 0)
+      .bind(
+        r.id, BUILDING_ID, r.status ?? 'approved', r.move_in_season, r.move_in_year, r.move_out_year_new,
+        r.is_current_tenant ?? 0, r.review_title ?? null, r.review_text ?? null, r.comments ?? null,
+      )
       .run();
   }
   return db;
@@ -145,6 +155,84 @@ describe.skipIf(!sqliteAvailable)('POST /api/disputes with a building page link'
     expect(response.status).toBe(400);
     expect((await response.json()).error).toBe(DISPUTE_TARGET_ERRORS.manyMatch);
     expect(await disputedReviewIds(db)).toEqual([]);
+  });
+
+  // A skipped move-in is stored as winter of the current year, so many current tenants share
+  // one range. The title, or the first words of the review, picks between them.
+  const titled: ReviewSeed = { ...currentTenant, id: 'rev-titled', review_title: 'Quiet street, slow repairs', comments: 'The heat took a week.' };
+  const untitled: ReviewSeed = { ...currentTenant, id: 'rev-untitled', comments: "Heat's fine. The mail room is a mess." };
+
+  it('tells two same-date reviews apart by the title', async () => {
+    const db = await disputesDb([titled, untitled]);
+    const response = await POST(context(db, {
+      ...base, reviewUrl: PAGE, reviewDates: 'Fall 2023 · Current', reviewWords: 'QUIET STREET slow',
+    }));
+    expect(response.status).toBe(201);
+    expect(await disputedReviewIds(db)).toEqual(['rev-titled']);
+    await flushBackground();
+  });
+
+  it('tells them apart by the first words of an untitled review, however punctuated', async () => {
+    const db = await disputesDb([titled, untitled]);
+    const response = await POST(context(db, {
+      ...base, reviewUrl: PAGE, reviewDates: 'Fall 2023 · Current', reviewWords: 'heat’s fine the mail',
+    }));
+    expect(response.status).toBe(201);
+    expect(await disputedReviewIds(db)).toEqual(['rev-untitled']);
+    await flushBackground();
+  });
+
+  it('reads the review text before the older comments column, as the card does', async () => {
+    const db = await disputesDb([
+      { ...untitled, review_text: 'Rent went up twice.', comments: 'Ignored by the card.' },
+      titled,
+    ]);
+    const response = await POST(context(db, {
+      ...base, reviewUrl: PAGE, reviewDates: 'Fall 2023 · Current', reviewWords: 'Rent went up',
+    }));
+    expect(response.status).toBe(201);
+    expect(await disputedReviewIds(db)).toEqual(['rev-untitled']);
+    await flushBackground();
+  });
+
+  it('matches whole words only', async () => {
+    const db = await disputesDb([titled, untitled]);
+    const response = await POST(context(db, {
+      ...base, reviewUrl: PAGE, reviewDates: 'Fall 2023 · Current', reviewWords: 'Quiet str',
+    }));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe(DISPUTE_TARGET_ERRORS.noWordsMatch);
+    expect(await disputedReviewIds(db)).toEqual([]);
+  });
+
+  it('says so when no review with those dates starts with those words', async () => {
+    const db = await disputesDb([titled, untitled]);
+    const response = await POST(context(db, {
+      ...base, reviewUrl: PAGE, reviewDates: 'Fall 2023 · Current', reviewWords: 'Great landlord',
+    }));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe(DISPUTE_TARGET_ERRORS.noWordsMatch);
+    expect(await disputedReviewIds(db)).toEqual([]);
+  });
+
+  it('still refuses when the words fit both reviews', async () => {
+    const db = await disputesDb([titled, { ...titled, id: 'rev-titled-2' }]);
+    const response = await POST(context(db, {
+      ...base, reviewUrl: PAGE, reviewDates: 'Fall 2023 · Current', reviewWords: 'Quiet street',
+    }));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe(DISPUTE_TARGET_ERRORS.stillMany);
+    expect(await disputedReviewIds(db)).toEqual([]);
+  });
+
+  it('ignores the words when the dates already name one review', async () => {
+    const db = await disputesDb([pastTenant, titled]);
+    const response = await POST(context(db, {
+      ...base, reviewUrl: PAGE, reviewDates: 'Summer 2019 · 2021', reviewWords: 'Quiet street',
+    }));
+    expect(response.status).toBe(201);
+    expect(await disputedReviewIds(db)).toEqual(['rev-past']);
+    await flushBackground();
   });
 
   it('ignores reviews that are not on the page', async () => {

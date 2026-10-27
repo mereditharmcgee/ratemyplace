@@ -3,6 +3,7 @@ import {
   extractReviewIdFromUrl,
   extractBuildingSlugFromUrl,
   normalizeReviewDates,
+  normalizeReviewWords,
   validateDisputeForm,
   DISPUTE_REASONS,
 } from '../disputes';
@@ -67,6 +68,35 @@ describe('normalizeReviewDates', () => {
 
   it('is empty for blank input', () => {
     expect(normalizeReviewDates('  · ')).toBe('');
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// normalizeReviewWords
+// ═══════════════════════════════════════════════════
+
+describe('normalizeReviewWords', () => {
+  it('reduces a title or opening to lowercase words', () => {
+    expect(normalizeReviewWords('Quiet street, slow repairs!')).toBe('quiet street slow repairs');
+  });
+
+  it('matches however quotes, dashes and line breaks are typed', () => {
+    const want = normalizeReviewWords("Heat's fine. The mail room");
+    for (const typed of ['Heat’s fine. The mail room', 'HEAT S FINE the mail room', " heat's — fine\nthe mail room "]) {
+      expect(normalizeReviewWords(typed)).toBe(want);
+    }
+  });
+
+  it('keeps short words such as "to", unlike the dates', () => {
+    expect(normalizeReviewWords('Close to the T')).toBe('close to the t');
+  });
+
+  it('keeps accented letters', () => {
+    expect(normalizeReviewWords('Café below')).toBe('café below');
+  });
+
+  it('is empty for blank input', () => {
+    expect(normalizeReviewWords(' -- ')).toBe('');
   });
 });
 

@@ -3,8 +3,10 @@
  *
  * Public pages never print a review's internal id, so a landlord has no review link to copy.
  * The dispute form takes the building page link instead. The review is then the only approved
- * review on that page, or the one whose card shows the dates the landlord gave. When two
- * reviews on the page show the same dates, this refuses rather than guess: a dispute against
+ * review on that page, or the one whose card shows the dates the landlord gave. Two cards
+ * often show the same dates (a skipped move-in is stored as winter of the current year), so
+ * the review's title or first words, as printed on the card, then pick between them. When
+ * those still fit more than one review, this refuses rather than guess: a dispute against
  * the wrong review would notify the wrong tenant.
  *
  * A review link (`#review-{id}`, or the author's own `/review/edit/{id}`) still names the
@@ -12,7 +14,12 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
-import { extractBuildingSlugFromUrl, extractReviewIdFromUrl, normalizeReviewDates } from './disputes';
+import {
+  extractBuildingSlugFromUrl,
+  extractReviewIdFromUrl,
+  normalizeReviewDates,
+  normalizeReviewWords,
+} from './disputes';
 import { reviewTenancyLabel } from './privacy';
 import type { ReviewTenancyFields } from './privacy';
 
@@ -34,22 +41,33 @@ export const DISPUTE_TARGET_ERRORS = {
   noReviews: 'That building page has no reviews.',
   needDates: 'That page has more than one review. Add the dates shown on the review you mean.',
   noMatch: 'No review on that page shows those dates. Copy them from the review.',
-  manyMatch: 'More than one review on that page shows those dates. Use the contact page to tell us which one.',
+  manyMatch: 'More than one review on that page shows those dates. Add the review title or its first words.',
+  noWordsMatch: 'No review with those dates starts with those words. Copy them from the review.',
+  stillMany: 'More than one review on that page matches. Use the contact page to tell us which one.',
 } as const;
 
 /** Far longer than any card's dates; anything past it cannot match, so it is not normalized. */
 const MAX_REVIEW_DATES_LENGTH = 200;
 
+/** A whole pasted review (5000 characters at most) still fits; anything longer cannot match. */
+const MAX_REVIEW_WORDS_LENGTH = 6000;
+
 /** Same bound as the building page's review list, so the route sees what the page shows. */
 const PAGE_REVIEW_LIMIT = 500;
 
-type PageReview = DisputedReview & ReviewTenancyFields;
+type PageReview = DisputedReview &
+  ReviewTenancyFields & {
+    review_title: string | null;
+    review_text: string | null;
+    comments: string | null;
+  };
 
 export async function resolveDisputedReview(
   db: D1Database,
   reviewUrl: string,
   reviewDates: unknown,
   siteUrl: string,
+  reviewWords?: unknown,
 ): Promise<DisputeTarget> {
   const reviewId = extractReviewIdFromUrl(reviewUrl, siteUrl);
   if (reviewId) {
@@ -78,7 +96,8 @@ export async function resolveDisputedReview(
   // Only approved reviews appear on the page, so only they can be the one the landlord saw.
   const rows = await db
     .prepare(
-      `SELECT id, building_id, user_id, move_in_season, move_in_year, move_out_year_new, is_current_tenant
+      `SELECT id, building_id, user_id, move_in_season, move_in_year, move_out_year_new, is_current_tenant,
+              review_title, review_text, comments
        FROM reviews
        WHERE building_id = ? AND status = 'approved'
        ORDER BY created_at DESC
@@ -106,9 +125,35 @@ export async function resolveDisputedReview(
   if (matches.length === 1) {
     return { ok: true, review: pick(matches[0]) };
   }
-  return matches.length === 0
-    ? { ok: false, status: 400, error: DISPUTE_TARGET_ERRORS.noMatch }
-    : { ok: false, status: 400, error: DISPUTE_TARGET_ERRORS.manyMatch };
+  if (matches.length === 0) {
+    return { ok: false, status: 400, error: DISPUTE_TARGET_ERRORS.noMatch };
+  }
+
+  // Same dates on more than one card: only now do the title or first words count.
+  const text = typeof reviewWords === 'string' ? reviewWords : '';
+  const words = text.length > MAX_REVIEW_WORDS_LENGTH ? null : normalizeReviewWords(text);
+  if (words === '') {
+    return { ok: false, status: 400, error: DISPUTE_TARGET_ERRORS.manyMatch };
+  }
+  const byWords = words === null ? [] : matches.filter((review) => startsWithWords(review, words));
+  if (byWords.length === 1) {
+    return { ok: true, review: pick(byWords[0]) };
+  }
+  return byWords.length === 0
+    ? { ok: false, status: 400, error: DISPUTE_TARGET_ERRORS.noWordsMatch }
+    : { ok: false, status: 400, error: DISPUTE_TARGET_ERRORS.stillMany };
+}
+
+/**
+ * Whether the card's title, or the start of its text, is the given words. Whole words only,
+ * so "quiet str" does not match "Quiet street". The text is `review_text || comments`, the
+ * same pick ReviewCard.astro prints.
+ */
+function startsWithWords(review: PageReview, words: string): boolean {
+  return [review.review_title, review.review_text || review.comments].some((shown) => {
+    const normalized = normalizeReviewWords(shown ?? '');
+    return normalized !== '' && (normalized === words || normalized.startsWith(`${words} `));
+  });
 }
 
 function pick(review: PageReview): DisputedReview {
