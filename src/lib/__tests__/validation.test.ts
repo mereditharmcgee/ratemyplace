@@ -7,6 +7,7 @@ import {
   isSafeHttpUrl,
   enforceMaxLength,
   escapeLikePattern,
+  fitsLikePattern,
   validateDisputeForm,
   validateBugReport,
   validateReviewText,
@@ -382,6 +383,25 @@ describe('escapeLikePattern', () => {
 
   it('returns empty string for empty input', () => {
     expect(escapeLikePattern('')).toBe('');
+  });
+});
+
+describe('fitsLikePattern', () => {
+  it('accepts a pattern of up to 50 bytes, the most D1 allows', () => {
+    expect(fitsLikePattern(`%${'a'.repeat(48)}%`)).toBe(true);
+    expect(fitsLikePattern(`%${'a'.repeat(49)}%`)).toBe(false);
+  });
+
+  it('counts UTF-8 bytes, not characters', () => {
+    // 'é' is two bytes: 25 of them plus the two wildcards is 27 characters but 52 bytes.
+    expect(fitsLikePattern(`%${'é'.repeat(24)}%`)).toBe(true);
+    expect(fitsLikePattern(`%${'é'.repeat(25)}%`)).toBe(false);
+  });
+
+  it('counts the escape characters', () => {
+    // 46 characters typed, plus two escapes and two wildcards, is 50 bytes; one more is 51.
+    expect(fitsLikePattern(`%${escapeLikePattern(`${'a'.repeat(44)}%_`)}%`)).toBe(true);
+    expect(fitsLikePattern(`%${escapeLikePattern(`${'a'.repeat(45)}%_`)}%`)).toBe(false);
   });
 });
 

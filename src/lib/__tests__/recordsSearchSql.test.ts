@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
-import { BUILDING_SEARCH_ORDER, buildingSearchSelect, buildingSearchWhere } from '../searchSql';
+import { buildingSearchOrder, buildingSearchSelect, buildingSearchWhere } from '../searchSql';
 
 const suite = sqliteAvailable ? describe : describe.skip;
 const YEAR = 2026;
@@ -15,15 +15,16 @@ async function review(db: TestD1Database, buildingId: string, score: number, id 
 
 async function search(db: TestD1Database, query: string): Promise<Array<{ slug: string; review_count: number; has_records: number }>> {
   const where = buildingSearchWhere(query);
+  const order = buildingSearchOrder(query);
   const sql = `SELECT ${buildingSearchSelect(YEAR)}
     FROM buildings b
     LEFT JOIN reviews r ON b.id = r.building_id AND r.status = 'approved'
     LEFT JOIN landlords l ON b.landlord_id = l.id
     WHERE ${where.sql}
     GROUP BY b.id
-    ${BUILDING_SEARCH_ORDER}
+    ${order.sql}
     LIMIT 50`;
-  const { results } = await db.prepare(sql).bind(...where.binds).all<{ slug: string; review_count: number; has_records: number }>();
+  const { results } = await db.prepare(sql).bind(...where.binds, ...order.binds).all<{ slug: string; review_count: number; has_records: number }>();
   return results;
 }
 
@@ -86,8 +87,11 @@ suite('building search SQL', () => {
 
   it('escapes LIKE wildcards in every bind', () => {
     const { binds } = buildingSearchWhere('100% Main_St');
-    expect(binds.length).toBeGreaterThan(0);
-    for (const bind of binds) {
+    // The house number is bound as a number, compared as one; every other bind is a LIKE pattern.
+    expect(binds.filter((bind) => typeof bind === 'number')).toEqual([100, 100, 100, 100]);
+    const patterns = binds.filter((bind): bind is string => typeof bind === 'string');
+    expect(patterns.length).toBeGreaterThan(0);
+    for (const bind of patterns) {
       expect(bind.startsWith('%') && bind.endsWith('%')).toBe(true);
       const inner = bind.slice(1, -1);
       // every % or _ inside must be preceded by the escape backslash
