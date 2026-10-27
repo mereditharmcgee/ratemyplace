@@ -25,6 +25,7 @@ import {
 import { humanize } from '../../lib/format';
 import { BUILDING_DETAIL_FIELDS, hasBuildingDetails, type BuildingDetailFields } from '../../lib/buildingDetails';
 import { localityLine } from '../../lib/locality';
+import { NO_CHECKLIST_ISSUES_COPY, resolveUnitType } from '../../lib/reviewDisplay';
 import { buildingPageMeta } from '../../lib/buildingMeta';
 
 // Label and formatter for each field in BUILDING_DETAIL_FIELDS, in display order —
@@ -135,7 +136,8 @@ interface UnitStats {
 const reviewsByUnit = new Map<string, UnitStats>();
 
 reviews.forEach(review => {
-  const unitType = review.unit_type || 'unknown';
+  // The bedrooms answer wins over a stored unit_type that disagrees with it (reviewDisplay.ts).
+  const unitType = resolveUnitType(review) || 'unknown';
   const unitKey = unitType;
   const displayName = unitTypeLabels[unitType] || unitType;
 
@@ -374,7 +376,7 @@ const meta = buildingPageMeta(
               )}
             </ul>
             {scores.pct_pest_issues === 0 && scores.pct_heat_issues === 0 && scores.pct_water_issues === 0 && scores.pct_deposit_issues === 0 && (
-              <p class="text-gray-500 text-sm">No issues reported</p>
+              <p class="text-gray-500 text-sm">{NO_CHECKLIST_ISSUES_COPY}</p>
             )}
           </div>
         )}

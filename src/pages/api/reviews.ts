@@ -6,6 +6,7 @@ import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
 import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
 import { getSeasonFromMonth } from '../../lib/privacy';
+import { unitTypeFromBedrooms } from '../../lib/reviewDisplay';
 import { validateReviewText } from '../../lib/validation';
 import { queueOwnerNotice } from '../../lib/ownerNotify';
 
@@ -65,10 +66,10 @@ export async function POST(context: APIContext): Promise<Response> {
     const isCurrentTenant = moveOutYearNew === 'current' ? 1 : 0;
 
     // Unit details — derive unit_type from bedrooms if not provided directly
-    // unit_type must be one of: studio, 1br, 2br, 3br, 4br+, house
+    // unit_type must be one of: studio, 1br, 2br, 3br, 4br+, house. The mapping covers every
+    // bedrooms option on the form, including 'studio' and '5+', which once fell back to '1br'.
     const bedroomsForType = formData.get('bedrooms') as string || '1';
-    const unitTypeMap: Record<string, string> = { '0': 'studio', '1': '1br', '2': '2br', '3': '3br', '4': '4br+' };
-    const unitType = formData.get('unit_type') as string || unitTypeMap[bedroomsForType] || '1br';
+    const unitType = formData.get('unit_type') as string || unitTypeFromBedrooms(bedroomsForType) || '1br';
     // unit_number is collected for moderation only and is never displayed on public pages.
     const unitNumber = formData.get('unit_number') as string || null;
     const bedrooms = formData.get('bedrooms') as string || null;

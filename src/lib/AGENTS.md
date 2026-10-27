@@ -113,7 +113,8 @@ const apiKey = getEnv(context).RESEND_API_KEY;
 
 `maybeEnv(locals)` is the exception, and only for render paths that must never throw and
 have a safe default for every value they read — today, BaseLayout's head, which reads
-`SITE_URL` and falls back to `https://ratemyplace.org`. It returns `undefined` when there is
+`SITE_URL` and falls back to `https://ratemyplace.org`, and the sign-in and sign-up pages'
+review note (`reviewSignin.ts`), which reads `DB` and drops the address without it. It returns `undefined` when there is
 no runtime (the Astro container in unit tests) and when the Astro 6+ Cloudflare adapter's
 `locals.runtime.env` getter throws its migration error, and logs that once per isolate.
 Everything else keeps using `getEnv`, which throws on purpose.
@@ -442,6 +443,16 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   and `shouldPanToUser` pans to the reader only when they are inside the fitted box.
   `BuildingMap.tsx` fits once (`didFitRef`) and never again on refetch, and skips viewport
   refetches until the first unbounded load lands so that one fit sees every building.
+- **The homepage dropdown has its own Places scope.** `GET /api/places/autocomplete` serves
+  two islands. The review form's `AddressAutocomplete` sends no scope and gets any US
+  address (people review buildings outside Boston). `HomeSearch` alone sends `scope=boston`:
+  `autocompleteRequestBody` (`places.ts`) adds a location bias to `BOSTON_BOX`,
+  `bostonScopePredictions` drops every suggestion not in Massachusetts and puts Boston
+  first, and `matchPredictionsToBuildings` (`homeSearchMatch.ts`) resolves each suggestion
+  read-only through `findExistingBuilding`, refusing an address-key match when Google and
+  the building name different neighborhoods. `homeSearchItems.ts` (a leaf) orders the rows:
+  buildings we have ("See this building", with "Write a review" beside it), landlords, then
+  "Other addresses". Never add the scope to the review form without the owner's say.
 - **`mapCluster.ts` decides how a marker cluster looks.** The badge is filled with
   `getScoreHex` of the plain mean of the clustered buildings' scores (unscored ones left
   out; none scored → the no-score grey). It is a map colour only — never shown as a number,
