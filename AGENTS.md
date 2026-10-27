@@ -240,8 +240,15 @@ corrections, and the public records request (`/api/records/request`). It cannot 
 preview or locally; verify on production.
 
 Email templates live in `lib/email.ts`, never in route handlers, and every interpolated
-user value goes through that module's local `escapeHtml`. Send with
-`fireAndForget(context, promise)`, never a bare `await`.
+user value goes through that module's local `escapeHtml`. Every send goes
+`trackSend(context, kind, to, sendX(…))` (`lib/trackSend.ts`), which wraps
+`fireAndForget` — never a bare `await`, and never a bare `fireAndForget(context, sendX(…))`.
+A failed or unconfigured send is recorded in `app_settings` as
+`email_last_failure_{owner,records,public}` plus counters, and shows on `/admin` under
+"Email delivery"; `emailTrackingContract.test.ts` fails on an untracked send. An intake that
+needs the owner's action calls `queueOwnerNotice(context, { kind, buildingId })`
+(`lib/ownerNotify.ts`) after its write commits. The owner inbox is `OWNER_NOTIFY_EMAIL` in
+`lib/email.ts`; there is no env var for it.
 
 ## Traps
 
@@ -257,6 +264,10 @@ Things that have already cost time. Read before debugging.
   else, so a change to `src/lib/records/scheduler.ts` or `queue.ts` is live in the admin
   routes but not in the cron until someone runs `npm run records:worker:deploy`. Its secrets
   (`RESEND_API_KEY`, `RECORDS_ALERT_EMAIL`) are Worker secrets, separate from the site's.
+  An unset or blank `RECORDS_ALERT_EMAIL` falls back to `OWNER_NOTIFY_EMAIL` and logs
+  `records_alert_recipient_default`; a failed alert shows on `/admin` under "Records-fill
+  alerts". The alert code is `src/lib/records/schedulerAlert.ts`, so a change there or in
+  `email.ts` / `emailHealth.ts` also needs a Worker deploy.
   After a deploy, zero cron invocations for more than fifteen minutes has so far meant a
   Cloudflare Cron Triggers incident rather than a broken Worker — check the status page
   first. See [`docs/runbooks/records-scheduler.md`](docs/runbooks/records-scheduler.md).
@@ -284,6 +295,11 @@ Things that have already cost time. Read before debugging.
   showed an unfiltered list. The list SELECT must keep returning `admin_notes` and the
   `owner_*` columns, and the edit form sends only changed fields (`buildingEditPatch`):
   the old full-row PUT nulled whatever the list had not loaded.
+- **"Sent" means Resend accepted it, nothing more.** Bounces and spam filtering happen after
+  that and are invisible to the app: the `/admin` "Email delivery" card only knows about sends
+  Resend refused, sends that threw, sends with no API key, and owner notices held back by the
+  cap. Check the Resend dashboard and the inbox (including spam) for the rest. The "Waiting on
+  you" card reads the queues directly, so it shows the backlog whether or not a notice arrived.
 - **Preview deploys cannot exercise Turnstile or the map.** The Turnstile sitekey is not
   allowlisted for `pages.dev`, and preview has no Maps key. Verify those widgets on
   production only — a failure in preview is expected, not a bug.
