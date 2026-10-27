@@ -86,6 +86,7 @@ npm run db:setup   # db:fresh then db:seed (local D1 only)
 npm run ops:metrics   # regenerate ops/METRICS.md from production (read-only)
 npm run records:check   # live Lanark fixture check (hits data.boston.gov), run by hand
 npm run records:seed -- --dry-run   # Boston bulk seed; --write / --apply --local / --apply --remote
+npm run records:suffix-backfill -- --remote   # after a SUFFIX_SPELLINGS change: generates re-key/respell/refresh SQL, applies nothing
 npm run records:worker        # run the records-scheduler Worker locally (stop `npm run dev` first)
 npm run records:worker:deploy # deploy the records-scheduler Worker — separate from the site deploy
 ```
@@ -343,7 +344,9 @@ Things that have already cost time. Read before debugging.
   cannot appear on one and not the other. Browse mode (no query), the landlord queries and
   `src/pages/api/buildings/map.ts` keep their `HAVING COUNT(r.id) > 0`.
   `recordsSearchParity.test.ts` fails if either call site stops using the fragments or if
-  the browse-mode and landlord counts change.
+  the browse-mode and landlord counts change. The typed spelling of each term matches
+  anywhere in the address; every other spelling of its suffix row matches only as a whole
+  word (`ADDRESS_WORDS` in `searchSql.ts`).
 - **`/sitemap.xml`, `/sitemaps/*.xml`, and `/robots.txt` are D1-backed routes** in
   `src/pages/`, not files in `public/`. The static-page allowlist is `STATIC_SITEMAP_PATHS`
   in `src/lib/sitemap.ts`; a new public page is not in the sitemap until it is added there.
