@@ -1,6 +1,7 @@
 ---
-// A list of records as the city filed them: date, the city's own words, the city's own status
-// word. Four sections print this same shape, so they print it from here.
+// A list of records as the city filed them: date, the city's own words, and its status. The
+// status is the city's word, except that an open 311, ISD or Public Works case reads "Still open
+// in city records". Four sections print this same shape, so they print it from here.
 //
 // The rows arrive already built by `ledger.ts` — this component picks no field and composes
 // no label, which is what keeps the decisions about what a row says testable without a render.
@@ -29,7 +30,7 @@ const ROW = 'grid grid-cols-1 sm:grid-cols-[7rem_1fr_auto] gap-x-2 gap-y-0.5 py-
       <span class="text-gray-500">{formatRecordDate(row.date)}</span>
       <span class="text-gray-900">{row.label}</span>
       <span class="text-xs sm:text-right">
-        <StatusToken status={row.status} />
+        <StatusToken status={row.status} label={row.statusLabel} />
         {row.trailing && <span class="text-gray-500">{row.trailing}</span>}
       </span>
     </li>

@@ -20,6 +20,11 @@ import {
   yearSpanLabel,
   NOT_RECORDED,
   orNotRecorded,
+  STILL_OPEN_LABEL,
+  STILL_OPEN_NOTE,
+  stillOpenHeading,
+  stillOpenLabel,
+  statusText,
 } from '../records/display';
 // Namespace import purely so the guard below can reflect over every export of the module.
 import * as displayModule from '../records/display';
@@ -506,6 +511,64 @@ describe('isOpenStatus', () => {
     expect(isOpenStatus(null)).toBe(false);
     expect(isOpenStatus(undefined)).toBe(false);
     expect(isOpenStatus('')).toBe(false);
+  });
+});
+
+/**
+ * "Open" is the city's status word. Read bare, it says the problem is there today; what the
+ * record says is only that no closing action has been recorded. The panel keeps every open
+ * record and words it as what it is.
+ */
+describe('still-open wording', () => {
+  it('heads the open list with where the status comes from, and the count', () => {
+    expect(STILL_OPEN_LABEL).toBe('Still open in city records');
+    expect(stillOpenHeading(7)).toBe('Still open in city records (7)');
+    expect(stillOpenHeading(1)).toBe('Still open in city records (1)');
+  });
+
+  it('explains what open means without saying the problem is current', () => {
+    expect(STILL_OPEN_NOTE).toBe(
+      'Open means the city has not recorded a closing action. It does not confirm the problem exists today.',
+    );
+  });
+
+  it('labels an open case with the year it was filed, in each date shape the feeds use', () => {
+    expect(stillOpenLabel('2013-04-02 09:30:00')).toBe('Still open in city records, filed 2013');
+    expect(stillOpenLabel('2021-01-28T16:29:26')).toBe('Still open in city records, filed 2021');
+    expect(stillOpenLabel('2026-08-01 10:00:00+00')).toBe('Still open in city records, filed 2026');
+  });
+
+  it('never prints anything more precise than the year', () => {
+    const label = stillOpenLabel('2016-09-14 07:12:00');
+    expect(label).toBe('Still open in city records, filed 2016');
+    expect(label).not.toMatch(/Sep|14|07:12/);
+  });
+
+  it('leaves the year off rather than guessing one when the filing date is missing or unreadable', () => {
+    expect(stillOpenLabel(null)).toBe('Still open in city records');
+    expect(stillOpenLabel('')).toBe('Still open in city records');
+    expect(stillOpenLabel('not a date')).toBe('Still open in city records');
+    expect(stillOpenLabel('2019-13-01')).toBe('Still open in city records');
+  });
+
+  it('uses no em dash and no exclamation point', () => {
+    for (const copy of [STILL_OPEN_LABEL, STILL_OPEN_NOTE, stillOpenHeading(2), stillOpenLabel('2013-04-02')]) {
+      expect(copy).not.toMatch(/[—!]/);
+    }
+  });
+});
+
+describe('statusText', () => {
+  it("prints the city's status word as recorded", () => {
+    expect(statusText('Closed')).toBe('Closed');
+    expect(statusText('Open')).toBe('Open');
+    expect(statusText('Issued')).toBe('Issued');
+  });
+
+  it('names a blank status rather than printing nothing', () => {
+    expect(statusText(null)).toBe(NOT_RECORDED);
+    expect(statusText(undefined)).toBe(NOT_RECORDED);
+    expect(statusText('   ')).toBe(NOT_RECORDED);
   });
 });
 
