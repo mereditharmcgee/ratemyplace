@@ -3,9 +3,10 @@ import { formatTenancyRange } from '../privacy';
 
 /**
  * The season chip on a review card shows a fuzzy tenancy range: move-in season and year,
- * then the move-out year (or "Current"). Older reviews were stored with a placeholder
- * move-in of winter of the submission year, so a stored move-in can fall after the
- * move-out year. A range that runs backwards is never shown.
+ * then the move-out year (or "Current"). When a reviewer skips the optional move-in
+ * question, the submit route stores winter of the current year (the columns are NOT NULL),
+ * so a stored move-in can fall after the move-out year. A range that runs backwards is
+ * never shown.
  */
 describe('formatTenancyRange', () => {
   it('shows move-in season and year with the move-out year', () => {
