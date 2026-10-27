@@ -2,17 +2,23 @@ import { describe, expect, it } from 'vitest';
 import {
   ANALYZE_BOSTON_URL,
   BOSTON_OPEN_DATA_LICENSE,
+  STALE_PULL_AFTER_SECONDS,
+  isPullStale,
   recordsCitations,
   resourceUrl,
+  showStalePullNote,
 } from '../records/provenance';
 import { pulledFromLine, rowPulledLabel } from '../records/display';
 import { sourcesForCity } from '../records/jurisdictions';
+import { REFRESH_AFTER_SECONDS } from '../records/queue';
 import { ASSESSOR_YEARS, FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
 import { LEGACY_311_RESOURCES, NEW_311_RESOURCE_ID } from '../records/sources/boston/serviceRequests';
+import type { RecordsRequestState } from '../records/coverage';
 
 const BOSTON_SOURCES = sourcesForCity('Boston');
 const ALL_SOURCE_IDS = BOSTON_SOURCES.map((source) => source.id);
+const DAY = 86_400;
 
 /** Every link in a citation list, flattened. */
 function allLinks(ids: Iterable<string>) {
@@ -143,5 +149,49 @@ describe('pull dates', () => {
   it('dates a late-evening Boston pull to its Boston day', () => {
     // 2026-09-13 01:30 UTC is 9:30 pm on Sep 12 in Boston.
     expect(rowPulledLabel(Date.UTC(2026, 8, 13, 1, 30) / 1000)).toBe('pulled Sep 12, 2026');
+  });
+});
+
+describe('isPullStale', () => {
+  const now = Date.UTC(2026, 9, 27, 14) / 1000;
+
+  it('uses the queue refresh interval, 30 days', () => {
+    expect(STALE_PULL_AFTER_SECONDS).toBe(REFRESH_AFTER_SECONDS);
+    expect(STALE_PULL_AFTER_SECONDS).toBe(30 * DAY);
+  });
+
+  it('calls a pull stale only once it is more than 30 days old', () => {
+    expect(isPullStale(now - 45 * DAY, now)).toBe(true);
+    expect(isPullStale(now - 30 * DAY - 1, now)).toBe(true);
+    // Exactly 30 days is the refresh planner's boundary too: not yet.
+    expect(isPullStale(now - 30 * DAY, now)).toBe(false);
+    expect(isPullStale(now - DAY, now)).toBe(false);
+    expect(isPullStale(now, now)).toBe(false);
+  });
+
+  it('does not call a pull stale when either time is not a number', () => {
+    expect(isPullStale(Number.NaN, now)).toBe(false);
+    expect(isPullStale(now - 45 * DAY, Number.NaN)).toBe(false);
+  });
+
+  it('does not call a pull from a clock ahead of ours stale', () => {
+    expect(isPullStale(now + DAY, now)).toBe(false);
+  });
+});
+
+describe('showStalePullNote', () => {
+  const now = Date.UTC(2026, 9, 27, 14) / 1000;
+  const old = now - 45 * DAY;
+
+  it('shows on an old pull of a building whose deeper records are in', () => {
+    expect(showStalePullNote('pulled', old, now)).toBe(true);
+    expect(showStalePullNote('pulled', now - DAY, now)).toBe(false);
+  });
+
+  it('stays off every other page state, which already says what is happening to the records', () => {
+    const others: RecordsRequestState[] = ['ineligible', 'fill_queued', 'parked', 'requested', 'never_pulled'];
+    for (const state of others) {
+      expect(showStalePullNote(state, old, now)).toBe(false);
+    }
   });
 });

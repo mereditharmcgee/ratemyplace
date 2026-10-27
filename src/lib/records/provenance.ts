@@ -1,4 +1,4 @@
-// Where the public records panel's data comes from.
+// Where the public records panel's data comes from, and how old the stored copy is.
 //
 // The citations are built only from the code constants the pull itself queries
 // (`sources/boston/*.ts`), so the list cannot name a resource the pull does not use, and a
@@ -20,6 +20,8 @@ import {
   SERVICE_REQUESTS_PAGE_URL,
 } from './sources/boston/serviceRequests';
 import { VIOLATIONS_PAGE_URL, VIOLATIONS_RESOURCE_ID } from './sources/boston/violations';
+import { REFRESH_AFTER_SECONDS } from './queue';
+import type { RecordsRequestState } from './coverage';
 
 /** The City of Boston's open data site, which publishes every dataset the panel reads. */
 export const ANALYZE_BOSTON_URL = 'https://data.boston.gov/';
@@ -120,4 +122,34 @@ export function recordsCitations(pulledSourceIds: Iterable<string>): DatasetCita
     });
   }
   return citations;
+}
+
+/**
+ * How old a stored pull can get before the panel says the city may have added records since.
+ * It is the queue's own refresh interval (30 days): a building with a review, a saved follower
+ * or a reader's request is re-pulled once its newest pull is older than this, so on those
+ * buildings the note usually shows for a day or less. A building the city-wide pass pulled
+ * once and nobody has asked about since keeps it.
+ */
+export const STALE_PULL_AFTER_SECONDS = REFRESH_AFTER_SECONDS;
+
+/**
+ * Whether a pull is older than `STALE_PULL_AFTER_SECONDS`, with the queue's boundary: the
+ * refresh planner takes a building whose newest pull is strictly older than the interval, so
+ * a pull exactly 30 days old is not stale yet. Both arguments are unix seconds. A timestamp
+ * that is not a number says nothing about age, so it is not called stale.
+ */
+export function isPullStale(pulledAt: number, nowSeconds: number): boolean {
+  if (!Number.isFinite(pulledAt) || !Number.isFinite(nowSeconds)) return false;
+  return nowSeconds - pulledAt > STALE_PULL_AFTER_SECONDS;
+}
+
+/**
+ * Whether the panel shows the stale-pull note beside its pull date. Only on a building whose
+ * deeper records are in (`pulled`): every other page state already has its own line about
+ * what is happening to the records (the request button, "requested", "set aside"), and a
+ * seeded building with only its assessor row has nothing deeper to have gone stale.
+ */
+export function showStalePullNote(state: RecordsRequestState, pulledAt: number, nowSeconds: number): boolean {
+  return state === 'pulled' && isPullStale(pulledAt, nowSeconds);
 }

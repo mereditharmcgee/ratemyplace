@@ -21,6 +21,7 @@ import {
   REQUEST_BUTTON_LABEL,
   REQUEST_PARKED_COPY,
   SHOW_LESS_LABEL,
+  STALE_PULL_NOTE,
   STILL_OPEN_NOTE,
 } from '../records/display';
 import { ROW_CAP } from '../records/ckan';
@@ -287,8 +288,25 @@ suite('BuildingRecords.astro ledger', () => {
 
     // Said as when this site pulled the records, not as the city dataset's own date.
     expect(line).toMatch(/^Pulled from City of Boston open data on [A-Z][a-z]{2} \d{1,2}, \d{4}\.$/);
+    // A fresh pull carries no stale note.
+    expect(line).not.toContain(STALE_PULL_NOTE);
     // The correction link is the panel's one call to action and has to be tappable.
     expect(html).toMatch(/href="#report-record"[^>]*min-h-\[44px\]/);
+  });
+
+  it('notes beside the pull date when the stored pull is more than 30 days old', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+    await db
+      .prepare('UPDATE record_pulls SET retrieved_at = retrieved_at - ? WHERE building_id = ?')
+      .bind(31 * 86_400, BUILDING_ID)
+      .run();
+
+    const html = await renderPanel(db);
+    const line = parse(html).querySelector('#public-records h2')?.nextElementSibling?.textContent ?? '';
+
+    expect(line).toMatch(/^Pulled from City of Boston open data on .+\. The city may have added records since then\.$/);
+    expect(line).toContain(STALE_PULL_NOTE);
   });
 
   it('dates each row to the pull that fetched it, in the same words', async () => {
@@ -988,6 +1006,35 @@ suite('BuildingRecords.astro request button states', () => {
     // The ledger below is the answer now, and the button never comes back.
     expect(text).not.toContain(REQUEST_BUTTON_LABEL);
     expect(text).not.toContain(REQUESTED_COPY);
+  });
+
+  /** Moves every pull row for the building back by `days`. */
+  async function agePulls(db: TestD1Database, id: string, days: number): Promise<void> {
+    await db
+      .prepare('UPDATE record_pulls SET retrieved_at = retrieved_at - ? WHERE building_id = ?')
+      .bind(days * 86_400, id)
+      .run();
+  }
+
+  it('notes an old pull beside its date once the deeper records are in', async () => {
+    const db = await seededBuilding('bldg-state-6');
+    await insertPull(db, 'bldg-state-6', PERMITS_RESOURCE_ID);
+    await agePulls(db, 'bldg-state-6', 45);
+
+    const text = panelText(await renderPanel(db, 'bldg-state-6'));
+
+    expect(text).toContain(STALE_PULL_NOTE);
+  });
+
+  it('leaves the stale note off a page that still offers the button', async () => {
+    const db = await seededBuilding('bldg-state-7');
+    await agePulls(db, 'bldg-state-7', 45);
+
+    const text = panelText(await renderPanel(db, 'bldg-state-7'));
+
+    // The button already says what this page can do about its records.
+    expect(text).toContain(REQUEST_BUTTON_LABEL);
+    expect(text).not.toContain(STALE_PULL_NOTE);
   });
 
   it('cites only the assessor year on a seeded building', async () => {

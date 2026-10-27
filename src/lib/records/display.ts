@@ -293,6 +293,13 @@ export function pulledFromLine(unix: number): string {
   return `Pulled from City of Boston open data on ${formatPullDate(unix)}.`;
 }
 
+/**
+ * Beside the pull date once the stored pull is older than the refresh interval
+ * (`provenance.ts`). Analyze Boston updates the 311, ISD, permit, Public Works and RentSmart
+ * resources daily; the assessor once a year.
+ */
+export const STALE_PULL_NOTE = 'The city may have added records since then.';
+
 /** Each ledger row's own retrieval date, worded the same way as the panel's line. */
 export function rowPulledLabel(unix: number): string {
   return `pulled ${formatPullDate(unix)}`;
@@ -619,6 +626,7 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   STILL_OPEN_LABEL,
   STILL_OPEN_NOTE,
   SHOW_LESS_LABEL,
+  STALE_PULL_NOTE,
   SOURCES_HEADING,
   SOURCES_CREDIT_LEAD,
   ANALYZE_BOSTON_LINK_TEXT,
