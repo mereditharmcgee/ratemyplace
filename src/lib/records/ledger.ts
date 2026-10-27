@@ -25,6 +25,7 @@ import {
   formatDollarsCompact,
   formatRecordDate,
   isOpenStatus,
+  missingYearsNote,
   openSubCount,
   orNotRecorded,
   otherRequestsLine,
@@ -103,6 +104,10 @@ export interface RequestsSection extends LedgerSection {
   /** The open rows on their own, listed above the full disclosure. */
   openRows: RecordRow[];
   years: YearCount[];
+  /** Years inside `years` the city 311 API returns no rows for, drawn as missing rather than as zero. */
+  missingYears: number[];
+  /** The line under the chart that says why those years are missing. Null when there are none. */
+  missingYearsNote: string | null;
   types: KeyBreakdown;
 }
 
@@ -220,6 +225,28 @@ function openNoteFor(openCount: number): string | null {
 const REQUEST_NOUN = { one: 'request', many: 'requests' };
 
 /**
+ * Calendar years whose legacy 311 resource on data.boston.gov returns no rows from the datastore
+ * (the CKAN API our pull reads), so no building can show a request from them and a zero bar there
+ * would be the city's API, not the building. The source CSV for each year is still listed on the
+ * resource page and holds data; only the datastore copy is empty (`resource_show` reports
+ * `datastore_contains_all_records_of_source_file: false` for both). Checked 2026-10-27 with
+ * `datastore_search` on every `LEGACY_311_RESOURCES` id: the 2011 and 2014 resources report a
+ * total of 0 rows, and every other year from 2012 to 2026 holds more than 100,000. The new-system
+ * resource starts in 2025, so it fills neither year. When the city reloads a year into the
+ * datastore, take that year out of this list.
+ */
+export const EMPTY_311_YEARS: readonly number[] = [2011, 2014];
+
+/**
+ * The years in a 311 series that fall in `EMPTY_311_YEARS` and hold no rows. A year with rows is
+ * never called missing, so a restored file shows its bars even before this list is updated.
+ */
+export function missingYearsIn(series: readonly YearCount[], emptyYears: readonly number[] = EMPTY_311_YEARS): number[] {
+  const empty = new Set(emptyYears);
+  return series.filter((entry) => entry.count === 0 && empty.has(entry.year)).map((entry) => entry.year);
+}
+
+/**
  * One 311 group's section. Every group reads the same source, so whether there is a count at
  * all, and whether the cap bit, is the source's answer rather than the group's: a pull that
  * returned only other requests still answered, so a later failure is a stale answer rather
@@ -235,7 +262,8 @@ function requestsSection(
   const countable = isCountable(status, hasRows);
   const open = rows.filter((row) => isOpenStatus(row.status));
   const years = countByYear(rows, (row) => row.openedAt, { to: currentYear });
-  const toRow = (row: ServiceRequestPayload, trailing: string | null): RecordRow => ({
+  const missingYears = missingYearsIn(years);
+  const toRow =(row: ServiceRequestPayload, trailing: string | null): RecordRow => ({
     date: row.openedAt,
     label: row.type ?? row.title ?? 'Request',
     status: row.status,
@@ -259,6 +287,8 @@ function requestsSection(
     openRows: open.map((row) => toRow(row, null)),
     matchNote,
     years,
+    missingYears,
+    missingYearsNote: missingYearsNote(missingYears),
     types: countByKey(rows, (row) => row.type ?? row.title, 6),
     showAll: showAllLabel(rows.length, REQUEST_NOUN),
   };

@@ -14,11 +14,14 @@ import {
   DECLARED_VALUATION_CAVEAT,
   FILL_QUEUED_COPY,
   NO_VIOLATIONS_CAVEAT,
+  PERMIT_COVERAGE_NOTE,
   GROUPING_LINK_TEXT,
   GROUPING_NOTE,
   REQUESTED_COPY,
   REQUEST_BUTTON_LABEL,
   REQUEST_PARKED_COPY,
+  SHOW_LESS_LABEL,
+  STALE_PULL_NOTE,
   STILL_OPEN_NOTE,
 } from '../records/display';
 import { ROW_CAP } from '../records/ckan';
@@ -37,6 +40,8 @@ import enforcementRows from './helpers/records/enforcement-lanark.json';
 /** The assessor's previous fiscal year, so the value series has two points to draw between. */
 const FY2025_RESOURCE_ID = ASSESSOR_YEARS[1].resourceId;
 const LEGACY_2024_RESOURCE_ID = LEGACY_311_RESOURCES.find((resource) => resource.year === 2024)!.resourceId;
+const LEGACY_2013_RESOURCE_ID = LEGACY_311_RESOURCES.find((resource) => resource.year === 2013)!.resourceId;
+const LEGACY_2023_RESOURCE_ID = LEGACY_311_RESOURCES.find((resource) => resource.year === 2023)!.resourceId;
 
 /**
  * The panel's privacy and empty-state rules, checked against the HTML the server actually
@@ -278,10 +283,73 @@ suite('BuildingRecords.astro ledger', () => {
     await seedFullBuilding(db);
 
     const html = await renderPanel(db);
+    const heading = parse(html).querySelector('#public-records h2');
+    const line = heading?.nextElementSibling?.textContent ?? '';
 
-    expect(html).toContain('City of Boston · pulled');
+    // Said as when this site pulled the records, not as the city dataset's own date.
+    expect(line).toMatch(/^Pulled from City of Boston open data on [A-Z][a-z]{2} \d{1,2}, \d{4}\.$/);
+    // A fresh pull carries no stale note.
+    expect(line).not.toContain(STALE_PULL_NOTE);
     // The correction link is the panel's one call to action and has to be tappable.
     expect(html).toMatch(/href="#report-record"[^>]*min-h-\[44px\]/);
+  });
+
+  it('notes beside the pull date when the stored pull is more than 30 days old', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+    await db
+      .prepare('UPDATE record_pulls SET retrieved_at = retrieved_at - ? WHERE building_id = ?')
+      .bind(31 * 86_400, BUILDING_ID)
+      .run();
+
+    const html = await renderPanel(db);
+    const line = parse(html).querySelector('#public-records h2')?.nextElementSibling?.textContent ?? '';
+
+    expect(line).toMatch(/^Pulled from City of Boston open data on .+\. The city may have added records since then\.$/);
+    expect(line).toContain(STALE_PULL_NOTE);
+  });
+
+  it('dates each row to the pull that fetched it, in the same words', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const summary = ledgerRow(await renderPanel(db), 'Building permits').querySelector('summary')?.textContent ?? '';
+
+    expect(summary).toMatch(/pulled [A-Z][a-z]{2} \d{1,2}, \d{4}/);
+    expect(summary).not.toContain('as of');
+  });
+
+  it('credits the city and Analyze Boston, states the license, and links each resource used', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const html = await renderPanel(db);
+    const sources = parse(html).querySelector('#records-sources');
+    const text = (sources?.textContent ?? '').replace(/\s+/g, ' ');
+
+    expect(sources?.querySelector('h3')?.textContent).toBe('Sources');
+    expect(text).toContain(
+      'Data from the City of Boston, published on Analyze Boston (data.boston.gov) under the Open Data Commons Public Domain Dedication and License (PDDL).',
+    );
+    const hrefs = Array.from(sources?.querySelectorAll('a') ?? []).map((link) => link.getAttribute('href'));
+    expect(hrefs).toContain('https://data.boston.gov/');
+    expect(hrefs).toContain('https://opendatacommons.org/licenses/pddl/');
+    // Resource-level links, not dataset pages: the assessor years, permits, and every 311 file.
+    expect(hrefs).toContain(`https://data.boston.gov/dataset/property-assessment/resource/${FY2026_RESOURCE_ID}`);
+    expect(hrefs).toContain(`https://data.boston.gov/dataset/property-assessment/resource/${FY2025_RESOURCE_ID}`);
+    expect(hrefs).toContain(`https://data.boston.gov/dataset/approved-building-permits/resource/${PERMITS_RESOURCE_ID}`);
+    for (const { resourceId } of LEGACY_311_RESOURCES) {
+      expect(hrefs).toContain(`https://data.boston.gov/dataset/311-service-requests/resource/${resourceId}`);
+    }
+    expect(hrefs).toContain(`https://data.boston.gov/dataset/311-service-requests/resource/${NEW_311_RESOURCE_ID}`);
+    expect(hrefs.some((href) => href?.endsWith('/dataset/311-service-requests'))).toBe(false);
+    // A bare year link names its dataset for a screen reader.
+    const year2024 = Array.from(sources?.querySelectorAll('a') ?? []).find((link) => link.textContent === '2024');
+    expect(year2024?.getAttribute('aria-label')).toBe('311 Service Requests 2024');
+    // Every source link opens the city's page without handing it this page as an opener.
+    for (const link of Array.from(sources?.querySelectorAll('a') ?? [])) {
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    }
   });
 
   it('keeps the record-error form folded until a reader asks for it', async () => {
@@ -323,7 +391,8 @@ suite('BuildingRecords.astro ledger', () => {
     expect(html).toContain('Assessor FY2026 · parcel 2102098000');
     expect(html).toContain('Built');
     expect(html).toContain('1920');
-    expect(html).toContain('Last remodel 1980 · units not recorded');
+    // Says whose field is blank, so it does not read against a unit count in Building details.
+    expect(html).toContain('Last remodel 1980 · units not recorded by the assessor');
     expect(html).toContain('Land use');
     expect(html).toContain('APT 7-30 UNITS');
     // Compact, not the long form, so the four cells fit across a phone.
@@ -368,6 +437,11 @@ suite('BuildingRecords.astro ledger', () => {
     // The coverage label is the years the permits actually fall in (2019 and 2021) — not the
     // feed's documented coverage window the bars are drawn across, which runs 2006 to 2026.
     expect(permits).toContain('2019–2021');
+    // The body names the feed's start as the feed's, so it does not read as a second span for
+    // this building's permits.
+    const permitsBody = sectionText(html, 'Building permits');
+    expect(permitsBody).toContain(PERMIT_COVERAGE_NOTE);
+    expect(permitsBody).not.toContain('On record from');
   });
 
   it('says none on record rather than zero open for a source that came back empty', async () => {
@@ -408,7 +482,7 @@ suite('BuildingRecords.astro ledger', () => {
     expect(summary?.className).toContain('min-h-[44px]');
     // Everything a closed row has to answer lives in the summary, not behind the disclosure.
     expect(summary?.querySelector('h4')?.textContent).toContain('Building permits');
-    expect(summary?.textContent).toContain('as of');
+    expect(summary?.textContent).toContain('pulled ');
     expect(summary?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
   });
 
@@ -425,6 +499,40 @@ suite('BuildingRecords.astro ledger', () => {
     // Every year in the span draws, including 2025, which has nothing in it.
     expect(requests.innerHTML).toContain('title="2025: 0"');
     expect(requests.innerHTML).toContain('title="2026: 1"');
+  });
+
+  it('draws a year whose city 311 file is empty as missing, not as a zero, and says why', async () => {
+    const db = await createDbWithAdmin();
+    // One living-conditions request from 2013, so the chart's span crosses 2014.
+    const heat = (legacy311 as AssessorRow[]).find((row) => String(row.type).startsWith('Heat'))!;
+    await seedFullBuilding(db, [
+      {
+        resourceId: LEGACY_2013_RESOURCE_ID,
+        records: [{ ...heat, case_enquiry_id: '101000000013', open_dt: '2013-02-01 09:00:00', closed_dt: '2013-02-03 09:00:00', case_status: 'Closed' }],
+      },
+    ]);
+
+    const requests = ledgerRow(await renderPanel(db), '311 living conditions requests');
+
+    const missing = requests.querySelector('[data-missing-year="2014"]');
+    expect(missing?.getAttribute('title')).toBe('2014: no data');
+    // Not a zero bar: no solid fill, and the note under the chart says why.
+    expect(missing?.innerHTML).not.toMatch(/bg-gray-(200|700)/);
+    expect(requests.innerHTML).not.toContain('title="2014: 0"');
+    expect(requests.textContent).toContain('2014 is marked as missing data, not zero.');
+    expect(requests.querySelector('[role="img"]')?.getAttribute('aria-label')).toContain('no data for 2014');
+    // A year with no requests that the city does have a file for is still an ordinary zero.
+    expect(requests.innerHTML).toContain('title="2015: 0"');
+  });
+
+  it('marks no year missing when the chart does not reach back to an empty file', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const html = await renderPanel(db);
+
+    expect(html).not.toContain('data-missing-year');
+    expect(html).not.toContain('marked as missing data');
   });
 
   it('lists the requests still open in city records above the full list, and says what open means', async () => {
@@ -487,6 +595,111 @@ suite('BuildingRecords.astro ledger', () => {
     expect(statuses).toContain('Open');
     expect(permits.textContent).not.toContain('Still open in city records');
     expect(permits.textContent).not.toContain(STILL_OPEN_NOTE);
+  });
+
+  it('turns "Show all" into "Show less" once the list is open', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const permits = ledgerRow(await renderPanel(db), 'Building permits');
+    const disclosure = permits.querySelector('details.records-show-all');
+    const summary = disclosure?.querySelector('summary');
+
+    // Both labels are in the summary; the panel's stylesheet shows the closed one until the
+    // disclosure is open and the open one after, so the control never claims to show what is
+    // already on screen.
+    expect(summary?.querySelector('.records-show-all-closed')?.textContent?.trim()).toBe('Show all 2 permits');
+    expect(summary?.querySelector('.records-show-all-open')?.textContent?.trim()).toBe(SHOW_LESS_LABEL);
+    // A two-row list needs no second control at its end.
+    expect(disclosure?.querySelector('button[data-records-show-less]')).toBeNull();
+  });
+
+  it('puts a second "Show less" after the last row of a long list, hidden until script can run it', async () => {
+    const db = await createDbWithAdmin();
+    const heat = (legacy311 as AssessorRow[]).find((row) => String(row.type).startsWith('Heat'))!;
+    const manyRequests = Array.from({ length: 6 }, (_unused, index) => ({
+      ...heat,
+      case_enquiry_id: `10100000100${index}`,
+      open_dt: `2023-0${index + 1}-01 09:00:00`,
+      closed_dt: `2023-0${index + 1}-02 09:00:00`,
+      case_status: 'Closed',
+    }));
+    await seedFullBuilding(db, [{ resourceId: LEGACY_2023_RESOURCE_ID, records: manyRequests }]);
+
+    const requests = ledgerRow(await renderPanel(db), '311 living conditions requests');
+    const disclosure = requests.querySelector('details.records-show-all');
+    const endButton = disclosure?.querySelector('button[data-records-show-less]');
+
+    expect(endButton?.textContent?.trim()).toBe(SHOW_LESS_LABEL);
+    expect(endButton?.getAttribute('type')).toBe('button');
+    // Script closes the list, so without script the button stays hidden rather than doing nothing.
+    expect(endButton?.hasAttribute('hidden')).toBe(true);
+    // It sits after the list, as the disclosure's last element.
+    expect(disclosure?.lastElementChild).toBe(endButton);
+  });
+
+  it('pads the Source links and the Show all controls to a tappable height', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const fragment = parse(await renderPanel(db));
+    const sources = Array.from(fragment.querySelectorAll('a')).filter((node) => (node.textContent ?? '').trim() === 'Source');
+    const summaries = Array.from(fragment.querySelectorAll('details.records-show-all > summary'));
+
+    // Bare text measured 40x15 (Source) and 20px tall (Show all); 24px is the floor.
+    expect(sources.length).toBeGreaterThan(0);
+    for (const link of sources) expect(link.className).toMatch(/\binline-block\b.*\bpy-1\.5\b|\bpy-1\.5\b.*\binline-block\b/);
+    expect(summaries.length).toBeGreaterThan(0);
+    for (const summary of summaries) expect(summary.className).toContain('py-1.5');
+  });
+
+  it('keeps a space between every count and its noun, and the noun in the right number', async () => {
+    const db = await createDbWithAdmin();
+    // Eight property upkeep types, so the category chart has a leftover line to print.
+    const trash = (legacy311 as AssessorRow[]).find((row) => String(row.type).startsWith('Improper Storage'))!;
+    const upkeepTypes = [
+      'Improper Storage of Trash (Barrels)', 'Poor Conditions of Property', 'Unshoveled Sidewalk', 'Snow Removal',
+      'Illegal Dumping', 'Construction Debris', 'Illegal Posting of Signs', 'Illegal Vending',
+    ];
+    const upkeepRows = upkeepTypes.map((type, index) => ({
+      ...trash,
+      case_enquiry_id: `10100000200${index}`,
+      open_dt: `2023-0${index + 1}-01 09:00:00`,
+      closed_dt: `2023-0${index + 1}-02 09:00:00`,
+      case_status: 'Closed',
+      type,
+      case_title: type,
+      reason: 'Code Enforcement',
+    }));
+    await seedFullBuilding(db, [OPEN_VIOLATION_ROUTE, { resourceId: LEGACY_2023_RESOURCE_ID, records: upkeepRows }]);
+
+    const text = (parse(await renderPanel(db)).textContent ?? '').replace(/\s+/g, ' ');
+
+    // "4requests", "2tickets", "42permits", "10more types" came from two expressions printed
+    // side by side with the space between them lost.
+    expect(text).not.toMatch(/\d(requests?|tickets?|permits?|cases?|more types?|code lines?|violation lines?)\b/);
+    expect(text).toMatch(/\d+ more types? · \d+ requests?/);
+    // "Show all 1 requests" was wrong in number; one record reads "Show 1 request".
+    expect(text).not.toMatch(/\b1 (requests|tickets|permits|cases)\b/);
+    expect(text).not.toContain('Show all 1 ');
+    // The other-requests count is its own sentence, never "not shown" beside a Show all link.
+    expect(text).not.toContain('not shown');
+  });
+
+  it('puts the 311 notes between the last group and the record-error fold, not an empty double rule', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const report = parse(await renderPanel(db)).querySelector('#report-record');
+    const sources = report?.previousElementSibling;
+    const notes = sources?.previousElementSibling;
+
+    // The ledger's closing rule and the fold's opening rule used to sit 24px apart with
+    // nothing between them. Now the grouping note sits there, then the source list.
+    expect(sources?.id).toBe('records-sources');
+    expect(sources?.className ?? '').not.toContain('border-b');
+    expect(notes?.className ?? '').not.toContain('border-b');
+    expect((notes?.textContent ?? '').trim()).toContain(GROUPING_NOTE);
   });
 
   it('keeps the full lists one disclosure down rather than dropping them', async () => {
@@ -793,5 +1006,44 @@ suite('BuildingRecords.astro request button states', () => {
     // The ledger below is the answer now, and the button never comes back.
     expect(text).not.toContain(REQUEST_BUTTON_LABEL);
     expect(text).not.toContain(REQUESTED_COPY);
+  });
+
+  /** Moves every pull row for the building back by `days`. */
+  async function agePulls(db: TestD1Database, id: string, days: number): Promise<void> {
+    await db
+      .prepare('UPDATE record_pulls SET retrieved_at = retrieved_at - ? WHERE building_id = ?')
+      .bind(days * 86_400, id)
+      .run();
+  }
+
+  it('notes an old pull beside its date once the deeper records are in', async () => {
+    const db = await seededBuilding('bldg-state-6');
+    await insertPull(db, 'bldg-state-6', PERMITS_RESOURCE_ID);
+    await agePulls(db, 'bldg-state-6', 45);
+
+    const text = panelText(await renderPanel(db, 'bldg-state-6'));
+
+    expect(text).toContain(STALE_PULL_NOTE);
+  });
+
+  it('leaves the stale note off a page that still offers the button', async () => {
+    const db = await seededBuilding('bldg-state-7');
+    await agePulls(db, 'bldg-state-7', 45);
+
+    const text = panelText(await renderPanel(db, 'bldg-state-7'));
+
+    // The button already says what this page can do about its records.
+    expect(text).toContain(REQUEST_BUTTON_LABEL);
+    expect(text).not.toContain(STALE_PULL_NOTE);
+  });
+
+  it('cites only the assessor year on a seeded building', async () => {
+    const html = await renderPanel(await seededBuilding('bldg-state-8'), 'bldg-state-8');
+    const sources = parse(html).querySelector('#records-sources');
+    const hrefs = Array.from(sources?.querySelectorAll('a') ?? []).map((link) => link.getAttribute('href'));
+
+    expect(hrefs).toContain(`https://data.boston.gov/dataset/property-assessment/resource/${FY2026_RESOURCE_ID}`);
+    expect(hrefs.filter((href) => href?.includes('/resource/'))).toHaveLength(1);
+    expect(sources?.textContent ?? '').not.toContain('311 Service Requests');
   });
 });

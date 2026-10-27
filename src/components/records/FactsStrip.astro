@@ -12,6 +12,7 @@ import {
   mailingAddressLine,
   formatDollarsCompact,
   orNotRecorded,
+  assessorUnitsText,
 } from '../../lib/records/display';
 import type { AssessmentPayload } from '../../lib/records/types';
 
@@ -28,6 +29,9 @@ const { current, all } = Astro.props;
 function orNotRecordedInline(value: string | number | null | undefined): string {
   return value === null || value === undefined || value === '' ? 'not recorded' : String(value);
 }
+
+// One string, so the separator and the unit wording cannot lose a space between expressions.
+const builtSubLine = `Last remodel ${orNotRecordedInline(current.yearRemodel)} · ${assessorUnitsText(current.residentialUnits)}`;
 
 const SPARK_WIDTH = 84;
 const SPARK_HEIGHT = 22;
@@ -78,9 +82,7 @@ const SUB = 'mt-1 block text-xs text-gray-500';
     <dt class={LABEL}>Built</dt>
     <dd class={VALUE}>
       {orNotRecorded(current.yearBuilt)}
-      <span class={SUB}>
-        Last remodel {orNotRecordedInline(current.yearRemodel)} · units {orNotRecordedInline(current.residentialUnits)}
-      </span>
+      <span class={SUB}>{builtSubLine}</span>
     </dd>
   </div>
 
