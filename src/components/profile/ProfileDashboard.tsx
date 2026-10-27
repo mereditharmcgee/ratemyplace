@@ -253,7 +253,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             </div>
 
             <p className="text-sm text-gray-600 mb-4">
-              Verify your email to get the Email Verified badge on your reviews.
+              Verify your email to confirm this address is yours. This is not shown on your public reviews.
             </p>
 
             <button

@@ -1,21 +1,20 @@
 ---
-// A record's own status word. Open is outlined so it can be found by scanning a list; every
-// other status is muted text. The outline is grey on purpose — a red or amber "Open" would
-// tell the reader that an open record is bad news, which is exactly the reading this panel
-// refuses to supply.
-import { isOpenStatus, NOT_RECORDED } from '../../lib/records/display';
+// A record's status, printed as plain text. Not a pill: an outlined "Open" read as a button,
+// and tapping it did nothing. The label arrives already worded by `ledger.ts`, so an open 311,
+// ISD or Public Works case reads "Still open in city records" and every other status reads as
+// the city recorded it. Open is set slightly darker so it can be found by scanning a list. No
+// colour: a red or amber status would tell the reader that an open record is bad news, which is
+// exactly the reading this panel refuses to supply.
+import { isOpenStatus } from '../../lib/records/display';
 
 interface Props {
+  /** The city's own status word, which decides only the weight of the text. */
   status: string | null | undefined;
+  /** What to print, from `RecordRow.statusLabel`. */
+  label: string;
 }
 
-const { status } = Astro.props;
-
-const text = status === null || status === undefined || status.trim() === '' ? NOT_RECORDED : status;
+const { status, label } = Astro.props;
 ---
 
-{isOpenStatus(status) ? (
-  <span class="inline-flex items-center rounded-full border border-gray-400 px-2 py-0.5 text-[11px] font-medium text-gray-700">{text}</span>
-) : (
-  <span class="text-gray-500">{text}</span>
-)}
+<span class={isOpenStatus(status) ? 'font-medium text-gray-700' : 'text-gray-500'}>{label}</span>
