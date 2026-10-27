@@ -477,6 +477,24 @@ export function openSubCount(openCount: number, total: number): string {
   return `${openCount} open`;
 }
 
+/** `2014`, `2011 and 2014`, `2011, 2012 and 2014`. */
+function joinYears(years: readonly number[]): string {
+  if (years.length <= 1) return years.map(String).join('');
+  return `${years.slice(0, -1).join(', ')} and ${years[years.length - 1]}`;
+}
+
+/**
+ * Under a 311 year chart whose span crosses a year the city's 311 file is empty for (see
+ * `EMPTY_311_YEARS` in `ledger.ts`). The bar for that year is drawn as missing rather than as a
+ * zero, and this says why. Null when the chart crosses no such year.
+ */
+export function missingYearsNote(years: readonly number[]): string | null {
+  if (years.length === 0) return null;
+  return years.length === 1
+    ? `${years[0]} is marked as missing data, not zero. The city's 311 file for that year is currently empty.`
+    : `${joinYears(years)} are marked as missing data, not zero. The city's 311 files for those years are currently empty.`;
+}
+
 /**
  * The span a dense year series covers, as the ledger's coverage line writes it. Null when no
  * row carried a readable date — there is no span to state, and "–" alone would suggest one.
@@ -572,4 +590,6 @@ export const PANEL_COPY: Readonly<Record<string, string>> = {
   'caseLinesNote()': caseLinesNote(6, 1) ?? '',
   'ticketLinesNote()': ticketLinesNote(12, 9) ?? '',
   'assessorUnitsText() — blank': assessorUnitsText(null),
+  'missingYearsNote() — one': missingYearsNote([2014]) ?? '',
+  'missingYearsNote() — two': missingYearsNote([2011, 2014]) ?? '',
 };

@@ -5,6 +5,10 @@
 //
 // Every year in the span gets a bar, including the empty ones. Dropping a zero year would
 // close a gap the records actually have and make an intermittent run look continuous.
+//
+// A year the city's own file is empty for is different: its zero is not a count. Those years
+// arrive in `missingYears` (worked out in `ledger.ts`) and draw as a dashed, unfilled outline
+// instead of a bar, with `missingNote` under the chart saying why.
 import type { YearCount } from '../../lib/records/charts';
 
 interface Props {
@@ -12,9 +16,14 @@ interface Props {
   series: YearCount[];
   /** Plural noun for the accessible description, e.g. `requests`. */
   noun: string;
+  /** Years in the series with no data from the city, drawn as missing rather than as zero. */
+  missingYears?: readonly number[];
+  /** The line under the chart that says why those years are missing. */
+  missingNote?: string | null;
 }
 
-const { title, series, noun } = Astro.props;
+const { title, series, noun, missingYears = [], missingNote = null } = Astro.props;
+const missing = new Set(missingYears);
 
 const BAR_AREA_PX = 64;
 /** A year with no records still draws, so the axis reads as a continuous span. */
@@ -48,9 +57,11 @@ function axisLabel(year: number): string {
 
 // The frontmatter runs whether or not the markup below renders, so the empty case still has
 // to be handled here even though the JSX only reaches `ariaLabel` behind `series.length > 0`.
+const missingInSeries = series.filter((entry) => missing.has(entry.year)).map((entry) => entry.year);
 const ariaLabel =
   series.length > 0
-    ? `${title}: ${total} ${noun} across ${series[0].year} to ${series[series.length - 1].year}`
+    ? `${title}: ${total} ${noun} across ${series[0].year} to ${series[series.length - 1].year}` +
+      (missingInSeries.length > 0 ? `, no data for ${missingInSeries.join(' and ')}` : '')
     : '';
 ---
 
@@ -60,18 +71,25 @@ const ariaLabel =
     <div role="img" aria-label={ariaLabel} class="mt-2 flex items-end gap-px" style={`height:${BAR_AREA_PX}px`}>
       {/* Capped so a one- or two-year span draws bars rather than a wall of ink. A long span
           never reaches the cap, so the chart still fills its column. */}
-      {series.map((entry) => (
-        <span class="flex max-w-8 flex-1 items-end" title={`${entry.year}: ${entry.count}`}>
-          <span
-            class:list={['block w-full', entry.count > 0 ? 'bg-gray-700' : 'bg-gray-200']}
-            style={`height:${barHeight(entry.count)}px`}></span>
-        </span>
-      ))}
+      {series.map((entry) =>
+        missing.has(entry.year) ? (
+          <span class="flex max-w-8 flex-1 items-end" title={`${entry.year}: no data`} data-missing-year={entry.year}>
+            <span class="block w-full border border-dashed border-gray-400" style={`height:${BAR_AREA_PX}px`}></span>
+          </span>
+        ) : (
+          <span class="flex max-w-8 flex-1 items-end" title={`${entry.year}: ${entry.count}`}>
+            <span
+              class:list={['block w-full', entry.count > 0 ? 'bg-gray-700' : 'bg-gray-200']}
+              style={`height:${barHeight(entry.count)}px`}></span>
+          </span>
+        ),
+      )}
     </div>
     <div class="mt-1 flex gap-px" aria-hidden="true">
       {series.map((entry) => (
         <span class="max-w-8 flex-1 whitespace-nowrap text-center text-[10px] leading-none text-gray-400">{axisLabel(entry.year)}</span>
       ))}
     </div>
+    {missingInSeries.length > 0 && missingNote && <p class="mt-2 text-xs text-gray-500">{missingNote}</p>}
   </div>
 )}

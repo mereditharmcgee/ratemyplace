@@ -38,6 +38,7 @@ import enforcementRows from './helpers/records/enforcement-lanark.json';
 /** The assessor's previous fiscal year, so the value series has two points to draw between. */
 const FY2025_RESOURCE_ID = ASSESSOR_YEARS[1].resourceId;
 const LEGACY_2024_RESOURCE_ID = LEGACY_311_RESOURCES.find((resource) => resource.year === 2024)!.resourceId;
+const LEGACY_2013_RESOURCE_ID = LEGACY_311_RESOURCES.find((resource) => resource.year === 2013)!.resourceId;
 
 /**
  * The panel's privacy and empty-state rules, checked against the HTML the server actually
@@ -432,6 +433,40 @@ suite('BuildingRecords.astro ledger', () => {
     // Every year in the span draws, including 2025, which has nothing in it.
     expect(requests.innerHTML).toContain('title="2025: 0"');
     expect(requests.innerHTML).toContain('title="2026: 1"');
+  });
+
+  it('draws a year whose city 311 file is empty as missing, not as a zero, and says why', async () => {
+    const db = await createDbWithAdmin();
+    // One living-conditions request from 2013, so the chart's span crosses 2014.
+    const heat = (legacy311 as AssessorRow[]).find((row) => String(row.type).startsWith('Heat'))!;
+    await seedFullBuilding(db, [
+      {
+        resourceId: LEGACY_2013_RESOURCE_ID,
+        records: [{ ...heat, case_enquiry_id: '101000000013', open_dt: '2013-02-01 09:00:00', closed_dt: '2013-02-03 09:00:00', case_status: 'Closed' }],
+      },
+    ]);
+
+    const requests = ledgerRow(await renderPanel(db), '311 living conditions requests');
+
+    const missing = requests.querySelector('[data-missing-year="2014"]');
+    expect(missing?.getAttribute('title')).toBe('2014: no data');
+    // Not a zero bar: no solid fill, and the note under the chart says why.
+    expect(missing?.innerHTML).not.toMatch(/bg-gray-(200|700)/);
+    expect(requests.innerHTML).not.toContain('title="2014: 0"');
+    expect(requests.textContent).toContain('2014 is marked as missing data, not zero.');
+    expect(requests.querySelector('[role="img"]')?.getAttribute('aria-label')).toContain('no data for 2014');
+    // A year with no requests that the city does have a file for is still an ordinary zero.
+    expect(requests.innerHTML).toContain('title="2015: 0"');
+  });
+
+  it('marks no year missing when the chart does not reach back to an empty file', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const html = await renderPanel(db);
+
+    expect(html).not.toContain('data-missing-year');
+    expect(html).not.toContain('marked as missing data');
   });
 
   it('lists the requests still open in city records above the full list, and says what open means', async () => {

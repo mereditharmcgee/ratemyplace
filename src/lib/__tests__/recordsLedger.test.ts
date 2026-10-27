@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ledgerModel } from '../records/ledger';
+import { EMPTY_311_YEARS, ledgerModel, missingYearsIn } from '../records/ledger';
 import {
   CAPPED_CODE_LINES_COPY,
   CAPPED_REQUESTS_COPY,
@@ -12,7 +12,7 @@ import { ROW_CAP } from '../records/ckan';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
 import { VIOLATIONS_RESOURCE_ID } from '../records/sources/boston/violations';
 import { ENFORCEMENT_RESOURCE_ID } from '../records/sources/boston/enforcement';
-import { NEW_311_RESOURCE_ID } from '../records/sources/boston/serviceRequests';
+import { LEGACY_311_RESOURCES, NEW_311_RESOURCE_ID } from '../records/sources/boston/serviceRequests';
 import type { BuildingRecordsView, SourceStatus } from '../records/query';
 import type {
   EnforcementTicketPayload,
@@ -763,5 +763,69 @@ describe('ledgerModel Public Works tickets', () => {
     const model = ledgerModel(view({ sources: allPulled(), enforcement: [ticket()] }), NOW);
     expect(model.enforcement.showAll).toBe('Show 1 ticket');
     expect(model.enforcement.note).toBeNull();
+  });
+});
+
+describe('ledgerModel years the city has no 311 file for', () => {
+  it('lists 2014 as missing, not zero, when a group spans it with no row in it', () => {
+    const model = ledgerModel(
+      view({
+        sources: allPulled(),
+        serviceRequests: [
+          request({ caseId: 'A', openedAt: '2013-03-01 09:00:00' }),
+          request({ caseId: 'B', openedAt: '2016-03-01 09:00:00' }),
+        ],
+      }),
+      NOW,
+    );
+    expect(model.living.years.find((entry) => entry.year === 2014)).toEqual({ year: 2014, count: 0 });
+    expect(model.living.missingYears).toEqual([2014]);
+    expect(model.living.missingYearsNote).toBe(
+      "2014 is marked as missing data, not zero. The city's 311 file for that year is currently empty.",
+    );
+    // A real empty year beside it stays an ordinary zero.
+    expect(model.living.missingYears).not.toContain(2015);
+  });
+
+  it('marks nothing when the chart starts after the empty year', () => {
+    const model = ledgerModel(
+      view({ sources: allPulled(), serviceRequests: [request({ openedAt: '2016-03-01 09:00:00' })] }),
+      NOW,
+    );
+    expect(model.living.missingYears).toEqual([]);
+    expect(model.living.missingYearsNote).toBeNull();
+  });
+
+  it('never calls a year missing when it has rows, so a restored file shows its bars', () => {
+    const model = ledgerModel(
+      view({
+        sources: allPulled(),
+        serviceRequests: [
+          request({ caseId: 'A', openedAt: '2013-03-01 09:00:00' }),
+          request({ caseId: 'B', openedAt: '2014-03-01 09:00:00' }),
+        ],
+      }),
+      NOW,
+    );
+    expect(model.living.missingYears).toEqual([]);
+  });
+
+  it('only names years whose city file was checked and found empty', () => {
+    expect(EMPTY_311_YEARS).toEqual([2011, 2014]);
+    // Each is a year the legacy 311 resource list covers, so the list cannot drift to a year
+    // the pull never reads.
+    const legacyYears = new Set(LEGACY_311_RESOURCES.map((resource) => resource.year));
+    for (const year of EMPTY_311_YEARS) expect(legacyYears.has(year)).toBe(true);
+  });
+
+  it('works out missing years from a series and a list', () => {
+    const series = [
+      { year: 2013, count: 2 },
+      { year: 2014, count: 0 },
+      { year: 2015, count: 0 },
+    ];
+    expect(missingYearsIn(series, [2014])).toEqual([2014]);
+    expect(missingYearsIn(series, [2013])).toEqual([]);
+    expect(missingYearsIn(series, [])).toEqual([]);
   });
 });

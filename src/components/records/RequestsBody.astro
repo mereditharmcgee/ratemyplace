@@ -26,7 +26,13 @@ const disclosureClass =
 ) : (
   <>
     <div class={chartsClass}>
-      <YearBars title="Requests by year opened" series={section.years} noun="requests" />
+      <YearBars
+        title="Requests by year opened"
+        series={section.years}
+        noun="requests"
+        missingYears={section.missingYears}
+        missingNote={section.missingYearsNote}
+      />
       <CategoryBars title="What was reported" breakdown={section.types} noun={{ one: 'request', many: 'requests' }} />
     </div>
     {section.openRows.length > 0 && (

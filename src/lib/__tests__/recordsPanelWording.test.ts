@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assessorUnitsText, PERMIT_COVERAGE_NOTE } from '../records/display';
+import { assessorUnitsText, missingYearsNote, PERMIT_COVERAGE_NOTE } from '../records/display';
 import { PERMIT_COVERAGE_START } from '../records/sources/boston/permits';
 
 /**
@@ -26,5 +26,29 @@ describe('PERMIT_COVERAGE_NOTE', () => {
     // "On record from" read as this building's permits, against a row span that starts later.
     expect(PERMIT_COVERAGE_NOTE).not.toContain('On record from');
     expect(PERMIT_COVERAGE_NOTE).not.toMatch(/[—!]/);
+  });
+});
+
+describe('missingYearsNote', () => {
+  it('says a missing year is not a zero and why, in the singular', () => {
+    expect(missingYearsNote([2014])).toBe(
+      "2014 is marked as missing data, not zero. The city's 311 file for that year is currently empty.",
+    );
+  });
+
+  it('joins several years and words the sentence in the plural', () => {
+    expect(missingYearsNote([2011, 2014])).toBe(
+      "2011 and 2014 are marked as missing data, not zero. The city's 311 files for those years are currently empty.",
+    );
+    expect(missingYearsNote([2010, 2011, 2014])).toContain('2010, 2011 and 2014 are marked');
+  });
+
+  it('says nothing when no year is missing', () => {
+    expect(missingYearsNote([])).toBeNull();
+  });
+
+  it('stays plain: no dash, no exclamation point', () => {
+    expect(missingYearsNote([2014])).not.toMatch(/[—!]/);
+    expect(missingYearsNote([2011, 2014])).not.toMatch(/[—!]/);
   });
 });
