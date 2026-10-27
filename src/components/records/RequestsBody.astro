@@ -1,0 +1,46 @@
+---
+// The body of one 311 group's ledger row: the year and category charts, the requests still
+// open in city records, and the full list one disclosure down. The three groups print the same
+// shape, so they print it from here. Every figure and label arrives built by `ledger.ts`.
+import type { RequestsSection } from '../../lib/records/ledger';
+import { stillOpenHeading } from '../../lib/records/display';
+import CategoryBars from './CategoryBars.astro';
+import RecordList from './RecordList.astro';
+import YearBars from './YearBars.astro';
+
+interface Props {
+  section: RequestsSection;
+  /** What the section says when this group holds no requests, e.g. `No living conditions requests on record.` */
+  emptyCopy: string;
+}
+
+const { section, emptyCopy } = Astro.props;
+
+const chartsClass = 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5';
+const disclosureClass =
+  'mt-4 text-sm text-teal-700 cursor-pointer list-none [&::-webkit-details-marker]:hidden underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700';
+---
+
+{section.rows.length === 0 ? (
+  <p class="text-sm text-gray-600">{emptyCopy}</p>
+) : (
+  <>
+    <div class={chartsClass}>
+      <YearBars title="Requests by year opened" series={section.years} noun="requests" />
+      <CategoryBars title="What was reported" breakdown={section.types} noun={{ one: 'request', many: 'requests' }} />
+    </div>
+    {section.openRows.length > 0 && (
+      <>
+        <h5 class="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
+          {stillOpenHeading(section.openRows.length)}
+        </h5>
+        {section.openNote && <p class="mt-1 text-xs text-gray-500">{section.openNote}</p>}
+        <RecordList rows={section.openRows} />
+      </>
+    )}
+    <details>
+      <summary class={disclosureClass}>{section.showAll}</summary>
+      <RecordList rows={section.rows} cappedNote={section.cappedNote} />
+    </details>
+  </>
+)}

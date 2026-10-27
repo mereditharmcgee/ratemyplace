@@ -3,15 +3,16 @@
 // against the largest. The label is the city's own word for the category, reproduced as
 // stored; the bar is a count. Neither is ranked against anything outside this building.
 import type { KeyBreakdown } from '../../lib/records/charts';
+import { categoryRestLine, type CountNoun } from '../../lib/records/display';
 
 interface Props {
   title: string;
   breakdown: KeyBreakdown;
-  /** Plural noun for the leftover line, e.g. `requests`. */
-  restNoun: string;
+  /** The noun for the leftover line, in both numbers, e.g. request / requests. */
+  noun: CountNoun;
 }
 
-const { title, breakdown, restNoun } = Astro.props;
+const { title, breakdown, noun } = Astro.props;
 
 // The largest category, which the rest are drawn against. Sorted first by `countByKey`, and
 // never zero: a category only exists because at least one row was filed under it. The list is
@@ -26,7 +27,7 @@ function trackWidth(count: number): number {
 
 {breakdown.top.length > 0 && (
   <div>
-    <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</h4>
+    <h5 class="text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</h5>
     <ul class="mt-2 space-y-2">
       {breakdown.top.map((entry) => (
         <li class="grid grid-cols-[minmax(0,1fr)_2.5rem] items-center gap-2">
@@ -41,9 +42,7 @@ function trackWidth(count: number): number {
       ))}
     </ul>
     {breakdown.restTypes > 0 && (
-      <p class="mt-2 text-xs text-gray-500">
-        {breakdown.restTypes} more types · {breakdown.restCount} {restNoun}
-      </p>
+      <p class="mt-2 text-xs text-gray-500">{categoryRestLine(breakdown.restTypes, breakdown.restCount, noun)}</p>
     )}
   </div>
 )}
