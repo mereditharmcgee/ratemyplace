@@ -589,6 +589,52 @@ suite('BuildingRecords.astro ledger', () => {
     for (const summary of summaries) expect(summary.className).toContain('py-1.5');
   });
 
+  it('keeps a space between every count and its noun, and the noun in the right number', async () => {
+    const db = await createDbWithAdmin();
+    // Eight property upkeep types, so the category chart has a leftover line to print.
+    const trash = (legacy311 as AssessorRow[]).find((row) => String(row.type).startsWith('Improper Storage'))!;
+    const upkeepTypes = [
+      'Improper Storage of Trash (Barrels)', 'Poor Conditions of Property', 'Unshoveled Sidewalk', 'Snow Removal',
+      'Illegal Dumping', 'Construction Debris', 'Illegal Posting of Signs', 'Illegal Vending',
+    ];
+    const upkeepRows = upkeepTypes.map((type, index) => ({
+      ...trash,
+      case_enquiry_id: `10100000200${index}`,
+      open_dt: `2023-0${index + 1}-01 09:00:00`,
+      closed_dt: `2023-0${index + 1}-02 09:00:00`,
+      case_status: 'Closed',
+      type,
+      case_title: type,
+      reason: 'Code Enforcement',
+    }));
+    await seedFullBuilding(db, [OPEN_VIOLATION_ROUTE, { resourceId: LEGACY_2023_RESOURCE_ID, records: upkeepRows }]);
+
+    const text = (parse(await renderPanel(db)).textContent ?? '').replace(/\s+/g, ' ');
+
+    // "4requests", "2tickets", "42permits", "10more types" came from two expressions printed
+    // side by side with the space between them lost.
+    expect(text).not.toMatch(/\d(requests?|tickets?|permits?|cases?|more types?|code lines?|violation lines?)\b/);
+    expect(text).toMatch(/\d+ more types? · \d+ requests?/);
+    // "Show all 1 requests" was wrong in number; one record reads "Show 1 request".
+    expect(text).not.toMatch(/\b1 (requests|tickets|permits|cases)\b/);
+    expect(text).not.toContain('Show all 1 ');
+    // The other-requests count is its own sentence, never "not shown" beside a Show all link.
+    expect(text).not.toContain('not shown');
+  });
+
+  it('puts the 311 notes between the last group and the record-error fold, not an empty double rule', async () => {
+    const db = await createDbWithAdmin();
+    await seedFullBuilding(db);
+
+    const report = parse(await renderPanel(db)).querySelector('#report-record');
+    const before = report?.previousElementSibling;
+
+    // The ledger's closing rule and the fold's opening rule used to sit 24px apart with
+    // nothing between them. Now the grouping note sits there.
+    expect(before?.className ?? '').not.toContain('border-b');
+    expect((before?.textContent ?? '').trim()).toContain(GROUPING_NOTE);
+  });
+
   it('keeps the full lists one disclosure down rather than dropping them', async () => {
     const db = await createDbWithAdmin();
     await seedFullBuilding(db);
