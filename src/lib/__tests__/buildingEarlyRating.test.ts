@@ -78,6 +78,12 @@ function breakdownRows(root: HTMLElement): string[] {
   });
 }
 
+/** Class lists of the sub-score numbers in the breakdown's tiles. */
+function breakdownTileNumbers(root: HTMLElement): string[] {
+  const card = Array.from(root.querySelectorAll('h3')).find((h) => text(h) === 'Rating breakdown')?.parentElement;
+  return Array.from(card?.querySelectorAll('div.text-center > div.text-2xl') ?? []).map((el) => el.getAttribute('class') ?? '');
+}
+
 function commonIssueRows(root: HTMLElement): string[] {
   const card = Array.from(root.querySelectorAll('h3')).find((h) => text(h) === 'Common issues reported')?.parentElement;
   return Array.from(card?.querySelectorAll('li') ?? []).map((li) => Array.from(li.children).map((c) => text(c)).join(': '));
@@ -109,6 +115,16 @@ suite('building page, one review', () => {
     expect(rows).toContain('Reported heat/hot water issues: 1 of 1 review');
     expect(rows.join(' ')).not.toMatch(/\d%/);
     expect(commonIssueRows(root)).toEqual(['Pest issues: 1 of 1 review', 'Heat/hot water issues: 1 of 1 review']);
+  });
+
+  it('draws the sub-scores in the breakdown lighter too', async () => {
+    const root = await renderPage(await seed([{ recommend: 'yes' }]));
+    const tiles = breakdownTileNumbers(root);
+    expect(tiles.length).toBeGreaterThan(0);
+    for (const tile of tiles) {
+      expect(tile).toContain('font-semibold');
+      expect(tile).toContain(getEarlyScoreTextColor(4));
+    }
   });
 
   it('never shows a lone maybe as 0% or as a no', async () => {
@@ -155,6 +171,9 @@ suite('building page at the threshold', () => {
     const yes = NAMED_PARTY_MIN_REVIEWS - 1;
     expect(rows).toContain(`Would recommend: ${Math.round((yes / NAMED_PARTY_MIN_REVIEWS) * 100)}%`);
     expect(rows).toContain(`Reported pest issues: ${Math.round((1 / NAMED_PARTY_MIN_REVIEWS) * 100)}%`);
+    const tiles = breakdownTileNumbers(root);
+    expect(tiles.length).toBeGreaterThan(0);
+    for (const tile of tiles) expect(tile).toContain('font-bold');
   });
 
   it('shows maybe answers as a count beside the percentage, outside it', async () => {

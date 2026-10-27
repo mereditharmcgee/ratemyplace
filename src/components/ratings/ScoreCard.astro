@@ -5,6 +5,7 @@ import {
   earlyRatingNote,
   isEarlyRating,
   recommendDisplay,
+  scoreNumberClass,
   type BuildingRateCounts,
   type IssueCounts,
 } from '../../lib/earlyRating';
@@ -89,7 +90,7 @@ const availableIssues = issues.filter(i => scores?.[i.key] != null && scores[i.k
             const score = scores[domain.key];
             return (
               <div class={`text-center p-3 rounded-[6px] ${getScoreBgTint(score)}`}>
-                <div class={`text-2xl font-bold ${getScoreTextColor(score)}`}>
+                <div class={`text-2xl ${early && rates ? scoreNumberClass(score, rates.reviewCount) : `font-bold ${getScoreTextColor(score)}`}`}>
                   {score.toFixed(1)}
                 </div>
                 <div class="text-xs text-gray-600 mt-1">{domain.label}</div>
