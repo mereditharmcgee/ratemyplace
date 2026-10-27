@@ -55,6 +55,26 @@ Use the helpers — never hardcode a threshold or a color:
 - `getScoreTextColor(score)` → Tailwind class for a colored score number
 - `getScoreBgTint(score)` → soft-tinted background for score detail tiles
 - `getScoreHex(score)` / `SCORE_HEX` → hex for non-Tailwind contexts (Maps markers, OG images)
+- `getEarlyScoreTextColor(score)` → the same band one shade lighter, for an early rating;
+  large text (24px and up) only, since the lighter shades clear 3:1, not 4.5:1
+
+### `earlyRating.ts` is how a thin score is displayed, not computed
+
+A building score shows from its first approved review. Below `NAMED_PARTY_MIN_REVIEWS` it is
+an **early rating** everywhere a building score appears (building page, search cards,
+landlord and property manager building lists, map info window): the count sits beside the
+score ("from 1 review"), `scoreNumberClass` draws it lighter, and issue and recommend rates
+are counts ("1 of 1 review") instead of percentages. Import the constant; never type 3.
+
+The percentages it still prints use the formulas in `calculateAggregatedScores` /
+`calculateBuildingAverages`, and `earlyRating.test.ts` holds them equal. It changes no score.
+A "Maybe / It depends" answer is never a no: the recommend percentage counts yes and no only
+(as it always has), a maybe is shown on its own as a count, and a lone maybe produces no
+recommend figure at all rather than "0%". The methodology paragraph `#early-ratings` says so
+and its test pins the wording that matters.
+
+The search and map islands import it, so its only runtime imports are `./scoring` and
+`./scoring-colors`, which import nothing; its test fails if that changes.
 
 ### `surveyItems.ts` is the canonical survey definition
 

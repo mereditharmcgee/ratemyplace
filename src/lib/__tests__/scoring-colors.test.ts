@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   getScoreColor,
   getScoreTextColor,
+  getEarlyScoreTextColor,
   getScoreHex,
   getScoreBgTint,
   SCORE_HEX,
@@ -35,6 +36,24 @@ describe('getScoreTextColor', () => {
     expect(getScoreTextColor(3.5)).toBe('text-amber-700');
     expect(getScoreTextColor(2.5)).toBe('text-red-700');
     expect(getScoreTextColor(1.0)).toBe('text-red-700');
+  });
+});
+
+describe('getEarlyScoreTextColor', () => {
+  it('uses the same band boundaries as getScoreTextColor, one shade lighter', () => {
+    expect(getEarlyScoreTextColor(4.5)).toBe('text-emerald-600');
+    expect(getEarlyScoreTextColor(4)).toBe('text-emerald-600');
+    expect(getEarlyScoreTextColor(3.9)).toBe('text-amber-600');
+    expect(getEarlyScoreTextColor(3)).toBe('text-amber-600');
+    expect(getEarlyScoreTextColor(2.9)).toBe('text-red-600');
+    expect(getEarlyScoreTextColor(1.4)).toBe('text-red-600');
+  });
+
+  it('changes band exactly where getScoreTextColor does', () => {
+    for (const score of [1, 1.9, 2, 2.9, 3, 3.9, 4, 5]) {
+      const established = getScoreTextColor(score).replace('-700', '');
+      expect(getEarlyScoreTextColor(score).replace('-600', '')).toBe(established);
+    }
   });
 });
 

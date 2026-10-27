@@ -22,6 +22,16 @@ export function getScoreTextColor(score: number): string {
   return 'text-red-700';
 }
 
+// Lighter shade of the same band for an early rating, a building score from fewer reviews
+// than NAMED_PARTY_MIN_REVIEWS (see earlyRating.ts). Same band boundaries as
+// getScoreTextColor, one step lighter, so the band still reads but the number carries less
+// weight. The 600 shades clear 3:1 on white, so use them for large text only (24px and up).
+export function getEarlyScoreTextColor(score: number): string {
+  if (score >= 4) return 'text-emerald-600';
+  if (score >= 3) return 'text-amber-600';
+  return 'text-red-600';
+}
+
 // Hex equivalents for non-Tailwind contexts (Google Maps markers, generated
 // images, PDFs). Values match the Tailwind classes in getScoreColor exactly.
 export const SCORE_HEX = {
