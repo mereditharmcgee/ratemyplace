@@ -182,7 +182,7 @@ const pestLabels: Record<string, string> = {
         <span class="text-sm font-medium text-gray-900">
           {(domainScores.overall || review.overall_score || 0).toFixed(1)}
         </span>
-        <span class="text-xs text-gray-400">overall</span>
+        <span class="text-xs text-gray-600">overall</span>
       </div>
       <!-- Domain Sub-Scores -->
       {(domainScores.unit || domainScores.building || domainScores.landlord) && (
@@ -263,7 +263,7 @@ const pestLabels: Record<string, string> = {
               <div class="flex justify-between text-sm">
                 <span class={isRated ? 'text-gray-600' : 'text-slate-600'}>
                   {label}
-                  {isRated && weighted && <span class="text-red-400 ml-0.5" title="Health/Safety weighted">*</span>}
+                  {isRated && weighted && <span class="text-red-700 ml-0.5" title="Health/Safety weighted">*</span>}
                 </span>
                 {isRated ? (
                   <span class={`font-medium ${getScoreTextColor(value)}`}>{value}/5</span>
@@ -294,7 +294,7 @@ const pestLabels: Record<string, string> = {
               <div class="flex justify-between text-sm">
                 <span class={isRated ? 'text-gray-600' : 'text-slate-600'}>
                   {label}
-                  {isRated && weighted && <span class="text-red-400 ml-0.5" title="Health/Safety weighted">*</span>}
+                  {isRated && weighted && <span class="text-red-700 ml-0.5" title="Health/Safety weighted">*</span>}
                 </span>
                 {isRated ? (
                   <span class={`font-medium ${getScoreTextColor(value)}`}>{value}/5</span>
@@ -325,7 +325,7 @@ const pestLabels: Record<string, string> = {
               <div class="flex justify-between text-sm">
                 <span class={isRated ? 'text-gray-600' : 'text-slate-600'}>
                   {label}
-                  {isRated && weighted && <span class="text-red-400 ml-0.5" title="Health/Safety weighted">*</span>}
+                  {isRated && weighted && <span class="text-red-700 ml-0.5" title="Health/Safety weighted">*</span>}
                 </span>
                 {isRated ? (
                   <span class={`font-medium ${getScoreTextColor(value)}`}>{value}/5</span>
@@ -338,7 +338,7 @@ const pestLabels: Record<string, string> = {
         </div>
       </div>
     </div>
-    <p class="text-xs text-gray-400 mt-3"><span class="text-red-400">*</span> Health and safety weighted. These factors count more in the overall score. <a href="/methodology" class="-my-1.5 inline-block py-1.5 text-teal-500 hover:text-teal-700">Learn more</a></p>
+    <p class="text-xs text-gray-500 mt-3"><span class="text-red-700">*</span> Health and safety weighted. These factors count more in the overall score. <a href="/methodology" class="-my-1.5 inline-block py-1.5 text-teal-700 hover:text-teal-800">Learn more</a></p>
   </div>
 
   <!-- Security Deposit Highlight -->
@@ -423,7 +423,7 @@ const pestLabels: Record<string, string> = {
               <span class="text-gray-600">
                 <strong>Laundry:</strong> {laundryLabels[review.laundry_type] || humanize(review.laundry_type)}
                 {review.laundry_cost_per_load && (
-                  <span class="text-gray-500"> (${review.laundry_cost_per_load}/load)</span>
+                  <span class="text-gray-600"> (${review.laundry_cost_per_load}/load)</span>
                 )}
               </span>
             )}

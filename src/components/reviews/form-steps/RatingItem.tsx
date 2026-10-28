@@ -13,9 +13,9 @@ export default function RatingItem({ item, value, onChange }: Props) {
       <div className="mb-3">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <span className="text-xs text-gray-400 font-mono mr-2">{item.code}</span>
+            <span className="text-xs text-gray-600 font-mono mr-2">{item.code}</span>
             <span className="font-medium text-gray-900">{item.dimension}</span>
-            {item.required && <span className="text-red-500 ml-1">*</span>}
+            {item.required && <span className="text-red-700 ml-1">*</span>}
             <HelpTooltip help={item.help} dimension={item.dimension} />
           </div>
         </div>
@@ -31,10 +31,10 @@ export default function RatingItem({ item, value, onChange }: Props) {
             className={`w-10 h-10 rounded-full text-sm font-medium transition-all ${
               value === rating
                 ? rating <= 2
-                  ? 'bg-red-500 text-white'
+                  ? 'bg-red-600 text-white'
                   : rating === 3
                     ? 'bg-amber-400 text-slate-900'
-                    : 'bg-emerald-500 text-white'
+                    : 'bg-emerald-700 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -46,7 +46,7 @@ export default function RatingItem({ item, value, onChange }: Props) {
             type="button"
             onClick={() => onChange(item.key, null)}
             className={`px-3 h-10 rounded-full text-sm font-medium transition-all ${
-              value === null ? 'bg-gray-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              value === null ? 'bg-gray-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
             N/A
@@ -61,7 +61,7 @@ export function RatingScale() {
   return (
     <div className="flex justify-between items-center text-xs text-gray-500 mb-4 px-2">
       <span className="text-red-700 font-medium">1 = Strongly Disagree</span>
-      <span className="text-gray-400">3 = Neutral</span>
+      <span className="text-gray-600">3 = Neutral</span>
       <span className="text-emerald-700 font-medium">5 = Strongly Agree</span>
     </div>
   );

@@ -22,7 +22,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
       {building && (
         <div className="bg-paper p-4 rounded-[6px] mb-6">
           <div className="font-medium">{building.address}</div>
-          <div className="text-sm text-gray-500">{localityLine(building)}</div>
+          <div className="text-sm text-gray-600">{localityLine(building)}</div>
         </div>
       )}
 
@@ -71,7 +71,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2 sm:col-span-1">
           <label htmlFor="review-unit-number" className="block text-sm font-medium text-gray-700 mb-2">
-            Unit Number <span className="text-gray-400">(optional)</span>
+            Unit Number <span className="text-gray-600">(optional)</span>
           </label>
           <input
             id="review-unit-number"
@@ -81,14 +81,14 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
             placeholder="e.g., 2A, 301"
             className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-gray-600 mt-1">
             For our moderation team only. Never shown publicly.
           </p>
         </div>
 
         <div className="col-span-2 sm:col-span-1">
           <label htmlFor="review-square-footage" className="block text-sm font-medium text-gray-700 mb-2">
-            Square Footage <span className="text-gray-400">(optional)</span>
+            Square Footage <span className="text-gray-600">(optional)</span>
           </label>
           <input
             id="review-square-footage"
@@ -134,10 +134,10 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
 
         <div className="col-span-2">
           <label htmlFor="review-rent" className="block text-sm font-medium text-gray-700 mb-2">
-            Monthly Rent <span className="text-gray-400">(optional)</span>
+            Monthly Rent <span className="text-gray-600">(optional)</span>
           </label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600">$</span>
             <input
               id="review-rent"
               type="number"
@@ -152,7 +152,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
 
       <div role="group" aria-labelledby="review-amenities-label">
         <span id="review-amenities-label" className="block text-sm font-medium text-gray-700 mb-3">
-          Amenities <span className="text-gray-400">(select all that apply)</span>
+          Amenities <span className="text-gray-600">(select all that apply)</span>
         </span>
         <div className="grid grid-cols-2 gap-2">
           {amenityOptions.map((amenity) => (
@@ -183,7 +183,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
 
       <div role="group" aria-labelledby="review-utilities-label">
         <span id="review-utilities-label" className="block text-sm font-medium text-gray-700 mb-3">
-          Utilities Included in Rent <span className="text-gray-400">(select all that apply)</span>
+          Utilities Included in Rent <span className="text-gray-600">(select all that apply)</span>
         </span>
         <div className="grid grid-cols-2 gap-2">
           {utilityOptions.map((utility) => (
@@ -218,10 +218,10 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
       {unitDetails.utilitiesIncluded.length < utilityOptions.length && (
         <div>
           <label htmlFor="review-estimated-utilities" className="block text-sm font-medium text-gray-700 mb-2">
-            Estimated Monthly Utility Cost <span className="text-gray-400">(for utilities not included)</span>
+            Estimated Monthly Utility Cost <span className="text-gray-600">(for utilities not included)</span>
           </label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600">$</span>
             <input
               id="review-estimated-utilities"
               type="number"
@@ -231,7 +231,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
               className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
           </div>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-gray-600 mt-1">
             Approximate monthly cost for utilities you paid separately
           </p>
         </div>
@@ -256,10 +256,10 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
         {unitDetails.laundryType === 'coin_op' && (
           <div>
             <label htmlFor="review-laundry-cost-per-load" className="block text-sm font-medium text-gray-700 mb-2">
-              Cost per Load (wash + dry) <span className="text-gray-400">(optional)</span>
+              Cost per Load (wash + dry) <span className="text-gray-600">(optional)</span>
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600">$</span>
               <input
                 id="review-laundry-cost-per-load"
                 type="number"
@@ -270,7 +270,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
                 className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-600 mt-1">
               Total cost for one wash + one dry cycle
             </p>
           </div>
@@ -279,7 +279,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
 
       <div>
         <label htmlFor="review-parking" className="block text-sm font-medium text-gray-700 mb-2">
-          Parking Situation <span className="text-gray-400">(optional)</span>
+          Parking Situation <span className="text-gray-600">(optional)</span>
         </label>
         <select
           id="review-parking"
@@ -298,7 +298,7 @@ export default function UnitDetailsStep({ building, unitDetails, onChange, onNex
 
       <div role="group" aria-labelledby="review-pets-label">
         <span id="review-pets-label" className="block text-sm font-medium text-gray-700 mb-3">
-          Pets Allowed <span className="text-gray-400">(select all that apply)</span>
+          Pets Allowed <span className="text-gray-600">(select all that apply)</span>
         </span>
         <div className="grid grid-cols-2 gap-2">
           {petTypeOptions.map((pet) => (

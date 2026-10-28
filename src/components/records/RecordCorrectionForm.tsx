@@ -237,7 +237,7 @@ export default function RecordCorrectionForm({ buildingId }: Props) {
 
       <div>
         <label htmlFor="record-kind" className="block text-sm font-medium text-gray-700 mb-2">
-          Which record is wrong? <span className="text-red-500" aria-hidden="true">*</span>
+          Which record is wrong? <span className="text-red-700" aria-hidden="true">*</span>
         </label>
         <select
           id="record-kind"
@@ -273,7 +273,7 @@ export default function RecordCorrectionForm({ buildingId }: Props) {
 
       <div>
         <label htmlFor="record-claim" className="block text-sm font-medium text-gray-700 mb-2">
-          What's wrong with it? <span className="text-red-500" aria-hidden="true">*</span>
+          What's wrong with it? <span className="text-red-700" aria-hidden="true">*</span>
         </label>
         <textarea
           id="record-claim"

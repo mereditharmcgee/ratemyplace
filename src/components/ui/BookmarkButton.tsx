@@ -50,7 +50,7 @@ export default function BookmarkButton({ buildingId, initialSaved }: Props) {
         className={`p-2 rounded-[6px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
           saved
             ? 'text-teal-700 hover:text-teal-700 hover:bg-teal-50'
-            : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+            : 'text-gray-500 hover:text-gray-600 hover:bg-gray-100'
         }`}
       >
         <svg

@@ -40,7 +40,7 @@ const signupHref = '/auth/signup' + redirectQuery(redirectTo);
         ) : (
           <p class="mt-2 text-center text-sm text-gray-600">
             Or{' '}
-            <a href={signupHref} class="font-medium text-teal-700 hover:text-teal-500">
+            <a href={signupHref} class="font-medium text-teal-700 hover:text-teal-800">
               create a new account
             </a>
           </p>
@@ -87,7 +87,7 @@ const signupHref = '/auth/signup' + redirectQuery(redirectTo);
               type="email"
               autocomplete="email"
               required
-              class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-400 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
+              class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-600 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
             />
           </div>
 
@@ -96,7 +96,7 @@ const signupHref = '/auth/signup' + redirectQuery(redirectTo);
               <label for="password" class="block text-sm font-medium text-gray-700">
                 Password
               </label>
-              <a href="/auth/forgot-password" class="text-sm text-teal-700 hover:text-teal-500">
+              <a href="/auth/forgot-password" class="text-sm text-teal-700 hover:text-teal-800">
                 Forgot password?
               </a>
             </div>
@@ -107,11 +107,11 @@ const signupHref = '/auth/signup' + redirectQuery(redirectTo);
                 type="password"
                 autocomplete="current-password"
                 required
-                class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-400 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
+                class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-600 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
               />
               <button
                 type="button"
-                class="toggle-password absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                class="toggle-password absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-600"
                 data-target="password"
                 aria-label="Toggle password visibility"
               >
