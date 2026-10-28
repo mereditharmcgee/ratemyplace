@@ -51,7 +51,7 @@ function bannedPatterns(): RegExp[] {
       '(?<![\\w-])(?:hover|focus|focus-visible|focus-within|active|group-hover|group-focus|peer-hover|peer-focus):text-teal-600(?![\\w-])',
       'g',
     ),
-    // Colored text below 4.5 on the light surfaces: 3.82, 2.93, 3.59, 4.12 and 3.70 at best.
+    // Colored text below 4.5 on the light surfaces: 3.82, 2.93, 3.59, 4.12 and 4.40 at best.
     new RegExp('(?<![\\w-])text-(?:red-500|yellow-600|orange-600|purple-500|violet-500)(?![\\w-])', 'g'),
     // Gray 400 placeholders. 2.37 on paper.
     new RegExp('(?<![\\w-])placeholder(?:-|:text-)gray-400(?![\\w-])', 'g'),
