@@ -20,7 +20,14 @@ import {
 import { HelpTooltip } from './HelpTooltip';
 import type { ReviewDetail } from '../../pages/api/reviews/[id]';
 import { localityLine } from '../../lib/locality';
-import { formatMoveIn, givenMoveIn, MOVE_IN_NOT_GIVEN } from '../../lib/privacy';
+import {
+  formatMoveIn,
+  formatMoveOut,
+  givenMoveIn,
+  MOVE_IN_NOT_GIVEN,
+  moveOutEditChoices,
+  moveOutEditValue,
+} from '../../lib/privacy';
 
 interface Props {
   review: ReviewDetail;
@@ -94,11 +101,16 @@ export default function ReviewEditForm({ review }: Props) {
     givenMoveIn(review).year?.toString() || ''
   );
 
-  // Tenure & move-out
+  // Tenure & move-out. The select starts at the stored answer, so an untouched save keeps it.
   const [tenureMonths, setTenureMonths] = useState(review.tenure_months || 18);
-  const [moveOutYear, setMoveOutYear] = useState(
-    review.is_current_tenant ? 'current' : (review.move_out_year_new || 'current')
-  );
+  const initialMoveOut = moveOutEditValue(review);
+  const [moveOutYear, setMoveOutYear] = useState(initialMoveOut);
+  const moveOutChoices = moveOutEditChoices(supplementaryItems.moveOutTiming.options, initialMoveOut);
+  const moveOut = formatMoveOut({
+    moveOutSeason: review.move_out_season,
+    moveOutYear: review.move_out_year_new,
+    isCurrentTenant: review.is_current_tenant,
+  });
 
   // New survey fields
   const [housingVouchers, setHousingVouchers] = useState<string | null>((review as any).accepts_housing_vouchers || null);
@@ -275,12 +287,12 @@ export default function ReviewEditForm({ review }: Props) {
       {/* Building Info (read-only) */}
       <div className="bg-paper p-4 rounded-[6px]">
         <div className="font-medium text-gray-900">{review.building_address}</div>
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-gray-600">
           {localityLine({ address: review.building_address, neighborhood: review.neighborhood, city: review.city })}
         </div>
-        <div className="text-xs text-gray-400 mt-1">
+        <div className="text-xs text-gray-600 mt-1">
           Move-in: {formatMoveIn(review) ?? MOVE_IN_NOT_GIVEN}
-          {review.is_current_tenant ? ' (Current tenant)' : (review as any).move_out_year_new && ` - Move-out: ${(review as any).move_out_season} ${(review as any).move_out_year_new}`}
+          {review.is_current_tenant ? ' (Current tenant)' : moveOut && ` - Move-out: ${moveOut}`}
         </div>
       </div>
 
@@ -771,7 +783,7 @@ export default function ReviewEditForm({ review }: Props) {
               onChange={(e) => setMoveOutYear(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
-              {supplementaryItems.moveOutTiming.options.map((opt) => (
+              {moveOutChoices.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
