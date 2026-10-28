@@ -131,7 +131,7 @@ export default function ManagersTable() {
   };
 
   const getScoreColor = (score: number | null) => {
-    if (score === null) return 'text-gray-400';
+    if (score === null) return 'text-gray-600';
     return getScoreTextColor(score);
   };
 
@@ -334,7 +334,7 @@ export default function ManagersTable() {
                     )}
                   </div>
                   <svg
-                    className={`w-5 h-5 text-gray-400 transition-transform ${
+                    className={`w-5 h-5 text-gray-500 transition-transform ${
                       expandedManager === manager.id ? 'rotate-180' : ''
                     }`}
                     fill="none"
@@ -521,7 +521,7 @@ export default function ManagersTable() {
         </div>
       )}
 
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-600">
         Showing {filteredManagers.length} of {managers.length} property managers
       </div>
     </div>

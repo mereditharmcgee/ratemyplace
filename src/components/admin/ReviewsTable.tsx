@@ -298,7 +298,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                     {review.status}
                   </span>
                   <svg
-                    className={`w-5 h-5 text-gray-400 transition-transform ${
+                    className={`w-5 h-5 text-gray-500 transition-transform ${
                       expandedReview === review.id ? 'rotate-180' : ''
                     }`}
                     fill="none"
@@ -358,7 +358,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                               key={field}
                               className={`inline-flex flex-col items-center px-2 py-1 rounded text-xs font-medium ${getScoreBadgeColor(val)}`}
                             >
-                              <span className="opacity-80">{formatScoreLabel(field)}</span>
+                              <span>{formatScoreLabel(field)}</span>
                               <span className="font-bold text-sm">{val}</span>
                             </span>
                           );
@@ -447,7 +447,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                           <button
                             onClick={(e) => { e.stopPropagation(); updateStatus(review.id, 'approved'); }}
                             disabled={processing === review.id}
-                            className="px-4 py-2 bg-green-600 text-white rounded-[6px] hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+                            className="px-4 py-2 bg-green-700 text-white rounded-[6px] hover:bg-green-800 disabled:opacity-50 text-sm font-medium"
                           >
                             {processing === review.id ? '...' : 'Approve'}
                           </button>
@@ -482,7 +482,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                         updateStatus(review.id, 'approved');
                       }}
                       disabled={processing === review.id}
-                      className="px-4 py-2 bg-green-600 text-white rounded-[6px] hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+                      className="px-4 py-2 bg-green-700 text-white rounded-[6px] hover:bg-green-800 disabled:opacity-50 text-sm font-medium"
                     >
                       {processing === review.id ? '...' : 'Approve'}
                     </button>
@@ -506,7 +506,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                         updateStatus(review.id, 'flagged');
                       }}
                       disabled={processing === review.id}
-                      className="px-4 py-2 bg-orange-600 text-white rounded-[6px] hover:bg-orange-700 disabled:opacity-50 text-sm font-medium"
+                      className="px-4 py-2 bg-orange-700 text-white rounded-[6px] hover:bg-orange-800 disabled:opacity-50 text-sm font-medium"
                     >
                       {processing === review.id ? '...' : 'Flag'}
                     </button>
@@ -551,7 +551,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
       )}
 
       {/* Pagination footer — search + status filters are client-side and only see the loaded slice */}
-      <div className="flex items-center justify-between text-sm text-gray-500">
+      <div className="flex items-center justify-between text-sm text-gray-600">
         <span>
           Showing {filteredReviews.length}
           {(search || statusFilter !== 'all') ? ` of ${reviews.length} loaded` : ''} ({total} total)

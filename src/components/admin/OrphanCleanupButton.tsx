@@ -82,7 +82,7 @@ export default function OrphanCleanupButton({ onDeleted, refreshKey = 0 }: Props
       type="button"
       onClick={run}
       disabled={working || count === 0}
-      className="px-4 py-2 bg-orange-100 text-orange-700 rounded-[6px] hover:bg-orange-200 disabled:opacity-50 text-left"
+      className="px-4 py-2 bg-orange-100 text-orange-800 rounded-[6px] hover:bg-orange-200 disabled:opacity-50 text-left"
     >
       {working
         ? 'Cleaning...'

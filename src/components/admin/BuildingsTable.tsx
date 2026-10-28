@@ -254,7 +254,7 @@ export default function BuildingsTable() {
   };
 
   const getScoreColor = (score: number | null) => {
-    if (score === null) return 'text-gray-400';
+    if (score === null) return 'text-gray-600';
     return getScoreTextColor(score);
   };
 
@@ -355,7 +355,7 @@ export default function BuildingsTable() {
                     <div className="text-xs text-gray-500">{building.review_count} reviews</div>
                   </div>
                   <svg
-                    className={`w-5 h-5 text-gray-400 transition-transform ${
+                    className={`w-5 h-5 text-gray-500 transition-transform ${
                       expandedBuilding === building.id ? 'rotate-180' : ''
                     }`}
                     fill="none"
@@ -820,7 +820,7 @@ export default function BuildingsTable() {
       )}
 
       {/* Pagination footer — search and filters run on the server, so `total` counts every match */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-500">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600">
         <span>
           Showing {buildings.length} of {total}{filtersActive ? ' matching' : ''} buildings
           {filter.q ? ' (search covers address, city, and ZIP across all buildings)' : ''}

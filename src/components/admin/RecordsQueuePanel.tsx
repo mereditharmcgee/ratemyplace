@@ -507,7 +507,7 @@ export default function RecordsQueuePanel() {
                       {row.last_error ? (
                         <span title={row.last_error}>{truncate(row.last_error, MAX_ERROR_CHARS)}</span>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-gray-600">—</span>
                       )}
                     </td>
                     <td className="py-2 pr-4 text-gray-700 whitespace-nowrap">

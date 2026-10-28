@@ -151,7 +151,7 @@ const getStatusColor = (status: string) => {
         </div>
         <div class="mt-4 flex items-center gap-4 text-sm">
           <span class="text-gray-500">{userStats?.admins || 0} admins</span>
-          <span class="text-green-600">+{userStats?.last_week || 0} this week</span>
+          <span class="text-green-700">+{userStats?.last_week || 0} this week</span>
         </div>
       </div>
 
@@ -170,7 +170,7 @@ const getStatusColor = (status: string) => {
         </div>
         <div class="mt-4 flex items-center gap-4 text-sm">
           <span class="text-amber-700">{reviewStats?.pending || 0} pending</span>
-          <span class="text-green-600">{reviewStats?.verified || 0} verified</span>
+          <span class="text-green-700">{reviewStats?.verified || 0} verified</span>
         </div>
       </div>
 
@@ -212,7 +212,7 @@ const getStatusColor = (status: string) => {
               Review {verificationStats.pending} pending →
             </a>
           ) : (
-            <span class="text-green-600">All caught up</span>
+            <span class="text-green-700">All caught up</span>
           )}
         </div>
       </div>
