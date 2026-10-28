@@ -465,7 +465,7 @@ export default function BuildingMap({
 
         const detailsLink = document.createElement('a');
         detailsLink.href = `/building/${encodeURIComponent(building.slug)}`;
-        detailsLink.style.cssText = 'display: inline-block; padding: 6px 12px; background: #1A9A7D; color: white; text-decoration: none; border-radius: 6px; font-size: 12px; font-weight: 500;';
+        detailsLink.style.cssText = 'display: inline-block; padding: 6px 12px; background: #0F766E; color: white; text-decoration: none; border-radius: 6px; font-size: 12px; font-weight: 500;';
         detailsLink.textContent = 'View Details';
         container.appendChild(detailsLink);
 

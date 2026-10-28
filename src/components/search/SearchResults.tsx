@@ -78,7 +78,7 @@ function BuildingCard({ building }: { building: Building }) {
               {early && <div className="text-xs text-gray-500 whitespace-nowrap">{EARLY_RATING_LABEL}</div>}
             </div>
           ) : (
-            <span className="text-sm text-gray-400">
+            <span className="text-sm text-gray-500">
               {building.review_count === 0 && building.has_records ? SEARCH_SEEDED_COPY : 'No reviews yet'}
             </span>
           )}
@@ -120,7 +120,7 @@ function LandlordCard({ landlord }: { landlord: Landlord }) {
               <div className="text-sm text-gray-500">{landlord.review_count} reviews</div>
             </div>
           ) : (
-            <span className="text-sm text-gray-400">No reviews yet</span>
+            <span className="text-sm text-gray-500">No reviews yet</span>
           )}
         </div>
       </div>

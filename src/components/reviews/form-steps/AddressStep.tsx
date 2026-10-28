@@ -109,7 +109,7 @@ export default function AddressStep({
               />
             </div>
           </div>
-          <p className="text-sm text-gray-500 mt-3">
+          <p className="text-sm text-gray-600 mt-3">
             Address is entered manually and is not verified against an address database.
           </p>
         </div>
@@ -147,7 +147,7 @@ export default function AddressStep({
           placeholder="Start typing your address..."
           initialValue={searchInitialValue}
         />
-        <p className="text-sm text-gray-500 mt-2">
+        <p className="text-sm text-gray-600 mt-2">
           Enter the street address of the building you want to review
         </p>
       </div>

@@ -160,8 +160,8 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
     );
   }
 
-  const inputClass = "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-400 focus:outline-none focus:ring-teal-500 focus:border-teal-500";
-  const errorInputClass = "mt-1 block w-full px-3 py-2 border border-red-400 rounded-[4px] shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500";
+  const inputClass = "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-500 focus:outline-none focus:ring-teal-500 focus:border-teal-500";
+  const errorInputClass = "mt-1 block w-full px-3 py-2 border border-red-400 rounded-[4px] shadow-sm placeholder-gray-500 focus:outline-none focus:ring-red-500 focus:border-red-500";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -173,7 +173,7 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
 
       <div>
         <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-          Name <span className="text-red-500">*</span>
+          Name <span className="text-red-700">*</span>
         </label>
         <input
           id="name"
@@ -190,7 +190,7 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
 
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-          Email <span className="text-red-500">*</span>
+          Email <span className="text-red-700">*</span>
         </label>
         <input
           id="email"
@@ -223,7 +223,7 @@ export function ContactForm({ turnstileSitekey = '0x4AAAAAACo4KpkxsacPhM2r' }: C
 
       <div>
         <label htmlFor="message" className="block text-sm font-medium text-gray-700">
-          Message <span className="text-red-500">*</span>
+          Message <span className="text-red-700">*</span>
         </label>
         <textarea
           id="message"

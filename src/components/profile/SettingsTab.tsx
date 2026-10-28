@@ -150,7 +150,7 @@ export default function SettingsTab({
   const renderMessage = (msg: MessageState) => {
     if (!msg) return null;
     return (
-      <p className={`mt-3 text-sm ${msg.type === 'success' ? 'text-green-600' : 'text-red-700'}`}>
+      <p className={`mt-3 text-sm ${msg.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>
         {msg.text}
       </p>
     );

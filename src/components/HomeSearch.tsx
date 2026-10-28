@@ -241,7 +241,7 @@ export default function HomeSearch() {
                               </span>
                             )}
                             {item.reviewCount > 0 && (
-                              <span className="text-xs text-gray-400">
+                              <span className="text-xs text-gray-500">
                                 {item.reviewCount} review{item.reviewCount !== 1 ? 's' : ''}
                               </span>
                             )}
@@ -296,11 +296,11 @@ export default function HomeSearch() {
                             <span className="text-xs text-gray-500">Score unavailable</span>
                           )}
                           {result.reviewCount > 0 && (
-                            <span className="text-xs text-gray-400">
+                            <span className="text-xs text-gray-500">
                               {result.reviewCount} review{result.reviewCount !== 1 ? 's' : ''}
                             </span>
                           )}
-                          <span className="text-xs text-purple-500 font-medium">Landlord</span>
+                          <span className="text-xs text-purple-600 font-medium">Landlord</span>
                         </div>
                       </div>
                     </button>
@@ -340,7 +340,7 @@ export default function HomeSearch() {
                 );
               })}
               {googleResults.length > 0 && (
-                <div className="px-4 py-2 text-xs text-gray-400 bg-gray-50 flex items-center gap-1">
+                <div className="px-4 py-2 text-xs text-gray-600 bg-gray-50 flex items-center gap-1">
                   <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                   </svg>

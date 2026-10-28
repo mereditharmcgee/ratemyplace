@@ -25,7 +25,7 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
         <h1 class="text-center text-3xl font-bold text-gray-900">Create your account</h1>
         <p class="mt-2 text-center text-sm text-gray-600">
           Already have an account?{' '}
-          <a href={'/auth/signin' + redirectQuery(redirectTo)} class="font-medium text-teal-700 hover:text-teal-500">
+          <a href={'/auth/signin' + redirectQuery(redirectTo)} class="font-medium text-teal-700 hover:text-teal-800">
             Sign in
           </a>
         </p>
@@ -70,7 +70,7 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
               type="email"
               autocomplete="email"
               required
-              class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-400 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
+              class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-600 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
             />
           </div>
 
@@ -86,11 +86,11 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
                 autocomplete="new-password"
                 required
                 minlength="6"
-                class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-400 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
+                class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-600 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
               />
               <button
                 type="button"
-                class="toggle-password absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                class="toggle-password absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-600"
                 data-target="password"
                 aria-label="Toggle password visibility"
               >
@@ -103,7 +103,7 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
                 </svg>
               </button>
             </div>
-            <p class="mt-1 text-xs text-gray-500">At least 6 characters</p>
+            <p class="mt-1 text-xs text-gray-600">At least 6 characters</p>
           </div>
 
           <div>
@@ -118,11 +118,11 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
                 autocomplete="new-password"
                 required
                 minlength="6"
-                class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-400 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
+                class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-600 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
               />
               <button
                 type="button"
-                class="toggle-password absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                class="toggle-password absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-600"
                 data-target="confirmPassword"
                 aria-label="Toggle password visibility"
               >
@@ -140,9 +140,9 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
 
         <div class="text-sm text-gray-600">
           By signing up, you agree to our{' '}
-          <a href="/terms" class="inline-block py-1 text-teal-700 hover:text-teal-500">Terms of Service</a>
+          <a href="/terms" class="inline-block py-1 text-teal-700 hover:text-teal-800">Terms of Service</a>
           {' '}and{' '}
-          <a href="/privacy" class="inline-block py-1 text-teal-700 hover:text-teal-500">Privacy Policy</a>.
+          <a href="/privacy" class="inline-block py-1 text-teal-700 hover:text-teal-800">Privacy Policy</a>.
         </div>
 
         <div id="turnstile-container" class="flex justify-center"></div>

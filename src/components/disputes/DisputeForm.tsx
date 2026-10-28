@@ -248,7 +248,7 @@ export default function DisputeForm({ siteUrl }: Props) {
       <div className="space-y-4">
         <div>
           <label htmlFor="reviewUrl" className="block text-sm font-medium text-gray-700 mb-2">
-            Building page link <span className="text-red-500">*</span>
+            Building page link <span className="text-red-700">*</span>
           </label>
           <input
             type="text"
@@ -263,7 +263,7 @@ export default function DisputeForm({ siteUrl }: Props) {
           {fieldErrors.reviewUrl && (
             <p className="mt-1 text-sm text-red-700">{fieldErrors.reviewUrl}</p>
           )}
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-600">
             Copy it from your browser's address bar on the building page.
           </p>
         </div>
@@ -281,7 +281,7 @@ export default function DisputeForm({ siteUrl }: Props) {
             maxLength={100}
             className="w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500"
           />
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-600">
             Needed if the page has more than one review. Copy them from the review.
           </p>
         </div>
@@ -298,7 +298,7 @@ export default function DisputeForm({ siteUrl }: Props) {
             maxLength={200}
             className="w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500"
           />
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-600">
             Needed if two reviews show the same dates.
           </p>
         </div>
@@ -312,7 +312,7 @@ export default function DisputeForm({ siteUrl }: Props) {
           {/* Name */}
           <div>
             <label htmlFor="landlordName" className="block text-sm font-medium text-gray-700 mb-2">
-              Name <span className="text-red-500">*</span>
+              Name <span className="text-red-700">*</span>
             </label>
             <input
               type="text"
@@ -332,7 +332,7 @@ export default function DisputeForm({ siteUrl }: Props) {
           {/* Email */}
           <div>
             <label htmlFor="landlordEmail" className="block text-sm font-medium text-gray-700 mb-2">
-              Email <span className="text-red-500">*</span>
+              Email <span className="text-red-700">*</span>
             </label>
             <input
               type="email"
@@ -352,7 +352,7 @@ export default function DisputeForm({ siteUrl }: Props) {
           {/* Phone */}
           <div>
             <label htmlFor="landlordPhone" className="block text-sm font-medium text-gray-700 mb-2">
-              Phone <span className="text-red-500">*</span>
+              Phone <span className="text-red-700">*</span>
             </label>
             <input
               type="tel"
@@ -374,9 +374,9 @@ export default function DisputeForm({ siteUrl }: Props) {
       {/* Dispute Reasons */}
       <div className="border-t pt-6">
         <h3 className="text-lg font-medium text-gray-900 mb-2">
-          Why are you disputing this review? <span className="text-red-500">*</span>
+          Why are you disputing this review? <span className="text-red-700">*</span>
         </h3>
-        <p className="text-sm text-gray-500 mb-4">Select all that apply</p>
+        <p className="text-sm text-gray-600 mb-4">Select all that apply</p>
 
         <div className="space-y-1">
           {DISPUTE_REASONS.map((reason) => (
@@ -420,7 +420,7 @@ export default function DisputeForm({ siteUrl }: Props) {
         {fieldErrors.disputeExplanation && (
           <p className="mt-1 text-sm text-red-700">{fieldErrors.disputeExplanation}</p>
         )}
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-gray-600">
           {disputeExplanation.length}/2000 characters
         </p>
       </div>

@@ -11,3 +11,13 @@
   --radius-input: 0.25rem;      /* 4px */
   --radius-pill: 9999px;
 }
+
+@layer base {
+  /* Placeholder text counts as text for WCAG AA (4.5:1). Tailwind's preflight paints it at
+     half the input's own color, about 3.9:1 on paper and white. Gray-600 is 6.87:1 on paper
+     and gray-100, 7.24:1 on gray-50 and 7.56:1 on white. A placeholder-* utility still wins. */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-gray-600);
+  }
+}
