@@ -2,10 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-// These text colors fail WCAG AA as text on every surface the public site uses: paper, white,
-// gray-50 and the tinted panels. The fix is the 700 shade, or 600 for purple and violet. Do
-// not add an exemption list. A decorative icon or a large display figure that needs a lighter
-// shade can use bare text-teal-600, which stays allowed.
+// These text colors fail WCAG AA as text on the light surfaces the public site uses: paper,
+// white, gray-50 and the tinted panels. The fix is the 700 shade, or 600 for purple and violet.
+// Do not add an exemption list. A decorative icon or a large display figure that needs a
+// lighter shade can use bare text-teal-600, which stays allowed. The guard also covers the
+// dark footer and home hero, so light teal text there should use teal-300 or lighter.
 //
 // The scan reads raw source, comments included, the same way the records panel scan does, so
 // a retired token quoted in a comment is a failure too.
@@ -46,7 +47,10 @@ function bannedPatterns(): RegExp[] {
     // Teal 400 and 500 as text, bare or behind any variant. Best case is 2.42 on white.
     new RegExp('(?<![\\w-])text-teal-(?:400|500)(?![\\w-])', 'g'),
     // Teal 600 as a hover or focus text color. Best case is 3.66.
-    new RegExp('(?<![\\w-])(?:hover|focus|focus-visible|active|group-hover):text-teal-600(?![\\w-])', 'g'),
+    new RegExp(
+      '(?<![\\w-])(?:hover|focus|focus-visible|focus-within|active|group-hover|group-focus|peer-hover|peer-focus):text-teal-600(?![\\w-])',
+      'g',
+    ),
     // Colored text below 4.5 on the light surfaces: 3.82, 2.93, 3.59, 4.12 and 3.70 at best.
     new RegExp('(?<![\\w-])text-(?:red-500|yellow-600|orange-600|purple-500|violet-500)(?![\\w-])', 'g'),
     // Gray 400 placeholders. 2.37 on paper.
@@ -87,6 +91,9 @@ describe('contrast tokens on the public site', () => {
     expect(matches(TEAL, 'class="text-teal-500"')).toBe(true);
     expect(matches(TEAL, 'hover:text-teal-500')).toBe(true);
     expect(matches(TEAL_HOVER, 'className="hover:text-teal-600"')).toBe(true);
+    expect(matches(TEAL_HOVER, 'group-focus:text-teal-600')).toBe(true);
+    expect(matches(TEAL_HOVER, 'peer-focus:text-teal-600')).toBe(true);
+    expect(matches(TEAL_HOVER, 'focus-within:text-teal-600')).toBe(true);
     expect(matches(COLORED, 'text-red-500 ml-1')).toBe(true);
     expect(matches(COLORED, 'text-violet-500')).toBe(true);
     expect(matches(PLACEHOLDER, 'placeholder-gray-400 focus:outline-none')).toBe(true);
@@ -118,9 +125,10 @@ describe('contrast tokens on the public site', () => {
 
   it('global placeholder colour stays', () => {
     const css = readFileSync(join(ROOT, 'src/styles/global.css'), 'utf8');
-    expect(css).toMatch(/@layer base/);
-    expect(css).toMatch(/input::placeholder/);
-    expect(css).toMatch(/textarea::placeholder/);
-    expect(css).toMatch(/var\(--color-gray-600\)/);
+    // One unit: the rule, its colour and its base layer, so a gray-600 used elsewhere in the
+    // file cannot stand in for it.
+    expect(css).toMatch(
+      /@layer base\s*\{[^{}]*input::placeholder,\s*textarea::placeholder\s*\{\s*color:\s*var\(--color-gray-600\);?\s*\}\s*\}/,
+    );
   });
 });
