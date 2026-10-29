@@ -29,6 +29,7 @@ export type ComboboxKeyAction =
   | { type: 'select'; index: number }
   | { type: 'close' }
   | { type: 'clear' }
+  | { type: 'deactivate' }
   | { type: 'none' };
 
 const NONE: ComboboxKeyAction = { type: 'none' };
@@ -44,7 +45,9 @@ const NONE: ComboboxKeyAction = { type: 'none' };
  *   input still submits.
  * - Escape closes an open popup; on a closed one it clears the text.
  * - Tab closes the popup without selecting, and focus moves on as usual.
- * - Home and End are not handled: in an editable combobox they move the text caret.
+ * - ArrowLeft, ArrowRight, Home and End move the text caret, as in any text box. With an option
+ *   active they also hand visual focus back to the input, so the reader is back in the text and
+ *   Enter submits what was typed rather than an option they can no longer hear.
  */
 export function comboboxKeyAction(
   key: string,
@@ -72,6 +75,11 @@ export function comboboxKeyAction(
       return hasText ? { type: 'clear' } : NONE;
     case 'Tab':
       return open ? { type: 'close' } : NONE;
+    case 'ArrowLeft':
+    case 'ArrowRight':
+    case 'Home':
+    case 'End':
+      return hasActive ? { type: 'deactivate' } : NONE;
     default:
       return NONE;
   }

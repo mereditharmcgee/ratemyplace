@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useId, useMemo } from 'react';
-import { keepInputFocus, useComboboxListbox } from './ui/useComboboxListbox';
+import { keepInputFocus, popupMayOpen, useComboboxListbox } from './ui/useComboboxListbox';
 
 export interface PlaceDetails {
   placeId: string;
@@ -88,6 +88,12 @@ export default function AddressAutocomplete({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dbDebounceRef = useRef<NodeJS.Timeout>();
   const googleDebounceRef = useRef<NodeJS.Timeout>();
+  // The text the newest lookup is for. A response for older text (typed over, cleared, or
+  // replaced by a pick) is dropped, so it cannot bring back suggestions for that text.
+  const queryRef = useRef(initialValue);
+  // Tab can land on Clear address while a lookup runs. The spinner takes the button's place
+  // only while the button is not focused, so a lookup never unmounts the focused control.
+  const [clearFocused, setClearFocused] = useState(false);
 
   const totalItems = dbMatches.length + predictions.length;
   const showManual = Boolean(onManualEntry) && inputValue.length >= 3;
@@ -115,6 +121,7 @@ export default function AddressAutocomplete({
       const params = new URLSearchParams({ q: input });
       const response = await fetch(`/api/search/autocomplete?${params}`);
       const data = await response.json();
+      if (input !== queryRef.current) return;
       // Only show buildings from DB (not landlords) in the review form
       const buildings = (data.results || [])
         .filter((r: any) => r.type === 'building')
@@ -149,6 +156,7 @@ export default function AddressAutocomplete({
       const params = new URLSearchParams({ input, sessionToken });
       const response = await fetch(`/api/places/autocomplete?${params}`);
       const data = await response.json();
+      if (input !== queryRef.current) return;
       if (!response.ok || data.error) {
         setPredictions([]);
         setApiError(true);
@@ -156,7 +164,7 @@ export default function AddressAutocomplete({
         setPredictions(data.predictions || []);
         setApiError(false);
       }
-      setShowDropdown(true);
+      if (popupMayOpen(inputRef.current)) setShowDropdown(true);
     } catch {
       setPredictions([]);
       setApiError(true);
@@ -173,6 +181,7 @@ export default function AddressAutocomplete({
   /** The clear button and Escape on a closed popup: empty the box and every result. */
   const clearInput = () => {
     clearPendingSearches();
+    queryRef.current = '';
     setInputValue('');
     setDbMatches([]);
     setPredictions([]);
@@ -181,6 +190,7 @@ export default function AddressAutocomplete({
   };
 
   const handleSelectDbMatch = (match: DbMatch) => {
+    queryRef.current = match.title;
     setInputValue(match.title);
     setShowDropdown(false);
     setDbMatches([]);
@@ -190,6 +200,7 @@ export default function AddressAutocomplete({
   };
 
   const handleSelectPrediction = async (prediction: Prediction) => {
+    queryRef.current = prediction.description;
     setInputValue(prediction.description);
     setShowDropdown(false);
     setDbMatches([]);
@@ -246,6 +257,7 @@ export default function AddressAutocomplete({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    queryRef.current = value;
     setInputValue(value);
     combobox.setActiveIndex(-1);
 
@@ -262,7 +274,7 @@ export default function AddressAutocomplete({
     // DB first: fast, 150ms
     dbDebounceRef.current = setTimeout(() => {
       fetchDbMatches(value);
-      setShowDropdown(true);
+      if (popupMayOpen(inputRef.current)) setShowDropdown(true);
     }, 150);
 
     // Google Places: 600ms (longer debounce reduces request count;
@@ -306,6 +318,7 @@ export default function AddressAutocomplete({
     );
   });
   const manualIndex = options.length - 1;
+  const showSpinner = isLoading && !clearFocused;
 
   return (
     <div className="relative">
@@ -316,14 +329,17 @@ export default function AddressAutocomplete({
           type="text"
           value={inputValue}
           onChange={handleInputChange}
-          onFocus={() => totalItems > 0 && setShowDropdown(true)}
+          onFocus={() => {
+            setClearFocused(false);
+            if (totalItems > 0) setShowDropdown(true);
+          }}
           {...combobox.inputProps}
           aria-describedby={describedBy}
           placeholder={placeholder}
           className="w-full px-4 py-3 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent pr-10"
           autoComplete="off"
         />
-        {isLoading && (
+        {showSpinner && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
             <svg aria-hidden="true" className="animate-spin h-5 w-5 text-teal-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -331,10 +347,12 @@ export default function AddressAutocomplete({
             </svg>
           </div>
         )}
-        {!isLoading && inputValue && (
+        {!showSpinner && inputValue && (
           <button
             type="button"
             aria-label="Clear address"
+            onFocus={() => setClearFocused(true)}
+            onBlur={() => setClearFocused(false)}
             onClick={() => {
               clearInput();
               combobox.setActiveIndex(-1);

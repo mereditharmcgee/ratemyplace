@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import HomeSearch from '../../components/HomeSearch';
 import { NAMED_PARTY_MIN_REVIEWS } from '../scoring';
 import { getEarlyScoreStyle, getScoreBgTint, getScoreColor, getScoreTextColor } from '../scoring-colors';
@@ -350,6 +350,98 @@ describe('HomeSearch combobox semantics', () => {
     expect(input.getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(go).not.toHaveBeenCalled();
+  });
+
+  it.each(['ArrowLeft', 'ArrowRight', 'Home', 'End'])(
+    '%s returns to the text, so Enter then searches for what was typed',
+    async (key) => {
+      const go = spyOnNav();
+      const { input, container } = await openWithEveryKind();
+      fireEvent.keyDown(input, { key: 'ArrowDown' });
+      expect(input.getAttribute('aria-activedescendant')).not.toBeNull();
+
+      // Not prevented: the caret still moves in the text.
+      expect(fireEvent.keyDown(input, { key })).toBe(true);
+      expect(input.getAttribute('aria-activedescendant')).toBeNull();
+      expect(input.getAttribute('aria-expanded')).toBe('true');
+
+      expect(fireEvent.keyDown(input, { key: 'Enter' })).toBe(true);
+      expect(go).not.toHaveBeenCalled();
+      fireEvent.submit(container.querySelector('form')!);
+      expect(go).toHaveBeenCalledWith('/search?q=12%20Example');
+    },
+  );
+
+  it('a blur to another control closes the popup; a blur to nowhere (a phone keyboard Done) leaves it', async () => {
+    const { input } = await openWithEveryKind();
+    fireEvent.blur(input);
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+
+    const elsewhere = document.createElement('button');
+    document.body.appendChild(elsewhere);
+    fireEvent.blur(input, { relatedTarget: elsewhere });
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    elsewhere.remove();
+  });
+
+  /** A fetch that answers only when the test says so. */
+  function heldFetch() {
+    const held: { answer: (value: unknown) => void } = { answer: () => {} };
+    const fetchMock = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          held.answer = resolve;
+        }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    return { fetchMock, held };
+  }
+
+  async function answerWith(held: { answer: (value: unknown) => void }, results: unknown[]) {
+    await act(async () => {
+      held.answer({ ok: true, json: async () => ({ results }) });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+  }
+
+  it('results that land after focus has moved to another control do not open the popup', async () => {
+    const { fetchMock, held } = heldFetch();
+    const { getByRole } = render(<HomeSearch />);
+    const input = screen.getByRole('combobox', { name: SEARCH_LABEL });
+    input.focus();
+    type(getByRole, '12 Example');
+    // The 150ms debounce sends the lookup; the reader tabs on before it answers.
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const elsewhere = document.createElement('button');
+    document.body.appendChild(elsewhere);
+    elsewhere.focus();
+
+    await answerWith(held, [ownBuilding, ownLandlord, { ...ownBuilding, id: 'b2', slug: 'b2' }]);
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('listbox')).toBeNull();
+
+    // Back in the box, the results it now holds open as usual.
+    fireEvent.focus(input);
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+    elsewhere.remove();
+  });
+
+  it('a response for text that has since been cleared is dropped', async () => {
+    const { fetchMock, held } = heldFetch();
+    const { getByRole } = render(<HomeSearch />);
+    const input = screen.getByRole('combobox', { name: SEARCH_LABEL });
+    input.focus();
+    type(getByRole, '12 Example');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    // Escape on the closed popup clears the text while the lookup is still out.
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect((input as HTMLInputElement).value).toBe('');
+
+    await answerWith(held, [ownBuilding, ownLandlord, { ...ownBuilding, id: 'b2', slug: 'b2' }]);
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('listbox')).toBeNull();
+    fireEvent.focus(input);
+    expect(input.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('options are not tabbable and hold no button or link, and decorative glyphs are hidden', async () => {

@@ -12,7 +12,7 @@ import {
   type HomePrediction,
   type HomeReviewTarget,
 } from '../lib/homeSearchItems';
-import { keepInputFocus, useComboboxListbox } from './ui/useComboboxListbox';
+import { keepInputFocus, popupMayOpen, useComboboxListbox } from './ui/useComboboxListbox';
 
 const SEARCH_LABEL = 'Search by address, neighborhood, or landlord';
 
@@ -59,6 +59,9 @@ export default function HomeSearch() {
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dbDebounceRef = useRef<NodeJS.Timeout>();
+  // The text the newest lookup is for. A response for older text (typed over or cleared) is
+  // dropped, so it cannot bring back suggestions for that text.
+  const queryRef = useRef('');
 
   // Buildings already on RateMyPlace first (ours, then Google suggestions the server matched
   // to a building page), then landlords, then other addresses. See homeSearchItems.ts.
@@ -89,8 +92,9 @@ export default function HomeSearch() {
       const params = new URLSearchParams({ input, sessionToken, scope: 'boston' });
       const response = await fetch(`/api/places/autocomplete?${params}`);
       const data = await response.json();
+      if (input !== queryRef.current) return;
       setGoogleResults(data.predictions || []);
-      setShowDropdown(true);
+      if (popupMayOpen(inputRef.current)) setShowDropdown(true);
     } catch {
       setGoogleResults([]);
     } finally {
@@ -111,9 +115,10 @@ export default function HomeSearch() {
       const params = new URLSearchParams({ q: input });
       const response = await fetch(`/api/search/autocomplete?${params}`);
       const data = await response.json();
+      if (input !== queryRef.current) return;
       const results = data.results || [];
       setDbResults(results);
-      setShowDropdown(true);
+      if (popupMayOpen(inputRef.current)) setShowDropdown(true);
       if (results.length < 3 && input.length >= 3) {
         fetchGoogleResults(input);
       } else {
@@ -130,6 +135,7 @@ export default function HomeSearch() {
   /** Escape on a closed popup: HomeSearch's way to clear, with no extra visible button. */
   const clearInput = () => {
     if (dbDebounceRef.current) clearTimeout(dbDebounceRef.current);
+    queryRef.current = '';
     setInputValue('');
     setDbResults([]);
     setGoogleResults([]);
@@ -169,6 +175,7 @@ export default function HomeSearch() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    queryRef.current = value;
     setInputValue(value);
     combobox.setActiveIndex(-1);
 

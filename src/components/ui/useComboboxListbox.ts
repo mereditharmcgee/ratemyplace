@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import type { HTMLAttributes, InputHTMLAttributes, KeyboardEvent, MouseEvent } from 'react';
+import type { FocusEvent, HTMLAttributes, InputHTMLAttributes, KeyboardEvent, MouseEvent } from 'react';
 import { clampActive, comboboxKeyAction, comboboxStatusText } from '../../lib/combobox';
 
 // One combobox with a listbox popup (WAI-ARIA APG, list autocomplete without automatic
@@ -68,12 +68,8 @@ export interface ComboboxListbox {
   inputProps: ComboboxInputProps;
   listboxProps: Pick<HTMLAttributes<HTMLElement>, 'role' | 'aria-labelledby' | 'aria-label'> & { id: string };
   getOptionProps: (index: number) => ComboboxOptionProps;
-  /** The id an option at this index carries. */
-  optionId: (index: number) => string;
   activeIndex: number;
   setActiveIndex: (index: number) => void;
-  /** The popup is shown and holds at least one option. */
-  expanded: boolean;
   /** Text for an always-rendered polite status region outside the popup. */
   statusText: string;
 }
@@ -81,6 +77,18 @@ export interface ComboboxListbox {
 /** A mouse press inside the popup must not take focus from the input. */
 export function keepInputFocus(event: MouseEvent): void {
   event.preventDefault();
+}
+
+/**
+ * Whether results that arrive late (a debounced lookup, a slow fetch) may show the popup.
+ * Yes while focus is in the input, or on nothing at all: a phone's keyboard Done button blurs
+ * the input to show the page, and the list should still appear there. No once focus has moved
+ * on to another control, or the popup would open, and its count be read, under a reader who
+ * has left the search.
+ */
+export function popupMayOpen(input: HTMLElement | null): boolean {
+  const active = typeof document === 'undefined' ? null : document.activeElement;
+  return !active || active === input || active === document.body;
 }
 
 export function useComboboxListbox(options: UseComboboxListboxOptions): ComboboxListbox {
@@ -99,6 +107,16 @@ export function useComboboxListbox(options: UseComboboxListboxOptions): Combobox
     setActiveIndex((current) => clampActive(current, count));
   }, [count]);
 
+  const { active: statusActive, results: statusResults, loading: statusLoading, message: statusMessage, version } = status;
+
+  // New results can shift the rows (a late Google answer lands above "Enter it manually", or
+  // beside our own buildings), so the index the reader arrowed to may now be another option.
+  // None stays active: Enter cannot take a row the reader never heard, and the next arrow
+  // starts again from the top or bottom.
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [version]);
+
   useEffect(() => {
     if (!scrollPending.current) return;
     scrollPending.current = false;
@@ -108,7 +126,6 @@ export function useComboboxListbox(options: UseComboboxListboxOptions): Combobox
 
   // The status region speaks once results have stopped changing and nothing is loading. It is
   // emptied first, so the same count after new typing is read again.
-  const { active: statusActive, results: statusResults, loading: statusLoading, message: statusMessage, version } = status;
   useEffect(() => {
     setStatusText('');
     if (!statusActive || statusLoading) return;
@@ -160,14 +177,22 @@ export function useComboboxListbox(options: UseComboboxListboxOptions): Combobox
         setActiveIndex(-1);
         onClear();
         break;
+      case 'deactivate':
+        // The caret still moves; only the active option goes.
+        setActiveIndex(-1);
+        break;
       case 'none':
         break;
     }
   };
 
-  const onBlur = () => {
+  // Focus moving to another control closes the popup (Tab and Shift+Tab already have, on
+  // keydown). A blur to nowhere leaves it open: on a phone, the keyboard's Done button blurs
+  // the input so the reader can see the list it was covering. A press elsewhere on the page
+  // is closed by each component's own outside-press listener.
+  const onBlur = (event: FocusEvent<HTMLInputElement>) => {
     setActiveIndex(-1);
-    onOpenChange(false);
+    if (event.relatedTarget) onOpenChange(false);
   };
 
   const getOptionProps = (index: number): ComboboxOptionProps => ({
@@ -199,10 +224,8 @@ export function useComboboxListbox(options: UseComboboxListboxOptions): Combobox
       'aria-label': listboxLabelledBy ? undefined : listboxLabel,
     },
     getOptionProps,
-    optionId,
     activeIndex,
     setActiveIndex,
-    expanded,
     statusText,
   };
 }

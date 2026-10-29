@@ -117,16 +117,21 @@ describe('comboboxKeyAction: Tab and the keys left to the input', () => {
     expect(comboboxKeyAction('Tab', state({ open: false }))).toEqual({ type: 'none' });
   });
 
-  it('Home and End move the text caret, so the combobox ignores them', () => {
-    expect(comboboxKeyAction('Home', state({ activeIndex: 1 }))).toEqual({ type: 'none' });
-    expect(comboboxKeyAction('End', state({ activeIndex: 1 }))).toEqual({ type: 'none' });
-    expect(comboboxKeyAction('Home', state({ open: false }))).toEqual({ type: 'none' });
-    expect(comboboxKeyAction('End', state({ open: false }))).toEqual({ type: 'none' });
+  it.each(['ArrowLeft', 'ArrowRight', 'Home', 'End'])(
+    '%s with an option active hands focus back to the text (the caret still moves)',
+    (key) => {
+      expect(comboboxKeyAction(key, state({ activeIndex: 1 }))).toEqual({ type: 'deactivate' });
+    },
+  );
+
+  it.each(['ArrowLeft', 'ArrowRight', 'Home', 'End'])('%s with no option active is left to the input', (key) => {
+    expect(comboboxKeyAction(key, state({ activeIndex: -1 }))).toEqual({ type: 'none' });
+    expect(comboboxKeyAction(key, state({ open: false, activeIndex: 1 }))).toEqual({ type: 'none' });
   });
 
   it('ignores ordinary typing', () => {
     expect(comboboxKeyAction('a', state())).toEqual({ type: 'none' });
-    expect(comboboxKeyAction('ArrowLeft', state({ activeIndex: 1 }))).toEqual({ type: 'none' });
+    expect(comboboxKeyAction('a', state({ activeIndex: 1 }))).toEqual({ type: 'none' });
   });
 });
 

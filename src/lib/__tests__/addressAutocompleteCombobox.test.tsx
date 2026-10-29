@@ -291,12 +291,28 @@ describe('AddressAutocomplete combobox semantics', () => {
     expect(input.getAttribute('aria-activedescendant')).toBe(screen.getAllByRole('option')[0].id);
   });
 
-  it('the blur of the input closes the popup', async () => {
+  it('focus moving to another control closes the popup', async () => {
     stubFetch();
     renderStep();
     const input = await typeAndWaitForBoth();
-    fireEvent.blur(input);
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    const elsewhere = document.createElement('button');
+    document.body.appendChild(elsewhere);
+    fireEvent.blur(input, { relatedTarget: elsewhere });
     expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(input.getAttribute('aria-activedescendant')).toBeNull();
+    elsewhere.remove();
+  });
+
+  it('a blur to nowhere, as a phone keyboard Done button does, leaves the list showing', async () => {
+    stubFetch();
+    renderStep();
+    const input = await typeAndWaitForBoth();
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.blur(input);
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+    // No option stays active, so nothing is chosen by a later Enter.
+    expect(input.getAttribute('aria-activedescendant')).toBeNull();
   });
 
   it('the "Clear address" button clears the text and puts focus back in the input', async () => {
@@ -409,5 +425,120 @@ describe('AddressAutocomplete status region', () => {
     fireEvent.change(input, { target: { value: '' } });
     await advance(STATUS_SETTLE_MS + 100);
     expect(statusRegion(container).textContent).toBe('');
+  });
+});
+
+describe('AddressAutocomplete late results and the clear button', () => {
+  /** Our-buildings answers at once; the Google lookup waits until the test answers it. */
+  function stubFetchHoldingGoogle() {
+    const held: { answer: (value: unknown) => void } = { answer: () => {} };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/search/autocomplete')) {
+        return Promise.resolve({ ok: true, json: async () => ({ results: ourBuildings }) });
+      }
+      return new Promise((resolve) => {
+        held.answer = resolve;
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return held;
+  }
+
+  function otherControl(): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.textContent = 'Elsewhere';
+    document.body.appendChild(button);
+    return button;
+  }
+
+  it('new results clear the active option, so Enter cannot take a row that moved under the reader', async () => {
+    vi.useFakeTimers();
+    stubFetch();
+    const { onEnterManual, onExistingBuildingSelect, onPlaceSelect } = renderStep();
+    const input = combobox();
+    input.focus();
+    fireEvent.change(input, { target: { value: '12 Example Road' } });
+    // Our buildings are in; the reader goes to the last option, manual entry.
+    await advance(300);
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    const active = document.getElementById(input.getAttribute('aria-activedescendant') ?? '');
+    expect(active?.textContent).toMatch(MANUAL);
+
+    // The Google address lands where manual entry was.
+    await advance(400);
+    expect(screen.getByText('16 Example Road')).toBeTruthy();
+    expect(input.getAttribute('aria-activedescendant')).toBeNull();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onEnterManual).not.toHaveBeenCalled();
+    expect(onExistingBuildingSelect).not.toHaveBeenCalled();
+    expect(onPlaceSelect).not.toHaveBeenCalled();
+  });
+
+  it('results that arrive after focus has moved to another control do not open the popup', async () => {
+    vi.useFakeTimers();
+    stubFetch();
+    const { container } = renderStep();
+    const input = combobox();
+    input.focus();
+    fireEvent.change(input, { target: { value: '12 Example Road' } });
+    const elsewhere = otherControl();
+    elsewhere.focus();
+
+    await settleBothSources();
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(statusRegion(container).textContent).toBe('');
+
+    // Back in the box, the results it now holds open as usual.
+    input.focus();
+    fireEvent.focus(input);
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+    elsewhere.remove();
+  });
+
+  it('a Google lookup that starts while Clear address has focus leaves the button in place', async () => {
+    vi.useFakeTimers();
+    const held = stubFetchHoldingGoogle();
+    renderStep();
+    const input = combobox();
+    input.focus();
+    fireEvent.change(input, { target: { value: '12 Example Road' } });
+    await advance(200);
+
+    // The reader tabs from the input to Clear address before the Google lookup starts.
+    const clear = screen.getByRole('button', { name: 'Clear address' });
+    clear.focus();
+    await advance(500);
+    expect(document.activeElement).toBe(clear);
+    expect(clear.isConnected).toBe(true);
+
+    await act(async () => {
+      held.answer({ ok: true, json: async () => ({ predictions: googlePredictions }) });
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Clear address' }));
+  });
+
+  it('a response for text that has since been cleared is dropped', async () => {
+    vi.useFakeTimers();
+    const held = stubFetchHoldingGoogle();
+    renderStep();
+    const input = combobox();
+    input.focus();
+    fireEvent.change(input, { target: { value: '12 Example Road' } });
+    // Google is asked at 600ms and has not answered when the reader clears the box.
+    await advance(700);
+    fireEvent.keyDown(input, { key: 'Escape' });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(input.value).toBe('');
+
+    await act(async () => {
+      held.answer({ ok: true, json: async () => ({ predictions: googlePredictions }) });
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(screen.queryByText('16 Example Road')).toBeNull();
   });
 });
