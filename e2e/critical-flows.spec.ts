@@ -231,11 +231,15 @@ test.describe('Phase 20: Critical Flows', () => {
     await authedPage.waitForLoadState('networkidle');
     const detailReviewCount = authedPage.getByText(/\d+\s+reviews?/).first();
     await expect(detailReviewCount).toBeVisible({ timeout: 10000 });
-    const detailScoreText = await detailReviewCount
-      .locator('..')
-      .locator(':scope > div')
-      .first()
-      .textContent();
+    // Under the named-party threshold the headline is an early rating (lib/earlyRating.ts):
+    // the score is a span beside "from N review(s)" inside [data-early-rating]. Above it,
+    // the score is the div above the review count.
+    const earlyScore = authedPage.locator('[data-early-rating] .text-3xl');
+    const detailScoreLocator =
+      (await earlyScore.count()) > 0
+        ? earlyScore.first()
+        : detailReviewCount.locator('..').locator(':scope > div').first();
+    const detailScoreText = await detailScoreLocator.textContent();
     expect(detailScoreText, 'Detail page must render score').toBeTruthy();
     const detailScore: number = parseFloat(detailScoreText!.trim());
     expect(Number.isFinite(detailScore), `Detail score must be a finite number, got: "${detailScoreText}"`).toBe(true);

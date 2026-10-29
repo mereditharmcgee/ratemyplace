@@ -727,3 +727,130 @@ test.describe('batch 7: reduced motion stops transitions and spinners', () => {
     await expect(spinner).toHaveCount(0, { timeout: 10_000 });
   });
 });
+
+test.describe('review fixes: focus after mode switches and requests, Enter on ratings, caret keys', () => {
+  const FICTIONAL_QUERY = '100 Example St';
+
+  async function hydrated(page: Page) {
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    await page.waitForFunction(
+      () => document.querySelectorAll('astro-island[ssr]:not([client="visible"])').length === 0,
+      undefined,
+      { timeout: 10_000 },
+    );
+  }
+
+  test('choosing manual entry by keyboard focuses the street field, and Back to search focuses the search', async ({
+    authedPage: page,
+  }) => {
+    await prepare(page, DESKTOP);
+    await page.goto('/review/new');
+    await hydrated(page);
+
+    const input = page.getByRole('combobox', { name: 'Search for your building address' });
+    await input.fill(FICTIONAL_QUERY);
+    await expect(page.getByRole('listbox')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Powered by Google')).toBeVisible({ timeout: 10_000 });
+    await input.press('ArrowUp');
+    const manualId = await input.getAttribute('aria-activedescendant');
+    await expect(page.locator(`[id="${manualId}"]`)).toContainText('Enter it manually');
+    await input.press('Enter');
+
+    await expect(page.getByLabel('Street address')).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.getByRole('button', { name: 'Back to search' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('combobox', { name: 'Search for your building address' })).toBeFocused();
+  });
+
+  test('home search: ArrowLeft hands focus back to the text, so Enter searches for it', async ({ page }) => {
+    await prepare(page, DESKTOP);
+    await page.goto('/');
+    await hydrated(page);
+
+    const input = page.getByRole('combobox', { name: 'Search by address, neighborhood, or landlord' });
+    await input.fill(FICTIONAL_QUERY);
+    await expect(page.getByRole('listbox')).toBeVisible({ timeout: 10_000 });
+    // Wait for every lookup to settle: new results clear the active option.
+    await expect(page.locator('form').filter({ has: input }).getByRole('status')).toHaveText(/result/, {
+      timeout: 10_000,
+    });
+    await input.press('ArrowDown');
+    await expect(input).toHaveAttribute('aria-activedescendant', /.+/);
+    await input.press('ArrowLeft');
+    await expect(input).not.toHaveAttribute('aria-activedescendant');
+    await input.press('Enter');
+    await page.waitForURL(/\/search\?q=/, { timeout: 15_000 });
+    expect(decodeURIComponent(page.url())).toContain(`q=${FICTIONAL_QUERY}`);
+  });
+
+  test('a failed sign-in is read from the alert and focus returns to the button', async ({ page }) => {
+    // Routed: the request never reaches the server, so no rate limit or account is touched.
+    await page.route(/\/api\/auth\/signin$/, (route) =>
+      route.fulfill({ status: 401, json: { error: 'Example sign-in failure' } }),
+    );
+    await page.goto('/auth/signin');
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    const alert = page.locator('#error-message');
+    await expect(alert).toHaveAttribute('role', 'alert');
+    await expect(alert).toHaveText('');
+
+    await page.locator('#signin-form input[name="email"]').fill('reader@example.com');
+    await page.locator('#signin-form input[name="password"]').fill('example-not-a-password');
+    const submit = page.locator('#signin-form button[type="submit"]');
+    await submit.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(alert).toHaveText('Example sign-in failure');
+    await expect(alert).toBeVisible();
+    await expect(submit).toBeEnabled();
+    await expect(submit).toBeFocused();
+  });
+
+  test('a reset link request is read from the status region and focus returns to the button', async ({ page }) => {
+    await page.route(/\/api\/auth\/forgot-password$/, (route) =>
+      route.fulfill({ status: 200, json: { message: 'Example reset message' } }),
+    );
+    await page.goto('/auth/forgot-password');
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    const status = page.locator('#success-message');
+    await expect(status).toHaveAttribute('role', 'status');
+    await expect(status).toHaveText('');
+    // Present but collapsed while empty.
+    expect((await status.boundingBox())?.height ?? 0).toBe(0);
+
+    await page.locator('#forgot-password-form input[name="email"]').fill('reader@example.com');
+    const submit = page.locator('#forgot-password-form button[type="submit"]');
+    await submit.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(status).toHaveText('Example reset message');
+    await expect(status).toBeVisible();
+    await expect(submit).toBeFocused();
+  });
+
+  test('Enter on a rating radio in the edit form chooses it and does not save', async ({ authedPage: page }) => {
+    const saves: string[] = [];
+    // Any save is refused here, so even a regression could not change the seed review.
+    await page.route(new RegExp(`/api/reviews/${SEED_REVIEW_ID}$`), (route) => {
+      if (route.request().method() === 'GET') return route.continue();
+      saves.push(route.request().method());
+      return route.fulfill({ status: 500, json: { error: 'Saving is blocked in this test' } });
+    });
+    await page.goto(`/review/edit/${SEED_REVIEW_ID}`);
+    await hydrated(page);
+
+    await page.getByRole('checkbox', { name: /I confirm this review/ }).check();
+    const group = page.getByRole('radiogroup').first();
+    const one = group.getByRole('radio', { name: '1', exact: true });
+    const five = group.getByRole('radio', { name: '5', exact: true });
+    const target = (await one.isChecked()) ? five : one;
+    await target.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(target).toBeChecked();
+    await expect(target).toBeFocused();
+    await page.waitForTimeout(500);
+    expect(saves).toEqual([]);
+  });
+});
