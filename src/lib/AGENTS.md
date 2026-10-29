@@ -184,6 +184,18 @@ goes through it (or `reviewSeasonChipProps` / `formatMoveIn`), never the two col
 directly. NULL means the review predates the column and is shown as stored. The module is
 a client leaf (`clientLeafModules.test.ts`): the edit form and admin table import it.
 
+### `reviewEdit.ts` and `tenure.ts`: a review edit changes only what it sends
+
+The reviewer's edit page starts every select at the stored answer, so an untouched save
+writes back what was there: `moveOutEditValue` / `moveOutEditChoices` (`privacy.ts`) for the
+move-out, `tenureEditValue` / `tenureEditChoices` (`tenure.ts`, a client leaf) for the
+tenure. A blank stored answer starts on a blank "Select..." choice, never on a default.
+`PATCH /api/reviews/[id]` keeps every field in `KEPT_WHEN_ABSENT` as stored when the body
+leaves its key out (`withStoredFields`), and `moveOutFromEdit` keeps the move-out the same
+way and clears a stored move-out season whenever the year changes, because the form has no
+season control. `review_text` / `comments` and the laundry type and cost are still written as
+sent: each pair is read together.
+
 ### `validation.ts` — use the shared primitives
 
 `isValidEmail`, `isSafeHttpUrl`, `validateReviewText`, `enforceMaxLength`,

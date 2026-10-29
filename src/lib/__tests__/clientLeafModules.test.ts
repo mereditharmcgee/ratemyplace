@@ -14,6 +14,8 @@ const LEAF_MODULES = [
   'src/lib/privacy.ts',
   'src/lib/reviewPaths.ts',
   'src/lib/reviewSubmitOutcome.ts',
+  // The review edit form starts its tenure select with it.
+  'src/lib/tenure.ts',
 ];
 
 describe('client leaf modules have no runtime imports', () => {

@@ -7,7 +7,8 @@ import { moveOutEditValue } from '../privacy';
 
 /**
  * A past tenant can be stored with no move-out: the submit route stores NULL when the form
- * sends none, and so does the edit route. The edit page starts its move-out select from
+ * sends none, and the edit route when it sends a blank one. An edit that leaves the move-out
+ * out of its body keeps what is stored. The edit page starts its move-out select from
  * `moveOutEditValue`, so an untouched save sends back what is stored. These run the real
  * routes against every migration in migrations/.
  */
@@ -95,14 +96,24 @@ suite('stored move-out round trip', () => {
     expect(await stored(db, id)).toEqual({ move_out_year_new: null, is_current_tenant: 0 });
   });
 
-  // This documents what the edit route does today, to show the NULL past-tenant state is
-  // reachable. It is not a requirement: dropping a stored move-out on a partial edit is a
-  // known gap, and a fix that keeps it should change this expectation.
-  it('stores a past tenant with no move-out when an edit sends none', async () => {
+  // A partial edit changes only what it sends. Before this was fixed, an edit body without
+  // move_out_year_new erased a stored move-out and stored a past tenant with none.
+  it('keeps the stored move-out when an edit sends none', async () => {
+    const db = schemaDb();
+    await seed(db);
+    const past = await submit(db, { move_out_year: '2024' });
+    const current = await submit(db, { move_out_year: 'current' });
+    await edit(db, past, {});
+    await edit(db, current, {});
+    expect(await stored(db, past)).toEqual({ move_out_year_new: '2024', is_current_tenant: 0 });
+    expect(await stored(db, current)).toEqual({ move_out_year_new: 'current', is_current_tenant: 1 });
+  });
+
+  it('stores a past tenant with no move-out when an edit sends a blank one', async () => {
     const db = schemaDb();
     await seed(db);
     const id = await submit(db, { move_out_year: '2024' });
-    await edit(db, id, {});
+    await edit(db, id, { move_out_year_new: '' });
     expect(await stored(db, id)).toEqual({ move_out_year_new: null, is_current_tenant: 0 });
   });
 
@@ -127,5 +138,59 @@ suite('stored move-out round trip', () => {
 
     expect(await stored(db, past)).toEqual({ move_out_year_new: '2020_or_earlier', is_current_tenant: 0 });
     expect(await stored(db, current)).toEqual({ move_out_year_new: 'current', is_current_tenant: 1 });
+  });
+});
+
+/**
+ * Reviews written before January 2026 can carry a move-out season with the year. The edit
+ * form has no season control, so a season belongs only to the year it was given with: when
+ * an edit changes the year, the season is cleared rather than carried onto a year it was
+ * never given for (stored fall 2019, edited to 2023, used to read "Move-out: Fall 2023").
+ */
+suite('stored move-out season on edit', () => {
+  async function olderReview(db: TestD1Database): Promise<string> {
+    const id = await submit(db, { move_out_year: '2019' });
+    // The submit route stores no season any more; this sets the row up as an older one.
+    await db.prepare("UPDATE reviews SET move_out_season = 'fall' WHERE id = ?").bind(id).run();
+    return id;
+  }
+
+  async function season(db: TestD1Database, id: string): Promise<string | null> {
+    const row = await db.prepare('SELECT move_out_season FROM reviews WHERE id = ?').bind(id).first<{ move_out_season: string | null }>();
+    if (!row) throw new Error(`no review ${id}`);
+    return row.move_out_season;
+  }
+
+  it('clears the season when an edit changes the move-out year', async () => {
+    const db = schemaDb();
+    await seed(db);
+    const id = await olderReview(db);
+    await edit(db, id, { move_out_year_new: '2023' });
+    expect(await stored(db, id)).toEqual({ move_out_year_new: '2023', is_current_tenant: 0 });
+    expect(await season(db, id)).toBeNull();
+  });
+
+  it('clears the season when an edit makes the reviewer a current tenant or blanks the move-out', async () => {
+    const db = schemaDb();
+    await seed(db);
+    const toCurrent = await olderReview(db);
+    const toBlank = await olderReview(db);
+    await edit(db, toCurrent, { move_out_year_new: 'current' });
+    await edit(db, toBlank, { move_out_year_new: '' });
+    expect(await season(db, toCurrent)).toBeNull();
+    expect(await season(db, toBlank)).toBeNull();
+  });
+
+  it('keeps the season when an edit keeps the year, or sends no move-out', async () => {
+    const db = schemaDb();
+    await seed(db);
+    const sameYear = await olderReview(db);
+    const noMoveOut = await olderReview(db);
+    await edit(db, sameYear, { move_out_year_new: await editStart(db, sameYear) });
+    await edit(db, noMoveOut, {});
+    for (const id of [sameYear, noMoveOut]) {
+      expect(await stored(db, id)).toEqual({ move_out_year_new: '2019', is_current_tenant: 0 });
+      expect(await season(db, id)).toBe('fall');
+    }
   });
 });
