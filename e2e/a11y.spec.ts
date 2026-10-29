@@ -520,9 +520,10 @@ for (const viewport of VIEWPORTS) {
       await page.goto(`/building/${BUILDING_SLUG}`);
       await scan(page, viewport, { ...target, state: 'default' });
 
-      // Open every disclosure: the unit cards (clickable divs today) and every <details>,
-      // which covers the records ledger rows and the report-a-record form.
-      const closedCards = page.locator('.unit-card[data-expanded="false"]');
+      // Open every disclosure: the unit cards (each toggled by a native button laid over the
+      // card) and every <details>, which covers the records ledger rows and the report-a-record
+      // form.
+      const closedCards = page.locator('.unit-card').getByRole('button', { expanded: false });
       for (let guard = 0; guard < 20 && (await closedCards.count()) > 0; guard++) {
         await closedCards.first().click();
       }

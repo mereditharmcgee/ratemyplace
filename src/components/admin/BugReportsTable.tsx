@@ -157,6 +157,7 @@ export default function BugReportsTable() {
           <button
             key={status}
             onClick={() => setStatusFilter(status)}
+            aria-pressed={statusFilter === status}
             className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               statusFilter === status
                 ? 'bg-teal-700 text-white'
@@ -175,11 +176,9 @@ export default function BugReportsTable() {
             key={bug.id}
             className="bg-white rounded-[6px] border border-gray-200 overflow-hidden hover:shadow-sm transition-shadow"
           >
-            {/* Header row */}
-            <div
-              className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={() => handleExpand(bug.id)}
-            >
+            {/* Header row: the button laid over it (its last child) is the toggle, named by the
+                report's description. */}
+            <div className="relative p-4 cursor-pointer hover:bg-gray-50 transition-colors">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -190,7 +189,7 @@ export default function BugReportsTable() {
                       {formatDate(bug.created_at)}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-900 truncate">{bug.description}</p>
+                  <p id={`bug-title-${bug.id}`} className="text-sm text-gray-900 truncate">{bug.description}</p>
                   {(bug.email || bug.user_email) && (
                     <p className="text-xs text-gray-500 mt-1">
                       From: {bug.email || bug.user_email}
@@ -211,11 +210,19 @@ export default function BugReportsTable() {
                   </svg>
                 </div>
               </div>
+              <button
+                type="button"
+                className="absolute inset-0 z-10 w-full h-full cursor-[inherit] rounded-[6px] focus-visible:-outline-offset-2"
+                aria-labelledby={`bug-title-${bug.id}`}
+                aria-expanded={expandedBug === bug.id}
+                aria-controls={expandedBug === bug.id ? `bug-panel-${bug.id}` : undefined}
+                onClick={() => handleExpand(bug.id)}
+              />
             </div>
 
             {/* Expanded details */}
             {expandedBug === bug.id && (
-              <div className="border-t border-gray-200 p-4 bg-gray-50 space-y-4">
+              <div id={`bug-panel-${bug.id}`} className="border-t border-gray-200 p-4 bg-gray-50 space-y-4">
                 <div>
                   <h4 className="text-sm font-medium text-gray-500 mb-1">Full description</h4>
                   <p className="text-sm text-gray-900 whitespace-pre-wrap">{bug.description}</p>
@@ -278,7 +285,7 @@ export default function BugReportsTable() {
                       onChange={(e) => setAdminNotes(e.target.value)}
                       rows={3}
                       placeholder="Add notes about this bug..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:ring-2 focus:ring-teal-700 focus:border-transparent"
                     />
                   </div>
 

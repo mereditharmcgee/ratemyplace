@@ -2,13 +2,15 @@ import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { executeLocalD1 } from './test-harness';
 import { prepare } from './review-helpers';
+import { FY2026_RESOURCE_ID } from '../src/lib/records/sources/boston/assessor';
 
 // Phase 28 keyboard checks that axe cannot make: where focus goes and what state a control
 // reports when it is used from the keyboard. Each Phase 28 batch appends its own describe block.
 //
 // Local only, like every spec here (e2e is not in CI). prepare() refuses Google and routes the
-// Places proxies to one fictional suggestion; Turnstile is the e2e stub. Nothing here writes to
-// the database.
+// Places proxies to one fictional suggestion; Turnstile is the e2e stub. The only database write
+// is one synthetic records pull in the batch 6 block, so the records panel renders; that block
+// removes it afterwards.
 
 const DESKTOP = { width: 1280, height: 900 };
 const MOBILE = { width: 375, height: 812 };
@@ -520,5 +522,120 @@ test.describe('batch 5: the verification dialog traps focus, closes on Escape an
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
     await expect(opener).toBeFocused();
+  });
+});
+
+test.describe('batch 6: unit cards and admin rows are native disclosure buttons', () => {
+  // One synthetic records pull on building-01, so the records panel (and its "Report a record
+  // error" link) renders. Nothing else is written; the row is removed after the block.
+  const RECORDS_PULL_ID = 'e2e-kbd-pull-assessor';
+
+  test.beforeAll(() => {
+    const now = Math.floor(Date.now() / 1000);
+    executeLocalD1(
+      `DELETE FROM record_pulls WHERE id = '${RECORDS_PULL_ID}'; ` +
+        'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, row_count, retrieved_at) ' +
+        `VALUES ('${RECORDS_PULL_ID}', '${BUILDING_ID}', 'boston', '${FY2026_RESOURCE_ID}', 'Property Assessment FY2026', 'e2e fixture', 'empty', 0, ${now})`,
+    );
+  });
+
+  test.afterAll(() => {
+    executeLocalD1(`DELETE FROM record_pulls WHERE id = '${RECORDS_PULL_ID}'`);
+  });
+
+  const focusOutline = (locator: Locator) =>
+    locator.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return { style: style.outlineStyle, width: style.outlineWidth, offset: style.outlineOffset };
+    });
+
+  test('a unit card opens with Enter and closes with Space', async ({ page }) => {
+    await prepare(page, DESKTOP);
+    await page.goto(`/building/${seedBuildingSlug(BUILDING_ID)}`);
+
+    // building-01 has reviews in three unit types, so three cards; the first starts open.
+    const cards = page.locator('#unit-list .unit-card');
+    await expect(cards).toHaveCount(3);
+    const first = cards.nth(0).getByRole('button');
+    const second = cards.nth(1).getByRole('button');
+    await expect(first).toHaveAttribute('aria-expanded', 'true');
+    await expect(second).toHaveAttribute('aria-expanded', 'false');
+    await expect(second).toHaveAccessibleName((await cards.nth(1).locator('h4').textContent())?.trim() ?? 'missing');
+    const panel = page.locator(`[id="${await second.getAttribute('aria-controls')}"]`);
+    await expect(panel).toBeHidden();
+
+    // Close the first card from the keyboard, so its reviews leave the Tab order, then Tab on.
+    await first.focus();
+    await page.keyboard.press('Enter');
+    await expect(first).toHaveAttribute('aria-expanded', 'false');
+    await expect(cards.nth(0)).toHaveAttribute('data-expanded', 'false');
+    await page.keyboard.press('Tab');
+    await expect(second).toBeFocused();
+    expect(await focusOutline(second)).toEqual({ style: 'solid', width: '2px', offset: '2px' });
+
+    await page.keyboard.press('Enter');
+    await expect(second).toHaveAttribute('aria-expanded', 'true');
+    await expect(cards.nth(1)).toHaveAttribute('data-expanded', 'true');
+    await expect(panel).toBeVisible();
+    await expect(cards.nth(1).locator('.chevron-icon')).toHaveClass(/rotate-180/);
+
+    await page.keyboard.press('Space');
+    await expect(second).toHaveAttribute('aria-expanded', 'false');
+    await expect(cards.nth(1)).toHaveAttribute('data-expanded', 'false');
+    await expect(panel).toBeHidden();
+    await expect(second).toBeFocused();
+  });
+
+  test('the Report a record error link opens the form and puts focus on its summary', async ({ page }) => {
+    await prepare(page, DESKTOP);
+    await page.goto(`/building/${seedBuildingSlug(BUILDING_ID)}`);
+
+    const link = page.getByRole('link', { name: 'Report a record error' });
+    const report = page.locator('#report-record');
+    const summary = report.locator('summary');
+    await expect(report).toHaveJSProperty('open', false);
+
+    await link.focus();
+    await page.keyboard.press('Enter');
+    await expect(report).toHaveJSProperty('open', true);
+    await expect(summary).toBeFocused();
+    await expect(summary).toBeInViewport();
+    await expect(page).toHaveURL(/#report-record$/);
+
+    // A second press, with the hash already set, lands there again.
+    await link.focus();
+    await page.keyboard.press('Enter');
+    await expect(summary).toBeFocused();
+    await expect(summary).toBeInViewport();
+  });
+
+  test('the seed admin opens a review row from the keyboard', async ({ adminPage: page }) => {
+    await prepare(page, DESKTOP);
+    await page.goto('/admin/reviews');
+    const flagged = page.getByRole('button', { name: /^Flagged \(/ });
+    await flagged.waitFor();
+
+    // The header keeps its .cursor-pointer class; the toggle is the native button over it.
+    const header = page.locator('.cursor-pointer').first();
+    const toggle = header.getByRole('button');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).not.toHaveAttribute('aria-controls', /.+/);
+
+    // The last status chip is followed in the Tab order by the first row.
+    await flagged.focus();
+    await page.keyboard.press('Tab');
+    await expect(toggle).toBeFocused();
+    // Drawn inside the row, so the card's rounded, clipped edge cannot hide it.
+    expect(await focusOutline(toggle)).toEqual({ style: 'solid', width: '2px', offset: '-2px' });
+
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const panel = page.locator(`[id="${await toggle.getAttribute('aria-controls')}"]`);
+    await expect(panel.getByRole('link', { name: 'Edit review' })).toBeVisible();
+    await expect(panel.getByRole('button', { name: /Reset to Pending|Approve/ }).first()).toBeVisible();
+
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(panel).toHaveCount(0);
   });
 });

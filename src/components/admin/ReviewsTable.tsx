@@ -207,7 +207,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
             placeholder="Search by address, email, title, or landlord..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
           />
         </div>
         <div className="flex flex-wrap gap-2">
@@ -215,6 +215,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
+              aria-pressed={statusFilter === status}
               className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
                 statusFilter === status
                   ? 'bg-teal-700 text-white'
@@ -234,29 +235,12 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
             key={review.id}
             className="bg-white rounded-[6px] border border-gray-200 overflow-hidden hover:shadow-sm transition-shadow"
           >
-            {/* Review Header */}
-            <div
-              className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={async () => {
-                const isCollapsing = expandedReview === review.id;
-                setExpandedReview(isCollapsing ? null : review.id);
-                if (!isCollapsing && !reviewDetails[review.id]) {
-                  setLoadingDetail(review.id);
-                  try {
-                    const res = await fetch(`/api/admin/reviews/${review.id}`);
-                    const data = await res.json();
-                    if (res.ok) {
-                      setReviewDetails((prev) => ({ ...prev, [review.id]: data.review ?? data }));
-                    }
-                  } catch {}
-                  setLoadingDetail(null);
-                }
-              }}
-            >
+            {/* Review Header: the button laid over it (its last child) is the toggle. */}
+            <div className="relative p-4 cursor-pointer hover:bg-gray-50 transition-colors">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold text-gray-900 truncate">
+                    <h3 id={`review-title-${review.id}`} className="font-semibold text-gray-900 truncate">
                       {review.building_address}
                     </h3>
                     {review.is_verified ? (
@@ -314,11 +298,33 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                   </svg>
                 </div>
               </div>
+              <button
+                type="button"
+                className="absolute inset-0 z-10 w-full h-full cursor-[inherit] rounded-[6px] focus-visible:-outline-offset-2"
+                aria-labelledby={`review-title-${review.id}`}
+                aria-expanded={expandedReview === review.id}
+                aria-controls={expandedReview === review.id ? `review-panel-${review.id}` : undefined}
+                onClick={async () => {
+                  const isCollapsing = expandedReview === review.id;
+                  setExpandedReview(isCollapsing ? null : review.id);
+                  if (!isCollapsing && !reviewDetails[review.id]) {
+                    setLoadingDetail(review.id);
+                    try {
+                      const res = await fetch(`/api/admin/reviews/${review.id}`);
+                      const data = await res.json();
+                      if (res.ok) {
+                        setReviewDetails((prev) => ({ ...prev, [review.id]: data.review ?? data }));
+                      }
+                    } catch {}
+                    setLoadingDetail(null);
+                  }
+                }}
+              />
             </div>
 
             {/* Expanded Details */}
             {expandedReview === review.id && (
-              <div className="border-t border-gray-200 p-4 bg-gray-50">
+              <div id={`review-panel-${review.id}`} className="border-t border-gray-200 p-4 bg-gray-50">
 
                 {/* Loading spinner */}
                 {loadingDetail === review.id && (
