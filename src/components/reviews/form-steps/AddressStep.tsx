@@ -1,3 +1,4 @@
+import { useEffect, useId, useRef } from 'react';
 import AddressAutocomplete, { type PlaceDetails } from '../../AddressAutocomplete';
 import { localityLine } from '../../../lib/locality';
 import type { PlaceData } from './types';
@@ -42,14 +43,28 @@ export default function AddressStep({
   onManualConfirm,
   onBackToSearch,
 }: Props) {
+  const inputId = useId();
+  const labelId = useId();
+  const helpId = useId();
+  const manualHeadingId = useId();
+  const manualErrorRef = useRef<HTMLDivElement>(null);
+
+  // The manual Continue disables itself while it works, so focus has nowhere to stay: a failed
+  // add moves focus to the error instead of announcing it from a live region.
+  useEffect(() => {
+    if (!manualMode || !error) return;
+    manualErrorRef.current?.focus();
+    manualErrorRef.current?.scrollIntoView?.({ block: 'center' });
+  }, [manualMode, error]);
+
   if (manualMode) {
     return (
       <div className="space-y-6">
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-gray-700">
+            <p id={manualHeadingId} className="block text-sm font-medium text-gray-700">
               Enter your building address
-            </label>
+            </p>
             <button
               type="button"
               onClick={onBackToSearch}
@@ -59,7 +74,7 @@ export default function AddressStep({
             </button>
           </div>
 
-          <div className="space-y-3">
+          <div role="group" aria-labelledby={manualHeadingId} className="space-y-3">
             <div>
               <label htmlFor="review-street-address" className="block text-xs text-gray-600 mb-1">Street address</label>
               <input
@@ -68,7 +83,7 @@ export default function AddressStep({
                 value={manualAddress.streetAddress}
                 onChange={(e) => onManualAddressChange({ ...manualAddress, streetAddress: e.target.value })}
                 placeholder="e.g. 100 Beacon St"
-                className="w-full px-4 py-3 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -80,7 +95,7 @@ export default function AddressStep({
                   value={manualAddress.city}
                   onChange={(e) => onManualAddressChange({ ...manualAddress, city: e.target.value })}
                   placeholder="e.g. Boston"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
                 />
               </div>
               <div>
@@ -92,7 +107,7 @@ export default function AddressStep({
                   onChange={(e) => onManualAddressChange({ ...manualAddress, state: e.target.value.toUpperCase().slice(0, 2) })}
                   placeholder="MA"
                   maxLength={2}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
                 />
               </div>
             </div>
@@ -105,7 +120,7 @@ export default function AddressStep({
                 onChange={(e) => onManualAddressChange({ ...manualAddress, zipCode: e.target.value })}
                 placeholder="02116"
                 maxLength={10}
-                className="w-full px-4 py-3 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
               />
             </div>
           </div>
@@ -115,7 +130,7 @@ export default function AddressStep({
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
+          <div ref={manualErrorRef} tabIndex={-1} className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
             {error}
           </div>
         )}
@@ -134,10 +149,13 @@ export default function AddressStep({
     );
   }
 
+  // The error and the selected place sit in always-present live regions: a lookup error or a
+  // pick arrives while focus is still in the search input. The regions carry no margin of their
+  // own; the boxes inside do, so the spacing matches the old space-y-6 and space-y-4 stack.
   return (
-    <div className="space-y-6">
+    <div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label id={labelId} htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-2">
           Search for your building address
         </label>
         <AddressAutocomplete
@@ -146,24 +164,29 @@ export default function AddressStep({
           onManualEntry={onEnterManual}
           placeholder="Start typing your address..."
           initialValue={searchInitialValue}
+          inputId={inputId}
+          labelledBy={labelId}
+          describedBy={helpId}
         />
-        <p className="text-sm text-gray-600 mt-2">
+        <p id={helpId} className="text-sm text-gray-600 mt-2">
           Enter the street address of the building you want to review
         </p>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
-          {error}
-        </div>
-      )}
+      <div role="alert">
+        {error && (
+          <div className="mt-6 bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
+            {error}
+          </div>
+        )}
+      </div>
 
-      {selectedPlace && (
-        <div className="space-y-4">
-          <div className="bg-teal-50 border border-teal-200 rounded-[6px] p-4">
+      <div aria-live="polite">
+        {selectedPlace && (
+          <div className="mt-6 bg-teal-50 border border-teal-200 rounded-[6px] p-4">
             <div className="flex items-start gap-3">
               <div className="shrink-0 mt-0.5">
-                <svg className="w-5 h-5 text-teal-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg aria-hidden="true" className="w-5 h-5 text-teal-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
@@ -192,17 +215,19 @@ export default function AddressStep({
               </div>
             </div>
           </div>
+        )}
+      </div>
 
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={onConfirm}
-              disabled={loading}
-              className="h-11 inline-flex items-center justify-center px-6 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
-            >
-              {loading ? 'Verifying...' : 'Continue'}
-            </button>
-          </div>
+      {selectedPlace && (
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={loading}
+            className="h-11 inline-flex items-center justify-center px-6 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50"
+          >
+            {loading ? 'Verifying...' : 'Continue'}
+          </button>
         </div>
       )}
     </div>

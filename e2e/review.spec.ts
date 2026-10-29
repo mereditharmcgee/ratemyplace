@@ -390,7 +390,7 @@ test.describe('Review form funnel', () => {
     await authedPage.waitForLoadState('networkidle');
     await authedPage.fill('input[placeholder="Start typing your address..."]', '45 Melnea');
     await expect(authedPage.locator('text=Existing properties')).toBeVisible({ timeout: 10000 });
-    await authedPage.locator('button', { hasText: /45 Melnea Cass Blvd/ }).first().click();
+    await authedPage.getByRole('option', { name: /45 Melnea Cass Blvd/ }).first().click();
     await authedPage.waitForURL(BUILDING_FORM_URL, { timeout: 15000 });
     await expect(authedPage.locator('#review-bedrooms')).toBeVisible({ timeout: 15000 });
     await expect(authedPage.locator('text=45 Melnea Cass Blvd').first()).toBeVisible();

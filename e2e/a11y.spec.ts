@@ -486,7 +486,7 @@ for (const viewport of VIEWPORTS) {
       await scan(page, viewport, { ...target, state: 'default' });
 
       // One of ours plus one routed Google suggestion, so both dropdown groups render.
-      await page.getByRole('textbox', { name: 'Search by address, neighborhood, or landlord' }).fill('78 Linden');
+      await page.getByRole('combobox', { name: 'Search by address, neighborhood, or landlord' }).fill('78 Linden');
       await page.getByText('Other addresses').waitFor({ timeout: 10_000 });
       await scan(page, viewport, { ...target, state: 'address suggestions open' });
 
@@ -584,7 +584,7 @@ for (const viewport of VIEWPORTS) {
       await page.getByText('Powered by Google').waitFor({ timeout: 10_000 });
       await scan(page, viewport, at('address', 'suggestions open'));
 
-      await page.getByRole('button', { name: /Enter it manually/ }).click();
+      await page.getByRole('option', { name: /Enter it manually/ }).click();
       await page.locator('#review-street-address').waitFor();
       await scan(page, viewport, at('address', 'manual entry'));
 

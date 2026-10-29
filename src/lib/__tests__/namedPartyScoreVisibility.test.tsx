@@ -138,15 +138,16 @@ describe('named-party score visibility in search results', () => {
     });
 
     await waitFor(() => expect(container.textContent).toContain('Thin Data Landlord'));
-    const landlordRow = Array.from(container.querySelectorAll('button'))
-      .find((button) => button.textContent?.includes('Thin Data Landlord'));
+    // Each dropdown row is a listbox option (A11Y-03).
+    const landlordRow = Array.from(container.querySelectorAll('[role="option"]'))
+      .find((option) => option.textContent?.includes('Thin Data Landlord'));
 
     expect(landlordRow?.textContent).not.toContain('4.8');
     expect(landlordRow?.textContent).toContain('Score after 3');
     expect(landlordRow?.textContent).toContain('2 reviews');
 
-    const buildingRow = Array.from(container.querySelectorAll('button'))
-      .find((button) => button.textContent?.includes('1 Main Street'));
+    const buildingRow = Array.from(container.querySelectorAll('[role="option"]'))
+      .find((option) => option.textContent?.includes('1 Main Street'));
 
     expect(buildingRow).toBeDefined();
     expect(buildingRow?.textContent).toContain('3.7');
@@ -196,8 +197,8 @@ describe('named-party score visibility in search results', () => {
     });
 
     await waitFor(() => expect(container.textContent).toContain('Legacy Landlord'));
-    const landlordRow = Array.from(container.querySelectorAll('button'))
-      .find((button) => button.textContent?.includes('Legacy Landlord'));
+    const landlordRow = Array.from(container.querySelectorAll('[role="option"]'))
+      .find((option) => option.textContent?.includes('Legacy Landlord'));
 
     expect(landlordRow?.textContent).toContain('Score unavailable');
     expect(landlordRow?.textContent).not.toContain('Score after 3');

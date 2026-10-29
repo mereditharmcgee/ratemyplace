@@ -78,7 +78,7 @@ test.describe('Cross-page links', () => {
 
   test('Homepage search navigates to search page', async ({ page }) => {
     await page.goto('/');
-    const searchInput = page.getByRole('textbox', { name: 'Search by address, neighborhood, or landlord' });
+    const searchInput = page.getByRole('combobox', { name: 'Search by address, neighborhood, or landlord' });
     await searchInput.fill('boston');
     await searchInput.press('Enter');
     await expect(page).toHaveURL(/\/search\?q=boston/);
