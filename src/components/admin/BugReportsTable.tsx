@@ -233,7 +233,7 @@ export default function BugReportsTable() {
                         href={bug.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-teal-700 hover:text-teal-700 break-all"
+                        className="text-sm text-teal-700 hover:text-teal-800 break-all"
                       >
                         {bug.url}
                       </a>
