@@ -74,7 +74,7 @@ const signupHref = '/auth/signup' + redirectQuery(redirectTo);
       </div>
 
       <form id="signin-form" class="space-y-6" data-redirect={redirectTo}>
-        <div id="error-message" role="alert" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"></div>
+        <div id="error-message" role="alert" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded empty:p-0 empty:border-0 empty:mb-0"></div>
 
         <div class="space-y-4">
           <div>
@@ -219,7 +219,9 @@ const signupHref = '/auth/signup' + redirectQuery(redirectTo);
 
     button.disabled = true;
     button.textContent = 'Signing in...';
-    errorMessage.classList.add('hidden');
+    // The alert box stays on the page, empty and collapsed, so a message written into it is
+    // announced (a box shown and filled at once is not a region the reader already had).
+    errorMessage.textContent = '';
 
     try {
       const response = await fetch('/api/auth/signin', {
@@ -234,15 +236,16 @@ const signupHref = '/auth/signup' + redirectQuery(redirectTo);
         // the server and this is the line that navigates.
         window.location.href = safeRedirectPath(form.dataset.redirect);
       } else {
-        errorMessage.classList.remove('hidden');
         errorMessage.textContent = result.error || 'An error occurred';
       }
     } catch {
-      errorMessage.classList.remove('hidden');
       errorMessage.textContent = 'An error occurred. Please try again.';
     } finally {
       button.disabled = false;
       button.textContent = 'Sign in';
+      // Disabling the button dropped focus to the page: give it back, so the next Tab starts
+      // here rather than at the top.
+      if (!document.activeElement || document.activeElement === document.body) button.focus();
       // A Turnstile token is single-use — reset the widget after every
       // attempt so a retry gets a fresh token instead of a spent one.
       if (turnstileWidgetId && window.turnstile) {
