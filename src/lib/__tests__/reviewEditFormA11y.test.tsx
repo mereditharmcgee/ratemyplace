@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import ReviewEditForm from '../../components/reviews/ReviewEditForm';
 import { supplementaryItems } from '../surveyItems';
 import type { ReviewDetail } from '../../pages/api/reviews/[id]';
@@ -183,5 +184,27 @@ describe('ReviewEditForm Save focus', () => {
     expect(focused.getAttribute('tabindex')).toBe('-1');
     expect(focused.querySelector('h3')?.textContent).toBe('Review Updated!');
     expect(focused.textContent).toContain('Redirecting to your profile...');
+  });
+});
+
+describe('ReviewEditForm rating keys', () => {
+  it('Enter on a rating radio chooses that answer and does not save the form', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    render(<ReviewEditForm review={review()} />);
+    // Consent enables Save, which is when Enter on a radio would submit the form.
+    await user.click(screen.getByRole('checkbox', { name: /I confirm this review/ }));
+
+    const group = screen.getAllByRole('radiogroup')[0];
+    const two = within(group).getByRole('radio', { name: '2' }) as HTMLInputElement;
+    two.focus();
+    await user.keyboard('{Enter}');
+    await flush();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(two.checked).toBe(true);
+    expect((within(group).getByRole('radio', { name: '4' }) as HTMLInputElement).checked).toBe(false);
+    expect(document.activeElement).toBe(two);
   });
 });

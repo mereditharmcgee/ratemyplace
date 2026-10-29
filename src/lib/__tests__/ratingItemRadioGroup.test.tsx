@@ -89,6 +89,24 @@ describe('RatingItem as a radio group', () => {
     expect(onChange).toHaveBeenCalledTimes(2);
   });
 
+  it('chooses the answer on Enter, as the old buttons did, and keeps Enter from submitting a form', () => {
+    const { group, onChange } = renderItem(OPTIONAL_WITH_NA, undefined);
+    // fireEvent returns false when a handler called preventDefault.
+    expect(fireEvent.keyDown(within(group).getByRole('radio', { name: '2' }), { key: 'Enter' })).toBe(false);
+    expect(onChange).toHaveBeenLastCalledWith('building_laundry', 2);
+    expect(fireEvent.keyDown(within(group).getByRole('radio', { name: 'N/A' }), { key: 'Enter' })).toBe(false);
+    expect(onChange).toHaveBeenLastCalledWith('building_laundry', null);
+    // Other keys are left to the browser: arrows move between radios, Space checks.
+    expect(fireEvent.keyDown(within(group).getByRole('radio', { name: '3' }), { key: ' ' })).toBe(true);
+    expect(fireEvent.keyDown(within(group).getByRole('radio', { name: '3' }), { key: 'ArrowRight' })).toBe(true);
+    expect(onChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a double click from selecting the pill text', () => {
+    const { group } = renderItem(REQUIRED_NO_NA, undefined);
+    expect(pill(group, '3').classList.contains('select-none')).toBe(true);
+  });
+
   it('gives every answer in a question the same name, so arrow keys move within it', () => {
     const { group } = renderItem(OPTIONAL_WITH_NA, undefined);
     const names = within(group).getAllByRole('radio').map((radio) => radio.getAttribute('name'));

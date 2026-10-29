@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, type KeyboardEvent } from 'react';
 import type { SurveyItem } from '../../../lib/surveyItems';
 import { HelpTooltip } from '../HelpTooltip';
 
@@ -12,16 +12,26 @@ interface Props {
 
 // Each answer is a native radio, visually hidden, inside a label whose span is the pill. The
 // span keeps the old button's look and adds what a span needs that a button had for free
-// (centered text), the keyboard focus outline taken from the radio, and an invisible 44x44 hit
-// area around the 40px pill. The radios call the same onChange as the buttons did, so the
-// answers held in state, and therefore the submitted payload, are unchanged.
+// (centered text that a double click does not select), the keyboard focus outline taken from
+// the radio, and an invisible 44x44 hit area around the 40px pill. The radios call the same
+// onChange as the buttons did, so the answers held in state, and therefore the submitted
+// payload, are unchanged.
 const PILL_A11Y =
-  "inline-flex items-center justify-center peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-teal-700 motion-reduce:transition-none before:absolute before:-inset-0.5 before:content-['']";
+  "inline-flex items-center justify-center select-none peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-teal-700 motion-reduce:transition-none before:absolute before:-inset-0.5 before:content-['']";
 
 export default function RatingItem({ item, value, onChange, describedBy }: Props) {
   const dimId = useId();
   const textId = useId();
   const name = `rating-${item.key}`;
+
+  // Enter on a radio submits the form around it, and the edit page is a form: one Enter would
+  // save a half-edited review. The old pill buttons chose their answer on Enter, so Enter
+  // still chooses it, through the same onChange, and never submits.
+  const chooseOnEnter = (answer: number | null) => (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    onChange(item.key, answer);
+  };
 
   return (
     <div className="py-4 border-b border-gray-100 last:border-0">
@@ -51,6 +61,7 @@ export default function RatingItem({ item, value, onChange, describedBy }: Props
               value={String(rating)}
               checked={value === rating}
               onChange={() => onChange(item.key, rating)}
+              onKeyDown={chooseOnEnter(rating)}
               className="peer sr-only"
             />
             <span
@@ -76,6 +87,7 @@ export default function RatingItem({ item, value, onChange, describedBy }: Props
               value="na"
               checked={value === null}
               onChange={() => onChange(item.key, null)}
+              onKeyDown={chooseOnEnter(null)}
               className="peer sr-only"
             />
             <span
