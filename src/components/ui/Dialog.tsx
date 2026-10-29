@@ -14,8 +14,12 @@ import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type 
  * - Tab and Shift+Tab wrap inside the dialog. showModal already makes the page inert;
  *   the explicit wrap keeps focus out of the browser chrome, and works where showModal
  *   is missing.
- * - On close, focus returns to the element that opened it. If that element is gone,
- *   returnFocusFallback() is used, then the page h1, then #main-content.
+ * - On close, focus returns to the element that had focus when it opened, else to
+ *   returnFocusRef (the control that opens it: Safari, and Firefox on macOS, do not focus a
+ *   button when it is clicked or tapped), else returnFocusFallback(). Only when the dialog was
+ *   opened from a focused control that has since gone does focus fall back to the page h1,
+ *   then #main-content. A dialog opened with nothing focused leaves focus where the browser
+ *   puts it, rather than scrolling the page to its heading.
  *
  * It only ever mounts after a press, never during server rendering, so the effects can
  * use the DOM directly.
@@ -27,6 +31,8 @@ export type DialogProps = DialogName & {
   onClose: () => void;
   describedBy?: string;
   initialFocusRef?: RefObject<HTMLElement>;
+  /** The control that opens the dialog, for browsers that do not focus it on click. */
+  returnFocusRef?: RefObject<HTMLElement | null>;
   returnFocusFallback?: () => HTMLElement | null;
   /** Classes for the <dialog> box. Replaces the default modal look when given. */
   className?: string;
@@ -34,7 +40,7 @@ export type DialogProps = DialogName & {
 };
 
 /** The centered modal box. The panel inside owns its own padding, radius and scrolling. */
-export const DIALOG_CLASS =
+const DIALOG_CLASS =
   'm-auto w-[calc(100%-2rem)] max-w-lg max-h-[calc(100dvh-2rem)] bg-transparent p-0 overflow-visible backdrop:bg-black/50';
 
 const FOCUSABLE = [
@@ -50,7 +56,7 @@ const FOCUSABLE = [
   '[tabindex]',
 ].join(', ');
 
-export function focusableElements(root: HTMLElement): HTMLElement[] {
+function focusableElements(root: HTMLElement): HTMLElement[] {
   return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
     (el) => el.getAttribute('tabindex') !== '-1' && !el.closest('[hidden], [inert]'),
   );
@@ -62,9 +68,21 @@ function tryFocus(el: HTMLElement | null | undefined): boolean {
   return document.activeElement === el;
 }
 
-function restoreFocus(opener: HTMLElement | null, fallback: (() => HTMLElement | null) | undefined): void {
+function isControl(el: HTMLElement | null): el is HTMLElement {
+  return Boolean(el) && el !== document.body && el !== document.documentElement;
+}
+
+function restoreFocus(
+  opener: HTMLElement | null,
+  trigger: HTMLElement | null | undefined,
+  fallback: (() => HTMLElement | null) | undefined,
+): void {
   if (tryFocus(opener)) return;
+  if (tryFocus(trigger)) return;
   if (tryFocus(fallback?.())) return;
+  // Opened from nothing focused (a click in Safari): there is no place to return to, and
+  // focusing the heading would scroll the page away from where the reader was.
+  if (!isControl(opener)) return;
   const heading = document.querySelector<HTMLElement>('main h1') ?? document.querySelector<HTMLElement>('h1');
   if (heading) {
     if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
@@ -79,6 +97,7 @@ export default function Dialog({
   ariaLabel,
   describedBy,
   initialFocusRef,
+  returnFocusRef,
   returnFocusFallback,
   className,
   children,
@@ -119,16 +138,21 @@ export default function Dialog({
       event.preventDefault();
       requestClose();
     };
+    // A safety net: should the browser ever close the <dialog> itself, the parent still
+    // hears about it and unmounts, so focus is restored.
+    const onNativeClose = () => requestClose();
     dialog.addEventListener('cancel', onCancel);
+    dialog.addEventListener('close', onNativeClose);
 
     return () => {
       dialog.removeEventListener('cancel', onCancel);
+      dialog.removeEventListener('close', onNativeClose);
       if (typeof dialog.close === 'function') {
         if (dialog.open) dialog.close();
       } else {
         dialog.removeAttribute('open');
       }
-      restoreFocus(opener, fallbackRef.current);
+      restoreFocus(opener, returnFocusRef?.current, fallbackRef.current);
     };
     // Mount and unmount only: the parent opens by mounting and closes by unmounting.
     // eslint-disable-next-line react-hooks/exhaustive-deps

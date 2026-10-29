@@ -86,6 +86,9 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
   // A successful verification upload reloads the list, which may remove the Verify button
   // that opened the dialog, so focus falls back to the reviews tab.
   const reviewsTabRef = useRef<HTMLButtonElement>(null);
+  // The Verify button that opened the dialog. Safari does not focus a button on click, so
+  // the dialog is told which one to return to.
+  const verifyTriggerRef = useRef<HTMLElement | null>(null);
 
   // Saved buildings state
   const [savedBuildings, setSavedBuildings] = useState<SavedBuilding[]>([]);
@@ -176,7 +179,8 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
     }
   };
 
-  const handleVerifyClick = (reviewId: string) => {
+  const handleVerifyClick = (reviewId: string, trigger: HTMLElement) => {
+    verifyTriggerRef.current = trigger;
     setVerifyingReviewId(reviewId);
   };
 
@@ -484,6 +488,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
           reviewId={verifyingReviewId}
           onClose={handleVerificationClose}
           onSuccess={handleVerificationSuccess}
+          returnFocusRef={verifyTriggerRef}
           returnFocusFallback={() => reviewsTabRef.current}
         />
       )}

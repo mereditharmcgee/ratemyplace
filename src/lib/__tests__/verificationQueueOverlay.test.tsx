@@ -37,17 +37,28 @@ const thumbnail = () => screen.getByRole('button', { name: /^Verification docume
 const focused = () => document.activeElement as HTMLElement | null;
 
 describe('VerificationQueue thumbnail', () => {
-  it('is a button that keeps its hint text and reports aria-expanded', async () => {
+  it('is a button that keeps its hint text and says it opens a dialog', async () => {
     await renderQueue();
     const button = thumbnail();
     expect(button.getAttribute('type')).toBe('button');
-    expect(button.getAttribute('aria-expanded')).toBe('false');
+    // A modal makes the page behind it inert, so an expanded state could never be heard.
+    expect(button.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(button.hasAttribute('aria-expanded')).toBe(false);
     expect(button.textContent).toContain('Click to expand');
 
     button.focus();
     fireEvent.click(button);
-    expect(button.getAttribute('aria-expanded')).toBe('true');
     expect(button.textContent).toContain('Click to shrink');
+  });
+
+  it('returns focus to the thumbnail even when the click did not focus it, as in Safari', async () => {
+    await renderQueue();
+    const button = thumbnail();
+    expect(focused()).toBe(document.body);
+    fireEvent.click(button);
+    fireEvent.keyDown(focused()!, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(focused()).toBe(button);
   });
 
   it('a PDF row stays a link, not a button', async () => {
@@ -76,7 +87,7 @@ describe('VerificationQueue full-size view', () => {
     fireEvent.click(button);
     fireEvent.keyDown(focused()!, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(button.textContent).toContain('Click to expand');
     expect(focused()).toBe(button);
   });
 

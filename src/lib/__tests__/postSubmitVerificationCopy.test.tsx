@@ -62,6 +62,21 @@ describe('post-submit verification prompt', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(verify);
   });
+
+  it('returns focus to Verify Now even when the click did not focus it, as in Safari', () => {
+    render(
+      <main id="main-content" tabIndex={-1}>
+        <h1>Example building</h1>
+        <PostSubmitVerification reviewId="review-1" />
+      </main>,
+    );
+    const verify = screen.getByRole('button', { name: 'Verify Now' });
+    expect(document.activeElement).toBe(document.body);
+    fireEvent.click(verify);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(verify);
+  });
 });
 
 describe('scoring ignores document verification', () => {

@@ -14,6 +14,9 @@ export default function VerificationQueue() {
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState<Record<string, string>>({});
   const overlayCloseRef = useRef<HTMLButtonElement>(null);
+  // The thumbnail that opened the full-size view, named to the dialog because Safari does not
+  // focus a button on click.
+  const thumbnailRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     fetchVerifications();
@@ -167,9 +170,12 @@ export default function VerificationQueue() {
               {verification.content_type.startsWith('image/') ? (
                 <button
                   type="button"
-                  aria-expanded={expandedImage === verification.id}
+                  aria-haspopup="dialog"
                   className="relative block w-full text-left cursor-pointer"
-                  onClick={() => setExpandedImage(expandedImage === verification.id ? null : verification.id)}
+                  onClick={(event) => {
+                    thumbnailRef.current = event.currentTarget;
+                    setExpandedImage(expandedImage === verification.id ? null : verification.id);
+                  }}
                 >
                   <img
                     src={`/api/admin/verification/${verification.id}`}
@@ -250,6 +256,7 @@ export default function VerificationQueue() {
           ariaLabel="Verification document"
           onClose={() => setExpandedImage(null)}
           initialFocusRef={overlayCloseRef}
+          returnFocusRef={thumbnailRef}
           className={OVERLAY_DIALOG_CLASS}
         >
           <button

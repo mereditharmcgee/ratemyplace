@@ -134,4 +134,21 @@ describe('ProfileDashboard verification dialog', () => {
     const tabs = screen.getByRole('navigation', { name: 'Tabs' });
     expect(focused()).toBe(within(tabs).getByText(/My Reviews/).closest('button'));
   });
+
+  it('returns focus to the Verify that was clicked even when the click did not focus it, as in Safari', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => ok({ reviews: [unverifiedReview, { ...unverifiedReview, id: 'review-2', building_address: '14 Example Rd' }] })),
+    );
+    render(<ProfileDashboard {...baseProps} />);
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Verify' })).toHaveLength(2));
+    const second = screen.getAllByRole('button', { name: 'Verify' })[1];
+    expect(second.getAttribute('type')).toBe('button');
+
+    expect(focused()).toBe(document.body);
+    fireEvent.click(second);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(focused()).toBe(second);
+  });
 });

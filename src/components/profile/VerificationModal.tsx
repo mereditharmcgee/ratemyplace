@@ -1,10 +1,12 @@
-import { useState, useRef, useCallback, useEffect, useId } from 'react';
+import { useState, useRef, useCallback, useEffect, useId, type RefObject } from 'react';
 import Dialog from '../ui/Dialog';
 
 interface Props {
   reviewId: string;
   onClose: () => void;
   onSuccess: () => void;
+  /** The button that opened the dialog. Safari does not focus a button on click, so name it. */
+  returnFocusRef?: RefObject<HTMLElement | null>;
   /** Where focus goes on close when the button that opened the dialog is gone. */
   returnFocusFallback?: () => HTMLElement | null;
 }
@@ -12,7 +14,7 @@ interface Props {
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/heic', 'image/heif', 'application/pdf'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
-export default function VerificationModal({ reviewId, onClose, onSuccess, returnFocusFallback }: Props) {
+export default function VerificationModal({ reviewId, onClose, onSuccess, returnFocusRef, returnFocusFallback }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -155,6 +157,7 @@ export default function VerificationModal({ reviewId, onClose, onSuccess, return
       describedBy={introId}
       initialFocusRef={fileInputRef}
       onClose={onClose}
+      returnFocusRef={returnFocusRef}
       returnFocusFallback={returnFocusFallback}
     >
       <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full p-6 overflow-y-auto max-h-[calc(100dvh-2rem)]">

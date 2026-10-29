@@ -9,6 +9,7 @@ export default function PostSubmitVerification({ reviewId }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const successRef = useRef<HTMLParagraphElement>(null);
+  const verifyNowRef = useRef<HTMLButtonElement>(null);
 
   // A successful upload replaces Verify Now with the success message, so focus moves to it
   // (the message is read when it takes focus).
@@ -42,6 +43,7 @@ export default function PostSubmitVerification({ reviewId }: Props) {
           </p>
         </div>
         <button
+          ref={verifyNowRef}
           type="button"
           onClick={() => setShowModal(true)}
           className="bg-teal-700 text-white px-6 py-2 rounded-[4px] text-sm font-semibold hover:bg-teal-800 transition-colors"
@@ -58,6 +60,7 @@ export default function PostSubmitVerification({ reviewId }: Props) {
             setShowModal(false);
             setSubmitted(true);
           }}
+          returnFocusRef={verifyNowRef}
           returnFocusFallback={() => successRef.current}
         />
       )}

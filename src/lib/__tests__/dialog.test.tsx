@@ -251,20 +251,23 @@ describe('Dialog focus restoration', () => {
     withFallback = false,
     fallbackReturnsNull = false,
     withHeading = true,
+    withTriggerRef = false,
   }: {
     removeOpenerOnClose?: boolean;
     withFallback?: boolean;
     fallbackReturnsNull?: boolean;
     withHeading?: boolean;
+    withTriggerRef?: boolean;
   }) {
     const [open, setOpen] = useState(false);
     const [openerShown, setOpenerShown] = useState(true);
     const fallbackRef = useRef<HTMLButtonElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
     return (
       <main id="main-content" tabIndex={-1}>
         {withHeading && <h1>Example page</h1>}
         {openerShown && (
-          <button type="button" onClick={() => setOpen(true)}>
+          <button type="button" ref={triggerRef} onClick={() => setOpen(true)}>
             Open
           </button>
         )}
@@ -278,6 +281,7 @@ describe('Dialog focus restoration', () => {
               setOpen(false);
               if (removeOpenerOnClose) setOpenerShown(false);
             }}
+            returnFocusRef={withTriggerRef ? triggerRef : undefined}
             returnFocusFallback={
               withFallback ? () => (fallbackReturnsNull ? null : fallbackRef.current) : undefined
             }
@@ -330,6 +334,44 @@ describe('Dialog focus restoration', () => {
     openFromKeyboard();
     pressEscape();
     expect(focused()?.id).toBe('main-content');
+  });
+
+  /** Safari, and Firefox on macOS, do not focus a button when it is clicked or tapped. */
+  function openByClickWithoutFocus() {
+    expect(focused()).toBe(document.body);
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    expect(focused()).toBe(screen.getByRole('button', { name: 'Inside' }));
+  }
+
+  it('opened by a click that did not focus its button, returns focus to returnFocusRef', () => {
+    render(<Page withTriggerRef withFallback />);
+    openByClickWithoutFocus();
+    pressEscape();
+    expect(focused()).toBe(screen.getByRole('button', { name: 'Open' }));
+  });
+
+  it('opened with nothing focused and nowhere to return, leaves the page heading alone', () => {
+    render(<Page />);
+    const heading = screen.getByRole('heading', { level: 1 });
+    openByClickWithoutFocus();
+    pressEscape();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(focused()).not.toBe(heading);
+    expect(heading.hasAttribute('tabindex')).toBe(false);
+    expect(focused()?.id).not.toBe('main-content');
+  });
+
+  it('a close the browser makes itself still reaches onClose, once', () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog labelledBy="dlg-title" onClose={onClose}>
+        <Panel />
+      </Dialog>,
+    );
+    const dialog = screen.getByRole('dialog');
+    dialog.dispatchEvent(new Event('close'));
+    dialog.dispatchEvent(new Event('close'));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('closes the native dialog on unmount', () => {
