@@ -86,7 +86,7 @@ See: `.planning/milestones/v1.5.0-ROADMAP.md`
 - [ ] Phase 26: Review Integrity and Moderation Priority
 - [ ] Phase 27: Account Rights and Erasure Recovery
 - [ ] Phase 28: Accessible Contribution
-- [x] Phase 29: Discoverability Baseline (SEO-01 to SEO-03 PR #43, SEO-04 v1.7 C3, SEO-05 to SEO-07 `feat/seo-structured-data`, 2026-10-29)
+- [ ] Phase 29: Discoverability Baseline (SEO-01 to SEO-03 PR #43, SEO-04 v1.7 C3, SEO-05 to SEO-07 PR #77; tick once the post-deploy production smoke and Rich Results Test pass)
 - [ ] Phase 30: Review-Density Pilot
 
 - Roadmap: `.planning/milestones/v1.6.0-ROADMAP.md`
@@ -127,7 +127,7 @@ See: `.planning/milestones/v1.5.0-ROADMAP.md`
 | 26. Review Integrity and Moderation Priority | v1.6.0 | — | Planned | — |
 | 27. Account Rights and Erasure Recovery | v1.6.0 | — | Planned | — |
 | 28. Accessible Contribution | v1.6.0 | — | Planned | — |
-| 29. Discoverability Baseline | v1.6.0 | — | Complete | 2026-10-29 |
+| 29. Discoverability Baseline | v1.6.0 | — | Code complete (PR #77), verify live | — |
 | 30. Review-Density Pilot | v1.6.0 | — | Planned | — |
 
 ---
