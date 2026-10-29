@@ -262,16 +262,26 @@ suite('sitemap routes', () => {
         throw new Error('D1 unavailable');
       },
     };
+    const locs = (xml: string): string[] => Array.from(xml.matchAll(/<loc>([^<]*)<\/loc>/g), (match) => match[1]);
+
     const index = await indexGet(createContext(broken, '/sitemap.xml'));
     expect(index.status).toBe(200);
     // A minute, not an hour: a brief blip must not pin the truncated index in caches.
     expect(index.headers.get('Cache-Control')).toBe('public, max-age=60');
-    expect(await index.text()).toContain('static.xml');
+    // Exactly the static file: the degraded index names no building chunk. This is the shape
+    // the release smoke (SEO-07) reports as "Sitemap degraded: static only".
+    const indexBody = await index.text();
+    expect(locs(indexBody)).toEqual([`${SITE}/sitemaps/static.xml`]);
+    expect(indexBody).not.toMatch(/buildings-\d+\.xml/);
 
     const statics = await staticGet(createContext(null, '/sitemaps/static.xml'));
     expect(statics.status).toBe(200);
     expect(statics.headers.get('Cache-Control')).toBe('public, max-age=60');
-    expect(await statics.text()).toContain(`<loc>${SITE}/about</loc>`);
+    // Exactly the allowlisted pages, in order: no landlord, no building.
+    const staticsBody = await statics.text();
+    expect(locs(staticsBody)).toEqual(STATIC_SITEMAP_PATHS.map((path) => `${SITE}${path}`));
+    expect(staticsBody).not.toContain('/landlord/');
+    expect(staticsBody).not.toContain('/building/');
 
     const chunk = await buildingsGet(createContext(null, '/sitemaps/buildings-1.xml', { n: '1' }));
     expect(chunk.status).toBe(503);

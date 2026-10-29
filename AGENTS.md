@@ -404,6 +404,15 @@ Things that have already cost time. Read before debugging.
   classified (sitemap page, indexable dynamic route, or `noindex`) in
   `src/lib/__tests__/pageIndexing.test.ts`. Until October 2026 the OG tags were relative and
   pointed at a file that did not exist, so every shared link previewed with no image.
+- **Every JSON-LD node goes through `serializeJsonLd`, and `set:html` is used nowhere else.**
+  `BaseLayout.astro` writes the page's structured data with `set:html`, which injects text
+  unescaped; `serializeJsonLd` (`src/lib/jsonLd.ts`) escapes `<`, `>`, `&` and U+2028/U+2029,
+  which is what keeps a landlord or manager named `</script><script>...` from closing the
+  data block and injecting markup. `structuredDataSource.test.ts` fails on a second
+  `set:html` or a second JSON-LD writer. Named-party ratings never go into structured data
+  while `NAMED_PARTY_MIN_REVIEWS` gating exists: no AggregateRating, Review or rating value,
+  even for a party above the threshold (deferred by the design spec). Feed the builder
+  strings the page already shows, never an entity row.
 - **`Window.turnstile` is declared once in `src/env.d.ts`; never add a per-component
   `declare global` for it.** TypeScript merges augmentations project-wide, so three
   components each carrying an identical copy compiled fine and drifted quietly instead.
