@@ -193,4 +193,14 @@ suite('stored move-out season on edit', () => {
       expect(await season(db, id)).toBe('fall');
     }
   });
+
+  it('keeps a stored season with no stored year through an untouched edit', async () => {
+    const db = schemaDb();
+    await seed(db);
+    const id = await submit(db, {});
+    await db.prepare("UPDATE reviews SET move_out_season = 'fall' WHERE id = ?").bind(id).run();
+    await edit(db, id, { move_out_year_new: await editStart(db, id) });
+    expect(await stored(db, id)).toEqual({ move_out_year_new: null, is_current_tenant: 0 });
+    expect(await season(db, id)).toBe('fall');
+  });
 });

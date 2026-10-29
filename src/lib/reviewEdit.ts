@@ -8,9 +8,11 @@
  * does the move-out (`moveOutFromEdit`). The ratings, `unit_type` and the move-in have their
  * own rules in the route and in `moveIn.ts`.
  *
- * Two pairs are still written as sent, because each pair is read together and keeping one
- * half while the other changes could show a stale half: `review_text` with `comments` (a
- * review card shows the first one set), and `laundry_type` with `laundry_cost_per_load`.
+ * Two pairs are read together, so each is kept only whole (`KEPT_PAIRS_WHEN_ABSENT`): a body
+ * that sends neither half keeps both, and a body that sends either half writes both as sent,
+ * because keeping one half while the other changes could show a stale half. They are
+ * `review_text` with `comments` (a review card shows the first one set), and `laundry_type`
+ * with `laundry_cost_per_load`.
  */
 
 /** The reviews columns a partial edit leaves as stored when the body does not name them. */
@@ -40,6 +42,12 @@ export const KEPT_WHEN_ABSENT = [
   'safely_lit_at_night',
 ] as const;
 
+/** Column pairs read together: kept as stored only when the body sends neither half. */
+export const KEPT_PAIRS_WHEN_ABSENT = [
+  ['review_text', 'comments'],
+  ['laundry_type', 'laundry_cost_per_load'],
+] as const;
+
 /** The stored move-out columns `moveOutFromEdit` reads. */
 export interface StoredMoveOut {
   move_out_year_new: string | null;
@@ -47,9 +55,10 @@ export interface StoredMoveOut {
   is_current_tenant: number | null;
 }
 
-/** Every stored column the route reads before an edit: the kept fields and the move-out. */
+/** Every stored column the route reads before an edit: the kept fields, pairs and move-out. */
 export const STORED_EDIT_COLUMNS: readonly string[] = [
   ...KEPT_WHEN_ABSENT,
+  ...KEPT_PAIRS_WHEN_ABSENT.flat(),
   'move_out_year_new',
   'move_out_season',
   'is_current_tenant',
@@ -63,9 +72,10 @@ function sent(body: Record<string, unknown>, key: string): boolean {
 }
 
 /**
- * The body with each kept field it leaves out filled from the stored row, so the route's
- * per-field handling stores the stored value back. A key the body sends is never replaced,
- * null and blank included: sending a blank still clears a field.
+ * The body with each kept field it leaves out, and each kept pair it sends neither half of,
+ * filled from the stored row, so the route's per-field handling stores the stored value back.
+ * A key the body sends is never replaced, null and blank included: sending a blank still
+ * clears a field.
  */
 export function withStoredFields<T extends Record<string, unknown>>(
   body: T,
@@ -73,8 +83,14 @@ export function withStoredFields<T extends Record<string, unknown>>(
 ): T {
   if (!stored || !body || typeof body !== 'object') return body;
   const filled: Record<string, unknown> = { ...body };
+  const keep = (key: string) => {
+    if (stored[key] !== undefined) filled[key] = stored[key];
+  };
   for (const key of KEPT_WHEN_ABSENT) {
-    if (!sent(body, key) && stored[key] !== undefined) filled[key] = stored[key];
+    if (!sent(body, key)) keep(key);
+  }
+  for (const pair of KEPT_PAIRS_WHEN_ABSENT) {
+    if (!pair.some((key) => sent(body, key))) pair.forEach(keep);
   }
   return filled as T;
 }
@@ -98,7 +114,8 @@ function moveOutYear(raw: unknown): string | null {
  * move-out and current-tenant flag as they are. A body with it stores what it sent (blank
  * means a past tenant with no move-out, 'current' a current tenant). The edit form has no
  * season control, so a stored season stays only while the year it was given with stays:
- * a changed year clears it rather than carrying it onto a year it was never given for.
+ * a changed year clears it rather than carrying it onto a year it was never given for. An
+ * unchanged year keeps it, a blank one included, so an untouched save changes nothing.
  */
 export function moveOutFromEdit(
   body: Record<string, unknown>,
@@ -112,7 +129,7 @@ export function moveOutFromEdit(
   const year = moveOutYear(body.move_out_year_new);
   return {
     year,
-    season: year !== null && year === storedYear ? storedSeason : null,
+    season: year === storedYear ? storedSeason : null,
     isCurrentTenant: year === 'current' ? 1 : 0,
   };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { KEPT_WHEN_ABSENT, moveOutFromEdit, withStoredFields } from '../reviewEdit';
+import { KEPT_PAIRS_WHEN_ABSENT, KEPT_WHEN_ABSENT, moveOutFromEdit, withStoredFields } from '../reviewEdit';
 
 const PAST = { move_out_year_new: '2019', move_out_season: 'fall', is_current_tenant: 0 };
 const CURRENT = { move_out_year_new: 'current', move_out_season: null, is_current_tenant: 1 };
@@ -27,6 +27,12 @@ describe('moveOutFromEdit', () => {
   it('stores a blank or null move-out as a past tenant with none', () => {
     expect(moveOutFromEdit({ move_out_year_new: '' }, PAST)).toEqual({ year: null, season: null, isCurrentTenant: 0 });
     expect(moveOutFromEdit({ move_out_year_new: null }, CURRENT)).toEqual({ year: null, season: null, isCurrentTenant: 0 });
+  });
+
+  it('keeps a stored season with no stored year when the body sends no year either', () => {
+    const noYear = { move_out_year_new: null, move_out_season: 'fall', is_current_tenant: 0 };
+    expect(moveOutFromEdit({ move_out_year_new: '' }, noYear)).toEqual({ year: null, season: 'fall', isCurrentTenant: 0 });
+    expect(moveOutFromEdit({ move_out_year_new: '2023' }, noYear)).toEqual({ year: '2023', season: null, isCurrentTenant: 0 });
   });
 
   it('reads a numeric year as its text, the way the column stores it', () => {
@@ -59,12 +65,23 @@ describe('withStoredFields', () => {
     });
   });
 
-  it('fills only the kept fields', () => {
-    const stored = { review_text: 'Stored', comments: 'Stored', laundry_type: 'coin_op', unit_structural: 5 };
+  it('fills only the kept fields and pairs', () => {
+    const stored = { unit_structural: 5, move_out_year_new: '2019', unit_type: '1br' };
     expect(withStoredFields({}, stored)).toEqual({});
-    for (const field of ['review_text', 'comments', 'laundry_type', 'laundry_cost_per_load', 'move_out_year_new', 'unit_type']) {
+    for (const field of ['move_out_year_new', 'unit_type']) {
       expect(KEPT_WHEN_ABSENT).not.toContain(field);
+      expect(KEPT_PAIRS_WHEN_ABSENT.flat()).not.toContain(field);
     }
+  });
+
+  it('keeps a read-together pair as stored only when the body sends neither half', () => {
+    const stored = { review_text: 'Stored text', comments: 'Stored text', laundry_type: 'coin_op', laundry_cost_per_load: 2.5 };
+    expect(withStoredFields({ unit_structural: 4 }, stored)).toEqual({ unit_structural: 4, ...stored });
+    // One half sent: the pair is written as sent, so the other half is not filled.
+    expect(withStoredFields({ review_text: 'New text', laundry_cost_per_load: null }, stored)).toEqual({
+      review_text: 'New text',
+      laundry_cost_per_load: null,
+    });
   });
 
   it('leaves the body alone when there is no stored row', () => {

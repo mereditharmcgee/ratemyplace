@@ -193,8 +193,9 @@ tenure. A blank stored answer starts on a blank "Select..." choice, never on a d
 `PATCH /api/reviews/[id]` keeps every field in `KEPT_WHEN_ABSENT` as stored when the body
 leaves its key out (`withStoredFields`), and `moveOutFromEdit` keeps the move-out the same
 way and clears a stored move-out season whenever the year changes, because the form has no
-season control. `review_text` / `comments` and the laundry type and cost are still written as
-sent: each pair is read together.
+season control. `review_text` / `comments` and the laundry type and cost are read together,
+so each pair is kept only whole (`KEPT_PAIRS_WHEN_ABSENT`): a body that sends neither half
+keeps both, and a body that sends either half writes both as sent.
 
 ### `validation.ts` — use the shared primitives
 

@@ -172,6 +172,49 @@ suite('partial review edit', () => {
       review_title: '',
     });
   });
+
+  // Each pair is read together, so a pair is kept only whole: when the body sends neither
+  // half. A body that sends one half writes both as sent, as before.
+  const PAIR_COLUMNS = ['review_text', 'comments', 'laundry_type', 'laundry_cost_per_load'] as const;
+
+  async function pairedReview(db: TestD1Database): Promise<string> {
+    const id = await submit(db);
+    // The submit route stores the text in comments only; a saved edit stores it in both.
+    await db.prepare('UPDATE reviews SET review_text = comments WHERE id = ?').bind(id).run();
+    return id;
+  }
+
+  it('keeps the review text and the laundry when the body sends neither half of a pair', async () => {
+    const db = schemaDb();
+    await seed(db);
+    const id = await pairedReview(db);
+    const before = await row(db, id, PAIR_COLUMNS);
+    expect(before).toEqual({
+      review_text: 'Heat was slow to come on.',
+      comments: 'Heat was slow to come on.',
+      laundry_type: 'coin_op',
+      laundry_cost_per_load: 2.5,
+    });
+
+    await edit(db, id, { unit_structural: 2 });
+
+    expect(await row(db, id, PAIR_COLUMNS)).toEqual(before);
+  });
+
+  it('writes both halves of a pair as sent when the body sends one half', async () => {
+    const db = schemaDb();
+    await seed(db);
+    const id = await pairedReview(db);
+
+    await edit(db, id, { unit_structural: 4, review_text: 'Heat is fixed now.', laundry_type: 'in_unit' });
+
+    expect(await row(db, id, PAIR_COLUMNS)).toEqual({
+      review_text: 'Heat is fixed now.',
+      comments: null,
+      laundry_type: 'in_unit',
+      laundry_cost_per_load: null,
+    });
+  });
 });
 
 suite('tenure on edit', () => {
