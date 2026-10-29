@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import type { SurveyItemHelp } from '../../lib/surveyItems';
 
 interface HelpTooltipProps {
@@ -6,10 +6,33 @@ interface HelpTooltipProps {
   dimension: string;
 }
 
+/** Space kept between the open panel and the edge of the screen, in px. */
+const EDGE_GAP = 16;
+/** The arrow's resting offset from the panel's left edge (left-3), in px. */
+const ARROW_LEFT = 12;
+
+/**
+ * The help for one rating question. A disclosure (APG disclosure pattern), not a tooltip:
+ * the button shows and hides a panel of text, Escape and Close put focus back on the
+ * button, and a press outside closes it.
+ */
 export function HelpTooltip({ help, dimension }: HelpTooltipProps) {
   const [isOpen, setIsOpen] = useState(false);
+  // How far the panel moves left so it ends inside the screen, in px.
+  const [shift, setShift] = useState(0);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
+
+  const close = (returnFocus: boolean) => {
+    setIsOpen(false);
+    if (returnFocus) buttonRef.current?.focus();
+  };
+
+  const toggle = () => {
+    setShift(0);
+    setIsOpen(!isOpen);
+  };
 
   // Close on click outside
   useEffect(() => {
@@ -30,11 +53,18 @@ export function HelpTooltip({ help, dimension }: HelpTooltipProps) {
     }
   }, [isOpen]);
 
-  // Close on Escape key
+  // Close on Escape key. Focus goes back to the button when it was on the button or in the
+  // panel; a reader who has moved on elsewhere stays where they are.
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        setIsOpen(false);
+        const active = document.activeElement;
+        const wasHere =
+          !active ||
+          active === document.body ||
+          buttonRef.current === active ||
+          Boolean(tooltipRef.current?.contains(active));
+        close(wasHere);
       }
     }
 
@@ -44,21 +74,33 @@ export function HelpTooltip({ help, dimension }: HelpTooltipProps) {
     }
   }, [isOpen]);
 
+  // The panel starts at the button. Next to a long question on a phone it would run past
+  // the right edge and make the page scroll sideways, so it moves left to fit.
+  useEffect(() => {
+    if (!isOpen || !tooltipRef.current) return;
+    const rect = tooltipRef.current.getBoundingClientRect();
+    const viewport = document.documentElement.clientWidth || window.innerWidth;
+    const overflow = rect.right - (viewport - EDGE_GAP);
+    if (overflow > 0) setShift(Math.max(0, Math.min(overflow, rect.left - EDGE_GAP)));
+  }, [isOpen]);
+
   return (
     <div className="relative inline-block">
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="ml-1.5 text-gray-500 hover:text-teal-700 focus:outline-none focus:text-teal-700 transition-colors"
+        onClick={toggle}
+        className="ml-0.5 -m-1 p-1 rounded-sm text-gray-500 hover:text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 transition-colors"
         aria-label={`Help for ${dimension}`}
         aria-expanded={isOpen}
+        aria-controls={isOpen ? panelId : undefined}
       >
         <svg
           className="w-4 h-4"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -72,22 +114,26 @@ export function HelpTooltip({ help, dimension }: HelpTooltipProps) {
       {isOpen && (
         <div
           ref={tooltipRef}
-          className="absolute z-50 left-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-lg border border-gray-200 p-4 text-sm"
-          role="tooltip"
+          id={panelId}
+          className="absolute z-50 left-0 top-full mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 p-4 text-sm"
+          style={shift > 0 ? { left: -shift } : undefined}
         >
           {/* Arrow */}
-          <div className="absolute -top-2 left-3 w-3 h-3 bg-white border-l border-t border-gray-200 transform rotate-45" />
+          <div
+            className="absolute -top-2 left-3 w-3 h-3 bg-white border-l border-t border-gray-200 transform rotate-45"
+            style={shift > 0 ? { left: ARROW_LEFT + shift } : undefined}
+          />
 
           {/* Header */}
           <div className="flex justify-between items-start mb-3">
             <h4 className="font-semibold text-gray-900">{dimension}</h4>
             <button
               type="button"
-              onClick={() => setIsOpen(false)}
+              onClick={() => close(true)}
               className="text-gray-500 hover:text-gray-600"
               aria-label="Close help"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>

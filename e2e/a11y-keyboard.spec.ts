@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { executeLocalD1 } from './test-harness';
 import { prepare } from './review-helpers';
@@ -437,4 +437,88 @@ test.describe('batch 4: review steps move focus to their heading, and the progre
       }
     });
   }
+});
+
+test.describe('batch 5: the verification dialog traps focus, closes on Escape and returns focus', () => {
+  // Nothing is uploaded: the dialog is opened and closed by keyboard only.
+  const DIALOG_NAME = 'Verify Your Tenancy';
+  const TAB_PRESSES = 15;
+
+  const focusInDialog = (page: Page) => page.evaluate(() => !!document.activeElement?.closest('dialog'));
+
+  async function hydrated(page: Page) {
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    await page.waitForFunction(
+      () => document.querySelectorAll('astro-island[ssr]:not([client="visible"])').length === 0,
+      undefined,
+      { timeout: 10_000 },
+    );
+  }
+
+  /** Open from `opener` by keyboard, Tab around inside, Escape, and check focus came back. */
+  async function exercise(page: Page, opener: Locator) {
+    await opener.focus();
+    await page.keyboard.press('Enter');
+
+    const dialog = page.getByRole('dialog', { name: DIALOG_NAME });
+    await expect(dialog).toBeVisible();
+    // Focus starts on the file input, so a file can be chosen at once.
+    await expect
+      .poll(() => page.evaluate(() => (document.activeElement as HTMLInputElement | null)?.type))
+      .toBe('file');
+    await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
+
+    const visited = new Set<string>();
+    for (let i = 0; i < TAB_PRESSES; i++) {
+      await page.keyboard.press('Tab');
+      expect(await focusInDialog(page), `Tab ${i + 1} stays in the dialog`).toBe(true);
+      visited.add(await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 80) ?? ''));
+    }
+    // Close, the file input and Cancel; Submit is disabled until a file is chosen.
+    expect(visited.size).toBeGreaterThanOrEqual(3);
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press('Shift+Tab');
+      expect(await focusInDialog(page), `Shift+Tab ${i + 1} stays in the dialog`).toBe(true);
+    }
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(opener).toBeFocused();
+  }
+
+  test('from Verify Now on the building page after a submit', async ({ authedPage: page }) => {
+    await prepare(page, DESKTOP);
+    const slug = seedBuildingSlug(BUILDING_ID);
+    await page.goto(`/building/${slug}?submitted=true&reviewId=${SEED_REVIEW_ID}`);
+    await hydrated(page);
+    await exercise(page, page.getByRole('button', { name: 'Verify Now', exact: true }));
+  });
+
+  test('from Verify in the profile review list', async ({ authedPage: page }) => {
+    await prepare(page, DESKTOP);
+    await page.goto('/profile');
+    await hydrated(page);
+    const verify = page.getByRole('button', { name: 'Verify', exact: true }).first();
+    await verify.waitFor();
+    await exercise(page, verify);
+  });
+
+  test('at 375px the dialog fits the screen and still returns focus', async ({ authedPage: page }) => {
+    await prepare(page, MOBILE);
+    const slug = seedBuildingSlug(BUILDING_ID);
+    await page.goto(`/building/${slug}?submitted=true&reviewId=${SEED_REVIEW_ID}`);
+    await hydrated(page);
+    const opener = page.getByRole('button', { name: 'Verify Now', exact: true });
+    await opener.focus();
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog', { name: DIALOG_NAME });
+    await expect(dialog).toBeVisible();
+    const box = await dialog.boundingBox();
+    expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect((box?.x ?? 0) + (box?.width ?? 1000)).toBeLessThanOrEqual(MOBILE.width);
+    expect((box?.y ?? 0) + (box?.height ?? 1000)).toBeLessThanOrEqual(MOBILE.height);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(opener).toBeFocused();
+  });
 });

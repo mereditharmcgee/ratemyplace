@@ -1,21 +1,52 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect, useId } from 'react';
+import Dialog from '../ui/Dialog';
 
 interface Props {
   reviewId: string;
   onClose: () => void;
   onSuccess: () => void;
+  /** Where focus goes on close when the button that opened the dialog is gone. */
+  returnFocusFallback?: () => HTMLElement | null;
 }
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/heic', 'image/heif', 'application/pdf'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
-export default function VerificationModal({ reviewId, onClose, onSuccess }: Props) {
+export default function VerificationModal({ reviewId, onClose, onSuccess, returnFocusFallback }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const titleId = useId();
+  const introId = useId();
+  const inputId = useId();
+
+  // Remove unmounts the preview and its button, so focus goes back to the file input.
+  const hadFile = useRef(false);
+  useEffect(() => {
+    if (file) {
+      hadFile.current = true;
+    } else if (hadFile.current) {
+      hadFile.current = false;
+      fileInputRef.current?.focus();
+    }
+  }, [file]);
+
+  // Submit disables itself while uploading, which drops focus out of the dialog. After a
+  // failed upload it is enabled again, so focus goes back to it; the error is read from the
+  // alert region.
+  const submitRef = useRef<HTMLButtonElement>(null);
+  const wasUploading = useRef(false);
+  useEffect(() => {
+    if (wasUploading.current && !uploading) {
+      const submit = submitRef.current;
+      const active = document.activeElement;
+      if (submit && !submit.closest('dialog')?.contains(active)) submit.focus();
+    }
+    wasUploading.current = uploading;
+  }, [uploading]);
 
   const validateFile = (file: File): string | null => {
     if (!ALLOWED_TYPES.includes(file.type)) {
@@ -116,149 +147,158 @@ export default function VerificationModal({ reviewId, onClose, onSuccess }: Prop
     }
   };
 
+  // The shared Dialog (A11Y-06) supplies the backdrop, Escape, the focus trap and focus
+  // return. Focus starts on the file input, so a keyboard user can choose a file at once.
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-center justify-center p-4">
-        {/* Backdrop */}
-        <div
-          className="fixed inset-0 bg-black/50 transition-opacity"
+    <Dialog
+      labelledBy={titleId}
+      describedBy={introId}
+      initialFocusRef={fileInputRef}
+      onClose={onClose}
+      returnFocusFallback={returnFocusFallback}
+    >
+      <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full p-6 overflow-y-auto max-h-[calc(100dvh-2rem)]">
+        {/* Close button */}
+        <button
+          type="button"
           onClick={onClose}
-        />
+          aria-label="Close"
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-600"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
 
-        {/* Modal */}
-        <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 text-gray-500 hover:text-gray-600"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        <h2 id={titleId} className="text-xl font-semibold text-gray-900 mb-2">Verify Your Tenancy</h2>
+        <p id={introId} className="text-gray-600 mb-6">
+          Upload proof that you lived at this address to get a verified badge on your review.
+        </p>
+
+        {/* Privacy guidance */}
+        <div className="bg-blue-50 border border-blue-200 rounded-[6px] p-4 mb-6">
+          <div className="flex gap-3">
+            <svg className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-          </button>
-
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Verify Your Tenancy</h2>
-          <p className="text-gray-600 mb-6">
-            Upload proof that you lived at this address to get a verified badge on your review.
-          </p>
-
-          {/* Privacy guidance */}
-          <div className="bg-blue-50 border border-blue-200 rounded-[6px] p-4 mb-6">
-            <div className="flex gap-3">
-              <svg className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div className="text-sm text-blue-800">
-                <p className="font-medium mb-1">Accepted documents:</p>
-                <ul className="list-disc list-inside space-y-0.5 mb-2">
-                  <li>Lease or rental agreement</li>
-                  <li>Utility bill (gas, electric, water)</li>
-                  <li>Rent receipt or payment confirmation</li>
-                  <li>Piece of mail showing your name and this address</li>
-                </ul>
-                <p className="font-medium">You may redact:</p>
-                <p>Account numbers, dates of birth, SSN, or other sensitive info</p>
-              </div>
+            <div className="text-sm text-blue-800">
+              <p className="font-medium mb-1">Accepted documents:</p>
+              <ul className="list-disc list-inside space-y-0.5 mb-2">
+                <li>Lease or rental agreement</li>
+                <li>Utility bill (gas, electric, water)</li>
+                <li>Rent receipt or payment confirmation</li>
+                <li>Piece of mail showing your name and this address</li>
+              </ul>
+              <p className="font-medium">You may redact:</p>
+              <p>Account numbers, dates of birth, SSN, or other sensitive info</p>
             </div>
           </div>
+        </div>
 
+        {/* Always present, so an error that appears while focus stays put is announced. */}
+        <div role="alert">
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 mb-4 text-red-700">
               {error}
             </div>
           )}
+        </div>
 
-          {!file ? (
-            /* Upload Zone */
-            <div
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-[6px] p-8 text-center cursor-pointer transition-colors ${
-                dragOver
-                  ? 'border-teal-500 bg-teal-50'
-                  : 'border-gray-300 hover:border-teal-400 hover:bg-gray-50'
-              }`}
-            >
-              <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              <p className="text-gray-600 mb-2">
-                <span className="font-medium text-teal-700">Click to upload</span> or drag and drop
-              </p>
-              <p className="text-sm text-gray-500">
-                JPG, PNG, HEIC, or PDF (max 10MB)
-              </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".jpg,.jpeg,.png,.heic,.heif,.pdf"
-                onChange={handleInputChange}
-                className="hidden"
-              />
-            </div>
-          ) : (
-            /* Preview */
-            <div className="border border-gray-200 rounded-[6px] p-4">
-              <div className="flex items-start gap-4">
-                {preview ? (
-                  <img
-                    src={preview}
-                    alt="Preview"
-                    className="w-24 h-24 object-cover rounded-lg"
-                  />
-                ) : (
-                  <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-12 h-12 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 truncate">{file.name}</p>
-                  <p className="text-sm text-gray-500">
-                    {(file.size / 1024 / 1024).toFixed(2)} MB
-                  </p>
-                  <button
-                    onClick={clearFile}
-                    className="mt-2 text-sm text-red-700 hover:text-red-700"
-                  >
-                    Remove
-                  </button>
+        {!file ? (
+          /* Upload Zone: the label opens the file picker; the input stays focusable. */
+          <label
+            htmlFor={inputId}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            className={`relative block border-2 border-dashed rounded-[6px] p-8 text-center cursor-pointer transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-teal-700 ${
+              dragOver
+                ? 'border-teal-500 bg-teal-50'
+                : 'border-gray-300 hover:border-teal-400 hover:bg-gray-50'
+            }`}
+          >
+            <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <span className="block text-gray-600 mb-2">
+              <span className="font-medium text-teal-700">Click to upload</span> or drag and drop
+            </span>
+            <span className="block text-sm text-gray-500">
+              JPG, PNG, HEIC, or PDF (max 10MB)
+            </span>
+            <input
+              ref={fileInputRef}
+              id={inputId}
+              type="file"
+              accept=".jpg,.jpeg,.png,.heic,.heif,.pdf"
+              onChange={handleInputChange}
+              className="sr-only"
+            />
+          </label>
+        ) : (
+          /* Preview */
+          <div className="border border-gray-200 rounded-[6px] p-4">
+            <div className="flex items-start gap-4">
+              {preview ? (
+                <img
+                  src={preview}
+                  alt=""
+                  className="w-24 h-24 object-cover rounded-lg"
+                />
+              ) : (
+                <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-12 h-12 text-gray-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                  </svg>
                 </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-gray-900 truncate">{file.name}</p>
+                <p className="text-sm text-gray-500">
+                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+                <button
+                  type="button"
+                  onClick={clearFile}
+                  className="mt-2 text-sm text-red-700 hover:text-red-700"
+                >
+                  Remove
+                </button>
               </div>
             </div>
-          )}
-
-          {/* Actions */}
-          <div className="mt-6 flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-[6px] text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleUpload}
-              disabled={!file || uploading}
-              className="flex-1 px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {uploading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Uploading...
-                </span>
-              ) : (
-                'Submit for Verification'
-              )}
-            </button>
           </div>
+        )}
+
+        {/* Actions */}
+        <div className="mt-6 flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-[6px] text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            ref={submitRef}
+            type="button"
+            onClick={handleUpload}
+            disabled={!file || uploading}
+            className="flex-1 px-4 py-2 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {uploading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Uploading...
+              </span>
+            ) : (
+              'Submit for Verification'
+            )}
+          </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
