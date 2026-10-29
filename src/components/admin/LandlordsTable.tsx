@@ -229,7 +229,7 @@ export default function LandlordsTable() {
             placeholder="Search by name or email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
           />
         </div>
         <button
@@ -258,7 +258,7 @@ export default function LandlordsTable() {
                 value={addForm.name}
                 onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
                 placeholder="e.g. Samia Management"
-                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700"
               />
             </div>
             <div>
@@ -267,7 +267,7 @@ export default function LandlordsTable() {
                 type="email"
                 value={addForm.email}
                 onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700"
               />
             </div>
             <div>
@@ -276,7 +276,7 @@ export default function LandlordsTable() {
                 type="tel"
                 value={addForm.phone}
                 onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700"
               />
             </div>
             <div>
@@ -286,7 +286,7 @@ export default function LandlordsTable() {
                 value={addForm.website}
                 onChange={(e) => setAddForm({ ...addForm, website: e.target.value })}
                 placeholder="https://..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700"
               />
             </div>
             <div className="md:col-span-2">
@@ -295,7 +295,7 @@ export default function LandlordsTable() {
                 value={addForm.description}
                 onChange={(e) => setAddForm({ ...addForm, description: e.target.value })}
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700"
               />
             </div>
           </div>
@@ -345,16 +345,11 @@ export default function LandlordsTable() {
             id={`landlord-${landlord.id}`}
             className="bg-white rounded-[6px] border border-gray-200 overflow-hidden hover:shadow-sm transition-shadow"
           >
-            {/* Landlord Header */}
-            <div
-              className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={() =>
-                setExpandedLandlord(expandedLandlord === landlord.id ? null : landlord.id)
-              }
-            >
+            {/* Landlord Header: the button laid over it (its last child) is the toggle. */}
+            <div className="relative p-4 cursor-pointer hover:bg-gray-50 transition-colors">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900">{landlord.name}</h3>
+                  <h3 id={`landlord-title-${landlord.id}`} className="font-semibold text-gray-900">{landlord.name}</h3>
                   <p className="text-sm text-gray-500">
                     {landlord.building_count} buildings • {landlord.review_count} reviews
                   </p>
@@ -391,11 +386,21 @@ export default function LandlordsTable() {
                   </svg>
                 </div>
               </div>
+              <button
+                type="button"
+                className="absolute inset-0 z-10 w-full h-full cursor-[inherit] rounded-[6px] focus-visible:-outline-offset-2"
+                aria-labelledby={`landlord-title-${landlord.id}`}
+                aria-expanded={expandedLandlord === landlord.id}
+                aria-controls={expandedLandlord === landlord.id ? `landlord-panel-${landlord.id}` : undefined}
+                onClick={() =>
+                  setExpandedLandlord(expandedLandlord === landlord.id ? null : landlord.id)
+                }
+              />
             </div>
 
             {/* Expanded Details */}
             {expandedLandlord === landlord.id && (
-              <div className="border-t border-gray-200 p-4 bg-gray-50">
+              <div id={`landlord-panel-${landlord.id}`} className="border-t border-gray-200 p-4 bg-gray-50">
                 {editingLandlord === landlord.id ? (
                   // Edit Form
                   <div className="space-y-4">
@@ -408,7 +413,7 @@ export default function LandlordsTable() {
                           type="text"
                           value={editForm.name || ''}
                           onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700"
                         />
                       </div>
                       <div>
@@ -419,7 +424,7 @@ export default function LandlordsTable() {
                           type="email"
                           value={editForm.email || ''}
                           onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700"
                         />
                       </div>
                       <div>
@@ -430,7 +435,7 @@ export default function LandlordsTable() {
                           type="tel"
                           value={editForm.phone || ''}
                           onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700"
                         />
                       </div>
                       <div>
@@ -441,7 +446,7 @@ export default function LandlordsTable() {
                           type="url"
                           value={editForm.website || ''}
                           onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -454,7 +459,7 @@ export default function LandlordsTable() {
                             setEditForm({ ...editForm, description: e.target.value })
                           }
                           rows={3}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -466,7 +471,7 @@ export default function LandlordsTable() {
                           onChange={(e) => setEditForm({ ...editForm, admin_notes: e.target.value })}
                           rows={2}
                           maxLength={1000}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700"
                         />
                       </div>
                     </div>

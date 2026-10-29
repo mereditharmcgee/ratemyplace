@@ -5,7 +5,7 @@ test.describe('Homepage', () => {
     await page.goto('/');
     await expect(page.locator('h1').first()).toBeVisible();
     // Search form should be present
-    await expect(page.getByRole('textbox', { name: 'Search by address, neighborhood, or landlord' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Search by address, neighborhood, or landlord' })).toBeVisible();
   });
 
   test('has How It Works section', async ({ page }) => {

@@ -190,6 +190,7 @@ export default function RecordCorrectionsQueue() {
             key={status}
             type="button"
             onClick={() => setStatusFilter(status)}
+            aria-pressed={statusFilter === status}
             className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               statusFilter === status
                 ? 'bg-teal-700 text-white'
@@ -259,6 +260,7 @@ export default function RecordCorrectionsQueue() {
                           type="button"
                           onClick={() => toggleExpand(item.id)}
                           aria-expanded={isExpanded}
+                          aria-controls={isExpanded ? `correction-panel-${item.id}` : undefined}
                           aria-label={`${isExpanded ? 'Close' : 'Open'} ${item.building_address}`}
                           className="px-3 py-1.5 text-sm font-medium rounded-[4px] bg-gray-100 text-gray-700 hover:bg-gray-200 shrink-0"
                         >
@@ -268,7 +270,7 @@ export default function RecordCorrectionsQueue() {
                     </div>
 
                     {isExpanded && (
-                      <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+                      <div id={`correction-panel-${item.id}`} className="mt-4 pt-4 border-t border-gray-200 space-y-4">
                         <button
                           type="button"
                           onClick={() => runRepull(item.id)}
@@ -325,7 +327,7 @@ export default function RecordCorrectionsQueue() {
                             id={`resolution-${item.id}`}
                             value={resolution}
                             onChange={(e) => setResolution(e.target.value as CorrectionResolution)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
                           >
                             {CORRECTION_RESOLUTIONS.map((r) => (
                               <option key={r} value={r}>
@@ -349,7 +351,7 @@ export default function RecordCorrectionsQueue() {
                                 ? 'Public note shown under the section (required)'
                                 : 'Private note (optional)'
                             }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
                           />
                         </div>
 

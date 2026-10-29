@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { SurveyItem } from '../../../lib/surveyItems';
 import RatingItem, { RatingScale } from './RatingItem';
 
@@ -20,6 +21,8 @@ export default function RatingStep({
   onBack,
   onNext,
 }: Props) {
+  const scaleId = useId();
+
   return (
     <div className="space-y-4">
       <div className="bg-teal-50 border border-teal-200 rounded-[6px] p-4 mb-6">
@@ -27,7 +30,7 @@ export default function RatingStep({
         <p className="text-sm text-teal-700">{description}</p>
       </div>
 
-      <RatingScale />
+      <RatingScale id={scaleId} />
 
       <div className="space-y-2">
         {items.map((item) => (
@@ -36,6 +39,7 @@ export default function RatingStep({
             item={item}
             value={scores[item.key]}
             onChange={onScoreChange}
+            describedBy={scaleId}
           />
         ))}
       </div>

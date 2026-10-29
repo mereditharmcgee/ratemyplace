@@ -13,7 +13,7 @@ if (user) {
 ---
 
 <header class="bg-white border-b border-slate-200">
-  <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  <nav aria-label="Main" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex justify-between h-16">
       <div class="flex items-center">
         <a href="/" class="flex items-center space-x-2">
@@ -39,12 +39,12 @@ if (user) {
             >
               Write a review
             </a>
-            <a href="/profile" class="relative inline-flex h-6 w-6 items-center justify-center text-slate-600 hover:text-teal-700 transition-colors" aria-label="Notifications">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <a href="/profile" class="relative inline-flex h-6 w-6 items-center justify-center text-slate-600 hover:text-teal-700 transition-colors" aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
               {unreadCount > 0 && (
-                <span class="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">
+                <span aria-hidden="true" class="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
@@ -87,9 +87,11 @@ if (user) {
           type="button"
           class="h-10 w-10 -mr-2 flex items-center justify-center text-slate-600 hover:text-teal-700"
           aria-label="Toggle menu"
+          aria-expanded="false"
+          aria-controls="mobile-menu"
           id="mobile-menu-button"
         >
-          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
@@ -156,7 +158,22 @@ if (user) {
   const menuButton = document.getElementById('mobile-menu-button');
   const mobileMenu = document.getElementById('mobile-menu');
 
+  function setMenuOpen(open: boolean) {
+    mobileMenu?.classList.toggle('hidden', !open);
+    menuButton?.setAttribute('aria-expanded', String(open));
+  }
+
   menuButton?.addEventListener('click', () => {
-    mobileMenu?.classList.toggle('hidden');
+    setMenuOpen(mobileMenu?.classList.contains('hidden') ?? false);
+  });
+
+  // Escape closes the open menu. When focus was in the menu or on its button, it goes back to
+  // the button, so it is not left on a link that is now hidden.
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || !mobileMenu || mobileMenu.classList.contains('hidden')) return;
+    const active = document.activeElement;
+    const focusWasHere = active === menuButton || (active !== null && mobileMenu.contains(active));
+    setMenuOpen(false);
+    if (focusWasHere) menuButton?.focus();
   });
 </script>

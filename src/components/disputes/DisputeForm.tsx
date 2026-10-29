@@ -256,7 +256,7 @@ export default function DisputeForm({ siteUrl }: Props) {
             value={reviewUrl}
             onChange={(e) => setReviewUrl(e.target.value)}
             placeholder={`${siteUrl}/building/...`}
-            className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
+            className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-700 focus:border-teal-500 ${
               fieldErrors.reviewUrl ? 'border-red-300' : 'border-gray-300'
             }`}
           />
@@ -279,7 +279,7 @@ export default function DisputeForm({ siteUrl }: Props) {
             onChange={(e) => setReviewDates(e.target.value)}
             placeholder="Fall 2023 · Current"
             maxLength={100}
-            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm focus:ring-teal-700 focus:border-teal-500"
           />
           <p className="mt-1 text-sm text-gray-600">
             Needed if the page has more than one review. Copy them from the review.
@@ -296,7 +296,7 @@ export default function DisputeForm({ siteUrl }: Props) {
             value={reviewWords}
             onChange={(e) => setReviewWords(e.target.value)}
             maxLength={200}
-            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm focus:ring-teal-700 focus:border-teal-500"
           />
           <p className="mt-1 text-sm text-gray-600">
             Needed if two reviews show the same dates.
@@ -320,7 +320,7 @@ export default function DisputeForm({ siteUrl }: Props) {
               value={landlordName}
               onChange={(e) => setLandlordName(e.target.value)}
               placeholder="Your full name"
-              className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
+              className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-700 focus:border-teal-500 ${
                 fieldErrors.landlordName ? 'border-red-300' : 'border-gray-300'
               }`}
             />
@@ -340,7 +340,7 @@ export default function DisputeForm({ siteUrl }: Props) {
               value={landlordEmail}
               onChange={(e) => setLandlordEmail(e.target.value)}
               placeholder="your.email@example.com"
-              className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
+              className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-700 focus:border-teal-500 ${
                 fieldErrors.landlordEmail ? 'border-red-300' : 'border-gray-300'
               }`}
             />
@@ -360,7 +360,7 @@ export default function DisputeForm({ siteUrl }: Props) {
               value={landlordPhone}
               onChange={(e) => setLandlordPhone(e.target.value)}
               placeholder="(555) 123-4567"
-              className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
+              className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-700 focus:border-teal-500 ${
                 fieldErrors.landlordPhone ? 'border-red-300' : 'border-gray-300'
               }`}
             />
@@ -413,7 +413,7 @@ export default function DisputeForm({ siteUrl }: Props) {
           placeholder="Provide any additional context that supports your dispute..."
           rows={6}
           maxLength={2000}
-          className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-500 focus:border-teal-500 ${
+          className={`w-full px-3 py-2 border rounded-[4px] shadow-sm focus:ring-teal-700 focus:border-teal-500 ${
             fieldErrors.disputeExplanation ? 'border-red-300' : 'border-gray-300'
           }`}
         />
@@ -435,7 +435,7 @@ export default function DisputeForm({ siteUrl }: Props) {
         <button
           type="submit"
           disabled={loading || !turnstileToken}
-          className="w-full h-11 flex items-center justify-center bg-teal-700 text-white px-6 rounded-[4px] font-semibold hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          className="w-full h-11 flex items-center justify-center bg-teal-700 text-white px-6 rounded-[4px] font-semibold hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-700 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? 'Submitting...' : 'Submit Dispute'}
         </button>

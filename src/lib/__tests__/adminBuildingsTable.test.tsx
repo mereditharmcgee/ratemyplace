@@ -142,8 +142,9 @@ describe('BuildingsTable server-side filters', () => {
       if (input.startsWith('/api/admin/managers')) return json({ managers: [] });
       return json({ data: { count: 0, sample: [] } });
     }));
-    const { findByText, findByRole } = render(<BuildingsTable />);
-    fireEvent.click(await findByText('6 Elm St'));
+    const { findByRole } = render(<BuildingsTable />);
+    // The row header's toggle is the native button laid over it, named by the address.
+    fireEvent.click(await findByRole('button', { name: '6 Elm St' }));
     fireEvent.click(await findByRole('button', { name: 'Edit building' }));
     expect(await findByRole('option', { name: 'AA Management — Boston' })).toBeTruthy();
     expect(await findByRole('option', { name: 'AA Management — New Haven' })).toBeTruthy();
