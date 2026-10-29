@@ -2,6 +2,7 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import { test, expect, clearRateLimits } from './fixtures';
 import { executeLocalD1, installTurnstileStub, TURNSTILE_SCRIPT } from './test-harness';
+import { rateAllItemsInStep } from './review-helpers';
 
 // Derive Page type from the fixture to avoid importing from @playwright/test directly
 type Page = Parameters<Parameters<typeof test>[1]>[0]['authedPage'];
@@ -11,18 +12,6 @@ const __dirname = path.dirname(__filename);
 
 // Path to the authenticated user session file (created by global.setup.ts)
 const USER_AUTH_FILE = path.join(__dirname, '../playwright/.auth/user.json');
-
-// Helper: rate all visible rating items in the current step with a given score.
-// Each step renders only its own RatingItem components (React conditional rendering),
-// so every button[type="button"] matching the score text belongs to this step.
-async function rateAllItemsInStep(page: Page, score: number) {
-  const scoreButtons = page.locator('button[type="button"]').filter({ hasText: new RegExp(`^${score}$`) });
-  const count = await scoreButtons.count();
-  for (let i = 0; i < count; i++) {
-    await scoreButtons.nth(i).click();
-  }
-  return count;
-}
 
 test.describe('Review Form', () => {
 
