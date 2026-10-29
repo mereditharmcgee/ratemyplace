@@ -545,26 +545,29 @@ interface HeadTags {
   jsonLd: string[];
 }
 
-// One left-to-right pass over the head: a whole script element, or any other start tag with its
-// quoted attributes. A tag is consumed whole, so markup quoted inside an attribute value (a
-// title or description holding "<link rel=canonical ...>") is never read as a tag of its own.
-const HEAD_TOKEN = new RegExp(`<script\\b${TAG_BODY}>([\\s\\S]*?)<\\/script\\s*>|<([a-zA-Z][\\w:-]*)${TAG_BODY}>`, 'gi');
+// One left-to-right pass from the head start tag: a whole script element, the head end tag, or
+// any other start tag with its quoted attributes. A tag is consumed whole, so markup quoted
+// inside an attribute value (a title or description holding "<link rel=canonical ...>" or
+// "</head>") is never read as a tag of its own, nor as the end of the head.
+const HEAD_TOKEN = new RegExp(`<script\\b${TAG_BODY}>([\\s\\S]*?)<\\/script\\s*>|<\\/head\\s*>|<([a-zA-Z][\\w:-]*)${TAG_BODY}>`, 'gi');
 
 function headTags(html: string): HeadTags | null {
-  const head = /<head\b[^>]*>([\s\S]*?)<\/head>/i.exec(html)?.[1];
-  if (head === undefined) return null;
+  const start = /<head\b[^>]*>/i.exec(html);
+  if (!start) return null;
   const tags: HeadTags = { links: [], metas: [], jsonLd: [] };
-  for (const match of head.matchAll(HEAD_TOKEN)) {
+  for (const match of html.slice(start.index + start[0].length).matchAll(HEAD_TOKEN)) {
     const [, scriptAttributes, scriptBody, tagName, attributes] = match;
     if (scriptAttributes !== undefined) {
       if ((tagAttributes(scriptAttributes).type ?? '').toLowerCase() === 'application/ld+json') tags.jsonLd.push(scriptBody ?? '');
+    } else if (tagName === undefined) {
+      return tags; // the real </head>
     } else if (tagName.toLowerCase() === 'link') {
       tags.links.push(tagAttributes(attributes ?? ''));
     } else if (tagName.toLowerCase() === 'meta') {
       tags.metas.push(tagAttributes(attributes ?? ''));
     }
   }
-  return tags;
+  return null; // no </head>
 }
 
 function metaContents(tags: HeadTags, key: string): string[] {

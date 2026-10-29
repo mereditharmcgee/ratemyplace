@@ -700,4 +700,19 @@ describe('indexPolicyProblem against the rendered layout', () => {
     const html = await renderLayout(`${PROD}/landlord/x`, { title: hostile, description: hostile, breadcrumbs: entityBreadcrumbs(hostile) });
     expect(indexPolicyProblem(html, { policy: 'indexable', canonicals: [`${PROD}/landlord/x`], breadcrumb: true })).toBeNull();
   });
+
+  // Astro escapes only & and " in attribute values, so a name holding "</head>" reaches the head
+  // verbatim inside og:title and the description. The head ends at a real end tag only.
+  it('reads past a </head> quoted inside an attribute value', async () => {
+    for (const name of ['Acme </head> Co', 'Acme </HEAD > <link rel="canonical" href="https://evil.example/"> Co']) {
+      const html = await renderLayout(`${PROD}/landlord/x`, { title: name, description: name, breadcrumbs: entityBreadcrumbs(name) });
+      expect(indexPolicyProblem(html, { policy: 'indexable', canonicals: [`${PROD}/landlord/x`], breadcrumb: true })).toBeNull();
+    }
+  });
+
+  it('fails a page with no head or an unterminated one', () => {
+    for (const html of ['<!doctype html><html><body>x</body></html>', '<!doctype html><html><head><link rel="canonical" href="x">']) {
+      expect(indexPolicyProblem(html, { policy: 'noindex', canonicals: [] })).toBe('Missing head');
+    }
+  });
 });
