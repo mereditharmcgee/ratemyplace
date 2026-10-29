@@ -23,11 +23,12 @@ export function getScoreTextColor(score: number): string {
 }
 
 // Hex equivalents for non-Tailwind contexts (Google Maps markers, generated
-// images, PDFs). Values match the Tailwind classes in getScoreColor exactly.
+// images, PDFs). Values are the Tailwind v3 hexes of the classes in
+// getScoreColor, except concerning (see its note).
 export const SCORE_HEX = {
   good: '#059669',       // emerald-600
   mixed: '#F59E0B',      // amber-500
-  concerning: '#A16207', // amber-700
+  concerning: '#A16207', // yellow-700 (Tailwind v3), not the amber-700 of the Concerning badge class
   poor: '#B91C1C',       // red-700
   none: '#6B7280',       // gray-500 — for null / no-data
 } as const;
