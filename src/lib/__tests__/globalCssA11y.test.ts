@@ -30,6 +30,15 @@ describe('global focus indicator and reduced motion', () => {
     expect(lastBaseLayer()).toMatch(/footer,\s*\.from-slate-800\s*\{\s*--focus-ring:\s*#fff;?\s*\}/);
   });
 
+  it('still finds the dark hero by that class, with the home search inside it', () => {
+    // If the hero gradient ever changes, the white ring is lost and teal-700 on dark slate is
+    // about 2:1. This fails first, so the selector moves with it.
+    const index = readFileSync(join(process.cwd(), 'src/pages/index.astro'), 'utf8');
+    const heroOpen = index.match(/<div class="([^"]*\bfrom-slate-800\b[^"]*)">/);
+    expect(heroOpen, 'the homepage hero wrapper carries from-slate-800').not.toBeNull();
+    expect(index.indexOf('<HomeSearch')).toBeGreaterThan(index.indexOf(heroOpen![0]));
+  });
+
   it('draws a 2px outline in that color on :focus-visible, at zero specificity', () => {
     const block = lastBaseLayer();
     const rule = block.match(/:where\(([^)]*\([^)]*\)[^)]*|[^)]*)\):focus-visible\s*\{([^}]*)\}/);

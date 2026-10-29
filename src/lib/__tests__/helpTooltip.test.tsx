@@ -105,6 +105,8 @@ describe('HelpTooltip look', () => {
         'focus-visible:outline-teal-700',
         'p-1',
         '-m-1',
+        // The icon still turns teal while its button has focus, as it did before.
+        'focus:text-teal-700',
       ]),
     );
     expect(classes).not.toContain('focus:outline-none');

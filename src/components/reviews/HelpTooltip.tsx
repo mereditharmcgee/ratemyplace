@@ -90,7 +90,7 @@ export function HelpTooltip({ help, dimension }: HelpTooltipProps) {
         ref={buttonRef}
         type="button"
         onClick={toggle}
-        className="ml-0.5 -m-1 p-1 rounded-sm text-gray-500 hover:text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 transition-colors"
+        className="ml-0.5 -m-1 p-1 rounded-sm text-gray-500 hover:text-teal-700 focus:text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 transition-colors"
         aria-label={`Help for ${dimension}`}
         aria-expanded={isOpen}
         aria-controls={isOpen ? panelId : undefined}

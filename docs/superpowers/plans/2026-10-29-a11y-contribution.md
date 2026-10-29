@@ -1,6 +1,6 @@
 # Accessible contribution (Phase 28): implementation plan
 
-**Date:** 2026-10-29. **Branch:** `feat/a11y-contribution`, worktree `C:/Users/mmcge/rmp-a11y`, created from `origin/main` at `83086a2`.
+**Date:** 2026-10-29. **Branch:** `feat/a11y-contribution`, in its own worktree (written `<worktree>` below), created from `origin/main` at `83086a2`.
 **Milestone:** v1.6.0, requirements A11Y-01 to A11Y-08 (`.planning/milestones/v1.6.0-REQUIREMENTS.md`, Phase 28 section of `.planning/milestones/v1.6.0-ROADMAP.md`, design spec `docs/superpowers/specs/2026-08-26-trust-density-design.md` section 8).
 **Evidence:** the 2026-10-29 axe baseline (`e2e/a11y.spec.ts`, 61 scans at 1280x900 and 375x812) and a read-only source audit of the same commit.
 
@@ -26,7 +26,7 @@
 ### Local e2e harness
 
 ```bash
-cd C:/Users/mmcge/rmp-a11y
+cd <worktree>
 npm run db:setup                         # local D1 only: fresh schema plus seed
 $HEAVY npm run build                     # the webServer serves dist/
 $HEAVY npx playwright test e2e/<spec>.ts # wrangler pages dev dist on port 8788
@@ -36,7 +36,7 @@ $HEAVY npx playwright test e2e/<spec>.ts # wrangler pages dev dist on port 8788
 - Seed users: `user@test.ratemyplace.local` and `admin@test.ratemyplace.local`; the password is in `e2e/global.setup.ts` (local only, never repeat it in results).
 - `global.setup` signs in twice per run. A third back-to-back run can hit "Too many attempts". Clear it locally with `npx tsx -e "import('./e2e/test-harness.ts').then((m) => m.executeLocalD1('DELETE FROM rate_limits'))"`.
 - Specs that submit reviews (`review.spec.ts`) write to local D1. Re-run `npm run db:setup` afterwards.
-- Never call Google: the a11y spec refuses `maps|places.googleapis.com` and routes `/api/places/autocomplete` and `/api/places/details` to a fictional suggestion. New specs reuse `prepare()` from `e2e/a11y.spec.ts` (export it, or move it into `e2e/review-helpers.ts`).
+- Never call Google: the a11y spec refuses `maps|places.googleapis.com` and routes `/api/places/autocomplete` and `/api/places/details` to a fictional suggestion. New specs reuse `prepare()` from `e2e/review-helpers.ts` (it moved there from `e2e/a11y.spec.ts`, since one spec cannot import another).
 
 ---
 
