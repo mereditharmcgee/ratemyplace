@@ -5,7 +5,7 @@ import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { executeLocalD1 } from './test-harness';
-import { rateAllItemsInStep } from './review-helpers';
+import { prepare, rateAllItemsInStep } from './review-helpers';
 import { FY2026_RESOURCE_ID } from '../src/lib/records/sources/boston/assessor';
 import { PERMITS_RESOURCE_ID } from '../src/lib/records/sources/boston/permits';
 import { VIOLATIONS_RESOURCE_ID } from '../src/lib/records/sources/boston/violations';
@@ -56,19 +56,6 @@ const BUILDING_SLUG = '12-brighton-ave';
 const SEED_REVIEW_ID = 'review-001';
 const REVIEW_BUILDING_ID = 'building-30';
 const LANDLORD_SLUG = 'allston-management-group-llc';
-
-const GOOGLE_API = /^https:\/\/(maps|places)\.googleapis\.com\//;
-const PLACES_AUTOCOMPLETE = /\/api\/places\/autocomplete(\?|$)/;
-const PLACES_DETAILS = /\/api\/places\/details(\?|$)/;
-const FAKE_PREDICTIONS = [
-  {
-    placeId: 'e2e-a11y-place-1',
-    description: '100 Example St, Boston, MA, USA',
-    mainText: '100 Example St',
-    secondaryText: 'Boston, MA, USA',
-    existing: null,
-  },
-];
 
 // --- Recording ---
 
@@ -209,13 +196,7 @@ function recordScan(scan: ScanRecord): void {
 }
 
 // --- Page handling ---
-
-async function prepare(page: Page, viewport: Viewport): Promise<void> {
-  await page.setViewportSize({ width: viewport.width, height: viewport.height });
-  await page.route(GOOGLE_API, (route) => route.abort());
-  await page.route(PLACES_AUTOCOMPLETE, (route) => route.fulfill({ json: { predictions: FAKE_PREDICTIONS } }));
-  await page.route(PLACES_DETAILS, (route) => route.fulfill({ json: { place: null } }));
-}
+// prepare() (viewport plus the Google refusal and the Places routes) is in review-helpers.ts.
 
 /** Let islands hydrate and transitions finish, so axe sees what a reader sees. */
 async function settle(page: Page): Promise<void> {

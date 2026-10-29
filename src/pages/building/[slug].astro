@@ -263,8 +263,8 @@ const meta = buildingPageMeta(
             <p class="text-teal-800 font-medium">Review submitted!</p>
             <p class="text-teal-700 text-sm">Your review has been submitted and is pending moderation. It will appear on this page once approved.</p>
           </div>
-          <button onclick="document.getElementById('submitted-banner').remove()" class="text-teal-700 hover:text-teal-800">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button type="button" aria-label="Close" data-dismiss="submitted-banner" class="text-teal-700 hover:text-teal-800">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>

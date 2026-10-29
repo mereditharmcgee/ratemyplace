@@ -21,3 +21,29 @@
     color: var(--color-gray-600);
   }
 }
+
+/* Phase 28: one visible focus indicator, and reduced motion, site-wide. */
+@layer base {
+  :root {
+    --focus-ring: var(--color-teal-700);
+  }
+  /* Dark surfaces: the footer, and the homepage hero, which this phase does not edit. */
+  footer,
+  .from-slate-800 {
+    --focus-ring: #fff;
+  }
+  :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

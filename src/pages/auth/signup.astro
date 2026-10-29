@@ -35,7 +35,7 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
       <div class="mt-8">
         <a
           href={'/api/auth/google' + redirectQuery(redirectTo)}
-          class="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-slate-200 rounded-[4px] bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
+          class="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-slate-200 rounded-[4px] bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-700"
         >
           <svg class="w-5 h-5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -57,7 +57,7 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
       </div>
 
       <form id="signup-form" class="space-y-6" data-redirect={redirectTo}>
-        <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"></div>
+        <div id="error-message" role="alert" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"></div>
 
         <div class="space-y-4">
           <div>
@@ -70,7 +70,7 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
               type="email"
               autocomplete="email"
               required
-              class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-600 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
+              class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-teal-500"
             />
           </div>
 
@@ -86,19 +86,20 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
                 autocomplete="new-password"
                 required
                 minlength="6"
-                class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-600 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
+                class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-teal-500"
               />
               <button
                 type="button"
                 class="toggle-password absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-600"
                 data-target="password"
                 aria-label="Toggle password visibility"
+                aria-pressed="false"
               >
-                <svg class="eye-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="eye-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
-                <svg class="eye-off-icon w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="eye-off-icon w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                 </svg>
               </button>
@@ -118,19 +119,20 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
                 autocomplete="new-password"
                 required
                 minlength="6"
-                class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-600 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
+                class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-teal-500"
               />
               <button
                 type="button"
                 class="toggle-password absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-600"
                 data-target="confirmPassword"
                 aria-label="Toggle password visibility"
+                aria-pressed="false"
               >
-                <svg class="eye-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="eye-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
-                <svg class="eye-off-icon w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="eye-off-icon w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                 </svg>
               </button>
@@ -149,7 +151,7 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
 
         <button
           type="submit"
-          class="w-full h-11 flex items-center justify-center px-4 border border-transparent rounded-[4px] text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="w-full h-11 flex items-center justify-center px-4 border border-transparent rounded-[4px] text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Create account
         </button>
@@ -173,10 +175,12 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
 
       if (input.type === 'password') {
         input.type = 'text';
+        button.setAttribute('aria-pressed', 'true');
         eyeIcon?.classList.add('hidden');
         eyeOffIcon?.classList.remove('hidden');
       } else {
         input.type = 'password';
+        button.setAttribute('aria-pressed', 'false');
         eyeIcon?.classList.remove('hidden');
         eyeOffIcon?.classList.add('hidden');
       }
@@ -236,8 +240,8 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
     const confirmPassword = formData.get('confirmPassword');
 
     if (password !== confirmPassword) {
-      errorMessage.textContent = 'Passwords do not match';
       errorMessage.classList.remove('hidden');
+      errorMessage.textContent = 'Passwords do not match';
       return;
     }
 
@@ -258,12 +262,12 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
         // the server and this is the line that navigates.
         window.location.href = safeRedirectPath(form.dataset.redirect);
       } else {
-        errorMessage.textContent = result.error || 'An error occurred';
         errorMessage.classList.remove('hidden');
+        errorMessage.textContent = result.error || 'An error occurred';
       }
     } catch {
-      errorMessage.textContent = 'An error occurred. Please try again.';
       errorMessage.classList.remove('hidden');
+      errorMessage.textContent = 'An error occurred. Please try again.';
     } finally {
       button.disabled = false;
       button.textContent = 'Create account';
