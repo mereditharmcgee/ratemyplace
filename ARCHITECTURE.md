@@ -102,8 +102,7 @@ ratemyplace/
 │   │   ├── reviews/
 │   │   │   ├── ReviewCard.astro   # Individual review display (27 fields)
 │   │   │   ├── ReviewForm.tsx     # React review form (island)
-│   │   │   ├── HelpTooltip.tsx    # Contextual help for survey questions
-│   │   │   └── UnitTypeSummary.astro
+│   │   │   └── HelpTooltip.tsx    # Contextual help for survey questions
 │   │   └── admin/                 # Admin dashboard components
 │   │
 │   ├── lib/
