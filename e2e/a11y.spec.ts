@@ -20,14 +20,16 @@ import type {
   ViolationPayload,
 } from '../src/lib/records/types';
 
-// Phase 28 (A11Y-01) automated baseline. axe runs the WCAG 2.0 and 2.1 A and AA rules over the
-// public contribution path (home, search, auth, every review step, the building page) and over
-// representative landlord, profile and admin pages, at 1280x900 and 375x812.
+// Phase 28 (A11Y-01, A11Y-08) axe gate. axe runs the WCAG 2.0 and 2.1 A and AA rules over the
+// public contribution path (home, search, auth, every review step, the building page, and the
+// profile with its verification dialog) and over representative landlord, review edit and admin
+// pages, at 1280x900, 375x812 and 640x450 (1280x900 at 200% browser zoom).
 //
-// For now it RECORDS and asserts nothing. Each scan is written to A11Y_BASELINE_OUT (default
-// test-results/a11y-baseline.json) with a per-rule summary. When the A11Y-08 fixes land, set
-// ENFORCE_CONTRIBUTION_PATH to true and every contribution-path scan must have zero serious
-// or critical violations.
+// Every scan is written to A11Y_BASELINE_OUT (default test-results/a11y-baseline.json) with a
+// per-rule summary. With ENFORCE_CONTRIBUTION_PATH on, every contribution-path scan must have
+// zero serious or critical violations and no horizontal overflow; each failure is a soft
+// assertion, so one run reports them all. Scans off the path (landlord, review edit, admin) are
+// recorded and reported, not enforced.
 //
 // Local only, like every spec here. Google Maps and Places are refused at the browser and the
 // two Places proxies answer with one fictional suggestion, so no Google API is called. Turnstile
@@ -35,7 +37,7 @@ import type {
 // 500. The only database write is a synthetic city-records fixture on one seed building, so the
 // records ledger has rows to open; it is removed in afterAll.
 
-const ENFORCE_CONTRIBUTION_PATH = false;
+const ENFORCE_CONTRIBUTION_PATH = true;
 
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 const BLOCKING_IMPACTS = new Set(['serious', 'critical']);
@@ -43,7 +45,11 @@ const BLOCKING_IMPACTS = new Set(['serious', 'critical']);
 const VIEWPORTS = [
   { name: 'desktop', width: 1280, height: 900 },
   { name: 'mobile', width: 375, height: 812 },
+  // 1280x900 at 200% browser zoom lays out as a 640x450 viewport (WCAG 1.4.4 and 1.4.10).
+  { name: 'zoom-200', width: 640, height: 450 },
 ] as const;
+/** Below Tailwind's md breakpoint the header shows the mobile menu button. */
+const MD_BREAKPOINT = 768;
 type Viewport = (typeof VIEWPORTS)[number];
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -65,7 +71,7 @@ interface Target {
   page: string;
   state: string;
   surface: Surface;
-  /** Home, search, auth, review and building: the A11Y-08 gate. */
+  /** Home, search, auth, review, building and profile: the A11Y-08 gate. */
   contributionPath: boolean;
 }
 
@@ -267,6 +273,7 @@ async function scan(page: Page, viewport: Viewport, target: Target): Promise<voi
         .filter((violation) => BLOCKING_IMPACTS.has(violation.impact ?? ''))
         .map((violation) => `${violation.id} (${violation.impact}, ${violation.nodeCount} nodes)`);
       expect.soft(blocking, `serious or critical axe findings on ${key}`).toEqual([]);
+      expect.soft(horizontalOverflow, `horizontal overflow on ${key}`).toBe(false);
     }
   } catch (error) {
     recordScan({
@@ -490,7 +497,7 @@ for (const viewport of VIEWPORTS) {
       await page.getByText('Other addresses').waitFor({ timeout: 10_000 });
       await scan(page, viewport, { ...target, state: 'address suggestions open' });
 
-      if (viewport.name === 'mobile') {
+      if (viewport.width < MD_BREAKPOINT) {
         await page.keyboard.press('Escape');
         await page.goto('/');
         await settle(page);
@@ -637,7 +644,8 @@ for (const viewport of VIEWPORTS) {
     test(`profile (${viewport.name})`, async ({ authedPage: page }) => {
       test.setTimeout(60_000);
       await prepare(page, viewport);
-      const target = { page: 'profile', surface: 'signed-in', contributionPath: false } as const;
+      // Email and residency verification are on the contribution path (design spec section 8).
+      const target = { page: 'profile', surface: 'signed-in', contributionPath: true } as const;
 
       await page.goto('/profile?updated=true');
       await page.getByRole('button', { name: /My Reviews/ }).waitFor();
@@ -650,6 +658,21 @@ for (const viewport of VIEWPORTS) {
       await page.getByRole('button', { name: 'Verify', exact: true }).first().click();
       await page.getByRole('heading', { name: 'Verify Your Tenancy' }).waitFor();
       await scan(page, viewport, { ...target, state: 'verification dialog open' });
+    });
+
+    test(`review edit page (${viewport.name})`, async ({ authedPage: page }) => {
+      test.setTimeout(60_000);
+      await prepare(page, viewport);
+      // Recorded and reported, not enforced yet. The tenure and move-out selects in
+      // ReviewEditForm.tsx belong to the concurrent review-edit lane and are still unlabeled
+      // here. Flip this to true once main is merged into this branch and those two selects
+      // have their labels (see the Phase 28 plan, "Out of scope and follow-ups").
+      const target = { page: 'review edit', surface: 'signed-in', contributionPath: false } as const;
+
+      // review-001 belongs to the seed user. Nothing is saved.
+      await page.goto(`/review/edit/${SEED_REVIEW_ID}`);
+      await page.locator('#review-edit-bedrooms').waitFor({ timeout: 15_000 });
+      await scan(page, viewport, { ...target, state: 'default' });
     });
 
     test(`admin pages (${viewport.name})`, async ({ adminPage: page }) => {

@@ -5,7 +5,8 @@ import { prepare } from './review-helpers';
 import { FY2026_RESOURCE_ID } from '../src/lib/records/sources/boston/assessor';
 
 // Phase 28 keyboard checks that axe cannot make: where focus goes and what state a control
-// reports when it is used from the keyboard. Each Phase 28 batch appends its own describe block.
+// reports when it is used from the keyboard, and what reduced motion turns off. Each Phase 28
+// batch appends its own describe block.
 //
 // Local only, like every spec here (e2e is not in CI). prepare() refuses Google and routes the
 // Places proxies to one fictional suggestion; Turnstile is the e2e stub. The only database write
@@ -637,5 +638,92 @@ test.describe('batch 6: unit cards and admin rows are native disclosure buttons'
     await page.keyboard.press('Enter');
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await expect(panel).toHaveCount(0);
+  });
+});
+
+test.describe('batch 7: reduced motion stops transitions and spinners', () => {
+  // The global.css rule under prefers-reduced-motion: reduce sets every duration to 0.01ms.
+  // Each test also turns motion back on, to show the same element does move by default.
+  const REDUCED_MS = 0.01;
+
+  /**
+   * A computed duration list ("0.15s", "1e-05s, 0s") as its longest value in milliseconds,
+   * rounded to the microsecond so float noise cannot tip 0.01 over the bound.
+   */
+  function longestMs(value: string): number {
+    const longest = Math.max(
+      ...value.split(',').map((part) => {
+        const text = part.trim();
+        const amount = Number.parseFloat(text);
+        return text.endsWith('ms') ? amount : amount * 1000;
+      }),
+    );
+    return Math.round(longest * 1000) / 1000;
+  }
+
+  async function hydrated(page: Page) {
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    await page.waitForFunction(
+      () => document.querySelectorAll('astro-island[ssr]:not([client="visible"])').length === 0,
+      undefined,
+      { timeout: 10_000 },
+    );
+  }
+
+  test('a rating pill does not transition', async ({ authedPage: page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await prepare(page, DESKTOP);
+    // building-30 is a seed building; nothing here is submitted.
+    await page.goto('/review/new?building=building-30');
+    await page.locator('#review-bedrooms').waitFor({ timeout: 15_000 });
+    await hydrated(page);
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('heading', { name: 'Rate Your Unit' }).waitFor();
+
+    // The pill is the span beside each hidden radio.
+    const pill = page.getByRole('radiogroup').first().locator('input[type="radio"] + span').first();
+    await expect(pill).toHaveText('1');
+    const duration = () => pill.evaluate((el) => getComputedStyle(el).transitionDuration);
+
+    expect(longestMs(await duration())).toBeLessThanOrEqual(REDUCED_MS);
+
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    expect(longestMs(await duration())).toBeGreaterThan(REDUCED_MS);
+  });
+
+  test('the home search spinner does not spin while a lookup is pending', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await prepare(page, DESKTOP);
+    // Our own lookup is held open, so the spinner stays up until the test lets it answer.
+    let release: () => void = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(/\/api\/search\/autocomplete(\?|$)/, async (route) => {
+      await released;
+      await route.fulfill({ json: { results: [] } }).catch(() => {});
+    });
+    await page.goto('/');
+    await hydrated(page);
+
+    const input = page.getByRole('combobox', { name: 'Search by address, neighborhood, or landlord' });
+    await input.fill('100 Example St');
+    const spinner = page.locator('form').filter({ has: input }).locator('svg.animate-spin');
+    await expect(spinner).toBeVisible({ timeout: 10_000 });
+    const timing = () =>
+      spinner.evaluate((el) => {
+        const style = getComputedStyle(el);
+        return { duration: style.animationDuration, count: style.animationIterationCount };
+      });
+
+    const reduced = await timing();
+    expect(longestMs(reduced.duration)).toBeLessThanOrEqual(REDUCED_MS);
+    expect(reduced.count).toBe('1');
+
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    expect(longestMs((await timing()).duration)).toBeGreaterThan(REDUCED_MS);
+
+    release();
+    await expect(spinner).toHaveCount(0, { timeout: 10_000 });
   });
 });
