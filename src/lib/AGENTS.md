@@ -542,6 +542,22 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   `/search` with any parameter. `DEFAULT_OG_IMAGE` is the committed PNG, guarded by
   `__tests__/ogImage.test.ts`. Every page must be classified as a sitemap page, an indexable
   dynamic route or noindex — `__tests__/pageIndexing.test.ts` fails on a new page until it is.
+- **`jsonLd.ts` is the page's structured data, and its serializer is the only way in.**
+  BaseLayout writes one JSON-LD block per indexable page with `set:html`, which does not
+  escape, so `serializeJsonLd` does: `JSON.stringify`, then `<`, `>`, `&`, U+2028 and U+2029
+  as unicode escapes, so a landlord named `</script><script>...` stays data and the text still
+  parses to the same value. `structuredData` builds Organization and WebSite on the home page
+  only, WebPage on every indexable page (`isPartOf` the WebSite by `@id`), and a
+  BreadcrumbList when the page passes `breadcrumbs`. Its input is strings the page already
+  shows (title prop, description, canonical, breadcrumb labels), never an entity row. No
+  AggregateRating, Review or rating value while `NAMED_PARTY_MIN_REVIEWS` withholds
+  named-party scores (design spec 2026-08-26, section 9), and no SearchAction (Google
+  retired the sitelinks search box; `/search?q=` is noindex). A noindex page gets none. The
+  building, landlord and property-manager pages pass `entityBreadcrumbs(<what their nav
+  prints>)`. `__tests__/structuredDataSource.test.ts` fails on a second `set:html` or JSON-LD
+  writer and on a breadcrumb that drifts from the visible nav; `__tests__/jsonLd.test.ts`
+  holds the escaping; the release smoke (`smoke.ts`, SEO-07) checks the block on every
+  sitemap page.
 - **`sitemap.ts` owns the allowlist and the chunking.** `STATIC_SITEMAP_PATHS` is the
   hand-kept list of public pages (property-manager pages are deliberately absent);
   `SITEMAP_CHUNK` is 10,000 URLs per chunk; `buildingChunkCount` has no floor of 1, so an
