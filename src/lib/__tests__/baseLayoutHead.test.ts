@@ -43,6 +43,19 @@ const content = (head: HTMLHeadElement, key: string): string | null =>
 const canonical = (head: HTMLHeadElement): string | null =>
   head.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? null;
 
+type JsonLdNode = Record<string, unknown>;
+const ldScripts = (head: HTMLHeadElement): HTMLScriptElement[] =>
+  Array.from(head.querySelectorAll('script[type="application/ld+json"]'));
+/** The one structured-data block's @graph, parsed. Fails the test unless there is exactly one. */
+function ldGraph(head: HTMLHeadElement): JsonLdNode[] {
+  const scripts = ldScripts(head);
+  expect(scripts).toHaveLength(1);
+  const parsed = JSON.parse(scripts[0].textContent ?? '') as { '@context': string; '@graph': JsonLdNode[] };
+  expect(parsed['@context']).toBe('https://schema.org');
+  return parsed['@graph'];
+}
+const ldNode = (graph: JsonLdNode[], type: string): JsonLdNode | undefined => graph.find((node) => node['@type'] === type);
+
 describe('BaseLayout head', () => {
   it('carries the full canonical, Open Graph and Twitter set', async () => {
     const head = await render('https://ratemyplace-64y.pages.dev/about/?utm_source=x');
@@ -128,5 +141,89 @@ describe('BaseLayout head', () => {
   it('noindexes the sign-in page', async () => {
     const head = await renderPage(SigninPage, 'https://ratemyplace.org/auth/signin');
     expect(content(head, 'robots')).toBe('noindex, follow');
+    expect(ldScripts(head)).toHaveLength(0);
+  });
+});
+
+// SEO-05: one structured-data block on every indexable page, built from the same canonical,
+// and none on a noindex page.
+describe('BaseLayout structured data', () => {
+  it('gives the home page Organization, WebSite and WebPage on the SITE_URL origin', async () => {
+    const head = await render('https://ratemyplace-64y.pages.dev/', { title: 'Know before you sign.', description: 'Home' });
+    const graph = ldGraph(head);
+
+    expect(graph.map((node) => node['@type'])).toEqual(['Organization', 'WebSite', 'WebPage']);
+    expect(ldNode(graph, 'Organization')?.['@id']).toBe('https://ratemyplace.org/#organization');
+    expect(ldNode(graph, 'WebSite')?.['@id']).toBe('https://ratemyplace.org/#website');
+    expect(ldNode(graph, 'WebPage')?.url).toBe(canonical(head));
+    expect(ldNode(graph, 'WebPage')?.name).toBe('Know before you sign.');
+    expect(ldNode(graph, 'WebPage')?.description).toBe('Home');
+  });
+
+  it('gives another page its WebPage only, at its canonical', async () => {
+    const head = await render('https://ratemyplace.org/about/?utm_source=x');
+    const graph = ldGraph(head);
+
+    expect(graph.map((node) => node['@type'])).toEqual(['WebPage']);
+    expect(ldNode(graph, 'WebPage')?.url).toBe('https://ratemyplace.org/about');
+    expect(ldNode(graph, 'WebPage')?.url).toBe(canonical(head));
+    expect(ldNode(graph, 'WebPage')?.isPartOf).toEqual({ '@id': 'https://ratemyplace.org/#website' });
+    expect(head.innerHTML).not.toContain('utm_source');
+  });
+
+  it('renders the breadcrumbs a page passes as a BreadcrumbList', async () => {
+    const head = await render('https://ratemyplace.org/landlord/x', {
+      title: 'X',
+      description: 'd',
+      breadcrumbs: [{ name: 'Home', path: '/' }, { name: 'Search', path: '/search' }, { name: 'X' }],
+    });
+    const list = ldNode(ldGraph(head), 'BreadcrumbList');
+    expect(list?.itemListElement).toEqual([
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://ratemyplace.org/' },
+      { '@type': 'ListItem', position: 2, name: 'Search', item: 'https://ratemyplace.org/search' },
+      { '@type': 'ListItem', position: 3, name: 'X', item: 'https://ratemyplace.org/landlord/x' },
+    ]);
+  });
+
+  it('carries no structured data on a noindex page', async () => {
+    const head = await render('https://ratemyplace.org/about', {
+      title: 'X',
+      noindex: true,
+      breadcrumbs: [{ name: 'Home', path: '/' }, { name: 'X' }],
+    });
+    expect(ldScripts(head)).toHaveLength(0);
+    expect(head.innerHTML).not.toContain('ld+json');
+  });
+
+  it('keeps a hostile title inert: no script breakout, and the parsed name is the raw text', async () => {
+    const sentinel = `Sentinel </script><script>alert(1)</script><!-- & Co${String.fromCharCode(0x2028)}${String.fromCharCode(0x2029)}`;
+    const container = await AstroContainer.create();
+    const html = await container.renderToString(BaseLayout, {
+      props: { title: sentinel, description: sentinel, breadcrumbs: [{ name: 'Home', path: '/' }, { name: sentinel }] },
+      slots: { default: '<p>x</p>' },
+      request: new Request('https://ratemyplace.org/landlord/sentinel'),
+      partial: false,
+      locals: { user: null, session: null, ...PROD } as unknown as App.Locals,
+    });
+    // The raw block, up to the first closing tag: had the name closed the element early, this
+    // would stop inside the name and carry its markup.
+    const block = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i)?.[1] ?? '';
+    expect(block).toContain('"@graph"');
+    expect(block).not.toMatch(/[<>&]/);
+    expect(block).not.toContain(String.fromCharCode(0x2028));
+    expect(block).not.toContain(String.fromCharCode(0x2029));
+
+    // Parsed as a browser would: the head holds one script, the data block, and no executable
+    // script anywhere carries the injected code. (The title and meta attributes hold the text
+    // too, escaped by Astro; inside a quoted attribute it is inert.)
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const headScripts = Array.from(doc.head.querySelectorAll('script'));
+    expect(headScripts.map((script) => script.getAttribute('type'))).toEqual(['application/ld+json']);
+    const executable = Array.from(doc.querySelectorAll('script')).filter((script) => script.getAttribute('type') !== 'application/ld+json');
+    for (const script of executable) expect(script.textContent ?? '').not.toContain('alert(1)');
+
+    const graph = ldGraph(doc.head);
+    expect(ldNode(graph, 'WebPage')?.name).toBe(sentinel);
+    expect((ldNode(graph, 'BreadcrumbList')?.itemListElement as JsonLdNode[])[1].name).toBe(sentinel);
   });
 });
