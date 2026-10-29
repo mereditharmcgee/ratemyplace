@@ -290,3 +290,54 @@ describe('"Existing properties" rows open that building', () => {
     expect(go).toHaveBeenCalledWith('/review/new?building=seed-1202188000');
   });
 });
+
+describe('switching between search and manual entry keeps focus on the form (A11Y-05)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('choosing "Enter it manually" by keyboard focuses the street field, and Back to search focuses the search', async () => {
+    stubAddressSearch();
+    render(<ReviewForm />);
+    const input = await typeAndWaitForExisting();
+    input.focus();
+
+    // ArrowUp from a closed list lands on the last option, the way out to manual entry.
+    fireEvent.keyDown(input, { key: 'Escape' });
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    const active = document.getElementById(input.getAttribute('aria-activedescendant') ?? '');
+    expect(active?.textContent).toMatch(/Enter it manually/);
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    const street = await screen.findByLabelText('Street address');
+    expect(document.activeElement).toBe(street);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to search' }));
+    const search = await screen.findByRole('combobox', { name: 'Search for your building address' });
+    expect(document.activeElement).toBe(search);
+  });
+
+  it('moves no focus on the first render of either mode', () => {
+    render(
+      <AddressStep
+        selectedPlace={null}
+        loading={false}
+        error={null}
+        manualMode
+        manualAddress={baseManualAddress}
+        onPlaceSelect={vi.fn()}
+        onConfirm={vi.fn()}
+        onEnterManual={vi.fn()}
+        onManualAddressChange={vi.fn()}
+        onManualConfirm={vi.fn()}
+        onBackToSearch={vi.fn()}
+        onExistingBuildingSelect={vi.fn()}
+      />
+    );
+    expect(document.activeElement).toBe(document.body);
+    cleanup();
+    renderSearchStep(vi.fn());
+    expect(document.activeElement).toBe(document.body);
+  });
+});

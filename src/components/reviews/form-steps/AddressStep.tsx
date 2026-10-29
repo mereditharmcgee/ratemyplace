@@ -28,6 +28,9 @@ interface Props {
   onBackToSearch: () => void;
 }
 
+/** The manual form's first field. The e2e specs find it by this id too. */
+const MANUAL_STREET_ID = 'review-street-address';
+
 export default function AddressStep({
   selectedPlace,
   searchInitialValue,
@@ -48,6 +51,16 @@ export default function AddressStep({
   const helpId = useId();
   const manualHeadingId = useId();
   const manualErrorRef = useRef<HTMLDivElement>(null);
+  const shownManualMode = useRef(manualMode);
+
+  // Switching modes unmounts the control that was pressed: the search option "Enter it
+  // manually" or the "Back to search" button. Focus goes to the first field of the mode that
+  // replaced it, never to the page. Nothing moves on the first render.
+  useEffect(() => {
+    if (shownManualMode.current === manualMode) return;
+    shownManualMode.current = manualMode;
+    document.getElementById(manualMode ? MANUAL_STREET_ID : inputId)?.focus();
+  }, [manualMode, inputId]);
 
   // The manual Continue disables itself while it works, so focus has nowhere to stay: a failed
   // add moves focus to the error instead of announcing it from a live region.
@@ -76,9 +89,9 @@ export default function AddressStep({
 
           <div role="group" aria-labelledby={manualHeadingId} className="space-y-3">
             <div>
-              <label htmlFor="review-street-address" className="block text-xs text-gray-600 mb-1">Street address</label>
+              <label htmlFor={MANUAL_STREET_ID} className="block text-xs text-gray-600 mb-1">Street address</label>
               <input
-                id="review-street-address"
+                id={MANUAL_STREET_ID}
                 type="text"
                 value={manualAddress.streetAddress}
                 onChange={(e) => onManualAddressChange({ ...manualAddress, streetAddress: e.target.value })}
