@@ -362,3 +362,79 @@ test.describe('batch 3: rating questions are native radio groups', () => {
     await expect(three).toBeFocused();
   });
 });
+
+test.describe('batch 4: review steps move focus to their heading, and the progress row fits', () => {
+  // building-30 is a seed building; the form opens at unit details. Nothing here is submitted.
+  async function openUnitDetails(page: Page) {
+    await page.goto('/review/new?building=building-30');
+    await page.locator('#review-bedrooms').waitFor({ timeout: 15_000 });
+    await page.waitForFunction(
+      () => document.querySelectorAll('astro-island[ssr]:not([client="visible"])').length === 0,
+      undefined,
+      { timeout: 10_000 },
+    );
+  }
+
+  const stepHeading = (page: Page, name: string) => page.getByRole('heading', { level: 2, name, exact: true });
+
+  test('Continue and Back by keyboard move focus to the new step heading', async ({ authedPage: page }) => {
+    await prepare(page, DESKTOP);
+    await openUnitDetails(page);
+
+    // Continue sits at the foot of the long unit details step.
+    await page.getByRole('button', { name: 'Continue', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect(stepHeading(page, 'Step 3 of 7: Your Unit')).toBeFocused();
+    // The new step starts on screen, not down where Continue was.
+    await expect(page.getByRole('list', { name: 'Review progress' })).toBeInViewport();
+    await expect(page.getByRole('heading', { name: 'Rate Your Unit' })).toBeInViewport();
+
+    await page.getByRole('button', { name: 'Back', exact: true }).focus();
+    await page.keyboard.press('Space');
+    await expect(stepHeading(page, 'Step 2 of 7: Unit Details')).toBeFocused();
+  });
+
+  // Before this batch the desktop row ran 215, 87 and 7px past the 704px form column.
+  for (const viewport of [
+    { width: 1024, height: 768 },
+    { width: 1280, height: 900 },
+    { width: 1440, height: 900 },
+  ]) {
+    test(`every step from unit details to confirm fits ${viewport.width}px with no sideways scroll`, async ({
+      authedPage: page,
+    }) => {
+      test.setTimeout(60_000);
+      await prepare(page, viewport);
+      await openUnitDetails(page);
+      const progress = page.getByRole('list', { name: 'Review progress' });
+
+      const steps = [
+        { title: 'Unit Details', number: 2, next: 'Continue' },
+        { title: 'Your Unit', number: 3, next: 'Continue' },
+        { title: 'Building', number: 4, next: 'Continue' },
+        { title: 'Landlord', number: 5, next: 'Continue' },
+        { title: 'Additional', number: 6, next: 'Review & Submit' },
+        { title: 'Submit', number: 7, next: null },
+      ];
+      for (const step of steps) {
+        const label = `step ${step.number} at ${viewport.width}px`;
+        await expect(stepHeading(page, `Step ${step.number} of 7: ${step.title}`)).toBeAttached();
+        await expect(progress).toBeVisible();
+        await expect(progress.locator('li[aria-current="step"]')).toContainText(step.title);
+
+        const widths = await page.evaluate(() => {
+          const doc = document.documentElement;
+          const list = document.querySelector('ol[aria-label="Review progress"]') as HTMLElement;
+          return {
+            page: { scroll: doc.scrollWidth, client: doc.clientWidth },
+            list: { scroll: list.scrollWidth, client: list.clientWidth },
+          };
+        });
+        expect(widths.page.scroll, label).toBeLessThanOrEqual(widths.page.client);
+        expect(widths.list.scroll, label).toBeLessThanOrEqual(widths.list.client);
+
+        if (step.next) await page.getByRole('button', { name: step.next, exact: true }).click();
+      }
+    });
+  }
+});
