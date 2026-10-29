@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 // Shared by review.spec.ts, a11y.spec.ts and a11y-keyboard.spec.ts, so a change to how a
 // rating is chosen (the A11Y-04 radio groups) or to how a page is kept off Google is made in
@@ -31,15 +31,18 @@ export async function prepare(page: Page, viewport: { width: number; height: num
 }
 
 /**
- * Rate every visible rating item in the current step with one score.
- * Each step renders only its own RatingItem components (React conditional rendering),
- * so every button[type="button"] matching the score text belongs to this step.
+ * Rate every rating question in the current step with one score, and return how many there
+ * were. Each step renders only its own questions (React conditional rendering), and each
+ * question is a radio group. The click goes to the visible label, as a user's would: the
+ * radio itself is visually hidden, so a click aimed at it would land on the label anyway.
  */
 export async function rateAllItemsInStep(page: Page, score: number): Promise<number> {
-  const scoreButtons = page.locator('button[type="button"]').filter({ hasText: new RegExp(`^${score}$`) });
-  const count = await scoreButtons.count();
+  const groups = page.getByRole('radiogroup');
+  const count = await groups.count();
   for (let i = 0; i < count; i++) {
-    await scoreButtons.nth(i).click();
+    const group = groups.nth(i);
+    await group.locator('label').filter({ hasText: new RegExp(`^${score}$`) }).click();
+    await expect(group.getByRole('radio', { name: String(score), exact: true })).toBeChecked();
   }
   return count;
 }

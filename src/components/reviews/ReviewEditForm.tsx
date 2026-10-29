@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   unitItems,
   buildingItems,
   landlordItems,
   RESPONSE_OPTIONS,
   supplementaryItems,
-  type SurveyItem,
 } from '../../lib/surveyItems';
 import {
   bedroomOptions,
@@ -17,7 +16,7 @@ import {
   petTypeOptions,
   pestTypeOptions,
 } from '../../lib/formOptions';
-import { HelpTooltip } from './HelpTooltip';
+import RatingItem, { RatingScale } from './form-steps/RatingItem';
 import type { ReviewDetail } from '../../pages/api/reviews/[id]';
 import { localityLine } from '../../lib/locality';
 import {
@@ -38,6 +37,16 @@ export default function ReviewEditForm({ review }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [consentAcknowledged, setConsentAcknowledged] = useState(false);
+
+  // Save disables itself while it works, so a failed save moves focus to the error, and a
+  // successful one to the panel that replaces the form. errorSeq counts every failed save,
+  // so the same message twice in a row still moves focus.
+  const [errorSeq, setErrorSeq] = useState(0);
+  const errorRef = useRef<HTMLDivElement>(null);
+  const successRef = useRef<HTMLDivElement>(null);
+  const unitScaleId = useId();
+  const buildingScaleId = useId();
+  const landlordScaleId = useId();
 
   // Form state - initialized from existing review
   const [unitType, setUnitType] = useState(review.unit_type || 'unknown');
@@ -137,6 +146,21 @@ export default function ReviewEditForm({ review }: Props) {
     return initial;
   });
 
+  useEffect(() => {
+    if (errorSeq === 0) return;
+    errorRef.current?.focus();
+    errorRef.current?.scrollIntoView?.({ block: 'center' });
+  }, [errorSeq]);
+
+  useEffect(() => {
+    if (success) successRef.current?.focus();
+  }, [success]);
+
+  const showError = (message: string) => {
+    setError(message);
+    setErrorSeq((n) => n + 1);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -144,7 +168,7 @@ export default function ReviewEditForm({ review }: Props) {
     // gives the reviewer clear feedback instead of a 400.
     const hasAnyRating = Object.values(scores).some((v) => v !== null);
     if (!hasAnyRating) {
-      setError('Please rate at least one item before saving your review.');
+      showError('Please rate at least one item before saving your review.');
       return;
     }
 
@@ -201,78 +225,22 @@ export default function ReviewEditForm({ review }: Props) {
           window.location.href = '/profile?updated=true';
         }, 1500);
       } else {
-        setError(data.error || 'Failed to update review');
+        showError(data.error || 'Failed to update review');
       }
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      showError('An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const renderRatingScale = () => (
-    <div className="flex justify-between items-center text-xs text-gray-500 mb-4 px-2">
-      <span className="text-red-700 font-medium">1 = Strongly Disagree</span>
-      <span className="text-gray-600">3 = Neutral</span>
-      <span className="text-emerald-700 font-medium">5 = Strongly Agree</span>
-    </div>
-  );
-
-  const renderRatingItem = (item: SurveyItem) => {
-    const value = scores[item.key];
-
-    return (
-      <div key={item.key} className="py-4 border-b border-gray-100 last:border-0">
-        <div className="mb-3">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <span className="text-xs text-gray-600 font-mono mr-2">{item.code}</span>
-              <span className="font-medium text-gray-900">{item.dimension}</span>
-              {item.required && <span className="text-red-700 ml-1">*</span>}
-              <HelpTooltip help={item.help} dimension={item.dimension} />
-            </div>
-          </div>
-          <p className="text-sm text-gray-600 mt-1">{item.text}</p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {[1, 2, 3, 4, 5].map((rating) => (
-            <button
-              key={rating}
-              type="button"
-              onClick={() => setScores({ ...scores, [item.key]: rating })}
-              className={`w-10 h-10 rounded-full text-sm font-medium transition-all ${
-                value === rating
-                  ? rating <= 2
-                    ? 'bg-red-600 text-white'
-                    : rating === 3
-                      ? 'bg-amber-400 text-slate-900'
-                      : 'bg-emerald-700 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {rating}
-            </button>
-          ))}
-          {item.allowNA && (
-            <button
-              type="button"
-              onClick={() => setScores({ ...scores, [item.key]: null })}
-              className={`px-3 h-10 rounded-full text-sm font-medium transition-all ${
-                value === null ? 'bg-gray-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              N/A
-            </button>
-          )}
-        </div>
-      </div>
-    );
+  const handleScoreChange = (key: string, value: number | null) => {
+    setScores({ ...scores, [key]: value });
   };
 
   if (success) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-[6px] p-6 text-center">
+      <div ref={successRef} tabIndex={-1} className="bg-green-50 border border-green-200 rounded-[6px] p-6 text-center">
         <svg className="w-12 h-12 text-green-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
@@ -297,7 +265,7 @@ export default function ReviewEditForm({ review }: Props) {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
+        <div ref={errorRef} tabIndex={-1} className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
           {error}
         </div>
       )}
@@ -308,15 +276,16 @@ export default function ReviewEditForm({ review }: Props) {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="review-edit-unit-number" className="block text-sm font-medium text-gray-700 mb-2">
               Unit Number <span className="text-gray-600">(optional)</span>
             </label>
             <input
+              id="review-edit-unit-number"
               type="text"
               value={unitNumber}
               onChange={(e) => setUnitNumber(e.target.value)}
               placeholder="e.g., 2A, 301"
-              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
             />
             <p className="text-xs text-gray-600 mt-1">
               For our moderation team only. Never shown publicly.
@@ -324,24 +293,26 @@ export default function ReviewEditForm({ review }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="review-edit-square-footage" className="block text-sm font-medium text-gray-700 mb-2">
               Square Footage <span className="text-gray-600">(optional)</span>
             </label>
             <input
+              id="review-edit-square-footage"
               type="number"
               value={squareFootage}
               onChange={(e) => setSquareFootage(e.target.value)}
               placeholder="e.g., 750"
-              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Bedrooms</label>
+            <label htmlFor="review-edit-bedrooms" className="block text-sm font-medium text-gray-700 mb-2">Bedrooms</label>
             <select
+              id="review-edit-bedrooms"
               value={bedrooms}
               onChange={(e) => setBedrooms(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
             >
               {bedroomOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -352,11 +323,12 @@ export default function ReviewEditForm({ review }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Bathrooms</label>
+            <label htmlFor="review-edit-bathrooms" className="block text-sm font-medium text-gray-700 mb-2">Bathrooms</label>
             <select
+              id="review-edit-bathrooms"
               value={bathrooms}
               onChange={(e) => setBathrooms(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
             >
               {bathroomOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -367,17 +339,18 @@ export default function ReviewEditForm({ review }: Props) {
           </div>
 
           <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="review-edit-rent-amount" className="block text-sm font-medium text-gray-700 mb-2">
               Monthly Rent <span className="text-gray-600">(optional)</span>
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600">$</span>
               <input
+                id="review-edit-rent-amount"
                 type="number"
                 value={rentAmount}
                 onChange={(e) => setRentAmount(e.target.value)}
                 placeholder="e.g., 2500"
-                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
               />
             </div>
           </div>
@@ -388,10 +361,10 @@ export default function ReviewEditForm({ review }: Props) {
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Amenities & Utilities</h3>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
+        <div role="group" aria-labelledby="review-edit-amenities-label">
+          <span id="review-edit-amenities-label" className="block text-sm font-medium text-gray-700 mb-3">
             Amenities <span className="text-gray-600">(select all that apply)</span>
-          </label>
+          </span>
           <div className="grid grid-cols-2 gap-2">
             {amenityOptions.map((amenity) => (
               <label
@@ -412,7 +385,7 @@ export default function ReviewEditForm({ review }: Props) {
                       setAmenities(amenities.filter((a) => a !== amenity.id));
                     }
                   }}
-                  className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+                  className="rounded border-gray-300 text-teal-700 focus:ring-teal-700"
                 />
                 <span className="text-sm text-gray-700">{amenity.label}</span>
               </label>
@@ -420,10 +393,10 @@ export default function ReviewEditForm({ review }: Props) {
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
+        <div role="group" aria-labelledby="review-edit-utilities-label">
+          <span id="review-edit-utilities-label" className="block text-sm font-medium text-gray-700 mb-3">
             Utilities Included in Rent <span className="text-gray-600">(select all that apply)</span>
-          </label>
+          </span>
           <div className="grid grid-cols-2 gap-2">
             {utilityOptions.map((utility) => (
               <label
@@ -444,7 +417,7 @@ export default function ReviewEditForm({ review }: Props) {
                       setUtilitiesIncluded(utilitiesIncluded.filter((u) => u !== utility.id));
                     }
                   }}
-                  className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+                  className="rounded border-gray-300 text-teal-700 focus:ring-teal-700"
                 />
                 <span className="text-sm text-gray-700">{utility.label}</span>
               </label>
@@ -455,17 +428,18 @@ export default function ReviewEditForm({ review }: Props) {
         {/* Estimated monthly utilities for non-included utilities */}
         {utilitiesIncluded.length < utilityOptions.length && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="review-edit-estimated-utilities" className="block text-sm font-medium text-gray-700 mb-2">
               Estimated Monthly Utility Cost <span className="text-gray-600">(for utilities not included)</span>
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600">$</span>
               <input
+                id="review-edit-estimated-utilities"
                 type="number"
                 value={estimatedMonthlyUtilities}
                 onChange={(e) => setEstimatedMonthlyUtilities(e.target.value)}
                 placeholder="e.g., 150"
-                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
               />
             </div>
             <p className="text-xs text-gray-600 mt-1">
@@ -477,11 +451,12 @@ export default function ReviewEditForm({ review }: Props) {
         {/* Laundry Section */}
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Laundry Situation</label>
+            <label htmlFor="review-edit-laundry-type" className="block text-sm font-medium text-gray-700 mb-2">Laundry Situation</label>
             <select
+              id="review-edit-laundry-type"
               value={laundryType}
               onChange={(e) => setLaundryType(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
             >
               {laundryTypeOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -493,18 +468,19 @@ export default function ReviewEditForm({ review }: Props) {
 
           {laundryType === 'coin_op' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="review-edit-laundry-cost" className="block text-sm font-medium text-gray-700 mb-2">
                 Cost per Load (wash + dry) <span className="text-gray-600">(optional)</span>
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600">$</span>
                 <input
+                  id="review-edit-laundry-cost"
                   type="number"
                   step="0.25"
                   value={laundryCostPerLoad}
                   onChange={(e) => setLaundryCostPerLoad(e.target.value)}
                   placeholder="e.g., 3.50"
-                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
                 />
               </div>
               <p className="text-xs text-gray-600 mt-1">
@@ -517,13 +493,14 @@ export default function ReviewEditForm({ review }: Props) {
 
       {/* Parking */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="review-edit-parking-type" className="block text-sm font-medium text-gray-700 mb-2">
           Parking Situation <span className="text-gray-600">(optional)</span>
         </label>
         <select
+          id="review-edit-parking-type"
           value={parkingType}
           onChange={(e) => setParkingType(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
         >
           <option value="">Select...</option>
           {parkingTypeOptions.map((opt) => (
@@ -533,10 +510,10 @@ export default function ReviewEditForm({ review }: Props) {
       </div>
 
       {/* Pets */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
+      <div role="group" aria-labelledby="review-edit-pets-label">
+        <span id="review-edit-pets-label" className="block text-sm font-medium text-gray-700 mb-3">
           Pets Allowed <span className="text-gray-600">(select all that apply)</span>
-        </label>
+        </span>
         <div className="grid grid-cols-2 gap-2">
           {petTypeOptions.map((pet) => (
             <label
@@ -552,7 +529,7 @@ export default function ReviewEditForm({ review }: Props) {
                   if (e.target.checked) setPetTypes([...petTypes, pet.id]);
                   else setPetTypes(petTypes.filter((p) => p !== pet.id));
                 }}
-                className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+                className="rounded border-gray-300 text-teal-700 focus:ring-teal-700"
               />
               <span className="text-sm text-gray-700">{pet.label}</span>
             </label>
@@ -568,8 +545,18 @@ export default function ReviewEditForm({ review }: Props) {
             Think about the unit you lived in. Rate how much you agree with each statement.
           </p>
         </div>
-        {renderRatingScale()}
-        <div className="space-y-2">{unitItems.map(renderRatingItem)}</div>
+        <RatingScale id={unitScaleId} />
+        <div className="space-y-2">
+          {unitItems.map((item) => (
+            <RatingItem
+              key={item.key}
+              item={item}
+              value={scores[item.key]}
+              onChange={handleScoreChange}
+              describedBy={unitScaleId}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Building Ratings */}
@@ -580,8 +567,18 @@ export default function ReviewEditForm({ review }: Props) {
             Think about the building as a whole. If something doesn't apply, select "N/A".
           </p>
         </div>
-        {renderRatingScale()}
-        <div className="space-y-2">{buildingItems.map(renderRatingItem)}</div>
+        <RatingScale id={buildingScaleId} />
+        <div className="space-y-2">
+          {buildingItems.map((item) => (
+            <RatingItem
+              key={item.key}
+              item={item}
+              value={scores[item.key]}
+              onChange={handleScoreChange}
+              describedBy={buildingScaleId}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Landlord Ratings */}
@@ -594,16 +591,17 @@ export default function ReviewEditForm({ review }: Props) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="review-edit-landlord-name" className="block text-sm font-medium text-gray-700 mb-2">
             Who was your landlord or property manager? <span className="text-gray-600">(optional)</span>
           </label>
           <input
+            id="review-edit-landlord-name"
             type="text"
             value={landlordName}
             onChange={(e) => setLandlordName(e.target.value)}
             placeholder="e.g. Samia Management, John Smith"
             maxLength={200}
-            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
           />
           <p className="text-sm text-gray-600 mt-1">This helps us link reviews to the right landlord. It won't be shown publicly on your review.</p>
 
@@ -615,31 +613,42 @@ export default function ReviewEditForm({ review }: Props) {
                 setHasSeparateManager(e.target.checked);
                 if (!e.target.checked) setPropertyManagerName('');
               }}
-              className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+              className="rounded border-gray-300 text-teal-700 focus:ring-teal-700"
             />
             <span className="text-sm text-gray-700">Someone else manages the property</span>
           </label>
 
           {hasSeparateManager && (
             <div className="mt-3">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="review-edit-property-manager-name" className="block text-sm font-medium text-gray-700 mb-2">
                 Who manages the property? <span className="text-gray-600">(optional)</span>
               </label>
               <input
+                id="review-edit-property-manager-name"
                 type="text"
                 value={propertyManagerName}
                 onChange={(e) => setPropertyManagerName(e.target.value)}
                 placeholder="e.g. ABC Property Management"
                 maxLength={200}
-                className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
               />
               <p className="text-sm text-gray-600 mt-1">The company or person who handles day-to-day management (maintenance, rent collection, etc.)</p>
             </div>
           )}
         </div>
 
-        {renderRatingScale()}
-        <div className="space-y-2">{landlordItems.map(renderRatingItem)}</div>
+        <RatingScale id={landlordScaleId} />
+        <div className="space-y-2">
+          {landlordItems.map((item) => (
+            <RatingItem
+              key={item.key}
+              item={item}
+              value={scores[item.key]}
+              onChange={handleScoreChange}
+              describedBy={landlordScaleId}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Issues */}
@@ -719,15 +728,17 @@ export default function ReviewEditForm({ review }: Props) {
         <h3 className="text-lg font-semibold text-gray-900">Tenancy Details</h3>
 
         {/* Move-in date */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div role="group" aria-labelledby="review-edit-move-in-label">
+          <span id="review-edit-move-in-label" className="block text-sm font-medium text-gray-700 mb-2">
             When did you move in?
-          </label>
+          </span>
           <div className="grid grid-cols-2 gap-3">
             <select
+              id="review-edit-move-in-month"
+              aria-label="Move-in month"
               value={moveInMonth}
               onChange={(e) => setMoveInMonth(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
             >
               <option value="">Month</option>
               <option value="1">January</option>
@@ -744,9 +755,11 @@ export default function ReviewEditForm({ review }: Props) {
               <option value="12">December</option>
             </select>
             <select
+              id="review-edit-move-in-year"
+              aria-label="Move-in year"
               value={moveInYear}
               onChange={(e) => setMoveInYear(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
             >
               <option value="">Year</option>
               {Array.from({ length: new Date().getFullYear() - 1999 }, (_, i) => new Date().getFullYear() - i).map((year) => (
@@ -794,10 +807,10 @@ export default function ReviewEditForm({ review }: Props) {
       </div>
 
       {/* Housing Vouchers */}
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700">
+      <div role="group" aria-labelledby="review-edit-housing-vouchers-label" className="space-y-2">
+        <span id="review-edit-housing-vouchers-label" className="block text-sm font-medium text-gray-700">
           {supplementaryItems.housingVouchers.text} <span className="text-gray-600">(optional)</span>
-        </label>
+        </span>
         <div className="flex gap-4">
           {supplementaryItems.housingVouchers.options.map((opt) => (
             <label key={opt.value} className="flex items-center gap-2">
@@ -805,7 +818,7 @@ export default function ReviewEditForm({ review }: Props) {
                 type="radio"
                 checked={housingVouchers === opt.value}
                 onChange={() => setHousingVouchers(opt.value)}
-                className="text-teal-700 focus:ring-teal-500"
+                className="text-teal-700 focus:ring-teal-700"
               />
               <span>{opt.label}</span>
             </label>
@@ -814,10 +827,10 @@ export default function ReviewEditForm({ review }: Props) {
       </div>
 
       {/* Safely Lit at Night */}
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700">
+      <div role="group" aria-labelledby="review-edit-safely-lit-label" className="space-y-2">
+        <span id="review-edit-safely-lit-label" className="block text-sm font-medium text-gray-700">
           {supplementaryItems.safelyLit.text} <span className="text-gray-600">(optional)</span>
-        </label>
+        </span>
         <div className="flex gap-4">
           {supplementaryItems.safelyLit.options.map((opt) => (
             <label key={opt.value} className="flex items-center gap-2">
@@ -825,7 +838,7 @@ export default function ReviewEditForm({ review }: Props) {
                 type="radio"
                 checked={safelyLit === opt.value}
                 onChange={() => setSafelyLit(opt.value)}
-                className="text-teal-700 focus:ring-teal-500"
+                className="text-teal-700 focus:ring-teal-700"
               />
               <span>{opt.label}</span>
             </label>
@@ -845,7 +858,7 @@ export default function ReviewEditForm({ review }: Props) {
                 type="radio"
                 checked={wouldRecommend === opt.value}
                 onChange={() => setWouldRecommend(opt.value)}
-                className="text-teal-700 focus:ring-teal-500"
+                className="text-teal-700 focus:ring-teal-700"
               />
               <span>{opt.label}</span>
             </label>
@@ -858,30 +871,32 @@ export default function ReviewEditForm({ review }: Props) {
         <h3 className="text-lg font-semibold text-gray-900">Your Review</h3>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="review-edit-review-title" className="block text-sm font-medium text-gray-700 mb-2">
             Review Title <span className="text-gray-600">(optional)</span>
           </label>
           <input
+            id="review-edit-review-title"
             type="text"
             value={reviewTitle}
             onChange={(e) => setReviewTitle(e.target.value)}
             placeholder="Summarize your experience"
             maxLength={100}
-            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="review-edit-review-text" className="block text-sm font-medium text-gray-700 mb-2">
             Additional Comments <span className="text-gray-600">(optional)</span>
           </label>
           <textarea
+            id="review-edit-review-text"
             value={reviewText}
             onChange={(e) => setReviewText(e.target.value)}
             placeholder="Share any details that would help future tenants. Avoid including identifying information."
             rows={4}
             maxLength={1000}
-            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
           />
           <p className="text-sm text-gray-600 mt-1">{reviewText.length}/1000 characters</p>
         </div>

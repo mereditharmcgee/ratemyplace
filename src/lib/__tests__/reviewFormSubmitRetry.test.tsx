@@ -53,7 +53,7 @@ function unparseable(status: number) {
 function walkToConfirm({ rate = true } = {}) {
   render(<ReviewForm building={{ id: 'b1', address: '45 Melnea Cass Blvd', city: 'Boston' }} />);
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-  if (rate) fireEvent.click(screen.getAllByRole('button', { name: '4' })[0]);
+  if (rate) fireEvent.click(screen.getAllByRole('radio', { name: '4' })[0]);
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));

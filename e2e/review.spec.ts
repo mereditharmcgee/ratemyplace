@@ -94,10 +94,13 @@ test.describe('Review Form', () => {
     await authedPage.locator('button[type="button"]', { hasText: 'Continue' }).click();
     await expect(authedPage.locator('text=Rate Your Unit').first()).toBeVisible({ timeout: 10000 });
 
-    // Rate the first two visible rating items with score 3
-    const scoreButtons = authedPage.locator('button[type="button"]').filter({ hasText: /^3$/ });
-    await scoreButtons.nth(0).click();
-    await scoreButtons.nth(1).click();
+    // Rate the first two questions 3. Each question is a radio group; click its visible label.
+    const groups = authedPage.getByRole('radiogroup');
+    const three = (i: number) => groups.nth(i).getByRole('radio', { name: '3', exact: true });
+    await groups.nth(0).locator('label').filter({ hasText: /^3$/ }).click();
+    await groups.nth(1).locator('label').filter({ hasText: /^3$/ }).click();
+    await expect(three(0)).toBeChecked();
+    await expect(three(1)).toBeChecked();
 
     // Navigate back to unit-details. The step's own field is the indicator: a 'Unit Details'
     // text locator resolves first to StepIndicator's compact mobile label, hidden at desktop width.
@@ -112,12 +115,10 @@ test.describe('Review Form', () => {
     await authedPage.locator('button[type="button"]', { hasText: 'Continue' }).click();
     await expect(authedPage.locator('text=Rate Your Unit').first()).toBeVisible({ timeout: 10000 });
 
-    // The previously rated buttons should still show selected state (colored background, not gray-100)
-    // We check that at least 2 buttons have selected styling (non-gray background)
-    // Selected score-3 buttons get amber-400 background; we verify the count of selected buttons
-    const ratedButtons = authedPage.locator('button[type="button"]').filter({ hasText: /^3$/ });
-    const ratedCount = await ratedButtons.count();
-    expect(ratedCount).toBeGreaterThanOrEqual(2);
+    // The two answers are still chosen, and nothing else is.
+    await expect(three(0)).toBeChecked();
+    await expect(three(1)).toBeChecked();
+    await expect(groups.nth(2).getByRole('radio', { checked: true })).toHaveCount(0);
   });
 
   // E2E-04 partial: Review form validates building_id is required
@@ -192,8 +193,8 @@ test.describe('Review Form', () => {
     await expect(authedPage.locator('button[type="button"]', { hasText: 'Submit Review' })).toBeEnabled();
   });
 
-  // Boundary values: rating buttons accept 1 (minimum) and 5 (maximum)
-  test('rating buttons at boundary values (1 and 5)', async ({ authedPage }) => {
+  // Boundary values: rating questions accept 1 (minimum) and 5 (maximum)
+  test('rating answers at boundary values (1 and 5)', async ({ authedPage }) => {
     await authedPage.goto('/review/new?building=building-30');
     await authedPage.waitForLoadState('networkidle');
     // Wait for UnitDetailsStep to render — the Bedrooms select is a reliable indicator
@@ -203,23 +204,22 @@ test.describe('Review Form', () => {
     await authedPage.locator('button[type="button"]', { hasText: 'Continue' }).click();
     await expect(authedPage.locator('text=Rate Your Unit').first()).toBeVisible({ timeout: 10000 });
 
-    // Rate first item with score 1 (minimum — low boundary)
-    const score1Buttons = authedPage.locator('button[type="button"]').filter({ hasText: /^1$/ });
-    await score1Buttons.nth(0).click();
+    // Rate the first question 1 (low boundary) and the second 5 (high boundary), by label.
+    const groups = authedPage.getByRole('radiogroup');
+    const label1 = groups.nth(0).locator('label').filter({ hasText: /^1$/ });
+    const label5 = groups.nth(1).locator('label').filter({ hasText: /^5$/ });
+    const radio1 = groups.nth(0).getByRole('radio', { name: '1', exact: true });
+    const radio5 = groups.nth(1).getByRole('radio', { name: '5', exact: true });
+    await label1.click();
+    await label5.click();
+    await expect(radio1).toBeChecked();
+    await expect(radio5).toBeChecked();
 
-    // Rate second item with score 5 (maximum — high boundary)
-    const score5Buttons = authedPage.locator('button[type="button"]').filter({ hasText: /^5$/ });
-    await score5Buttons.nth(1).click();
-
-    // Both boundary values should now be registered (not in the default gray-100 state).
-    // The score-1 button clicked gets coral-500 styling; score-5 gets emerald-500 styling.
-    // We verify the buttons are now in a selected state by checking they are visible and clickable.
-    await expect(score1Buttons.nth(0)).toBeVisible();
-    await expect(score5Buttons.nth(1)).toBeVisible();
-
-    // Click each again to confirm they remain responsive (UI doesn't freeze on boundary inputs)
-    await score1Buttons.nth(0).click();
-    await score5Buttons.nth(1).click();
+    // Clicking a chosen answer again keeps it chosen (the UI does not freeze or toggle off).
+    await label1.click();
+    await label5.click();
+    await expect(radio1).toBeChecked();
+    await expect(radio5).toBeChecked();
   });
 
 });

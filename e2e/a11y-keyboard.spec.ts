@@ -303,3 +303,62 @@ test.describe('batch 2: both address searches are comboboxes with a listbox popu
     await expect(picked).toContainText(FICTIONAL_QUERY);
   });
 });
+
+test.describe('batch 3: rating questions are native radio groups', () => {
+  test('Tab enters a question on its first answer, arrows choose, and Tab leaves the question', async ({
+    authedPage: page,
+  }) => {
+    await prepare(page, DESKTOP);
+    // building-30 is a seed building; nothing here is submitted.
+    await page.goto('/review/new?building=building-30');
+    await page.locator('#review-bedrooms').waitFor({ timeout: 15_000 });
+    await page.waitForFunction(
+      () => document.querySelectorAll('astro-island[ssr]:not([client="visible"])').length === 0,
+      undefined,
+      { timeout: 10_000 },
+    );
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByRole('heading', { name: 'Rate Your Unit' }).waitFor();
+
+    const first = page.getByRole('radiogroup').first();
+    await expect(first.getByRole('radio', { checked: true })).toHaveCount(0);
+
+    // Tab from wherever focus is until it reaches a radio.
+    let reached = false;
+    for (let i = 0; i < 60 && !reached; i++) {
+      await page.keyboard.press('Tab');
+      reached = await page.evaluate(() => (document.activeElement as HTMLInputElement | null)?.type === 'radio');
+    }
+    expect(reached).toBe(true);
+
+    // Nothing is answered, so the group's Tab stop is its first answer, unchecked.
+    const one = first.getByRole('radio', { name: '1', exact: true });
+    await expect(one).toBeFocused();
+    await expect(one).not.toBeChecked();
+
+    // Arrow keys move and choose within the question.
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    const three = first.getByRole('radio', { name: '3', exact: true });
+    await expect(three).toBeChecked();
+    await expect(three).toBeFocused();
+    await expect(first.getByRole('radio', { checked: true })).toHaveCount(1);
+
+    // The focused pill shows the keyboard outline, taken from its hidden radio. The pill's
+    // transition-all eases the outline in, so wait for it to settle.
+    await expect
+      .poll(() =>
+        three.evaluate((radio) => {
+          const style = getComputedStyle(radio.nextElementSibling as Element);
+          return { width: style.outlineWidth, style: style.outlineStyle };
+        }),
+      )
+      .toEqual({ width: '2px', style: 'solid' });
+
+    // One Tab stop per question: Tab leaves the group, Shift+Tab comes back to the answer.
+    await page.keyboard.press('Tab');
+    expect(await first.evaluate((group) => group.contains(document.activeElement))).toBe(false);
+    await page.keyboard.press('Shift+Tab');
+    await expect(three).toBeFocused();
+  });
+});
