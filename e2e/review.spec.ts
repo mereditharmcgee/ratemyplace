@@ -222,9 +222,8 @@ test.describe('Review Form', () => {
     const score5Buttons = authedPage.locator('button[type="button"]').filter({ hasText: /^5$/ });
     await score5Buttons.nth(1).click();
 
-    // Both boundary values should now be registered (not in the default gray-100 state).
-    // The score-1 button clicked gets coral-500 styling; score-5 gets emerald-500 styling.
-    // We verify the buttons are now in a selected state by checking they are visible and clickable.
+    // A selected 1 takes the red fill and a selected 5 the emerald fill (RatingItem.tsx).
+    // This test does not check the fill: it checks that both buttons stay visible and clickable.
     await expect(score1Buttons.nth(0)).toBeVisible();
     await expect(score5Buttons.nth(1)).toBeVisible();
 

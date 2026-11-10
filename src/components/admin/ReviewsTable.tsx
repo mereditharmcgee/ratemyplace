@@ -19,7 +19,7 @@ interface Review {
   review_title: string;
   review_text: string;
   comments: string;
-  overall_score: number;
+  overall_score: number | null;
   status: 'pending' | 'approved' | 'rejected' | 'flagged';
   is_verified: number;
   created_at: number;
@@ -153,7 +153,10 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
     }
   };
 
-  const getScoreColor = (score: number) => getScoreTextColor(score);
+  const getScoreColor = (score: number | null) => {
+    if (score === null) return 'text-gray-600';
+    return getScoreTextColor(score);
+  };
 
   const getScoreBadgeColor = (score: number) => {
     const c = getScoreColorPair(score);

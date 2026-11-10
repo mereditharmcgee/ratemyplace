@@ -28,6 +28,7 @@ import {
   moveOutEditChoices,
   moveOutEditValue,
 } from '../../lib/privacy';
+import { tenureEditChoices, tenureEditValue } from '../../lib/tenure';
 
 interface Props {
   review: ReviewDetail;
@@ -101,8 +102,10 @@ export default function ReviewEditForm({ review }: Props) {
     givenMoveIn(review).year?.toString() || ''
   );
 
-  // Tenure & move-out. The select starts at the stored answer, so an untouched save keeps it.
-  const [tenureMonths, setTenureMonths] = useState(review.tenure_months || 18);
+  // Tenure & move-out. Each select starts at the stored answer, so an untouched save keeps it.
+  const initialTenure = tenureEditValue(review);
+  const [tenureMonths, setTenureMonths] = useState(initialTenure);
+  const tenureChoices = tenureEditChoices(supplementaryItems.tenure.options, initialTenure);
   const initialMoveOut = moveOutEditValue(review);
   const [moveOutYear, setMoveOutYear] = useState(initialMoveOut);
   const moveOutChoices = moveOutEditChoices(supplementaryItems.moveOutTiming.options, initialMoveOut);
@@ -763,10 +766,10 @@ export default function ReviewEditForm({ review }: Props) {
             </label>
             <select
               value={tenureMonths}
-              onChange={(e) => setTenureMonths(parseInt(e.target.value))}
+              onChange={(e) => setTenureMonths(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
-              {supplementaryItems.tenure.options.map((opt) => (
+              {tenureChoices.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>

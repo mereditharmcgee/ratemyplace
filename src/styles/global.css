@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* Tailwind builds this file from every file git does not ignore. These paths are not UI: the
+   contrast guard tests quote the retired colours they ban, and the plans, docs and brand notes
+   quote old class names, so scanning them kept dead rules for retired classes in the live CSS.
+   Paths are relative to this file. */
+@source not "../lib/__tests__";
+@source not "../../CLAUDE_CONTEXT.md";
+@source not "../../brand.md";
+@source not "../../.planning";
+@source not "../../docs";
+@source not "../../brand/social/og-default.html";
+
 @theme {
   --color-paper: #F6F4EE;
   --color-warm-lamp: #F5E6A8;   /* logo lit window ONLY, never elsewhere */

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import SigninPage from '../../pages/auth/signin.astro';
 import SignupPage from '../../pages/auth/signup.astro';
 import ReviewEditPage from '../../pages/review/edit/[id].astro';
+import { fakeD1 } from './helpers/fakeD1';
 
 // Sign-in and sign-up carry a validated `?redirect=` through to every way out of the page:
 // the form's own success navigation (data-redirect), the Google button, and the link to the
@@ -104,5 +105,28 @@ describe('review edit page', () => {
     });
     expect(response.status).toBe(302);
     expect(response.headers.get('Location')).toBe('/auth/signin?redirect=%2Freview%2Fedit%2Fabc');
+  });
+
+  // The page reads its review through getDB, the same accessor the API routes use.
+  async function signedInTo(review: { user_id: string } | null): Promise<Response> {
+    const { db } = fakeD1((call) => (call.sql.includes('FROM reviews r') ? review : undefined));
+    const container = await AstroContainer.create();
+    return container.renderToResponse(ReviewEditPage, {
+      locals: { ...SIGNED_IN, runtime: { env: { DB: db } } } as unknown as App.Locals,
+      params: { id: 'abc' },
+      request: new Request('https://ratemyplace.org/review/edit/abc'),
+    });
+  }
+
+  it('sends a signed-in visitor to their profile when the review does not exist', async () => {
+    const response = await signedInTo(null);
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe('/profile?error=not-found');
+  });
+
+  it("sends a signed-in visitor to their profile from someone else's review", async () => {
+    const response = await signedInTo({ user_id: 'someone-else' });
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe('/profile?error=unauthorized');
   });
 });

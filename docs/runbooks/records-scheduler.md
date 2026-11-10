@@ -108,13 +108,17 @@ a next-morning check rather than a same-session one. Look for `records_plan` wit
 before it. Workers Logs is enabled on this Worker, so both can be read after the fact under
 Workers → `ratemyplace-records-scheduler` → Logs rather than by sitting on a tail at 2am.
 
-Unpausing the city-wide fill is a separate, deliberate step (sub-project C3, after the site
-release), not part of this deploy. See the next section.
+Unpausing the city-wide fill is a separate, deliberate step, not part of this deploy. See the
+next section.
 
 ## Turning the city-wide fill on for the first time
 
-The Worker ships paused. Once the C3 site release is live (search, the records button, the
-sitemap), turn the fill on once, deliberately.
+> **Done once, 2026-09-12.** The C3 site release (search, the records button, the sitemap)
+> went live and the fill was turned on that day, after migration `0033` (applied 2026-09-10).
+> The steps below stand as the procedure for a rebuild or a fresh environment.
+
+The Worker ships paused. Once the site release it feeds is live, turn the fill on once,
+deliberately.
 
 **Step 0, before anything else: apply migration `0033` by hand — done 2026-09-10.** It
 indexes `records_queue(reason, requested_at)`, which is the records button's rolling
