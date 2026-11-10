@@ -439,16 +439,29 @@ const chartsClass = 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5';
   // hashchange) covers a second click when the hash is already #report-record.
   const REPORT_HASH = '#report-record';
 
-  function unfoldReportForm(): void {
+  function unfoldReportForm(): HTMLDetailsElement | null {
     const report = document.getElementById('report-record');
-    if (report instanceof HTMLDetailsElement) report.open = true;
+    if (!(report instanceof HTMLDetailsElement)) return null;
+    report.open = true;
+    return report;
   }
 
   if (location.hash === REPORT_HASH) unfoldReportForm();
   window.addEventListener('hashchange', () => {
     if (location.hash === REPORT_HASH) unfoldReportForm();
   });
+  // The header link also takes keyboard and screen-reader focus to the form's summary. A plain
+  // jump to the fragment would not: the browser clears focus when the target (the details) is not
+  // focusable. So the link does the jump itself, keeping the URL and the history entry it made.
   document.querySelectorAll(`a[href="${REPORT_HASH}"]`).forEach((link) => {
-    link.addEventListener('click', unfoldReportForm);
+    link.addEventListener('click', (event) => {
+      const report = unfoldReportForm();
+      const summary = report?.querySelector('summary');
+      if (!report || !summary) return;
+      event.preventDefault();
+      if (location.hash !== REPORT_HASH) history.pushState(null, '', REPORT_HASH);
+      report.scrollIntoView({ block: 'start' });
+      summary.focus({ preventScroll: true });
+    });
   });
 </script>

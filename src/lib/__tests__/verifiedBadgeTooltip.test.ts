@@ -99,6 +99,30 @@ describe('VerifiedBadge tooltip', () => {
   });
 });
 
+describe('VerifiedBadge tooltip semantics', () => {
+  it('is the tooltip of the badge, tied to it by aria-describedby', async () => {
+    const root = await renderBadge();
+    const tip = root.querySelector('[data-verified-tooltip]')!;
+    const badge = tip.parentElement!;
+    expect(tip.getAttribute('role')).toBe('tooltip');
+    expect(tip.id).toMatch(/^verified-tip-/);
+    expect(badge.getAttribute('aria-describedby')).toBe(tip.id);
+  });
+
+  it('gives each badge its own tooltip id', async () => {
+    const first = (await renderBadge()).querySelector('[data-verified-tooltip]')!.id;
+    const second = (await renderBadge()).querySelector('[data-verified-tooltip]')!.id;
+    expect(first).not.toBe(second);
+  });
+
+  it('hides the tooltip while the badge is marked dismissed (Escape)', async () => {
+    const root = await renderBadge();
+    const tip = root.querySelector('[data-verified-tooltip]')!;
+    expect(tip.parentElement!.hasAttribute('data-verified-badge')).toBe(true);
+    expect(classesOf(tip)).toContain('group-data-[dismissed]:opacity-0!');
+  });
+});
+
 describe('ReviewCard anchors each Verified tooltip inside the card', () => {
   it('gives every badge a positioned row inside the article', async () => {
     const root = await renderCard();

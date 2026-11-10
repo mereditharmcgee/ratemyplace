@@ -3,7 +3,8 @@ import { localityLine } from '../../lib/locality';
 
 interface Props {
   review: UserReview;
-  onVerifyClick: (reviewId: string) => void;
+  /** The button is passed so the dialog it opens can return focus to it. */
+  onVerifyClick: (reviewId: string, trigger: HTMLElement) => void;
 }
 
 export default function ReviewListItem({ review, onVerifyClick }: Props) {
@@ -108,7 +109,8 @@ export default function ReviewListItem({ review, onVerifyClick }: Props) {
           </svg>
           <span className="text-xs text-blue-700">Verify your tenancy to add a trust badge to this review</span>
           <button
-            onClick={() => onVerifyClick(review.id)}
+            type="button"
+            onClick={(event) => onVerifyClick(review.id, event.currentTarget)}
             className="ml-auto text-xs font-medium text-teal-700 bg-teal-100 px-2 py-1 rounded hover:bg-teal-200 hover:text-teal-800 transition-colors whitespace-nowrap"
           >
             Verify

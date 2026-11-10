@@ -29,7 +29,7 @@ const RECORD_KIND_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
 ];
 
 const inputClass =
-  'w-full px-3 py-2 border rounded-[4px] shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500';
+  'w-full px-3 py-2 border rounded-[4px] shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-teal-500';
 
 export default function RecordCorrectionForm({ buildingId }: Props) {
   const [recordKind, setRecordKind] = useState('');
@@ -339,7 +339,7 @@ export default function RecordCorrectionForm({ buildingId }: Props) {
       <button
         type="submit"
         disabled={loading}
-        className="w-full bg-teal-700 text-white px-6 py-3 rounded-[4px] font-semibold hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+        className="w-full bg-teal-700 text-white px-6 py-3 rounded-[4px] font-semibold hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-700 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
       >
         {loading ? 'Sending…' : 'Send report'}
       </button>

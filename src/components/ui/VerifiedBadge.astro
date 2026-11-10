@@ -11,6 +11,8 @@
  * text stuck out past the card and made phone pages scroll sideways, even while hidden.
  *
  * The badge takes keyboard focus so the explanation shows on focus as well as hover.
+ * The explanation is the badge's tooltip (role="tooltip", tied by aria-describedby), and
+ * Escape hides it until the badge loses focus or the pointer leaves (WCAG 1.4.13).
  */
 interface Props {
   size?: 'sm' | 'md' | 'lg';
@@ -18,6 +20,9 @@ interface Props {
 }
 
 const { size = 'md', showText = true } = Astro.props;
+
+// One per badge: a page lists many reviews.
+const tipId = `verified-tip-${crypto.randomUUID().slice(0, 8)}`;
 
 const sizeClasses = {
   sm: 'w-4 h-4',
@@ -35,6 +40,8 @@ const textSizeClasses = {
 <span
   class="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-blue-600 group cursor-help rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
   tabindex="0"
+  aria-describedby={tipId}
+  data-verified-badge
 >
   <svg
     class={sizeClasses[size]}
@@ -50,9 +57,37 @@ const textSizeClasses = {
   </svg>
   {showText && <span class={`font-medium ${textSizeClasses[size]}`}>Residency verified</span>}
   <span
-    class="absolute bottom-full left-0 mb-2 w-max max-w-[min(16rem,100%)] whitespace-normal text-left px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none z-10"
+    id={tipId}
+    role="tooltip"
+    class="absolute bottom-full left-0 mb-2 w-max max-w-[min(16rem,100%)] whitespace-normal text-left px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-data-[dismissed]:opacity-0! transition-opacity pointer-events-none z-10"
     data-verified-tooltip
   >
     This tenant verified their residency with a lease or similar document
   </span>
 </span>
+
+<script>
+  // Escape hides the explanation of a focused or hovered badge; it comes back once the
+  // badge loses focus or the pointer leaves it.
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    for (const badge of document.querySelectorAll<HTMLElement>('[data-verified-badge]')) {
+      if (badge === document.activeElement || badge.matches(':hover')) badge.setAttribute('data-dismissed', '');
+    }
+  });
+  document.addEventListener('focusout', (event) => {
+    const badge = event.target;
+    if (badge instanceof HTMLElement && badge.matches('[data-verified-badge]')) badge.removeAttribute('data-dismissed');
+  });
+  // mouseleave does not bubble, so listen in the capture phase.
+  document.addEventListener(
+    'mouseleave',
+    (event) => {
+      const badge = event.target;
+      if (badge instanceof HTMLElement && badge.matches('[data-verified-badge]') && badge !== document.activeElement) {
+        badge.removeAttribute('data-dismissed');
+      }
+    },
+    true,
+  );
+</script>

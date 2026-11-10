@@ -167,7 +167,7 @@ records pipeline owns four, defined once in `SETTING_KEYS` in `src/lib/records/s
 
 | Key | Value |
 |-----|-------|
-| `records_fill_paused` | `'1'` or `'0'`. The city-wide fill brake. Set by the circuit breaker, cleared only by a human from `/admin/records` |
+| `records_fill_paused` | `'1'` or `'0'`. The city-wide fill brake; the fill was first turned on 2026-09-12. Set by the circuit breaker or by hand from `/admin/records`. A `fixture`-caused breaker pause clears itself at the next 06:00 UTC plan whose fixture passes with no source over the error-rate threshold; any other pause waits for a human to resume it |
 | `records_breaker_pause_cause` | `fixture` or `errors`, present only while the breaker owns the pause. Written in the same batch as the pause, deleted by any other write of the flag |
 | `records_breaker_last_alert` | Unix seconds of the last breaker email, so a paused fill does not alert again |
 | `records_fixture_last` | JSON: what the daily Lanark fixture saw. Rendered by the admin queue panel |

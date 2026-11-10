@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { unitItems, buildingItems, landlordItems, supplementaryItems } from '../../../lib/surveyItems';
 import { bedroomOptions, bathroomOptions } from '../../../lib/formOptions';
 import type { Building, UnitDetails, Tenancy, ReviewData } from './types';
@@ -31,6 +31,11 @@ interface Props {
   onTurnstileToken: (token: string | null) => void;
   loading: boolean;
   error: string | null;
+  /**
+   * Bumped by the parent with every submit error, even a repeat of the same message: each
+   * bump moves focus to the error.
+   */
+  errorSeq?: number;
   onBack: () => void;
   onSubmit: () => void;
   /** Bumped by the parent after a failed POST: the widget resets once per bump. */
@@ -51,6 +56,7 @@ export default function ConfirmStep({
   onTurnstileToken,
   loading,
   error,
+  errorSeq = 0,
   onBack,
   onSubmit,
   turnstileResetSignal,
@@ -59,8 +65,14 @@ export default function ConfirmStep({
   const turnstileRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   // The submit error belongs to the parent form; a widget failure is this step's own, so it
-  // gets its own state and shares the one error banner below.
+  // gets its own state and its own box below.
   const [turnstileError, setTurnstileError] = useState<string | null>(null);
+  const submitErrorRef = useRef<HTMLDivElement>(null);
+  // The bump this mount started with: coming back to this step focuses the step heading, not
+  // an error from an earlier visit.
+  const lastErrorSeqRef = useRef(errorSeq);
+  const confirmTextId = useId();
+  const waitingId = useId();
 
   // The script never arrived within POLL_TICKS. "Try again" clears it and polls again.
   const [loadFailed, setLoadFailed] = useState(false);
@@ -132,6 +144,17 @@ export default function ConfirmStep({
     if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
   }, [turnstileResetSignal]);
 
+  // A submit error follows a press of Submit, which disables itself while it works, so focus
+  // moves to the error. The box has no live role: focus already reads it, and both would
+  // read it twice.
+  useEffect(() => {
+    if (errorSeq === lastErrorSeqRef.current) return;
+    lastErrorSeqRef.current = errorSeq;
+    if (!error) return;
+    submitErrorRef.current?.focus();
+    submitErrorRef.current?.scrollIntoView?.({ block: 'center' });
+  }, [errorSeq, error]);
+
   const handleRetryLoad = () => {
     setLoadFailed(false);
     // A Turnstile <script> still in the DOM is pending or loaded: a failed one removes itself
@@ -148,7 +171,10 @@ export default function ConfirmStep({
     setLoadAttempt((n) => n + 1);
   };
 
-  const bannerMessage = error || turnstileError || (loadFailed ? TURNSTILE_LOAD_FAILED_COPY : null);
+  // A Turnstile message arrives without a press, so it is read from the alert region below,
+  // which is on the page before the message is. A submit error still takes precedence, as it
+  // did when the two shared one banner.
+  const turnstileMessage = error ? null : turnstileError || (loadFailed ? TURNSTILE_LOAD_FAILED_COPY : null);
   const waiting = privacyAcknowledged && !turnstileToken && !turnstileError && !loadFailed && !loading;
 
   const unitScoreCount = unitItems.filter((item) => scores[item.key] !== undefined).length;
@@ -160,7 +186,7 @@ export default function ConfirmStep({
       <div className="bg-amber-50 border border-amber-200 rounded-[6px] p-4">
         <div className="flex gap-3">
           <div className="shrink-0">
-            <svg className="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg aria-hidden="true" className="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -182,7 +208,7 @@ export default function ConfirmStep({
                 onChange={(e) => onPrivacyChange(e.target.checked)}
                 className="mt-0.5 h-5 w-5 shrink-0 accent-amber-600"
               />
-              <span className="text-sm text-amber-800">
+              <span id={confirmTextId} className="text-sm text-amber-800">
                 I confirm this review reflects my honest personal experience and agree to the{' '}
                 <a href="/terms" target="_blank" className="underline font-medium hover:text-amber-900">
                   Terms of Service
@@ -198,20 +224,30 @@ export default function ConfirmStep({
         </div>
       </div>
 
-      {bannerMessage && (
-        <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
-          <p>{bannerMessage}</p>
-          {loadFailed && (
-            <button
-              type="button"
-              onClick={handleRetryLoad}
-              className="mt-3 h-11 inline-flex items-center justify-center px-6 border border-red-300 bg-white text-red-700 font-semibold rounded-[4px] hover:bg-red-50"
-            >
-              Try again
-            </button>
-          )}
+      {error && (
+        <div ref={submitErrorRef} tabIndex={-1} className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
+          <p>{error}</p>
         </div>
       )}
+
+      {/* Always rendered, so the message is announced when it appears. While empty it takes
+          no room: empty:mb-0 drops the gap space-y-6 would otherwise add below it. */}
+      <div role="alert" className="empty:mb-0">
+        {turnstileMessage && (
+          <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
+            <p>{turnstileMessage}</p>
+            {loadFailed && (
+              <button
+                type="button"
+                onClick={handleRetryLoad}
+                className="mt-3 h-11 inline-flex items-center justify-center px-6 border border-red-300 bg-white text-red-700 font-semibold rounded-[4px] hover:bg-red-50"
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {authExpired && (
         <p role="alert" className="bg-amber-50 border border-amber-200 rounded-[6px] p-4 text-sm text-amber-800">
@@ -280,13 +316,14 @@ export default function ConfirmStep({
           type="button"
           onClick={onSubmit}
           disabled={loading || !privacyAcknowledged || !turnstileToken}
+          aria-describedby={`${confirmTextId} ${waitingId}`}
           className="h-11 inline-flex items-center justify-center px-6 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Submitting...' : 'Submit Review'}
         </button>
       </div>
 
-      <p aria-live="polite" className="text-sm text-gray-600 text-right min-h-5">
+      <p id={waitingId} aria-live="polite" className="text-sm text-gray-600 text-right min-h-5">
         {waiting ? TURNSTILE_WAITING_COPY : ''}
       </p>
     </div>

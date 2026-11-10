@@ -81,8 +81,9 @@ function EventIcon({ eventType }: { eventType: string }) {
 export default function NotificationsTab({ notifications, loading, error }: Props) {
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+      <div role="status" className="flex justify-center py-12">
+        <div aria-hidden="true" className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+        <span className="sr-only">Loading...</span>
       </div>
     );
   }
@@ -110,10 +111,10 @@ export default function NotificationsTab({ notifications, loading, error }: Prop
       {notifications.map((notification) => (
         <div
           key={notification.id}
-          className={`bg-white rounded-[6px] border p-4 flex items-start gap-3 ${
+          className={`rounded-[6px] border p-4 flex items-start gap-3 ${
             notification.read_at === null
               ? 'border-blue-200 bg-blue-50'
-              : 'border-gray-200'
+              : 'border-gray-200 bg-white'
           }`}
         >
           <EventIcon eventType={notification.event_type} />
@@ -121,7 +122,7 @@ export default function NotificationsTab({ notifications, loading, error }: Prop
             <p className={`text-sm ${notification.read_at === null ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
               {notification.message}
             </p>
-            <p className="text-xs text-gray-500 mt-1">{timeAgo(notification.created_at)}</p>
+            <p className="text-xs text-gray-600 mt-1">{timeAgo(notification.created_at)}</p>
           </div>
         </div>
       ))}

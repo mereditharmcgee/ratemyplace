@@ -216,11 +216,13 @@ const emptyState = searchEmptyState({ query, type, areaSearch, streetQuery });
           name="q"
           value={query}
           placeholder="Search by address, neighborhood, or landlord name..."
-          class="flex-1 px-4 py-3 border border-gray-300 rounded-[4px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          aria-label="Search by address, neighborhood, or landlord"
+          class="flex-1 px-4 py-3 border border-gray-300 rounded-[4px] focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-transparent"
         />
         <select
           name="type"
-          class="px-4 py-3 border border-gray-300 rounded-[4px] focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+          aria-label="Search type"
+          class="px-4 py-3 border border-gray-300 rounded-[4px] focus:outline-none focus:ring-2 focus:ring-teal-700 bg-white"
         >
           <option value="all" selected={type === 'all'}>All</option>
           <option value="buildings" selected={type === 'buildings'}>Buildings</option>
