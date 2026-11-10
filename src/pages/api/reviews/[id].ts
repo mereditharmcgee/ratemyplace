@@ -4,6 +4,9 @@ import { calculateOverallScore, ALL_SCORE_FIELDS } from '../../../lib/scoring';
 import { validateReviewText } from '../../../lib/validation';
 import { queueOwnerNotice } from '../../../lib/ownerNotify';
 import { moveInFromEdit } from '../../../lib/moveIn';
+import { moveOutFromEdit, STORED_EDIT_COLUMNS, withStoredFields } from '../../../lib/reviewEdit';
+import type { StoredEditRow } from '../../../lib/reviewEdit';
+import { parseTenureMonths } from '../../../lib/tenure';
 import type { MoveInGiven } from '../../../lib/types';
 
 export interface ReviewDetail {
@@ -186,16 +189,24 @@ export async function PATCH(context: APIContext): Promise<Response> {
       });
     }
 
-    const body = await context.request.json();
+    const sentBody = await context.request.json();
 
     // Cap free-text field lengths before any DB work (prevents oversized payloads).
-    const textErrors = validateReviewText(body);
+    const textErrors = validateReviewText(sentBody);
     if (textErrors.length > 0) {
       return new Response(JSON.stringify({ error: 'Validation failed', details: textErrors }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
     }
+
+    // A partial body changes only what it sends: each field it leaves out is read back from
+    // the stored row and written as it was, and so is the move-out (lib/reviewEdit.ts).
+    const storedFields = await db.prepare(
+      `SELECT ${STORED_EDIT_COLUMNS.join(', ')} FROM reviews WHERE id = ?`
+    ).bind(id).first<StoredEditRow>();
+    const body = withStoredFields(sentBody, storedFields);
+    const moveOut = moveOutFromEdit(sentBody, storedFields);
 
     // Collect all 27 survey scores from the request body
     // Only include fields that are present in the body to avoid wiping scores on partial update
@@ -289,6 +300,7 @@ export async function PATCH(context: APIContext): Promise<Response> {
         move_in_given = ?,
         move_out_year_new = ?,
         is_current_tenant = ?,
+        move_out_season = ?,
         unit_structural = ?,
         unit_plumbing = ?,
         unit_electrical = ?,
@@ -350,12 +362,13 @@ export async function PATCH(context: APIContext): Promise<Response> {
       body.laundry_type || null,
       body.laundry_cost_per_load ? parseFloat(body.laundry_cost_per_load) : null,
       body.estimated_monthly_utilities ? parseInt(body.estimated_monthly_utilities) : null,
-      body.tenure_months ? parseInt(body.tenure_months) : null,
+      parseTenureMonths(body.tenure_months),
       moveIn.year,
       moveIn.season,
       moveIn.given,
-      body.move_out_year_new || null,
-      body.move_out_year_new === 'current' ? 1 : 0,
+      moveOut.year,
+      moveOut.isCurrentTenant,
+      moveOut.season,
       // Unit scores (10)
       scores.unit_structural,
       scores.unit_plumbing,

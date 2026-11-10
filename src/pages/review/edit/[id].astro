@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../../components/layout/BaseLayout.astro';
 import ReviewEditForm from '../../../components/reviews/ReviewEditForm';
+import { getDB } from '../../../lib/db';
 
 const { id } = Astro.params;
 const user = Astro.locals.user;
@@ -12,7 +13,7 @@ if (!user) {
 }
 
 // Fetch review
-const db = Astro.locals.runtime.env.DB;
+const db = getDB(Astro);
 const review = await db.prepare(`
   SELECT
     r.*,
