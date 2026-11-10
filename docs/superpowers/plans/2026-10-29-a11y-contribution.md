@@ -620,15 +620,15 @@ Seed data or fictional files only; never real verification documents.
 
 ## Out of scope and follow-ups
 
-- **Follow-up after main is merged into this branch (lead):** the other lane's tenure and move-out selects in `ReviewEditForm.tsx` need `htmlFor`/`id` and `focus:ring-teal-700`; then set the guard allowance for that file to 0 and flip the edit-page scan to `contributionPath: true`.
+- **Follow-up after main is merged into this branch (lead):** the other lane's tenure and move-out selects in `ReviewEditForm.tsx` need `htmlFor`/`id` and `focus:ring-teal-700`; then set the guard allowance for that file to 0 and flip the edit-page scan to `contributionPath: true`. Done after #75 merged: the selects are `review-edit-tenure` and `review-edit-move-out-year`, the guard has no allowance left, and the edit-page scan is enforced.
 - Admin score-badge contrast (`scoring-colors.ts` palette): owner decision; not changed.
 - Survey wording, the "Not rated" label, visible 44x44 pills, explaining the `*`: owner decisions.
 - Converting native `details` disclosures to button-plus-script disclosures.
 - An APG grid popup for the home dropdown.
 - Map marker keyboard access beyond reduced motion (production-only; needs its own review).
-- `NotificationsTab.tsx` spinner semantics (the other lane is editing that file; the global reduced-motion rule already covers its animation).
+- `NotificationsTab.tsx` spinner semantics (the other lane is editing that file; the global reduced-motion rule already covers its animation). Done after #75 merged, with the ProfileDashboard spinner pattern.
 - CSP `unsafe-inline` tightening (this phase only removes the two inline handlers that blocked it).
-- `UnitTypeSummary.astro` (being deleted by the other lane).
+- `UnitTypeSummary.astro` (being deleted by the other lane). Deleted in #75.
 
 ## New accessible-name strings
 

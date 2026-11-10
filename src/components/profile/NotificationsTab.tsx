@@ -81,8 +81,9 @@ function EventIcon({ eventType }: { eventType: string }) {
 export default function NotificationsTab({ notifications, loading, error }: Props) {
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+      <div role="status" className="flex justify-center py-12">
+        <div aria-hidden="true" className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+        <span className="sr-only">Loading...</span>
       </div>
     );
   }

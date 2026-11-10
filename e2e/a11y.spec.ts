@@ -21,15 +21,15 @@ import type {
 } from '../src/lib/records/types';
 
 // Phase 28 (A11Y-01, A11Y-08) axe gate. axe runs the WCAG 2.0 and 2.1 A and AA rules over the
-// public contribution path (home, search, auth, every review step, the building page, and the
-// profile with its verification dialog) and over representative landlord, review edit and admin
-// pages, at 1280x900, 375x812 and 640x450 (1280x900 at 200% browser zoom).
+// public contribution path (home, search, auth, every review step, the building page, the
+// profile with its verification dialog, and the reviewer's edit page) and over representative
+// landlord and admin pages, at 1280x900, 375x812 and 640x450 (1280x900 at 200% browser zoom).
 //
 // Every scan is written to A11Y_BASELINE_OUT (default test-results/a11y-baseline.json) with a
 // per-rule summary. With ENFORCE_CONTRIBUTION_PATH on, every contribution-path scan must have
 // zero serious or critical violations and no horizontal overflow; each failure is a soft
-// assertion, so one run reports them all. Scans off the path (landlord, review edit, admin) are
-// recorded and reported, not enforced.
+// assertion, so one run reports them all. Scans off the path (landlord, admin) are recorded and
+// reported, not enforced.
 //
 // Local only, like every spec here. Google Maps and Places are refused at the browser and the
 // two Places proxies answer with one fictional suggestion, so no Google API is called. Turnstile
@@ -663,11 +663,8 @@ for (const viewport of VIEWPORTS) {
     test(`review edit page (${viewport.name})`, async ({ authedPage: page }) => {
       test.setTimeout(60_000);
       await prepare(page, viewport);
-      // Recorded and reported, not enforced yet. The tenure and move-out selects in
-      // ReviewEditForm.tsx belong to the concurrent review-edit lane and are still unlabeled
-      // here. Flip this to true once main is merged into this branch and those two selects
-      // have their labels (see the Phase 28 plan, "Out of scope and follow-ups").
-      const target = { page: 'review edit', surface: 'signed-in', contributionPath: false } as const;
+      // Enforced like the rest of the contribution path: editing a review is contributing.
+      const target = { page: 'review edit', surface: 'signed-in', contributionPath: true } as const;
 
       // review-001 belongs to the seed user. Nothing is saved.
       await page.goto(`/review/edit/${SEED_REVIEW_ID}`);

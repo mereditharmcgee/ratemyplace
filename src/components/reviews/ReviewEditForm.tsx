@@ -774,13 +774,14 @@ export default function ReviewEditForm({ review }: Props) {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="review-edit-tenure" className="block text-sm font-medium text-gray-700 mb-2">
               {supplementaryItems.tenure.text}
             </label>
             <select
+              id="review-edit-tenure"
               value={tenureMonths}
               onChange={(e) => setTenureMonths(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
             >
               {tenureChoices.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -791,13 +792,14 @@ export default function ReviewEditForm({ review }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="review-edit-move-out-year" className="block text-sm font-medium text-gray-700 mb-2">
               {supplementaryItems.moveOutTiming.text}
             </label>
             <select
+              id="review-edit-move-out-year"
               value={moveOutYear}
               onChange={(e) => setMoveOutYear(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
             >
               {moveOutChoices.map((opt) => (
                 <option key={opt.value} value={opt.value}>

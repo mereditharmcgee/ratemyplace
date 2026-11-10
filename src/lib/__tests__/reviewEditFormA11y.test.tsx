@@ -39,14 +39,9 @@ function review(fields: Partial<ReviewDetail> = {}): ReviewDetail {
   } as unknown as ReviewDetail;
 }
 
-// Owned by the concurrent fix/review-edit-and-admin-cleanup branch, which rewrites both
-// selects. They get their id/htmlFor after that branch is merged here (plan follow-up), so
-// they are the only controls this test lets through without a name.
-function otherLaneSelects(): Element[] {
-  const tenureLabel = supplementaryItems.tenure.options[0].label;
-  return Array.from(document.querySelectorAll('select')).filter((select) =>
-    Array.from(select.options).some((opt) => opt.textContent === tenureLabel || opt.value === '2020_or_earlier'),
-  );
+/** A visible question as an exact label pattern. */
+function exactly(text: string): RegExp {
+  return new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
 }
 
 const ROLES = ['textbox', 'spinbutton', 'combobox', 'checkbox', 'radio'] as const;
@@ -73,15 +68,12 @@ function tickConsentAndSave() {
 }
 
 describe('ReviewEditForm labels', () => {
-  it('names every input, select and textarea except the two selects the other branch owns', () => {
+  it('names every input, select and textarea', () => {
     render(<ReviewEditForm review={review()} />);
-    const skipped = otherLaneSelects();
-    expect(skipped).toHaveLength(2);
-
     const named = namedControls();
     const controls = Array.from(document.querySelectorAll<HTMLElement>('input, select, textarea'));
     expect(controls.length).toBeGreaterThan(100);
-    const unnamed = controls.filter((el) => !named.has(el) && !skipped.includes(el));
+    const unnamed = controls.filter((el) => !named.has(el));
     expect(unnamed.map((el) => el.outerHTML.slice(0, 120))).toEqual([]);
   });
 
@@ -101,6 +93,8 @@ describe('ReviewEditForm labels', () => {
       [/^Who manages the property\?/, 'review-edit-property-manager-name'],
       [/^Move-in month$/, 'review-edit-move-in-month'],
       [/^Move-in year$/, 'review-edit-move-in-year'],
+      [exactly(supplementaryItems.tenure.text), 'review-edit-tenure'],
+      [exactly(supplementaryItems.moveOutTiming.text), 'review-edit-move-out-year'],
       [/^Review Title/, 'review-edit-review-title'],
       [/^Additional Comments/, 'review-edit-review-text'],
     ] as const) {
@@ -131,12 +125,13 @@ describe('ReviewEditForm labels', () => {
     expect((screen.getAllByRole('radio', { name: '4' })[0] as HTMLInputElement).checked).toBe(true);
   });
 
-  it('uses the teal-700 focus ring everywhere but the two other-branch selects', () => {
+  it('uses the teal-700 focus ring everywhere', () => {
     render(<ReviewEditForm review={review()} />);
     const html = document.body.innerHTML;
-    const weak = html.match(/focus:ring-teal-500/g) ?? [];
-    expect(weak).toHaveLength(2);
-    for (const select of otherLaneSelects()) expect(select.className).toContain('focus:ring-teal-500');
+    expect(html.match(/focus:ring-teal-500/g) ?? []).toHaveLength(0);
+    for (const id of ['review-edit-tenure', 'review-edit-move-out-year']) {
+      expect(document.getElementById(id)?.className, id).toContain('focus:ring-teal-700');
+    }
   });
 });
 

@@ -17,14 +17,6 @@ const ROOT = process.cwd();
 const EXTENSIONS = ['.astro', '.tsx', '.ts', '.css'];
 const EXCLUDED_PREFIXES = ['src/pages/api/'];
 
-// Files allowed a fixed number of retired rings, and why. The two in ReviewEditForm.tsx are the
-// tenure and move-out selects, which the concurrent review-edit lane is rewriting. Set this to 0
-// (and remove the entry) once main is merged into this branch and those selects move to
-// teal-700 with their labels.
-const ALLOWED: Record<string, number> = {
-  'src/components/reviews/ReviewEditForm.tsx': 2,
-};
-
 function walk(dir: string): string[] {
   const found: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -74,7 +66,6 @@ describe('focus ring tokens', () => {
       expect(path.includes('/__tests__/')).toBe(false);
       expect(path.startsWith('src/pages/api/')).toBe(false);
     }
-    for (const path of Object.keys(ALLOWED)) expect(SOURCE_FILES).toContain(path);
   });
 
   it('the pattern matches what it is meant to', () => {
@@ -101,20 +92,16 @@ describe('focus ring tokens', () => {
     }
   });
 
-  it('no source uses a teal 400 or 500 focus ring beyond the allowance', () => {
-    const counts: Record<string, number> = {};
+  it('no source uses a teal 400 or 500 focus ring', () => {
     const offenders: string[] = [];
     for (const path of SOURCE_FILES) {
       const lines = readFileSync(join(ROOT, path), 'utf8').split(/\r?\n/);
       lines.forEach((line, lineIndex) => {
         for (const match of line.matchAll(retiredRing())) {
-          counts[path] = (counts[path] ?? 0) + 1;
           offenders.push(`${path}:${lineIndex + 1}: ${match[0]}`);
         }
       });
     }
-    // An exact match: a file over its allowance fails, and so does an allowance that is no
-    // longer needed, so the entry is removed when the last ring moves to teal-700.
-    expect(counts, offenders.join('\n')).toEqual(ALLOWED);
+    expect(offenders).toEqual([]);
   });
 });
