@@ -117,12 +117,13 @@ export default function UsersTable({ currentUserId }: Props) {
             placeholder="Search by email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
           />
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => setFilter('all')}
+            aria-pressed={filter === 'all'}
             className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               filter === 'all'
                 ? 'bg-teal-700 text-white'
@@ -133,6 +134,7 @@ export default function UsersTable({ currentUserId }: Props) {
           </button>
           <button
             onClick={() => setFilter('admin')}
+            aria-pressed={filter === 'admin'}
             className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               filter === 'admin'
                 ? 'bg-teal-700 text-white'
@@ -143,6 +145,7 @@ export default function UsersTable({ currentUserId }: Props) {
           </button>
           <button
             onClick={() => setFilter('verified')}
+            aria-pressed={filter === 'verified'}
             className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               filter === 'verified'
                 ? 'bg-teal-700 text-white'

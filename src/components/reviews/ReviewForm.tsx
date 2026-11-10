@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { unitItems, buildingItems, landlordItems } from '../../lib/surveyItems';
 import { browserNav, existingBuildingReviewPath } from '../../lib/reviewPaths';
 import {
@@ -17,6 +17,7 @@ import {
   RatingStep,
   AdditionalStep,
   ConfirmStep,
+  STEPS,
   type Building,
   type PlaceData,
   type UnitDetails,
@@ -42,6 +43,24 @@ export default function ReviewForm({ building, initialPlace }: Props) {
   const [step, setStep] = useState<Step>(building ? 'unit-details' : 'address');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped with every submit error, so ConfirmStep moves focus to it even when the message
+  // repeats.
+  const [errorSeq, setErrorSeq] = useState(0);
+
+  // A step change unmounts the button that was pressed, so focus moves to the new step's
+  // heading, which announces it, and the form's top scrolls into view (Continue sits at the
+  // foot of a long step). Not on the first render: the page has only just loaded.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const shownStepRef = useRef(step);
+  useEffect(() => {
+    if (shownStepRef.current === step) return;
+    shownStepRef.current = step;
+    stepHeadingRef.current?.focus({ preventScroll: true });
+    rootRef.current?.scrollIntoView?.({ block: 'start' });
+  }, [step]);
+  const stepIndex = STEPS.findIndex((s) => s.id === step);
+  const stepHeading = `Step ${stepIndex + 1} of ${STEPS.length}: ${STEPS[stepIndex]?.title ?? ''}`;
 
   // Form state
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(building || null);
@@ -265,6 +284,7 @@ export default function ReviewForm({ building, initialPlace }: Props) {
     const hasAnyRating = Object.values(scores).some((v) => v !== null);
     if (!hasAnyRating) {
       setError('Please rate at least one item before submitting your review.');
+      setErrorSeq((n) => n + 1);
       return;
     }
 
@@ -352,7 +372,10 @@ export default function ReviewForm({ building, initialPlace }: Props) {
       return;
     }
     if (outcome?.kind === 'auth-expired') setAuthExpired(true);
-    else setError(outcome?.kind === 'error' ? outcome.message : SUBMIT_NETWORK_COPY);
+    else {
+      setError(outcome?.kind === 'error' ? outcome.message : SUBMIT_NETWORK_COPY);
+      setErrorSeq((n) => n + 1);
+    }
     // The token went out with that POST and is spent. The ConfirmStep callback only stores
     // tokens, so resetting here is the RecordCorrectionForm shape and cannot loop (AGENTS.md
     // Traps). Clear first, then reset, so the fresh token the reset produces is never
@@ -381,8 +404,11 @@ export default function ReviewForm({ building, initialPlace }: Props) {
   }
 
   return (
-    <div>
+    <div ref={rootRef}>
       <StepIndicator currentStep={step} />
+      <h2 ref={stepHeadingRef} tabIndex={-1} className="sr-only">
+        {stepHeading}
+      </h2>
 
       {step === 'address' && (
         <AddressStep
@@ -471,6 +497,7 @@ export default function ReviewForm({ building, initialPlace }: Props) {
           onTurnstileToken={setTurnstileToken}
           loading={loading}
           error={error}
+          errorSeq={errorSeq}
           onBack={() => setStep('additional')}
           onSubmit={handleSubmit}
           turnstileResetSignal={turnstileResetSignal}

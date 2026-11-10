@@ -31,7 +31,7 @@ export default function BuildingsFilterBar({
         value={searchInput}
         maxLength={200}
         onChange={(e) => onSearchInput(e.target.value)}
-        className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
       />
       <div className="flex flex-wrap items-center gap-3 text-sm">
         {landlordId && (
@@ -50,7 +50,7 @@ export default function BuildingsFilterBar({
             type="checkbox"
             checked={orphansOnly}
             onChange={(e) => onOrphansOnly(e.target.checked)}
-            className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+            className="rounded border-gray-300 text-teal-700 focus:ring-teal-700"
           />
           Outside Boston / New Haven, no reviews
         </label>

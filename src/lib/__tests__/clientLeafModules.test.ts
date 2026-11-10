@@ -8,8 +8,12 @@ import { describe, expect, it } from 'vitest';
 // to the client by accident. Type-only imports are erased at build time and are fine.
 const LEAF_MODULES = [
   'src/lib/authRedirect.ts',
+  // Both address searches take their combobox keyboard rules and status wording from it.
+  'src/lib/combobox.ts',
   'src/lib/homeSearchItems.ts',
   'src/lib/mapCluster.ts',
+  // The map checks the reduced-motion preference with it.
+  'src/lib/motion.ts',
   // The review edit form and the admin reviews table format the move-in with it.
   'src/lib/privacy.ts',
   'src/lib/reviewPaths.ts',

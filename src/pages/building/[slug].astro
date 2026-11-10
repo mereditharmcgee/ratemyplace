@@ -263,8 +263,8 @@ const meta = buildingPageMeta(
             <p class="text-teal-800 font-medium">Review submitted!</p>
             <p class="text-teal-700 text-sm">Your review has been submitted and is pending moderation. It will appear on this page once approved.</p>
           </div>
-          <button onclick="document.getElementById('submitted-banner').remove()" class="text-teal-700 hover:text-teal-800">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button type="button" aria-label="Close" data-dismiss="submitted-banner" class="text-teal-700 hover:text-teal-800">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -286,7 +286,7 @@ const meta = buildingPageMeta(
 
     <!-- Header -->
     <div class="mb-8">
-      <nav class="text-sm text-gray-600 mb-4">
+      <nav aria-label="Breadcrumb" class="text-sm text-gray-600 mb-4">
         {/* py-1 makes each link a 28px-tall target (bare text measured 17px); the matching
             negative margin keeps the header where it was. */}
         <a href="/" class="-my-1 inline-block py-1 hover:text-teal-700">Home</a>
@@ -450,8 +450,11 @@ const meta = buildingPageMeta(
             <div class="space-y-3" id="unit-list">
               {sortedUnits.map((unitStats, index) => (
                 <div class="unit-section" data-unit-key={unitStats.unitKey}>
+                  {/* The card keeps its classes (plus `relative`) and its inner markup. A native
+                      button laid over it, its last child, is the toggle, so the heading stays a
+                      heading and the tests that read the card keep working. */}
                   <div
-                    class="unit-card bg-white border border-gray-200 rounded-[6px] p-4 cursor-pointer hover:border-teal-300 hover:shadow-sm transition-all"
+                    class="unit-card relative bg-white border border-gray-200 rounded-[6px] p-4 cursor-pointer hover:border-teal-300 hover:shadow-sm transition-all"
                     data-unit-key={unitStats.unitKey}
                     data-expanded={index === 0 ? "true" : "false"}
                   >
@@ -463,7 +466,7 @@ const meta = buildingPageMeta(
                           </svg>
                         </div>
                         <div>
-                          <h4 class="font-semibold text-gray-900">{unitStats.displayName}</h4>
+                          <h4 id={`unit-name-${index}`} class="font-semibold text-gray-900">{unitStats.displayName}</h4>
                           <p class="text-sm text-gray-500">
                             {unitStats.reviewCount} review{unitStats.reviewCount !== 1 ? 's' : ''}
                           </p>
@@ -499,17 +502,26 @@ const meta = buildingPageMeta(
                         </div>
 
                         <svg
-                          class="w-5 h-5 text-gray-500 chevron-icon transition-transform"
+                          class={`w-5 h-5 text-gray-500 chevron-icon transition-transform motion-reduce:transition-none ${index === 0 ? 'rotate-180' : ''}`}
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
+                          aria-hidden="true"
                         >
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      class="absolute inset-0 z-10 w-full h-full cursor-[inherit] rounded-[6px]"
+                      aria-labelledby={`unit-name-${index}`}
+                      aria-expanded={index === 0 ? 'true' : 'false'}
+                      aria-controls={`unit-reviews-${index}`}
+                    ></button>
                   </div>
                   <div
+                    id={`unit-reviews-${index}`}
                     class={`unit-reviews mt-4 space-y-4 pl-4 border-l-2 border-teal-200 ${index === 0 ? '' : 'hidden'}`}
                     data-reviews-for={unitStats.unitKey}
                   >
@@ -541,30 +553,20 @@ const meta = buildingPageMeta(
 </BaseLayout>
 
 <script>
-  // Handle collapsible unit sections
-  document.querySelectorAll('.unit-card').forEach(card => {
-    card.addEventListener('click', () => {
-      const unitKey = card.getAttribute('data-unit-key');
-      const reviewsContainer = document.querySelector(`[data-reviews-for="${unitKey}"]`);
-      const isExpanded = card.getAttribute('data-expanded') === 'true';
-      const chevron = card.querySelector('.chevron-icon');
+  // Collapsible unit sections. Each card's overlay button is the toggle: a click, Enter or Space
+  // shows or hides the panel it controls and keeps the button, the card and the chevron in step.
+  // The first card renders open, chevron turned, from the server.
+  document.querySelectorAll<HTMLButtonElement>('.unit-card > button[aria-controls]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const card = button.closest('.unit-card');
+      const panel = document.getElementById(button.getAttribute('aria-controls') ?? '');
+      if (!card || !panel) return;
 
-      if (reviewsContainer) {
-        if (isExpanded) {
-          reviewsContainer.classList.add('hidden');
-          card.setAttribute('data-expanded', 'false');
-          chevron?.classList.remove('rotate-180');
-        } else {
-          reviewsContainer.classList.remove('hidden');
-          card.setAttribute('data-expanded', 'true');
-          chevron?.classList.add('rotate-180');
-        }
-      }
+      const expand = button.getAttribute('aria-expanded') !== 'true';
+      panel.classList.toggle('hidden', !expand);
+      button.setAttribute('aria-expanded', String(expand));
+      card.setAttribute('data-expanded', String(expand));
+      card.querySelector('.chevron-icon')?.classList.toggle('rotate-180', expand);
     });
-  });
-
-  // Set initial chevron state for expanded cards
-  document.querySelectorAll('.unit-card[data-expanded="true"] .chevron-icon').forEach(chevron => {
-    chevron.classList.add('rotate-180');
   });
 </script>

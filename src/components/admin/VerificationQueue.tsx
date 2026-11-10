@@ -1,5 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { PendingVerification } from '../../pages/api/admin/pending-verifications';
+import Dialog from '../ui/Dialog';
+
+/** The full-size view covers the screen, dark, with the document centered as before. */
+const OVERLAY_DIALOG_CLASS =
+  'fixed inset-0 m-0 h-full w-full max-h-none max-w-none bg-black/80 p-4 open:flex items-center justify-center backdrop:bg-transparent [--focus-ring:#fff]';
 
 export default function VerificationQueue() {
   const [verifications, setVerifications] = useState<PendingVerification[]>([]);
@@ -8,6 +13,10 @@ export default function VerificationQueue() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState<Record<string, string>>({});
+  const overlayCloseRef = useRef<HTMLButtonElement>(null);
+  // The thumbnail that opened the full-size view, named to the dialog because Safari does not
+  // focus a button on click.
+  const thumbnailRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     fetchVerifications();
@@ -159,9 +168,14 @@ export default function VerificationQueue() {
             {/* Image Preview */}
             <div className="mb-4">
               {verification.content_type.startsWith('image/') ? (
-                <div
-                  className="relative cursor-pointer"
-                  onClick={() => setExpandedImage(expandedImage === verification.id ? null : verification.id)}
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  className="relative block w-full text-left cursor-pointer"
+                  onClick={(event) => {
+                    thumbnailRef.current = event.currentTarget;
+                    setExpandedImage(expandedImage === verification.id ? null : verification.id);
+                  }}
                 >
                   <img
                     src={`/api/admin/verification/${verification.id}`}
@@ -172,10 +186,10 @@ export default function VerificationQueue() {
                         : 'max-h-48 w-auto'
                     }`}
                   />
-                  <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                  <span className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
                     {expandedImage === verification.id ? 'Click to shrink' : 'Click to expand'}
-                  </div>
-                </div>
+                  </span>
+                </button>
               ) : (
                 <a
                   href={`/api/admin/verification/${verification.id}`}
@@ -204,7 +218,7 @@ export default function VerificationQueue() {
                   [verification.id]: e.target.value,
                 }))}
                 placeholder="e.g., Document doesn't show property address"
-                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent text-sm"
               />
             </div>
 
@@ -235,18 +249,34 @@ export default function VerificationQueue() {
         ))}
       </div>
 
-      {/* Full-screen image modal */}
+      {/* Full-screen image view: the shared Dialog, closed by Close, Escape or a click
+          anywhere, with focus back on the thumbnail. */}
       {expandedImage && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-          onClick={() => setExpandedImage(null)}
+        <Dialog
+          ariaLabel="Verification document"
+          onClose={() => setExpandedImage(null)}
+          initialFocusRef={overlayCloseRef}
+          returnFocusRef={thumbnailRef}
+          className={OVERLAY_DIALOG_CLASS}
         >
+          <button
+            ref={overlayCloseRef}
+            type="button"
+            aria-label="Close"
+            onClick={() => setExpandedImage(null)}
+            className="absolute top-4 right-4 p-2 rounded-[4px] bg-black/60 text-white hover:bg-black transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
           <img
             src={`/api/admin/verification/${expandedImage}`}
             alt="Verification document"
             className="max-w-full max-h-full object-contain"
+            onClick={() => setExpandedImage(null)}
           />
-        </div>
+        </Dialog>
       )}
     </div>
   );

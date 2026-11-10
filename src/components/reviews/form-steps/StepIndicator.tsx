@@ -32,10 +32,15 @@ export default function StepIndicator({ currentStep }: Props) {
         </div>
       </div>
 
-      {/* Full circle row from `lg` up */}
-      <div className="hidden lg:flex items-center justify-between">
+      {/* Full circle row from `lg` up. Each title sits under its circle, so seven equal columns
+          fit the 704px form column; titles beside the circles ran past it at 1024 to 1440. */}
+      <ol aria-label="Review progress" className="hidden lg:flex items-start">
         {STEPS.map((s, i) => (
-          <div key={s.id} className="flex items-center" title={s.title}>
+          <li
+            key={s.id}
+            className="relative flex-1 flex flex-col items-center text-center"
+            aria-current={i === currentStepIndex ? 'step' : undefined}
+          >
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium shrink-0 ${
                 i <= currentStepIndex ? 'bg-teal-700 text-white' : 'bg-gray-200 text-gray-600'
@@ -43,13 +48,19 @@ export default function StepIndicator({ currentStep }: Props) {
             >
               {i + 1}
             </div>
-            <span className="ml-2 text-sm text-gray-600 whitespace-nowrap">{s.title}</span>
+            <span className="mt-1 text-xs text-gray-600">{s.title}</span>
             {i < STEPS.length - 1 && (
-              <div className={`w-12 h-1 mx-2 shrink-0 ${i < currentStepIndex ? 'bg-teal-600' : 'bg-gray-200'}`} />
+              // From 4px past this circle to 4px before the next one, level with their centers.
+              <span
+                aria-hidden="true"
+                className={`absolute top-3.5 left-[calc(50%+1.25rem)] right-[calc(-50%+1.25rem)] h-1 ${
+                  i < currentStepIndex ? 'bg-teal-600' : 'bg-gray-200'
+                }`}
+              />
             )}
-          </div>
+          </li>
         ))}
-      </div>
+      </ol>
     </div>
   );
 }

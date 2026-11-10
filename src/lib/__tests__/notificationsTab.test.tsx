@@ -56,3 +56,12 @@ describe('NotificationsTab rows', () => {
     expect(classes(timeAgo)).not.toContain('text-gray-500');
   });
 });
+
+describe('NotificationsTab loading', () => {
+  it('names the spinner in a status region and hides the spinning shape', () => {
+    render(<NotificationsTab notifications={[]} loading={true} error={null} />);
+    const status = screen.getByRole('status');
+    expect(status.textContent).toBe('Loading...');
+    expect(status.querySelector('.animate-spin')?.getAttribute('aria-hidden')).toBe('true');
+  });
+});

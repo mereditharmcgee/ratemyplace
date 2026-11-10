@@ -1,0 +1,856 @@
+import type { Locator, Page } from '@playwright/test';
+import { test, expect } from './fixtures';
+import { executeLocalD1 } from './test-harness';
+import { prepare } from './review-helpers';
+import { FY2026_RESOURCE_ID } from '../src/lib/records/sources/boston/assessor';
+
+// Phase 28 keyboard checks that axe cannot make: where focus goes and what state a control
+// reports when it is used from the keyboard, and what reduced motion turns off. Each Phase 28
+// batch appends its own describe block.
+//
+// Local only, like every spec here (e2e is not in CI). prepare() refuses Google and routes the
+// Places proxies to one fictional suggestion; Turnstile is the e2e stub. The only database write
+// is one synthetic records pull in the batch 6 block, so the records panel renders; that block
+// removes it afterwards.
+
+const DESKTOP = { width: 1280, height: 900 };
+const MOBILE = { width: 375, height: 812 };
+
+// Seed data (scripts/db-seed.ts): building-01 has reviews, review-001 belongs to the seed user.
+const BUILDING_ID = 'building-01';
+const SEED_REVIEW_ID = 'review-001';
+
+function seedBuildingSlug(id: string): string {
+  const rows = JSON.parse(executeLocalD1(`SELECT slug FROM buildings WHERE id = '${id}'`));
+  const slug = rows?.[0]?.results?.[0]?.slug;
+  if (typeof slug !== 'string') throw new Error(`seed building ${id} not found; run npm run db:setup`);
+  return slug;
+}
+
+async function activeElement(page: Page) {
+  return page.evaluate(() => {
+    const el = document.activeElement as HTMLElement | null;
+    return {
+      tag: el?.tagName ?? null,
+      id: el?.id ?? '',
+      text: el?.textContent?.trim() ?? '',
+      href: el?.getAttribute('href') ?? null,
+    };
+  });
+}
+
+test.describe('batch 1: skip link, focus indicator, mobile menu, banner dismiss', () => {
+  test('the first Tab reaches a visible skip link, and Enter moves focus to main', async ({ page }) => {
+    await prepare(page, DESKTOP);
+    await page.goto('/');
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+
+    await page.keyboard.press('Tab');
+    const skip = page.getByRole('link', { name: 'Skip to main content' });
+    await expect(skip).toBeFocused();
+    const box = await skip.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThan(1);
+    expect(box?.height ?? 0).toBeGreaterThan(1);
+    // It overlays the page rather than pushing the header down.
+    expect(await skip.evaluate((el) => getComputedStyle(el).position)).toBe('absolute');
+
+    await page.keyboard.press('Enter');
+    await expect.poll(async () => (await activeElement(page)).id).toBe('main-content');
+
+    // The next Tab continues from main, past the header.
+    await page.keyboard.press('Tab');
+    const next = await activeElement(page);
+    expect(next.id).not.toBe('main-content');
+    expect(await page.evaluate(() => !!document.activeElement?.closest('main'))).toBe(true);
+  });
+
+  test('keyboard focus shows a teal outline on the page and a white one on the footer', async ({ page }) => {
+    await prepare(page, DESKTOP);
+    await page.goto('/search');
+
+    const outline = (selector: string) =>
+      page.locator(selector).first().evaluate((el) => {
+        const style = getComputedStyle(el);
+        return { width: style.outlineWidth, style: style.outlineStyle, color: style.outlineColor };
+      });
+
+    // Reach each link by keyboard so :focus-visible applies: focus the control before it, then Tab.
+    await page.locator('form[action="/search"] button[type="submit"]').focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    const onPage = await outline('form[action="/search"] button[type="submit"]');
+    expect(onPage.style).toBe('solid');
+    expect(onPage.width).toBe('2px');
+    expect(onPage.color).not.toBe('rgb(255, 255, 255)');
+
+    const footerLinks = page.locator('footer a');
+    await footerLinks.nth(1).focus();
+    await page.keyboard.press('Shift+Tab');
+    const inFooter = await footerLinks.first().evaluate((el) => {
+      const style = getComputedStyle(el);
+      return { width: style.outlineWidth, style: style.outlineStyle, color: style.outlineColor, focused: el === document.activeElement };
+    });
+    expect(inFooter.focused).toBe(true);
+    expect(inFooter.style).toBe('solid');
+    expect(inFooter.width).toBe('2px');
+    expect(inFooter.color).toBe('rgb(255, 255, 255)');
+  });
+
+  test('the mobile menu button reports its state, and Escape closes the menu and returns focus', async ({ page }) => {
+    await prepare(page, MOBILE);
+    await page.goto('/');
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+
+    const button = page.locator('#mobile-menu-button');
+    const menu = page.locator('#mobile-menu');
+    await expect(button).toHaveAttribute('aria-expanded', 'false');
+    await expect(button).toHaveAttribute('aria-controls', 'mobile-menu');
+    await expect(menu).toBeHidden();
+
+    // Open and close by keyboard.
+    await button.focus();
+    await page.keyboard.press('Enter');
+    await expect(button).toHaveAttribute('aria-expanded', 'true');
+    await expect(menu).toBeVisible();
+    await page.keyboard.press('Enter');
+    await expect(button).toHaveAttribute('aria-expanded', 'false');
+    await expect(menu).toBeHidden();
+
+    // Open, move into the menu, and Escape: closed, and focus is back on the button.
+    await page.keyboard.press('Space');
+    await expect(button).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => !!document.activeElement?.closest('#mobile-menu'))).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(button).toHaveAttribute('aria-expanded', 'false');
+    await expect(button).toBeFocused();
+  });
+
+  test('closing the submitted banner by keyboard moves focus to the page heading', async ({ authedPage: page }) => {
+    await prepare(page, DESKTOP);
+    const slug = seedBuildingSlug(BUILDING_ID);
+    await page.goto(`/building/${slug}?submitted=true&reviewId=${SEED_REVIEW_ID}`);
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+
+    const banner = page.locator('#submitted-banner');
+    await expect(banner).toBeVisible();
+    const close = banner.getByRole('button', { name: 'Close', exact: true });
+    await close.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(banner).toHaveCount(0);
+    const heading = page.locator('main h1');
+    await expect(heading).toBeFocused();
+    await expect(heading).toHaveAttribute('tabindex', '-1');
+  });
+
+  test('closing the profile updated banner by keyboard moves focus to main', async ({ authedPage: page }) => {
+    await prepare(page, DESKTOP);
+    await page.goto('/profile?updated=true');
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+
+    const banner = page.locator('#updated-banner');
+    await expect(banner).toBeVisible();
+    await banner.getByRole('button', { name: 'Close', exact: true }).focus();
+    await page.keyboard.press('Space');
+
+    await expect(banner).toHaveCount(0);
+    // The profile page has no h1, so focus goes to main.
+    await expect.poll(async () => (await activeElement(page)).id).toBe('main-content');
+  });
+});
+
+test.describe('batch 2: both address searches are comboboxes with a listbox popup', () => {
+  // Matches nothing in the seed, so the routed fictional suggestion (FAKE_PREDICTIONS in
+  // review-helpers.ts) is what answers. Addresses come after our own rows in both lists.
+  const FICTIONAL_QUERY = '100 Example St';
+  const HOME_LABEL = 'Search by address, neighborhood, or landlord';
+  const REVIEW_LABEL = 'Search for your building address';
+  const PLACES_DETAILS = /\/api\/places\/details(\?|$)/;
+
+  /** Islands must be hydrated before typing, or React never sees the text. */
+  async function hydrated(page: Page) {
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    await page.waitForFunction(
+      () => document.querySelectorAll('astro-island[ssr]:not([client="visible"])').length === 0,
+      undefined,
+      { timeout: 10_000 },
+    );
+  }
+
+  test('home search: arrows, Escape to close then clear, Tab out, and Enter goes to the option', async ({ page }) => {
+    await prepare(page, DESKTOP);
+    await page.goto('/');
+    await hydrated(page);
+
+    const input = page.getByRole('combobox', { name: HOME_LABEL });
+    const form = page.locator('form').filter({ has: input });
+    const listbox = page.getByRole('listbox', { name: HOME_LABEL });
+    const status = form.getByRole('status');
+    await expect(input).toHaveAttribute('aria-expanded', 'false');
+    await expect(status).toHaveText('');
+
+    await input.fill(FICTIONAL_QUERY);
+    await expect(listbox).toBeVisible({ timeout: 10_000 });
+    await expect(input).toHaveAttribute('aria-expanded', 'true');
+    await expect(input).toHaveAttribute('aria-controls', (await listbox.getAttribute('id')) ?? 'missing');
+    await expect(status).toHaveText(/result/, { timeout: 10_000 });
+
+    // ArrowDown names a visible option through aria-activedescendant; focus stays in the input.
+    await input.press('ArrowDown');
+    const activeId = await input.getAttribute('aria-activedescendant');
+    expect(activeId).toBeTruthy();
+    const active = page.locator(`[id="${activeId}"]`);
+    await expect(active).toBeVisible();
+    await expect(active).toHaveAttribute('role', 'option');
+    await expect(active).toHaveAttribute('aria-selected', 'true');
+    await expect(input).toBeFocused();
+
+    // Escape closes, and a second Escape clears.
+    await input.press('Escape');
+    await expect(input).toHaveAttribute('aria-expanded', 'false');
+    await expect(listbox).toHaveCount(0);
+    await expect(input).toHaveValue(FICTIONAL_QUERY);
+    await input.press('Escape');
+    await expect(input).toHaveValue('');
+    await expect(status).toHaveText('');
+
+    // Tab closes the popup and moves on to Search; no option is a Tab stop.
+    await input.fill(FICTIONAL_QUERY);
+    await expect(listbox).toBeVisible({ timeout: 10_000 });
+    await input.press('Tab');
+    await expect(listbox).toHaveCount(0);
+    await expect(form.getByRole('button', { name: 'Search', exact: true })).toBeFocused();
+
+    // ArrowUp opens on the last option, the routed address; Enter starts a review for it.
+    await input.focus();
+    await expect(listbox).toBeVisible({ timeout: 10_000 });
+    await input.press('ArrowUp');
+    const lastId = await input.getAttribute('aria-activedescendant');
+    await expect(page.locator(`[id="${lastId}"]`)).toContainText(FICTIONAL_QUERY);
+    await input.press('Enter');
+    // Signed out, the review form sends the reader to sign in with the handoff kept.
+    await page.waitForURL((url) => url.pathname !== '/', { timeout: 15_000 });
+    expect(decodeURIComponent(page.url())).toContain('placeId=e2e-a11y-place-1');
+  });
+
+  test('review address search: arrows, Escape to close then clear, Tab out, and Enter picks the place', async ({
+    authedPage: page,
+  }) => {
+    await prepare(page, DESKTOP);
+    // Registered after prepare(), so it wins: the routed suggestion resolves to a fictional
+    // place, and picking it shows the selected-place card. GET /api/buildings only looks up.
+    await page.route(PLACES_DETAILS, (route) =>
+      route.fulfill({
+        json: {
+          place: {
+            placeId: 'e2e-a11y-place-1',
+            formattedAddress: '100 Example St, Boston, MA 02101, USA',
+            streetAddress: '100 Example St',
+            neighborhood: 'Downtown',
+            city: 'Boston',
+            state: 'MA',
+            zipCode: '02101',
+            latitude: 42.355,
+            longitude: -71.06,
+          },
+        },
+      }),
+    );
+    await page.goto('/review/new');
+    await hydrated(page);
+
+    const input = page.getByRole('combobox', { name: REVIEW_LABEL });
+    const listbox = page.getByRole('listbox', { name: REVIEW_LABEL });
+    const status = page.locator('[role="status"]').filter({ hasText: /result/ });
+    await expect(input).toHaveAttribute('aria-expanded', 'false');
+
+    await input.fill(FICTIONAL_QUERY);
+    await expect(listbox).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Powered by Google')).toBeVisible({ timeout: 10_000 });
+    await expect(status).toHaveCount(1, { timeout: 10_000 });
+    // The attribution is outside the listbox; the manual-entry option is the last option.
+    await expect(listbox.getByText('Powered by Google')).toHaveCount(0);
+    await expect(listbox.getByRole('option').last()).toContainText('Enter it manually');
+
+    await input.press('ArrowDown');
+    const activeId = await input.getAttribute('aria-activedescendant');
+    expect(activeId).toBeTruthy();
+    await expect(page.locator(`[id="${activeId}"]`)).toBeVisible();
+    await expect(page.locator(`[id="${activeId}"]`)).toHaveAttribute('aria-selected', 'true');
+
+    await input.press('Escape');
+    await expect(input).toHaveAttribute('aria-expanded', 'false');
+    await expect(input).toHaveValue(FICTIONAL_QUERY);
+    await input.press('Escape');
+    await expect(input).toHaveValue('');
+
+    // Tab closes the popup and lands on the clear button, not in the list.
+    await input.fill(FICTIONAL_QUERY);
+    await expect(listbox).toBeVisible({ timeout: 10_000 });
+    await input.press('Tab');
+    await expect(listbox).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Clear address' })).toBeFocused();
+
+    // From the bottom: ArrowUp is manual entry, again is the routed address. Enter picks it.
+    await input.focus();
+    await expect(listbox).toBeVisible({ timeout: 10_000 });
+    await input.press('ArrowUp');
+    await input.press('ArrowUp');
+    const pickId = await input.getAttribute('aria-activedescendant');
+    await expect(page.locator(`[id="${pickId}"]`)).toContainText(FICTIONAL_QUERY);
+    await input.press('Enter');
+    const picked = page.locator('[aria-live="polite"]').filter({ hasText: 'This will be a new building in our system' });
+    await expect(picked).toBeVisible({ timeout: 10_000 });
+    await expect(picked).toContainText(FICTIONAL_QUERY);
+  });
+});
+
+test.describe('batch 3: rating questions are native radio groups', () => {
+  test('Tab enters a question on its first answer, arrows choose, and Tab leaves the question', async ({
+    authedPage: page,
+  }) => {
+    await prepare(page, DESKTOP);
+    // building-30 is a seed building; nothing here is submitted.
+    await page.goto('/review/new?building=building-30');
+    await page.locator('#review-bedrooms').waitFor({ timeout: 15_000 });
+    await page.waitForFunction(
+      () => document.querySelectorAll('astro-island[ssr]:not([client="visible"])').length === 0,
+      undefined,
+      { timeout: 10_000 },
+    );
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByRole('heading', { name: 'Rate Your Unit' }).waitFor();
+
+    const first = page.getByRole('radiogroup').first();
+    await expect(first.getByRole('radio', { checked: true })).toHaveCount(0);
+
+    // Tab from wherever focus is until it reaches a radio.
+    let reached = false;
+    for (let i = 0; i < 60 && !reached; i++) {
+      await page.keyboard.press('Tab');
+      reached = await page.evaluate(() => (document.activeElement as HTMLInputElement | null)?.type === 'radio');
+    }
+    expect(reached).toBe(true);
+
+    // Nothing is answered, so the group's Tab stop is its first answer, unchecked.
+    const one = first.getByRole('radio', { name: '1', exact: true });
+    await expect(one).toBeFocused();
+    await expect(one).not.toBeChecked();
+
+    // Arrow keys move and choose within the question.
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    const three = first.getByRole('radio', { name: '3', exact: true });
+    await expect(three).toBeChecked();
+    await expect(three).toBeFocused();
+    await expect(first.getByRole('radio', { checked: true })).toHaveCount(1);
+
+    // The focused pill shows the keyboard outline, taken from its hidden radio. The pill's
+    // transition-all eases the outline in, so wait for it to settle.
+    await expect
+      .poll(() =>
+        three.evaluate((radio) => {
+          const style = getComputedStyle(radio.nextElementSibling as Element);
+          return { width: style.outlineWidth, style: style.outlineStyle };
+        }),
+      )
+      .toEqual({ width: '2px', style: 'solid' });
+
+    // One Tab stop per question: Tab leaves the group, Shift+Tab comes back to the answer.
+    await page.keyboard.press('Tab');
+    expect(await first.evaluate((group) => group.contains(document.activeElement))).toBe(false);
+    await page.keyboard.press('Shift+Tab');
+    await expect(three).toBeFocused();
+  });
+});
+
+test.describe('batch 4: review steps move focus to their heading, and the progress row fits', () => {
+  // building-30 is a seed building; the form opens at unit details. Nothing here is submitted.
+  async function openUnitDetails(page: Page) {
+    await page.goto('/review/new?building=building-30');
+    await page.locator('#review-bedrooms').waitFor({ timeout: 15_000 });
+    await page.waitForFunction(
+      () => document.querySelectorAll('astro-island[ssr]:not([client="visible"])').length === 0,
+      undefined,
+      { timeout: 10_000 },
+    );
+  }
+
+  const stepHeading = (page: Page, name: string) => page.getByRole('heading', { level: 2, name, exact: true });
+
+  test('Continue and Back by keyboard move focus to the new step heading', async ({ authedPage: page }) => {
+    await prepare(page, DESKTOP);
+    await openUnitDetails(page);
+
+    // Continue sits at the foot of the long unit details step.
+    await page.getByRole('button', { name: 'Continue', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect(stepHeading(page, 'Step 3 of 7: Your Unit')).toBeFocused();
+    // The new step starts on screen, not down where Continue was.
+    await expect(page.getByRole('list', { name: 'Review progress' })).toBeInViewport();
+    await expect(page.getByRole('heading', { name: 'Rate Your Unit' })).toBeInViewport();
+
+    await page.getByRole('button', { name: 'Back', exact: true }).focus();
+    await page.keyboard.press('Space');
+    await expect(stepHeading(page, 'Step 2 of 7: Unit Details')).toBeFocused();
+  });
+
+  // Before this batch the desktop row ran 215, 87 and 7px past the 704px form column.
+  for (const viewport of [
+    { width: 1024, height: 768 },
+    { width: 1280, height: 900 },
+    { width: 1440, height: 900 },
+  ]) {
+    test(`every step from unit details to confirm fits ${viewport.width}px with no sideways scroll`, async ({
+      authedPage: page,
+    }) => {
+      test.setTimeout(60_000);
+      await prepare(page, viewport);
+      await openUnitDetails(page);
+      const progress = page.getByRole('list', { name: 'Review progress' });
+
+      const steps = [
+        { title: 'Unit Details', number: 2, next: 'Continue' },
+        { title: 'Your Unit', number: 3, next: 'Continue' },
+        { title: 'Building', number: 4, next: 'Continue' },
+        { title: 'Landlord', number: 5, next: 'Continue' },
+        { title: 'Additional', number: 6, next: 'Review & Submit' },
+        { title: 'Submit', number: 7, next: null },
+      ];
+      for (const step of steps) {
+        const label = `step ${step.number} at ${viewport.width}px`;
+        await expect(stepHeading(page, `Step ${step.number} of 7: ${step.title}`)).toBeAttached();
+        await expect(progress).toBeVisible();
+        await expect(progress.locator('li[aria-current="step"]')).toContainText(step.title);
+
+        const widths = await page.evaluate(() => {
+          const doc = document.documentElement;
+          const list = document.querySelector('ol[aria-label="Review progress"]') as HTMLElement;
+          return {
+            page: { scroll: doc.scrollWidth, client: doc.clientWidth },
+            list: { scroll: list.scrollWidth, client: list.clientWidth },
+          };
+        });
+        expect(widths.page.scroll, label).toBeLessThanOrEqual(widths.page.client);
+        expect(widths.list.scroll, label).toBeLessThanOrEqual(widths.list.client);
+
+        if (step.next) await page.getByRole('button', { name: step.next, exact: true }).click();
+      }
+    });
+  }
+});
+
+test.describe('batch 5: the verification dialog traps focus, closes on Escape and returns focus', () => {
+  // Nothing is uploaded: the dialog is opened and closed by keyboard only.
+  const DIALOG_NAME = 'Verify Your Tenancy';
+  const TAB_PRESSES = 15;
+
+  const focusInDialog = (page: Page) => page.evaluate(() => !!document.activeElement?.closest('dialog'));
+
+  async function hydrated(page: Page) {
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    await page.waitForFunction(
+      () => document.querySelectorAll('astro-island[ssr]:not([client="visible"])').length === 0,
+      undefined,
+      { timeout: 10_000 },
+    );
+  }
+
+  /** Open from `opener` by keyboard, Tab around inside, Escape, and check focus came back. */
+  async function exercise(page: Page, opener: Locator) {
+    await opener.focus();
+    await page.keyboard.press('Enter');
+
+    const dialog = page.getByRole('dialog', { name: DIALOG_NAME });
+    await expect(dialog).toBeVisible();
+    // Focus starts on the file input, so a file can be chosen at once.
+    await expect
+      .poll(() => page.evaluate(() => (document.activeElement as HTMLInputElement | null)?.type))
+      .toBe('file');
+    await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
+
+    const visited = new Set<string>();
+    for (let i = 0; i < TAB_PRESSES; i++) {
+      await page.keyboard.press('Tab');
+      expect(await focusInDialog(page), `Tab ${i + 1} stays in the dialog`).toBe(true);
+      visited.add(await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 80) ?? ''));
+    }
+    // Close, the file input and Cancel; Submit is disabled until a file is chosen.
+    expect(visited.size).toBeGreaterThanOrEqual(3);
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press('Shift+Tab');
+      expect(await focusInDialog(page), `Shift+Tab ${i + 1} stays in the dialog`).toBe(true);
+    }
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(opener).toBeFocused();
+  }
+
+  test('from Verify Now on the building page after a submit', async ({ authedPage: page }) => {
+    await prepare(page, DESKTOP);
+    const slug = seedBuildingSlug(BUILDING_ID);
+    await page.goto(`/building/${slug}?submitted=true&reviewId=${SEED_REVIEW_ID}`);
+    await hydrated(page);
+    await exercise(page, page.getByRole('button', { name: 'Verify Now', exact: true }));
+  });
+
+  test('from Verify in the profile review list', async ({ authedPage: page }) => {
+    await prepare(page, DESKTOP);
+    await page.goto('/profile');
+    await hydrated(page);
+    const verify = page.getByRole('button', { name: 'Verify', exact: true }).first();
+    await verify.waitFor();
+    await exercise(page, verify);
+  });
+
+  test('at 375px the dialog fits the screen and still returns focus', async ({ authedPage: page }) => {
+    await prepare(page, MOBILE);
+    const slug = seedBuildingSlug(BUILDING_ID);
+    await page.goto(`/building/${slug}?submitted=true&reviewId=${SEED_REVIEW_ID}`);
+    await hydrated(page);
+    const opener = page.getByRole('button', { name: 'Verify Now', exact: true });
+    await opener.focus();
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog', { name: DIALOG_NAME });
+    await expect(dialog).toBeVisible();
+    const box = await dialog.boundingBox();
+    expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect((box?.x ?? 0) + (box?.width ?? 1000)).toBeLessThanOrEqual(MOBILE.width);
+    expect((box?.y ?? 0) + (box?.height ?? 1000)).toBeLessThanOrEqual(MOBILE.height);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(opener).toBeFocused();
+  });
+});
+
+test.describe('batch 6: unit cards and admin rows are native disclosure buttons', () => {
+  // One synthetic records pull on building-01, so the records panel (and its "Report a record
+  // error" link) renders. Nothing else is written; the row is removed after the block.
+  const RECORDS_PULL_ID = 'e2e-kbd-pull-assessor';
+
+  test.beforeAll(() => {
+    const now = Math.floor(Date.now() / 1000);
+    executeLocalD1(
+      `DELETE FROM record_pulls WHERE id = '${RECORDS_PULL_ID}'; ` +
+        'INSERT INTO record_pulls (id, building_id, jurisdiction, source_id, source_label, query, status, row_count, retrieved_at) ' +
+        `VALUES ('${RECORDS_PULL_ID}', '${BUILDING_ID}', 'boston', '${FY2026_RESOURCE_ID}', 'Property Assessment FY2026', 'e2e fixture', 'empty', 0, ${now})`,
+    );
+  });
+
+  test.afterAll(() => {
+    executeLocalD1(`DELETE FROM record_pulls WHERE id = '${RECORDS_PULL_ID}'`);
+  });
+
+  const focusOutline = (locator: Locator) =>
+    locator.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return { style: style.outlineStyle, width: style.outlineWidth, offset: style.outlineOffset };
+    });
+
+  test('a unit card opens with Enter and closes with Space', async ({ page }) => {
+    await prepare(page, DESKTOP);
+    await page.goto(`/building/${seedBuildingSlug(BUILDING_ID)}`);
+
+    // building-01 has reviews in three unit types, so three cards; the first starts open.
+    const cards = page.locator('#unit-list .unit-card');
+    await expect(cards).toHaveCount(3);
+    const first = cards.nth(0).getByRole('button');
+    const second = cards.nth(1).getByRole('button');
+    await expect(first).toHaveAttribute('aria-expanded', 'true');
+    await expect(second).toHaveAttribute('aria-expanded', 'false');
+    await expect(second).toHaveAccessibleName((await cards.nth(1).locator('h4').textContent())?.trim() ?? 'missing');
+    const panel = page.locator(`[id="${await second.getAttribute('aria-controls')}"]`);
+    await expect(panel).toBeHidden();
+
+    // Close the first card from the keyboard, so its reviews leave the Tab order, then Tab on.
+    await first.focus();
+    await page.keyboard.press('Enter');
+    await expect(first).toHaveAttribute('aria-expanded', 'false');
+    await expect(cards.nth(0)).toHaveAttribute('data-expanded', 'false');
+    await page.keyboard.press('Tab');
+    await expect(second).toBeFocused();
+    expect(await focusOutline(second)).toEqual({ style: 'solid', width: '2px', offset: '2px' });
+
+    await page.keyboard.press('Enter');
+    await expect(second).toHaveAttribute('aria-expanded', 'true');
+    await expect(cards.nth(1)).toHaveAttribute('data-expanded', 'true');
+    await expect(panel).toBeVisible();
+    await expect(cards.nth(1).locator('.chevron-icon')).toHaveClass(/rotate-180/);
+
+    await page.keyboard.press('Space');
+    await expect(second).toHaveAttribute('aria-expanded', 'false');
+    await expect(cards.nth(1)).toHaveAttribute('data-expanded', 'false');
+    await expect(panel).toBeHidden();
+    await expect(second).toBeFocused();
+  });
+
+  test('the Report a record error link opens the form and puts focus on its summary', async ({ page }) => {
+    await prepare(page, DESKTOP);
+    await page.goto(`/building/${seedBuildingSlug(BUILDING_ID)}`);
+
+    const link = page.getByRole('link', { name: 'Report a record error' });
+    const report = page.locator('#report-record');
+    const summary = report.locator('summary');
+    await expect(report).toHaveJSProperty('open', false);
+
+    await link.focus();
+    await page.keyboard.press('Enter');
+    await expect(report).toHaveJSProperty('open', true);
+    await expect(summary).toBeFocused();
+    await expect(summary).toBeInViewport();
+    await expect(page).toHaveURL(/#report-record$/);
+
+    // A second press, with the hash already set, lands there again.
+    await link.focus();
+    await page.keyboard.press('Enter');
+    await expect(summary).toBeFocused();
+    await expect(summary).toBeInViewport();
+  });
+
+  test('the seed admin opens a review row from the keyboard', async ({ adminPage: page }) => {
+    await prepare(page, DESKTOP);
+    await page.goto('/admin/reviews');
+    const flagged = page.getByRole('button', { name: /^Flagged \(/ });
+    await flagged.waitFor();
+
+    // The header keeps its .cursor-pointer class; the toggle is the native button over it.
+    const header = page.locator('.cursor-pointer').first();
+    const toggle = header.getByRole('button');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).not.toHaveAttribute('aria-controls', /.+/);
+
+    // The last status chip is followed in the Tab order by the first row.
+    await flagged.focus();
+    await page.keyboard.press('Tab');
+    await expect(toggle).toBeFocused();
+    // Drawn inside the row, so the card's rounded, clipped edge cannot hide it.
+    expect(await focusOutline(toggle)).toEqual({ style: 'solid', width: '2px', offset: '-2px' });
+
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const panel = page.locator(`[id="${await toggle.getAttribute('aria-controls')}"]`);
+    await expect(panel.getByRole('link', { name: 'Edit review' })).toBeVisible();
+    await expect(panel.getByRole('button', { name: /Reset to Pending|Approve/ }).first()).toBeVisible();
+
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(panel).toHaveCount(0);
+  });
+});
+
+test.describe('batch 7: reduced motion stops transitions and spinners', () => {
+  // The global.css rule under prefers-reduced-motion: reduce sets every duration to 0.01ms.
+  // Each test also turns motion back on, to show the same element does move by default.
+  const REDUCED_MS = 0.01;
+
+  /**
+   * A computed duration list ("0.15s", "1e-05s, 0s") as its longest value in milliseconds,
+   * rounded to the microsecond so float noise cannot tip 0.01 over the bound.
+   */
+  function longestMs(value: string): number {
+    const longest = Math.max(
+      ...value.split(',').map((part) => {
+        const text = part.trim();
+        const amount = Number.parseFloat(text);
+        return text.endsWith('ms') ? amount : amount * 1000;
+      }),
+    );
+    return Math.round(longest * 1000) / 1000;
+  }
+
+  async function hydrated(page: Page) {
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    await page.waitForFunction(
+      () => document.querySelectorAll('astro-island[ssr]:not([client="visible"])').length === 0,
+      undefined,
+      { timeout: 10_000 },
+    );
+  }
+
+  test('a rating pill does not transition', async ({ authedPage: page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await prepare(page, DESKTOP);
+    // building-30 is a seed building; nothing here is submitted.
+    await page.goto('/review/new?building=building-30');
+    await page.locator('#review-bedrooms').waitFor({ timeout: 15_000 });
+    await hydrated(page);
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('heading', { name: 'Rate Your Unit' }).waitFor();
+
+    // The pill is the span beside each hidden radio.
+    const pill = page.getByRole('radiogroup').first().locator('input[type="radio"] + span').first();
+    await expect(pill).toHaveText('1');
+    const duration = () => pill.evaluate((el) => getComputedStyle(el).transitionDuration);
+
+    expect(longestMs(await duration())).toBeLessThanOrEqual(REDUCED_MS);
+
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    expect(longestMs(await duration())).toBeGreaterThan(REDUCED_MS);
+  });
+
+  test('the home search spinner does not spin while a lookup is pending', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await prepare(page, DESKTOP);
+    // Our own lookup is held open, so the spinner stays up until the test lets it answer.
+    let release: () => void = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(/\/api\/search\/autocomplete(\?|$)/, async (route) => {
+      await released;
+      await route.fulfill({ json: { results: [] } }).catch(() => {});
+    });
+    await page.goto('/');
+    await hydrated(page);
+
+    const input = page.getByRole('combobox', { name: 'Search by address, neighborhood, or landlord' });
+    await input.fill('100 Example St');
+    const spinner = page.locator('form').filter({ has: input }).locator('svg.animate-spin');
+    await expect(spinner).toBeVisible({ timeout: 10_000 });
+    const timing = () =>
+      spinner.evaluate((el) => {
+        const style = getComputedStyle(el);
+        return { duration: style.animationDuration, count: style.animationIterationCount };
+      });
+
+    const reduced = await timing();
+    expect(longestMs(reduced.duration)).toBeLessThanOrEqual(REDUCED_MS);
+    expect(reduced.count).toBe('1');
+
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    expect(longestMs((await timing()).duration)).toBeGreaterThan(REDUCED_MS);
+
+    release();
+    await expect(spinner).toHaveCount(0, { timeout: 10_000 });
+  });
+});
+
+test.describe('review fixes: focus after mode switches and requests, Enter on ratings, caret keys', () => {
+  const FICTIONAL_QUERY = '100 Example St';
+
+  async function hydrated(page: Page) {
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    await page.waitForFunction(
+      () => document.querySelectorAll('astro-island[ssr]:not([client="visible"])').length === 0,
+      undefined,
+      { timeout: 10_000 },
+    );
+  }
+
+  test('choosing manual entry by keyboard focuses the street field, and Back to search focuses the search', async ({
+    authedPage: page,
+  }) => {
+    await prepare(page, DESKTOP);
+    await page.goto('/review/new');
+    await hydrated(page);
+
+    const input = page.getByRole('combobox', { name: 'Search for your building address' });
+    await input.fill(FICTIONAL_QUERY);
+    await expect(page.getByRole('listbox')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Powered by Google')).toBeVisible({ timeout: 10_000 });
+    await input.press('ArrowUp');
+    const manualId = await input.getAttribute('aria-activedescendant');
+    await expect(page.locator(`[id="${manualId}"]`)).toContainText('Enter it manually');
+    await input.press('Enter');
+
+    await expect(page.getByLabel('Street address')).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.getByRole('button', { name: 'Back to search' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('combobox', { name: 'Search for your building address' })).toBeFocused();
+  });
+
+  test('home search: ArrowLeft hands focus back to the text, so Enter searches for it', async ({ page }) => {
+    await prepare(page, DESKTOP);
+    await page.goto('/');
+    await hydrated(page);
+
+    const input = page.getByRole('combobox', { name: 'Search by address, neighborhood, or landlord' });
+    await input.fill(FICTIONAL_QUERY);
+    await expect(page.getByRole('listbox')).toBeVisible({ timeout: 10_000 });
+    // Wait for every lookup to settle: new results clear the active option.
+    await expect(page.locator('form').filter({ has: input }).getByRole('status')).toHaveText(/result/, {
+      timeout: 10_000,
+    });
+    await input.press('ArrowDown');
+    await expect(input).toHaveAttribute('aria-activedescendant', /.+/);
+    await input.press('ArrowLeft');
+    await expect(input).not.toHaveAttribute('aria-activedescendant');
+    await input.press('Enter');
+    await page.waitForURL(/\/search\?q=/, { timeout: 15_000 });
+    expect(decodeURIComponent(page.url())).toContain(`q=${FICTIONAL_QUERY}`);
+  });
+
+  test('a failed sign-in is read from the alert and focus returns to the button', async ({ page }) => {
+    // Routed: the request never reaches the server, so no rate limit or account is touched.
+    await page.route(/\/api\/auth\/signin$/, (route) =>
+      route.fulfill({ status: 401, json: { error: 'Example sign-in failure' } }),
+    );
+    await page.goto('/auth/signin');
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    const alert = page.locator('#error-message');
+    await expect(alert).toHaveAttribute('role', 'alert');
+    await expect(alert).toHaveText('');
+
+    await page.locator('#signin-form input[name="email"]').fill('reader@example.com');
+    await page.locator('#signin-form input[name="password"]').fill('example-not-a-password');
+    const submit = page.locator('#signin-form button[type="submit"]');
+    await submit.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(alert).toHaveText('Example sign-in failure');
+    await expect(alert).toBeVisible();
+    await expect(submit).toBeEnabled();
+    await expect(submit).toBeFocused();
+  });
+
+  test('a reset link request is read from the status region and focus returns to the button', async ({ page }) => {
+    await page.route(/\/api\/auth\/forgot-password$/, (route) =>
+      route.fulfill({ status: 200, json: { message: 'Example reset message' } }),
+    );
+    await page.goto('/auth/forgot-password');
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    const status = page.locator('#success-message');
+    await expect(status).toHaveAttribute('role', 'status');
+    await expect(status).toHaveText('');
+    // Present but collapsed while empty.
+    expect((await status.boundingBox())?.height ?? 0).toBe(0);
+
+    await page.locator('#forgot-password-form input[name="email"]').fill('reader@example.com');
+    const submit = page.locator('#forgot-password-form button[type="submit"]');
+    await submit.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(status).toHaveText('Example reset message');
+    await expect(status).toBeVisible();
+    await expect(submit).toBeFocused();
+  });
+
+  test('Enter on a rating radio in the edit form chooses it and does not save', async ({ authedPage: page }) => {
+    const saves: string[] = [];
+    // Any save is refused here, so even a regression could not change the seed review.
+    await page.route(new RegExp(`/api/reviews/${SEED_REVIEW_ID}$`), (route) => {
+      if (route.request().method() === 'GET') return route.continue();
+      saves.push(route.request().method());
+      return route.fulfill({ status: 500, json: { error: 'Saving is blocked in this test' } });
+    });
+    await page.goto(`/review/edit/${SEED_REVIEW_ID}`);
+    await hydrated(page);
+
+    await page.getByRole('checkbox', { name: /I confirm this review/ }).check();
+    const group = page.getByRole('radiogroup').first();
+    const one = group.getByRole('radio', { name: '1', exact: true });
+    const five = group.getByRole('radio', { name: '5', exact: true });
+    const target = (await one.isChecked()) ? five : one;
+    await target.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(target).toBeChecked();
+    await expect(target).toBeFocused();
+    await page.waitForTimeout(500);
+    expect(saves).toEqual([]);
+  });
+});

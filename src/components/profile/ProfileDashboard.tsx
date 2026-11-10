@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ReviewListItem from './ReviewListItem';
 import VerificationModal from './VerificationModal';
 import NotificationsTab from './NotificationsTab';
@@ -69,6 +69,26 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
   // Email verification state
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const resendButtonRef = useRef<HTMLButtonElement>(null);
+  const wasResending = useRef(false);
+
+  // The resend button disables itself during the request, which drops focus to the page.
+  // When it is enabled again, focus goes back to it if nothing else has taken it; the result
+  // is read from the status or alert region.
+  useEffect(() => {
+    if (wasResending.current && !resendLoading) {
+      const active = document.activeElement;
+      if (!active || active === document.body) resendButtonRef.current?.focus();
+    }
+    wasResending.current = resendLoading;
+  }, [resendLoading]);
+
+  // A successful verification upload reloads the list, which may remove the Verify button
+  // that opened the dialog, so focus falls back to the reviews tab.
+  const reviewsTabRef = useRef<HTMLButtonElement>(null);
+  // The Verify button that opened the dialog. Safari does not focus a button on click, so
+  // the dialog is told which one to return to.
+  const verifyTriggerRef = useRef<HTMLElement | null>(null);
 
   // Saved buildings state
   const [savedBuildings, setSavedBuildings] = useState<SavedBuilding[]>([]);
@@ -159,7 +179,8 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
     }
   };
 
-  const handleVerifyClick = (reviewId: string) => {
+  const handleVerifyClick = (reviewId: string, trigger: HTMLElement) => {
+    verifyTriggerRef.current = trigger;
     setVerifyingReviewId(reviewId);
   };
 
@@ -257,6 +278,8 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             </p>
 
             <button
+              ref={resendButtonRef}
+              type="button"
               onClick={handleResendVerification}
               disabled={resendLoading}
               className="bg-teal-700 text-white font-semibold py-2 px-4 rounded-[4px] hover:bg-teal-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
@@ -264,11 +287,17 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
               {resendLoading ? 'Sending...' : 'Send Verification Email'}
             </button>
 
-            {resendMessage && (
-              <p className={`mt-3 text-sm ${resendMessage.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>
-                {resendMessage.text}
-              </p>
-            )}
+            {/* Both regions are always present, so the result is announced when it appears. */}
+            <div role="status">
+              {resendMessage?.type === 'success' && (
+                <p className="mt-3 text-sm text-green-700">{resendMessage.text}</p>
+              )}
+            </div>
+            <div role="alert">
+              {resendMessage?.type === 'error' && (
+                <p className="mt-3 text-sm text-red-700">{resendMessage.text}</p>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -280,6 +309,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
           aria-label="Tabs"
         >
           <button
+            ref={reviewsTabRef}
             onClick={() => handleTabSwitch('reviews')}
             aria-current={activeTab === 'reviews' ? 'true' : undefined}
             className={`shrink-0 h-11 py-3 text-sm font-medium border-b-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-teal-600 ${
@@ -343,8 +373,9 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
           </div>
 
           {loading ? (
-            <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+            <div role="status" className="flex justify-center py-12">
+              <div aria-hidden="true" className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+              <span className="sr-only">Loading...</span>
             </div>
           ) : error ? (
             <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
@@ -375,8 +406,9 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
       {activeTab === 'saved' && (
         <div>
           {savedLoading ? (
-            <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+            <div role="status" className="flex justify-center py-12">
+              <div aria-hidden="true" className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+              <span className="sr-only">Loading...</span>
             </div>
           ) : savedError ? (
             <div className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
@@ -456,6 +488,8 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
           reviewId={verifyingReviewId}
           onClose={handleVerificationClose}
           onSuccess={handleVerificationSuccess}
+          returnFocusRef={verifyTriggerRef}
+          returnFocusFallback={() => reviewsTabRef.current}
         />
       )}
     </div>

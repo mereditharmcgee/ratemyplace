@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PostSubmitVerification from '../../components/profile/PostSubmitVerification';
 
 /**
@@ -10,7 +10,10 @@ import PostSubmitVerification from '../../components/profile/PostSubmitVerificat
  * prompt now promises only what verification does: a badge on the review.
  */
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe('post-submit verification prompt', () => {
   it('promises the badge and nothing about scores', () => {
@@ -19,6 +22,60 @@ describe('post-submit verification prompt', () => {
     expect(text).toContain('Verified reviews display a trust badge. Upload proof of tenancy to get verified.');
     expect(text).not.toMatch(/weight/i);
     expect(text).not.toMatch(/score/i);
+  });
+
+  it('Verify Now is a plain button that opens the verification dialog', () => {
+    render(<PostSubmitVerification reviewId="review-1" />);
+    const verify = screen.getByRole('button', { name: 'Verify Now' });
+    expect(verify.getAttribute('type')).toBe('button');
+    verify.focus();
+    fireEvent.click(verify);
+    expect(screen.getByRole('dialog', { name: 'Verify Your Tenancy' })).toBeTruthy();
+  });
+
+  it('moves focus to the success message after a successful upload, since Verify Now is gone', async () => {
+    // Stubbed upload and a fictional file: nothing is sent anywhere.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
+    render(<PostSubmitVerification reviewId="review-1" />);
+    const verify = screen.getByRole('button', { name: 'Verify Now' });
+    verify.focus();
+    fireEvent.click(verify);
+
+    const file = new File(['fictional image bytes'], 'example-lease.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText(/Click to upload/), { target: { files: [file] } });
+    await screen.findByText('example-lease.png');
+    fireEvent.click(screen.getByRole('button', { name: 'Submit for Verification' }));
+
+    const success = await screen.findByText(/An admin will review your document shortly/);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Verify Now' })).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(success));
+    expect(success.getAttribute('tabindex')).toBe('-1');
+  });
+
+  it('returns focus to Verify Now when the dialog is closed without uploading', () => {
+    render(<PostSubmitVerification reviewId="review-1" />);
+    const verify = screen.getByRole('button', { name: 'Verify Now' });
+    verify.focus();
+    fireEvent.click(verify);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(verify);
+  });
+
+  it('returns focus to Verify Now even when the click did not focus it, as in Safari', () => {
+    render(
+      <main id="main-content" tabIndex={-1}>
+        <h1>Example building</h1>
+        <PostSubmitVerification reviewId="review-1" />
+      </main>,
+    );
+    const verify = screen.getByRole('button', { name: 'Verify Now' });
+    expect(document.activeElement).toBe(document.body);
+    fireEvent.click(verify);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(verify);
   });
 });
 

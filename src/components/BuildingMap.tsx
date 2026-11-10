@@ -11,6 +11,7 @@ import {
   clusterBadgeStyle,
   clusterTitle,
 } from '../lib/mapCluster';
+import { prefersReducedMotion } from '../lib/motion';
 
 interface Building {
   id: string;
@@ -176,7 +177,9 @@ export default function BuildingMap({
           // Move to the reader only when they are inside the area the markers were fitted
           // to. If the fit has not happened yet, the fit's own idle handler checks instead.
           if (mapInstanceRef.current && shouldPanToUser(newLocation, fittedBoxRef.current)) {
-            mapInstanceRef.current.panTo(newLocation);
+            // A reader who asked for reduced motion gets the move without the pan animation.
+            if (prefersReducedMotion()) mapInstanceRef.current.setCenter(newLocation);
+            else mapInstanceRef.current.panTo(newLocation);
             mapInstanceRef.current.setZoom(USER_LOCATION_ZOOM);
           }
         },
@@ -256,7 +259,10 @@ export default function BuildingMap({
 
     const container = document.createElement('div');
     container.className = 'building-marker';
-    container.style.cssText = `
+    // The hover scale animates only for readers who have not asked for reduced motion.
+    container.style.cssText = prefersReducedMotion()
+      ? 'cursor: pointer;'
+      : `
       cursor: pointer;
       transition: transform 0.2s ease;
     `;
@@ -359,7 +365,8 @@ export default function BuildingMap({
       }
       const user = userLocationRef.current;
       if (user && shouldPanToUser(user, view.box)) {
-        map.panTo(user);
+        if (prefersReducedMotion()) map.setCenter(user);
+        else map.panTo(user);
         map.setZoom(USER_LOCATION_ZOOM);
       }
     });

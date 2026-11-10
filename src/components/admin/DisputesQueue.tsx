@@ -165,6 +165,7 @@ export default function DisputesQueue() {
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
+              aria-pressed={statusFilter === status}
               className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
                 statusFilter === status
                   ? 'bg-teal-700 text-white'
@@ -180,6 +181,7 @@ export default function DisputesQueue() {
         <div className="flex gap-2 ml-auto">
           <button
             onClick={() => setSortOrder('oldest')}
+            aria-pressed={sortOrder === 'oldest'}
             className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               sortOrder === 'oldest'
                 ? 'bg-teal-700 text-white'
@@ -190,6 +192,7 @@ export default function DisputesQueue() {
           </button>
           <button
             onClick={() => setSortOrder('newest')}
+            aria-pressed={sortOrder === 'newest'}
             className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-colors ${
               sortOrder === 'newest'
                 ? 'bg-teal-700 text-white'
@@ -212,15 +215,12 @@ export default function DisputesQueue() {
               key={dispute.id}
               className="bg-white rounded-[6px] border border-gray-200 overflow-hidden hover:shadow-sm transition-shadow"
             >
-              {/* Dispute Header */}
-              <div
-                className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => handleExpandDispute(dispute.id)}
-              >
+              {/* Dispute Header: the button laid over it (its last child) is the toggle. */}
+              <div className="relative p-4 cursor-pointer hover:bg-gray-50 transition-colors">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-gray-900 truncate">
+                      <h3 id={`dispute-title-${dispute.id}`} className="font-semibold text-gray-900 truncate">
                         {dispute.building_address}
                       </h3>
                     </div>
@@ -256,11 +256,19 @@ export default function DisputesQueue() {
                     </svg>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  className="absolute inset-0 z-10 w-full h-full cursor-[inherit] rounded-[6px] focus-visible:-outline-offset-2"
+                  aria-labelledby={`dispute-title-${dispute.id}`}
+                  aria-expanded={expandedDispute === dispute.id}
+                  aria-controls={expandedDispute === dispute.id ? `dispute-panel-${dispute.id}` : undefined}
+                  onClick={() => handleExpandDispute(dispute.id)}
+                />
               </div>
 
               {/* Expanded view - side-by-side */}
               {expandedDispute === dispute.id && (
-                <div className="border-t border-gray-200 p-4 bg-gray-50">
+                <div id={`dispute-panel-${dispute.id}`} className="border-t border-gray-200 p-4 bg-gray-50">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
                     {/* LEFT: Dispute details */}
                     <div className="space-y-4">
@@ -389,7 +397,7 @@ export default function DisputesQueue() {
                           onChange={(e) =>
                             setResolutionForm({ ...resolutionForm, outcome: e.target.value })
                           }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
                         >
                           <option value="dismiss">Dismiss</option>
                           <option value="uphold">Uphold</option>
@@ -408,7 +416,7 @@ export default function DisputesQueue() {
                           }
                           rows={4}
                           placeholder="Explain the resolution decision..."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
                         />
                       </div>
 

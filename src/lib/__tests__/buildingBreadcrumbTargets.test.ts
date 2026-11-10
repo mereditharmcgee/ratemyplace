@@ -12,7 +12,7 @@ const PAGE = join(process.cwd(), 'src/pages/building/[slug].astro');
 
 describe('building page breadcrumb', () => {
   const source = readFileSync(PAGE, 'utf8');
-  const nav = /<nav class="text-sm text-gray-600 mb-4">([\s\S]*?)<\/nav>/.exec(source)?.[1] ?? '';
+  const nav = /<nav aria-label="Breadcrumb" class="text-sm text-gray-600 mb-4">([\s\S]*?)<\/nav>/.exec(source)?.[1] ?? '';
 
   it('is found where the header starts', () => {
     expect(nav).toContain('href="/"');

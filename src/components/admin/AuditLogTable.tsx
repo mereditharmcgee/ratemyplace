@@ -116,7 +116,7 @@ export default function AuditLogTable() {
           <select
             value={actionFilter}
             onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
           >
             <option value="all">All actions</option>
             {filterOptions.actionTypes.map(type => (
@@ -131,7 +131,7 @@ export default function AuditLogTable() {
           <select
             value={adminFilter}
             onChange={(e) => { setAdminFilter(e.target.value); setPage(1); }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-teal-700 focus:border-transparent"
           >
             <option value="all">All admins</option>
             {filterOptions.adminUsers.map(admin => (
@@ -170,8 +170,21 @@ export default function AuditLogTable() {
                   className="hover:bg-gray-50 cursor-pointer"
                   onClick={() => setExpandedLog(isExpanded ? null : log.id)}
                 >
+                  {/* The row click stays for the mouse. The date is the keyboard and screen-reader
+                      toggle; it stops the click there so one press toggles once. */}
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                    {formatDate(log.created_at)}
+                    <button
+                      type="button"
+                      className="text-left cursor-[inherit]"
+                      aria-expanded={isExpanded}
+                      aria-controls={isExpanded ? `audit-details-${log.id}` : undefined}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedLog(isExpanded ? null : log.id);
+                      }}
+                    >
+                      {formatDate(log.created_at)}
+                    </button>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
                     <div>{log.admin_email || 'Unknown'}</div>
@@ -188,7 +201,7 @@ export default function AuditLogTable() {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700">
                     {isExpanded ? (
-                      <div className="space-y-2">
+                      <div id={`audit-details-${log.id}`} className="space-y-2">
                         {oldValue && (
                           <div>
                             <span className="text-xs font-medium text-gray-500">From: </span>

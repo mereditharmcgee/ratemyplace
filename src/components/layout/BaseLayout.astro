@@ -50,10 +50,32 @@ const meta = headMeta({ title, description, pathname: Astro.url.pathname, siteOr
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
   </head>
   <body class="min-h-screen bg-paper flex flex-col">
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-white focus:px-4 focus:py-2 focus:text-teal-700 focus:rounded-[4px]">Skip to main content</a>
     <Header />
-    <main class="flex-1">
+    {/* tabindex -1: the skip link's target can take focus but is never a Tab stop, so no outline is needed. */}
+    <main id="main-content" tabindex="-1" class="flex-1 focus:outline-none">
       <slot />
     </main>
     <Footer />
+    <script>
+      // Dismissible banners: a button with data-dismiss="<banner id>" removes that banner. The
+      // button goes with it, so focus moves to the page heading, or to main when there is
+      // none, instead of falling back to the top of the document.
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const button = target.closest<HTMLElement>('[data-dismiss]');
+        const id = button?.dataset.dismiss;
+        if (!id) return;
+        document.getElementById(id)?.remove();
+        const heading = document.querySelector<HTMLElement>('main h1');
+        if (heading) {
+          if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+          heading.focus();
+        } else {
+          document.getElementById('main-content')?.focus();
+        }
+      });
+    </script>
   </body>
 </html>
