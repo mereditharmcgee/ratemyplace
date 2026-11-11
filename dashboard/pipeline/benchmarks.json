@@ -1,0 +1,7 @@
+{
+  "note": "Locked district-page numbers (method v3, data pulled Oct 27, 2026). gate.py compares each night's build with these and stops the deploy if the data has moved further than normal drift.",
+  "complaints_per_1000_rental_units_2025": {"1": 16.4, "2": 16.0, "3": 30.2, "4": 41.6, "5": 29.6, "6": 25.3, "7": 32.7, "8": 18.9, "9": 30.7, "citywide": 26.1},
+  "universe_buildings": 54821,
+  "rental_buildings": 46272,
+  "complaints_total_at_lock": 24599
+}

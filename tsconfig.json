@@ -6,7 +6,8 @@
   ],
   "exclude": [
     "dist",
-    "e2e/**"
+    "e2e/**",
+    "dashboard/**"
   ],
   "compilerOptions": {
     "jsx": "react-jsx",

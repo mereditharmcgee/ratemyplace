@@ -10,6 +10,7 @@
 @source not "../../.planning";
 @source not "../../docs";
 @source not "../../brand/social/og-default.html";
+@source not "../../dashboard";
 
 @theme {
   --color-paper: #F6F4EE;
