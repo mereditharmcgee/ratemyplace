@@ -62,7 +62,7 @@ export function App() {
       </header>
       <main class="wrap">
         <h1>{COPY.pageTitle}</h1>
-        <p class="intro placeholder">{COPY.introPlaceholder}</p>
+        {COPY.introPlaceholder.map((p) => <p class="intro">{p}</p>)}
 
         {failed && <p class="error" role="alert">{COPY.loadError}</p>}
         {!core && !failed && <p class="loading" role="status">{COPY.loading}</p>}

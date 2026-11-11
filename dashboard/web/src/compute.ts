@@ -6,6 +6,7 @@ export interface Core {
     ownerPolicy: string; sources: Record<string, { name: string; url: string }>;
     recordShards: number; ownerShards: number; universeBuildings: number; rentalBuildings: number; buildingsWithRecords: number;
     universeUnits: number;   // units at every building in the dashboard that has a unit count
+    unitSources: string[];   // what Buildings.usrc indexes: 'none', 'class', 'condo', 'address'
   };
   districts: string[]; neighborhoods: string[]; zips: string[];
   /** [district index, neighborhood index, zip index, buildings, rental buildings, rental units] */

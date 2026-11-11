@@ -5,7 +5,11 @@
 export const COPY = {
   siteName: 'RateMyPlace',
   pageTitle: 'Boston housing records',
-  introPlaceholder: '[PLACEHOLDER: intro, written by Meredith]',
+  // Written by Meredith. Two paragraphs. Do not edit the wording.
+  introPlaceholder: [
+    `This page was created in November 2026, ahead of the Boston City Council's hearing on the proposed "Bad Landlords List" ordinance, Docket #1958, to give tenants a tool to understand housing complaints and code enforcement in their own communities.`,
+    `Our tax dollars already pay for the city to collect this data, but it's spread across spreadsheets that are hard to read, so tenants rarely get to use it. Here you can see what the city knows about rental housing: the complaints tenants file through 311, the citations inspectors write, and the violation cases that are still open. Look up your district, your neighborhood or a single building, and see how it compares to the rest of the city. Everything comes from public city records going back to January 2023, and it updates every night.`,
+  ],
   updated: 'Last updated',
   dataThrough: 'Records through',
   loading: 'Loading records',
@@ -91,6 +95,7 @@ export const COPY = {
   citationDates: 'Citation dates',
   openCases: 'Open violation cases',
   sortBy: 'Sort by',
+  sortColumn: 'Sort by this column',
   sortAdjusted: 'Complaints per unit, adjusted for building size',
   download: 'Download these buildings (CSV)',
   prev: 'Previous',
@@ -115,7 +120,7 @@ export const COPY = {
   labelProblemHelp: 'Flagged as a problem property in the city Short-Term Rental Eligibility data.',
   labelProblemOwner: 'Problem Property owner flag',
   labelIncomeRestricted: 'Has income-restricted units',
-  unitsEstimated: 'units (city records or estimate)',
+  unitsEstimated: 'units (city records)',
   rentalUnits: 'estimated rental units',
   detailComplaints: '311 living-conditions complaints',
   detailCitations: 'State Sanitary Code citations',
@@ -152,8 +157,9 @@ export const COPY = {
 
   // how this works
   howHeading: 'How this works',
-  howPlaceholder: '[PLACEHOLDER: how this works, written by Meredith]',
-  howOrderPlaceholder: '[PLACEHOLDER: one sentence on the order of the building table, written by Meredith]',
+  // Written by Meredith. Do not edit the wording.
+  howPlaceholder: `These numbers show what got reported and what inspectors found. They don't tell a building's whole story. A complaint is a tenant asking the city for help, and some buildings have fewer complaints because tenants are afraid to call. A citation means an inspector came out and found a violation. Rates are per 1,000 rental units per year, so a neighborhood full of apartment buildings doesn't look worse just because more people rent there.`,
+  howOrderPlaceholder: `Buildings are listed by how many complaints they have compared to how many homes are in them. A small building with just one or two complaints won't jump to the top. Click any column to sort it your own way.`,
   howPoints: [
     'Every number comes from City of Boston open data (Analyze Boston). Nothing here is a RateMyPlace rating.',
     'Complaints are 311 requests about living conditions since January 2023. Requests closed as duplicates are left out. Outdoor rodent, rat bite and pigeon reports are counted separately.',

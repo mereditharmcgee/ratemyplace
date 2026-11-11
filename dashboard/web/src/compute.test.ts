@@ -7,7 +7,7 @@ const months: string[] = [];
 for (let y = 2023, m = 1; `${y}-${String(m).padStart(2, '0')}` <= '2024-02'; m === 12 ? (y++, (m = 1)) : m++) months.push(`${y}-${String(m).padStart(2, '0')}`);
 const core: Core = {
   meta: { pulled: '2024-02-15', dataThrough: '2024-02-14', windowStart: '2023-01-01', months, groups: ['pests', 'general', 'heat', 'other'], ownerPolicy: 'ordinance',
-    sources: {}, recordShards: 1, ownerShards: 1, universeBuildings: 30, rentalBuildings: 20, buildingsWithRecords: 3, universeUnits: 60 },
+    sources: {}, recordShards: 1, ownerShards: 1, universeBuildings: 30, rentalBuildings: 20, buildingsWithRecords: 3, universeUnits: 60, unitSources: [] },
   districts: ['1', '2'], neighborhoods: ['A', 'B'], zips: ['02111', '02112'],
   cells: [[0, 0, 0, 10, 8, 100], [1, 1, 1, 20, 12, 400]],
   bCell: [0, 0, 1], bRental: [1, 0, 1],

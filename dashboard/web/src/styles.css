@@ -35,8 +35,9 @@ a:hover { color: var(--teal-deep); }
 h1 { font: 400 clamp(34px, 6vw, 52px)/1.08 var(--display); margin: 28px 0 8px; letter-spacing: -0.01em; }
 h2 { font: 600 18px/1.3 var(--sans); margin: 0; }
 h3 { font: 600 15px/1.35 var(--sans); margin: 0 0 4px; }
-.intro { max-width: 68ch; margin: 0 0 20px; font-size: 17px; }
-.placeholder { background: var(--warn-wash); border: 1px dashed #d97706; color: var(--warn); padding: 8px 12px; border-radius: var(--radius); font-size: 14px; }
+.intro { max-width: 68ch; margin: 0 0 12px; font-size: 17px; }
+.intro:last-of-type { margin-bottom: 20px; }
+.how-text { max-width: 75ch; margin: 10px 0; }
 .sub { margin: 2px 0 10px; color: var(--ink-2); font-size: 14px; }
 .muted { color: var(--ink-2); font-size: 14px; }
 .loading, .empty { color: var(--ink-2); padding: 12px 0; margin: 0; }
@@ -85,9 +86,9 @@ fieldset { border: 0; padding: 0; margin: 14px 0 0; min-width: 0; }
 .seg button { min-height: 36px; padding: 4px 12px; font: 500 14px var(--sans); background: var(--surface); color: var(--ink); border: 0; cursor: pointer; }
 .seg button + button { border-left: 1px solid #94a3b8; }
 .seg button[aria-pressed="true"] { background: var(--teal); color: #fff; }
-.inline { display: flex; align-items: center; gap: 8px; }
+.inline { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
 .inline span { margin: 0; white-space: nowrap; }
-.inline select { min-height: 36px; padding: 4px 8px; width: auto; }
+.inline select { min-height: 36px; padding: 4px 8px; width: auto; min-width: 0; max-width: 100%; flex: 0 1 auto; text-overflow: ellipsis; }
 
 /* trend chart */
 .chart-wrap { position: relative; }
@@ -125,6 +126,11 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 thead th { font-weight: 600; color: var(--ink-2); font-size: 13px; position: sticky; top: 0; background: var(--surface); }
 tbody th { font-weight: 500; }
+.th-sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: inherit; }
+.th-sort:hover { color: var(--ink); text-decoration: underline; }
+th[aria-sort="descending"] .th-sort, th[aria-sort="ascending"] .th-sort { color: var(--ink); }
+th[aria-sort="descending"] .th-sort::after { content: " \25BE"; }
+th[aria-sort="ascending"] .th-sort::after { content: " \25B4"; }
 .n { text-align: right; font-variant-numeric: tabular-nums; padding-right: 0; padding-left: 10px; white-space: nowrap; }
 thead th.n { white-space: normal; }
 .nowrap { white-space: nowrap; }

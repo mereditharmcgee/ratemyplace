@@ -65,7 +65,25 @@ change it). The effect is that each building is treated as if it had 5 more unit
 record: a two-family with one complaint moves most of the way to the citywide rate, and a 100-unit
 building barely moves. The 5 comes from the data (how much buildings differ from each other beyond
 chance gives about 5.4) and is fixed in `web/src/compute.ts` as `SHRINK_UNITS`. A building with no
-unit count is placed at the citywide rate.
+unit count is placed at the citywide rate. Clicking a column header sorts by that column, and a
+second click reverses it.
+
+## Unit counts shown in the table
+
+The table, the per-unit column and the default order use a unit count only where city records
+support it (`units_shown` and `units_source` in `build.py`, `usrc` in `buildings.json`):
+
+| Source | Rule |
+|---|---|
+| `class` | One, two or three family: the assessment class is the count. |
+| `condo` | Condo lot: the number of residential condo unit records on the lot, when nothing else residential sits on it. |
+| `address` | 4 to 6 family and apartment classes: the city address list's unit count, when it falls inside the range the class allows. |
+| `none` | Everything else. No count is shown, no per-unit number, and the building is placed at the citywide rate. |
+
+`none` covers mixed-use, subsidized and exempt classes (the assessment file has no unit field for
+them, and the address list badly undercounts complexes), condo main records that hold a whole
+apartment building as one unit, class midpoints, and lots with more than one residential record.
+The district rates do not use this count. They keep the method's own `units` column, unchanged.
 
 ## The 311 switch on November 5, 2026
 

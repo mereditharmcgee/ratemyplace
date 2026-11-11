@@ -13,7 +13,7 @@ const ADDRESS_ORDER = new Intl.Collator('en', { numeric: true });
  * `cityRate` is the citywide complaints per unit for the chosen dates and issues. The default order ('adjusted')
  * uses each building's rate pulled toward it; every other order uses the number shown in its column.
  */
-export function sortRows(rows: BuildingRow[], buildings: Buildings, sort: Sort, cityRate = 0): BuildingRow[] {
+export function sortRows(rows: BuildingRow[], buildings: Buildings, sort: Sort, cityRate = 0, reverse = false): BuildingRow[] {
   // One shared collator: String.localeCompare with options builds a new one per call and is far slower.
   const byAddr = (a: BuildingRow, b: BuildingRow) => ADDRESS_ORDER.compare(buildings.addr[a.b], buildings.addr[b.b]);
   const byComplaints = (a: BuildingRow, b: BuildingRow) => b.complaints - a.complaints || b.citationDates - a.citationDates || byAddr(a, b);
@@ -29,6 +29,7 @@ export function sortRows(rows: BuildingRow[], buildings: Buildings, sort: Sort, 
     const adj = new Map(out.map((r) => [r.b, adjustedPerUnit(r.complaints, units(r), cityRate)] as const));
     out.sort((a, b) => adj.get(b.b)! - adj.get(a.b)! || byComplaints(a, b));
   } else out.sort(byComplaints);
+  if (reverse) out.reverse();
   return out;
 }
 
@@ -47,10 +48,19 @@ export function tableCsv(core: Core, buildings: Buildings, rows: BuildingRow[]):
 
 export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props) {
   const [sort, setSort] = useState<Sort>('adjusted');
+  const [reverse, setReverse] = useState(false);   // a second click on a column header flips its order
   const [page, setPage] = useState(0);
-  useEffect(() => setPage(0), [rows, sort]);
+  useEffect(() => setPage(0), [rows, sort, reverse]);
+  const pick = (s: Sort) => { setReverse(s === sort ? !reverse : false); setSort(s); };
+  const TEXT: Sort[] = ['address', 'owner'];       // these start A to Z; number columns start highest first
+  const head = (s: Sort, label: string, numeric: boolean) => (
+    <th scope="col" class={numeric ? 'n' : undefined}
+      aria-sort={sort === s ? ((TEXT.includes(s) ? !reverse : reverse) ? 'ascending' : 'descending') : undefined}>
+      <button type="button" class="th-sort" title={COPY.sortColumn} onClick={() => pick(s)}>{label}</button>
+    </th>
+  );
   const cityRate = useMemo(() => (buildings ? cityPerUnit(core, filters, buildings.units) : 0), [core, filters, buildings]);
-  const sorted = useMemo(() => (buildings ? sortRows(rows, buildings, sort, cityRate) : []), [rows, buildings, sort, cityRate]);
+  const sorted = useMemo(() => (buildings ? sortRows(rows, buildings, sort, cityRate, reverse) : []), [rows, buildings, sort, cityRate, reverse]);
   const pages = Math.max(1, Math.ceil(sorted.length / PAGE));
   const shown = sorted.slice(page * PAGE, page * PAGE + PAGE);
 
@@ -70,7 +80,7 @@ export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props)
         <h2>{COPY.tableHeading}</h2>
         <label class="inline">
           <span>{COPY.sortBy}</span>
-          <select value={sort} onChange={(e) => setSort((e.target as HTMLSelectElement).value as Sort)}>
+          <select value={sort} onChange={(e) => { setReverse(false); setSort((e.target as HTMLSelectElement).value as Sort); }}>
             <option value="adjusted">{COPY.sortAdjusted}</option>
             <option value="complaints">{COPY.complaints}</option>
             <option value="perUnit">{COPY.perUnit}</option>
@@ -88,13 +98,13 @@ export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props)
             <table id="buildings-table">
               <thead>
                 <tr>
-                  <th scope="col">{COPY.address}</th>
-                  <th scope="col">{COPY.owner}</th>
-                  <th scope="col" class="n">{COPY.units}</th>
-                  <th scope="col" class="n">{COPY.complaints}</th>
-                  <th scope="col" class="n">{COPY.perUnit}</th>
-                  <th scope="col" class="n">{COPY.citationDates}</th>
-                  <th scope="col" class="n">{COPY.openCases}</th>
+                  {head('address', COPY.address, false)}
+                  {head('owner', COPY.owner, false)}
+                  {head('units', COPY.units, true)}
+                  {head('complaints', COPY.complaints, true)}
+                  {head('perUnit', COPY.perUnit, true)}
+                  {head('citations', COPY.citationDates, true)}
+                  {head('cases', COPY.openCases, true)}
                 </tr>
               </thead>
               <tbody>

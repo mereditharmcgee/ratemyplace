@@ -11,11 +11,11 @@ for (const line of body.split('\n')) {
   const open = t.match(/^(\w+): [{[]$/);
   if (open) { prefix.push(open[1]); continue; }
   if (/^[}\]],?$/.test(t)) { prefix.pop(); continue; }
-  const kv = t.match(/^(\w+): (['"])(.*)\2,?$/);
+  const kv = t.match(/^(\w+): (['"`])(.*)\2,?$/);
   if (kv) { out.push(`- \`${[...prefix, kv[1]].join('.')}\`: ${kv[3]}`); continue; }
   const inline = t.match(/^(\w+): \{(.*)\},?$/);
   if (inline) { for (const m of inline[2].matchAll(/(\w+): '([^']*)'/g)) out.push(`- \`${inline[1]}.${m[1]}\`: ${m[2]}`); continue; }
-  const item = t.match(/^(['"])(.*)\1,?$/);
+  const item = t.match(/^(['"`])(.*)\1,?$/);
   if (item) out.push(`- \`${prefix.join('.')}[]\`: ${item[2]}`);
 }
 console.log(out.join('\n'));

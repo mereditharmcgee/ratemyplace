@@ -1,7 +1,7 @@
 import type { Core } from './compute';
 
 export interface Buildings {
-  id: string[]; addr: string[]; lat: (number | null)[]; lon: (number | null)[]; cell: number[]; units: (number | null)[]; ru: number[];
+  id: string[]; addr: string[]; lat: (number | null)[]; lon: (number | null)[]; cell: number[]; units: (number | null)[]; usrc: number[]; ru: number[];
   owner: number[]; oid: number[]; flags: number[]; isd: number[]; pwd: number[]; rod: number[]; pid: string[]; ownerStrings: string[];
 }
 export const FLAG = { public: 1, subsidized: 2, hidden: 4, condo: 8, problem: 16, problemOwner: 32, incomeRestricted: 64, rental: 128 } as const;

@@ -33,6 +33,8 @@ GROUPS = ["pests", "general", "heat", "other"]   # the four public issue groups,
 BUCKET_GROUP = {"pests_interior": 0, "living_conditions": 1, "heat": 2}   # everything else is group 3
 # Under the "ordinance" policy an owner-occupied small building is named only when its owner is plainly an entity.
 # Everything else is treated as a person: the name classifier reads surnames such as Hill or Park as organizations.
+# Where a shown unit count comes from (see build.py). "none" means no count is shown.
+UNIT_SOURCES = ["none", "class", "condo", "address"]
 NAMED_WHEN_OWNER_OCCUPIED = {"Company (LLC, corporation, or partnership)", "Public or quasi-public", "Condo association or trust"}
 
 OUT = os.path.abspath(OUT)
@@ -128,7 +130,7 @@ groups = defaultdict(lambda: {"names": Counter(), "holdings": [], "public": Fals
 
 
 def bsum(row):
-    return [row.GIS_ID, row.addr, row.dist, row.nbhd, row.zip, None if pd.isna(row.units_num) else int(row.units_num),
+    return [row.GIS_ID, row.addr, row.dist, row.nbhd, row.zip, None if pd.isna(row.units_shown) else int(row.units_shown),
             int(row.lc3_total) if row.U else 0, int(row.ssc_dates) if row.U else 0, int(row.isd_cond3) if row.U else 0]
 
 
@@ -195,11 +197,11 @@ def sidx(t):
     return owner_si[t]
 
 
-B = {"id": [], "addr": [], "lat": [], "lon": [], "cell": [], "units": [], "ru": [], "owner": [], "oid": [], "flags": [], "isd": [], "pwd": [], "rod": [], "pid": []}
+B = {"id": [], "addr": [], "lat": [], "lon": [], "cell": [], "units": [], "ru": [], "owner": [], "oid": [], "flags": [], "isd": [], "pwd": [], "rod": [], "pid": [], "usrc": []}
 for row in has.itertuples(index=False):
     B["id"].append(row.GIS_ID); B["addr"].append(row.addr)
     B["lat"].append(None if pd.isna(row.y) else round(float(row.y), 5)); B["lon"].append(None if pd.isna(row.x) else round(float(row.x), 5))
-    B["cell"].append(int(row.cell)); B["units"].append(None if pd.isna(row.units_num) else int(row.units_num))
+    B["cell"].append(int(row.cell)); B["units"].append(None if pd.isna(row.units_shown) else int(row.units_shown)); B["usrc"].append(UNIT_SOURCES.index(row.units_source))
     B["ru"].append(int(row.rental_units) if row.rental_bldg else 0)
     B["owner"].append(sidx(owner_text(row))); B["oid"].append(-1 if (row.hidden or not row.own_key) else oid[row.own_key])
     B["flags"].append(flags(row)); B["isd"].append(int(row.isd_cond3)); B["pwd"].append(int(row.pwd_tickets)); B["rod"].append(int(row.rodent3))
@@ -232,7 +234,7 @@ core = {
         "pulled": pulled, "dataThrough": data_through[:10], "windowStart": WINDOW_START, "months": months, "groups": GROUPS,
         "ownerPolicy": OWNER_NAME_POLICY, "sources": SOURCES, "recordShards": N_RECORD_SHARDS, "ownerShards": N_OWNER_SHARDS,
         "universeBuildings": int(len(u)), "rentalBuildings": int(u.rental_bldg.sum()), "buildingsWithRecords": int(len(has)),
-        "universeUnits": int(u.units_num[u.units_num > 0].sum()),
+        "universeUnits": int(u.units_shown[u.units_shown > 0].sum()), "unitSources": UNIT_SOURCES,
         "unmappedNew311": int(sum(bd["unmapped_new_311"].values())),
         "matched311": {k: int(v) for k, v in bd["match_311"].items()},
     },

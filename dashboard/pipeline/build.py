@@ -350,6 +350,34 @@ cd["rental"] = (cd.OWN_OCC != "Y").astype(int)
 cdg = cd.groupby("GIS_ID").agg(cd_units_all=("PID", "size"), cd_rental=("rental", "sum"))
 r = r.merge(cdg, left_on="GIS_ID", right_index=True, how="left")
 iscondo = r.LU.eq("CM")
+# Unit count shown on the page (table, per-unit column, default order). It is stricter than `units`, which the
+# district rates keep using unchanged. A count is shown only when city records support it:
+#   class    one, two or three family: the assessment class is the count
+#   condo    condo lot: the number of residential condo unit records (LU CD) on the lot, when nothing else
+#            residential sits on the lot (an apartment building held as one condo unit has no count)
+#   address  4 to 6 family and apartment classes: the city address list's unit count, when it falls inside the
+#            range the assessment class allows
+# Anything else has no count: address-list counts with no class range to check against (mixed use, subsidized
+# and exempt classes), class midpoints, and lots with more than one residential assessment record.
+RES_LU = {"R1", "R2", "R3", "R4", "RC", "A", "EA", "E"}
+_oth = a[a.GIS_ID.notna() & ~a.LU.isin(["CD", "CM"]) & a.LU.isin(RES_LU)].groupby("GIS_ID").size()
+r["res_rows"] = r.GIS_ID.map(_oth).fillna(0).astype(int)   # residential-type records on the lot, condo units and master aside
+
+
+def units_shown(x):
+    if x.LU == "CM":
+        ru = pd.to_numeric(x.RES_UNITS, errors="coerce")
+        if pd.notna(x.cd_units_all) and x.cd_units_all > 0 and x.res_rows == 0 and not (pd.notna(ru) and ru > x.cd_units_all):
+            return int(x.cd_units_all), "condo"
+        return np.nan, "none"
+    if x.res_rows > 1: return np.nan, "none"
+    if x.unit_basis.startswith("class ("): return int(x.units_num), "class"
+    if x.unit_basis.startswith("estimate: SAM unit addresses (class"): return int(x.units_num), "address"
+    return np.nan, "none"
+
+
+_us = r.apply(units_shown, axis=1, result_type="expand")
+r["units_shown"], r["units_source"] = _us[0], _us[1]
 r["rental_units"] = np.where(iscondo, r.cd_rental, np.where(r.OWN_OCC.eq("Y"), (r.units_num - 1).clip(lower=0), r.units_num))
 r["known"] = r.rate_ok & r.rental_units.notna()
 r["rental_bldg"] = r.known & (r.rental_units > 0)
