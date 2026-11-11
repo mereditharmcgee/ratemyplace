@@ -49,3 +49,16 @@ SOURCES = {
     "neighborhoods": {"name": "BPDA Neighborhood Boundaries", "url": "https://data.boston.gov/dataset/bpda-neighborhood-boundaries"},
     "sam": {"name": "Live Street Address Management (SAM) Addresses", "url": "https://data.boston.gov/dataset/live-street-address-management-sam-addresses"},
 }
+
+# New 311 system (from Nov 5, 2026): service name -> the method's bucket. A service that is not listed
+# here is left out and counted in meta.unmapped_new_311 so a new name is noticed rather than guessed at.
+NEW_311_BUCKETS = {
+    "unsatisfactory living conditions": "living_conditions",
+    "pest infestation - residential": "pests_interior",
+    "insufficient heat": "heat",
+    "unsatisfactory utilities - (electrical, plumbing) - residential": "utilities",
+    "no utilities (electrical, gas, water)": "utilities",
+    "cross metering": "utilities",
+    "sewage/septic back-up": "utilities",
+    "rat activity": "rodent_activity_isd",
+}

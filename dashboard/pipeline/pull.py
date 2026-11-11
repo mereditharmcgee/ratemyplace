@@ -69,11 +69,15 @@ if want("311_candidates.csv"):
     write_csv("311_candidates.csv", rows, COLS_311)
     done("311_candidates.csv", rows=len(rows), per_year=per_year)
 
-# the new 311 system: record its service list so a move of housing services into it is noticed
-if want("311_new_system_services.csv"):
-    svc = ckan.sql(f'SELECT assigned_department, service_name, count(*) n FROM "{RES["311_new_system"]}" GROUP BY 1,2')
-    write_csv("311_new_system_services.csv", svc, ["assigned_department", "service_name", "n"])
-    done("311_new_system_services.csv", rows=len(svc))
+# The new 311 system. ISD housing services moved here on Nov 5, 2026; the legacy yearly file stops that day.
+# Pull the ISD Housing team's cases plus Rat Activity; build.py maps the service names onto the locked groups.
+COLS_NEW = ["case_id", "open_date", "close_date", "case_status", "closure_reason", "service_name", "assigned_team", "street_number",
+            "street_name", "zip_code", "latitude", "longitude"]
+if want("311_new_system.csv"):
+    recs = ckan.sql_all(f'''SELECT {", ".join(COLS_NEW)} FROM "{RES["311_new_system"]}"
+WHERE assigned_team='ISD Housing' OR service_name='Rat Activity' ORDER BY case_id''')
+    write_csv("311_new_system.csv", recs, COLS_NEW)
+    done("311_new_system.csv", rows=len(recs))
 
 # RentSmart State Sanitary Code citations. The owner column is deliberately not pulled.
 if want("rentsmart.csv"):

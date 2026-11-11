@@ -36,13 +36,6 @@ class Exclusions:
         s = str(street or "")
         return any(b in s.upper() for b in self.guard_boxes) or any(g in mnorm(s) for g in self.guard_streets)
 
-    def text_hits(self, text):
-        """Safety scan: does this published text contain any excluded owner name, or match an addressee pattern?"""
-        norm = owner_norm(text)
-        if any(k and re.search(r"(?<![A-Z0-9])" + re.escape(k) + r"(?![A-Z0-9])", norm) for k in self.owner_keys):
-            return True
-        return any(p.search(text) for p in self.addressee)
-
 
 def load():
     raw = os.environ.get("DASHBOARD_EXCLUSIONS_JSON")

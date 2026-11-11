@@ -13,7 +13,7 @@ from scipy.spatial import cKDTree
 from shapely.geometry import shape
 
 import exclusions
-from config import RAW, WORK, WINDOW_START
+from config import RAW, WORK, WINDOW_START, NEW_311_BUCKETS
 from rules import *  # noqa: F401,F403  (the locked rules)
 from rules import PUBLIC_PAT, is_living, isd_class, living_bucket, mail_key, nonprofit_name, num_list, owner_class, owner_norm, street_norm, wnorm, zip5
 
@@ -260,6 +260,18 @@ d["open_day"] = d.open_dt.str[:10]
 d = d[d.open_day >= WINDOW_START]
 if AS_OF: d = d[d.open_day <= AS_OF]
 d["bucket"] = d.type.map(living_bucket)
+# the new 311 system (ISD housing cases from Nov 5, 2026), mapped onto the same buckets
+nw = pd.read_csv(raw("311_new_system.csv"), dtype=str)
+nw["bucket"] = nw.service_name.map(lambda x: NEW_311_BUCKETS.get(wnorm(x)))
+unmapped_new = nw[nw.bucket.isna()].service_name.value_counts().to_dict()
+nw = nw[nw.bucket.notna()]
+nw = pd.DataFrame({"case_enquiry_id": nw.case_id, "open_dt": nw.open_date, "closed_dt": nw.close_date, "case_status": nw.case_status,
+                   "closure_reason": nw.closure_reason, "type": nw.service_name, "reason": "Housing",
+                   "location_street_name": nw.street_number.fillna("") + " " + nw.street_name.fillna(""),
+                   "location_zipcode": nw.zip_code, "latitude": nw.latitude, "longitude": nw.longitude, "bucket": nw.bucket})
+nw["open_day"] = nw.open_dt.str[:10]
+if AS_OF: nw = nw[nw.open_day <= AS_OF]
+d = pd.concat([d, nw], ignore_index=True)
 d["lat"] = pd.to_numeric(d.latitude, errors="coerce"); d["lon"] = pd.to_numeric(d.longitude, errors="coerce")
 res = []
 for r in d.itertuples(index=False):
@@ -396,6 +408,7 @@ out = {
     "citations": rsm[["GIS_ID", "day", "description"]].copy(),
     "isd": v[v.GIS_ID.isin(res_ids) & ((v.status == "Open") | (v.status_day >= WINDOW_START))][["GIS_ID", "case_no", "status", "status_day", "description", "cond"]].copy(),
     "condo_units": cdk,
+    "unmapped_new_311": unmapped_new,
     "match_311": d.match_method.str.split(" \\(").str[0].value_counts().to_dict(),
 }
 name = "build.pkl" if not AS_OF else f"build_asof_{AS_OF}.pkl"
