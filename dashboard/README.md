@@ -41,6 +41,9 @@ reads it from `DASHBOARD_EXCLUSIONS_JSON` (a GitHub Actions secret at night) or 
 by `DASHBOARD_EXCLUSIONS_FILE`, and refuses to run without it. Nothing prints, logs or counts
 what it holds, and `export.py` deletes its own output if an entry is found in it.
 
+The same private file may carry an optional `owner_name_hide_patterns` list. An owner name that
+matches is published as "Owner name not shown"; the building and its records stay in every number.
+
 ## Owner names: one setting
 
 `OWNER_NAME_POLICY` in `pipeline/config.py`:

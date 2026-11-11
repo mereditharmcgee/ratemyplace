@@ -42,6 +42,12 @@ class Rules(unittest.TestCase):
         self.assertTrue(ex.by_addressee("C/O SAMPLE MGMT"))
         self.assertIn("0000000123", ex.parcels)
 
+    def test_optional_name_withholding(self):
+        ex = Exclusions({"parcel_ids": ["1"], "owner_name_hide_patterns": [r"SAMPLENAME"]})
+        self.assertTrue(ex.hide_name("SAMPLENAME JANE"))
+        self.assertFalse(ex.hide_name("SAMPLENAMESON JANE"))
+        self.assertFalse(Exclusions({"parcel_ids": ["1"]}).hide_name("SAMPLENAME JANE"))
+
     def test_an_empty_list_is_refused(self):
         with self.assertRaises(SystemExit):
             Exclusions({})

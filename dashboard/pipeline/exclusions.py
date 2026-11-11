@@ -18,6 +18,9 @@ class Exclusions:
         self.guard_name = owner_norm(note.split("(")[0]).replace(" INC", "").strip()
         self.guard_boxes = re.findall(r"PO Box (\d+)", note, re.I)
         self.guard_streets = [mnorm(s) for s in re.findall(r"\((\d+ [A-Za-z]+ St)", note)]
+        # Optional: owner names that are published as "Owner name not shown". The building and its
+        # records stay in every number; only the name is withheld.
+        self.hide_patterns = [re.compile(p, re.I) for p in cfg.get("owner_name_hide_patterns", [])]
         if not (self.parcels or self.owner_keys or self.addressee or self.mail_anchors):
             raise SystemExit("exclusions: the list loaded but is empty; refusing to continue")
 
@@ -30,6 +33,9 @@ class Exclusions:
     def by_mail(self, street, zip_):
         st, z = mnorm(street), zip5(zip_)
         return any(a and a in st and (not az or az == z) for a, az in self.mail_anchors)
+
+    def hide_name(self, *names):
+        return any(p.search(str(n)) for n in names if isinstance(n, str) and n for p in self.hide_patterns)
 
     def guard_mail(self, street):
         """True when a mailing street belongs to the protected company (its lots must stay in)."""

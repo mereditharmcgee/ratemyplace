@@ -14,6 +14,7 @@ OUT = os.environ.get("DASHBOARD_OUT", os.path.join(HERE, "..", "web", "public", 
 #   "all":       every owner of record is published by name.
 OWNER_NAME_POLICY = os.environ.get("DASHBOARD_OWNER_NAME_POLICY", "ordinance")
 INDIVIDUAL_OWNER_LABEL = "Individual owner"
+WITHHELD_OWNER_LABEL = "Owner name not shown"
 
 WINDOW_START = "2023-01-01"
 

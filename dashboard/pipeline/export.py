@@ -19,7 +19,7 @@ import pandas as pd
 from shapely.geometry import mapping, shape
 
 import exclusions
-from config import INDIVIDUAL_OWNER_LABEL, OUT, OWNER_NAME_POLICY, RAW, SOURCES, WINDOW_START, WORK
+from config import INDIVIDUAL_OWNER_LABEL, WITHHELD_OWNER_LABEL, OUT, OWNER_NAME_POLICY, RAW, SOURCES, WINDOW_START, WORK
 from rules import PUBLIC_PAT, nonprofit_name, owner_class, owner_norm, zip5
 
 if OWNER_NAME_POLICY not in ("ordinance", "all"):
@@ -74,6 +74,7 @@ r["owner_raw"] = r.OWNER.map(clean)
 r["own_key"] = r.owner_raw.map(owner_norm)
 r["own_class"] = r.own_key.map(owner_class)
 r["hidden"] = (OWNER_NAME_POLICY == "ordinance") & r.oo_le6 & r.LU.ne("CM") & r.own_class.isin(HIDE_CLASSES)
+r["withheld"] = r.owner_raw.map(EX.hide_name)
 r["is_condo"] = r.LU.eq("CM")
 u = r[r.U].copy()            # the dashboard universe: residential, not excluded, not an owner-occupied single-family home
 gid_row = {g: i for i, g in enumerate(r.GIS_ID)}
@@ -130,7 +131,7 @@ def bsum(row):
 
 
 for row in r.itertuples(index=False):
-    if row.hidden or not row.own_key:
+    if row.hidden or row.withheld or not row.own_key:
         continue
     g = groups[row.own_key]
     g["names"][row.owner_raw] += 1
@@ -144,7 +145,7 @@ cu = bd["condo_units"].copy()
 cu["OWNER"] = cu.OWNER.map(clean)
 if OWNER_NAME_POLICY == "ordinance":
     cu = cu[cu.OWN_OCC != "Y"]
-cu = cu[cu.own_n != ""]
+cu = cu[(cu.own_n != "") & ~cu.OWNER.map(EX.hide_name)]
 unit_owners = defaultdict(list)   # GIS_ID -> [[name, units]]
 for (gid, key), grp in cu.groupby(["GIS_ID", "own_n"]):
     row = r.iloc[gid_row[gid]]
@@ -175,12 +176,13 @@ dump("owners-index.json", {"name": o_name, "n": o_n, "rec": o_rec, "flag": o_fla
 # ---------------- buildings.json (columnar) ----------------
 def owner_text(row):
     if row.hidden: return INDIVIDUAL_OWNER_LABEL
+    if row.withheld: return WITHHELD_OWNER_LABEL
     return row.owner_raw or "Not listed"
 
 
 def flags(row):
     return (1 if row.public else 0) | (2 if row.owner_sub and not row.public else 0) | (4 if row.hidden else 0) | (8 if row.is_condo else 0) \
-        | (16 if row.pp_units > 0 else 0) | (32 if row.ppo_units > 0 else 0) | (64 if row.ir_units > 0 else 0) | (128 if row.rental_bldg else 0)
+        | (16 if row.pp_units > 0 else 0) | (32 if row.ppo_units > 0 else 0) | (64 if row.ir_units > 0 else 0) | (128 if row.rental_bldg else 0) | (256 if row.withheld and not row.hidden else 0)
 
 
 owner_strings, owner_si = [], {}
@@ -196,7 +198,7 @@ for row in has.itertuples(index=False):
     B["lat"].append(None if pd.isna(row.y) else round(float(row.y), 5)); B["lon"].append(None if pd.isna(row.x) else round(float(row.x), 5))
     B["cell"].append(int(row.cell)); B["units"].append(None if pd.isna(row.units_num) else int(row.units_num))
     B["ru"].append(int(row.rental_units) if row.rental_bldg else 0)
-    B["owner"].append(sidx(owner_text(row))); B["oid"].append(-1 if (row.hidden or not row.own_key) else oid[row.own_key])
+    B["owner"].append(sidx(owner_text(row))); B["oid"].append(-1 if (row.hidden or row.withheld or not row.own_key) else oid[row.own_key])
     B["flags"].append(flags(row)); B["isd"].append(int(row.isd_cond3)); B["pwd"].append(int(row.pwd_tickets)); B["rod"].append(int(row.rodent3))
     B["pid"].append(row.PID)
 B["ownerStrings"] = owner_strings
@@ -256,7 +258,7 @@ dump("boundaries.json", {"districts": outlines(os.path.join(RAW, "council_distri
 # 1. No published owner name may be an excluded name (the same exact-name test the exclusion uses).
 # 2. No file may contain an excluded parcel id or match an excluded addressee pattern.
 published_names = set(o_name) | set(owner_strings) | {n for g in groups.values() for n in g["names"]}
-bad = sum(1 for n in published_names if EX.by_owner(n) or EX.by_addressee(n))
+bad = sum(1 for n in published_names if EX.by_owner(n) or EX.by_addressee(n) or EX.hide_name(n))
 for root, _, files in os.walk(tmp):
     for fn in files:
         text = open(os.path.join(root, fn), encoding="utf-8").read()
