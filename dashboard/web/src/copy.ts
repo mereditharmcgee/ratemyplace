@@ -94,6 +94,8 @@ export const COPY = {
   perUnit: 'Complaints per unit',
   citationDates: 'Citation dates',
   openCases: 'Open violation cases',
+  noUnitCount: 'No count',
+  noUnitCountNote: 'Some buildings have no reliable unit count in city records, so they have no per-unit number.',
   sortBy: 'Sort by',
   sortColumn: 'Sort by this column',
   sortAdjusted: 'Complaints per unit, adjusted for building size',
@@ -159,7 +161,7 @@ export const COPY = {
   howHeading: 'How this works',
   // Written by Meredith. Do not edit the wording.
   howPlaceholder: `These numbers show what got reported and what inspectors found. They don't tell a building's whole story. A complaint is a tenant asking the city for help, and some buildings have fewer complaints because tenants are afraid to call. A citation means an inspector came out and found a violation. Rates are per 1,000 rental units per year, so a neighborhood full of apartment buildings doesn't look worse just because more people rent there.`,
-  howOrderPlaceholder: `Buildings are listed by how many complaints they have compared to how many homes are in them. A small building with just one or two complaints won't jump to the top. Click any column to sort it your own way.`,
+  howOrderPlaceholder: `Buildings are listed by how many complaints they have. Click any column to sort it your own way, including complaints per unit.`,
   howPoints: [
     'Every number comes from City of Boston open data (Analyze Boston). Nothing here is a RateMyPlace rating.',
     'Complaints are 311 requests about living conditions since January 2023. Requests closed as duplicates are left out. Outdoor rodent, rat bite and pigeon reports are counted separately.',

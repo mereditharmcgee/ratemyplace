@@ -42,7 +42,7 @@ cd ../web && npm ci && npm test && npm run build && npm run preview
 `OWNER_NAME_POLICY` in `pipeline/config.py`:
 
 - `ordinance` (default): where an individual or a family trust owns and lives in a building of 6 or
-  fewer units, the owner is published as "Individual owner". The name is dropped in `export.py`,
+  fewer units, or one with no verified unit count, the owner is published as "Individual owner". The name is dropped in `export.py`,
   so it never reaches a file the browser can load. Condo unit owners who live in their unit are
   not published. Everyone else is named exactly as the assessing record lists them.
 - `all`: every owner of record is published by name.
@@ -51,9 +51,10 @@ Mailing addresses are never exported under either setting.
 
 ## Order of the building table
 
-The table opens ordered by an adjusted complaints-per-unit rate. The adjusted rate is not shown; the
-table shows the raw complaint count and the raw complaints per unit, and any column can be chosen
-as the order instead.
+The table opens ordered by total complaints. Any column can be chosen as the order instead, and so
+can an adjusted complaints-per-unit rate ("Complaints per unit, adjusted for building size" in the
+Sort by menu). The adjusted rate is not shown; the table shows the raw complaint count and the raw
+complaints per unit.
 
 ```
 adjusted = (complaints + 5 x citywide rate) / (units + 5)
@@ -78,7 +79,7 @@ support it (`units_shown` and `units_source` in `build.py`, `usrc` in `buildings
 | `class` | One, two or three family: the assessment class is the count. |
 | `condo` | Condo lot: the number of residential condo unit records on the lot, when nothing else residential sits on it. |
 | `address` | 4 to 6 family and apartment classes: the city address list's unit count, when it falls inside the range the class allows. |
-| `none` | Everything else. No count is shown, no per-unit number, and the building is placed at the citywide rate. |
+| `none` | Everything else. The cell reads "No count", there is no per-unit number, and the adjusted order places the building at the citywide rate. |
 
 `none` covers mixed-use, subsidized and exempt classes (the assessment file has no unit field for
 them, and the address list badly undercounts complexes), condo main records that hold a whole

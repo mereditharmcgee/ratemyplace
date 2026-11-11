@@ -10,8 +10,8 @@ const PAGE = 25;
 const ADDRESS_ORDER = new Intl.Collator('en', { numeric: true });
 
 /**
- * `cityRate` is the citywide complaints per unit for the chosen dates and issues. The default order ('adjusted')
- * uses each building's rate pulled toward it; every other order uses the number shown in its column.
+ * The table opens ordered by complaints. `cityRate` is the citywide complaints per unit for the chosen dates and
+ * issues; the 'adjusted' order uses each building's rate pulled toward it. Every other order uses its column.
  */
 export function sortRows(rows: BuildingRow[], buildings: Buildings, sort: Sort, cityRate = 0, reverse = false): BuildingRow[] {
   // One shared collator: String.localeCompare with options builds a new one per call and is far slower.
@@ -40,14 +40,14 @@ export function tableCsv(core: Core, buildings: Buildings, rows: BuildingRow[]):
   const body = rows.map((r) => {
     const c = core.cells[buildings.cell[r.b]];
     return [buildings.addr[r.b], core.districts[c[0]] ?? '', core.neighborhoods[c[1]] ?? '', core.zips[c[2]] ?? '', buildings.ownerStrings[buildings.owner[r.b]],
-      buildings.units[r.b] ?? '', r.complaints, fmtPerUnit(perUnit(r.complaints, buildings.units[r.b])), ...r.byGroup, r.citationDates, buildings.isd[r.b],
+      buildings.units[r.b] ?? COPY.noUnitCount, r.complaints, fmtPerUnit(perUnit(r.complaints, buildings.units[r.b])), ...r.byGroup, r.citationDates, buildings.isd[r.b],
       (buildings.flags[r.b] & FLAG.hidden) !== 0 ? '' : assessingUrl(buildings.pid[r.b])];
   });
   return toCsv(header, body);
 }
 
 export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props) {
-  const [sort, setSort] = useState<Sort>('adjusted');
+  const [sort, setSort] = useState<Sort>('complaints');
   const [reverse, setReverse] = useState(false);   // a second click on a column header flips its order
   const [page, setPage] = useState(0);
   useEffect(() => setPage(0), [rows, sort, reverse]);
@@ -81,8 +81,8 @@ export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props)
         <label class="inline">
           <span>{COPY.sortBy}</span>
           <select value={sort} onChange={(e) => { setReverse(false); setSort((e.target as HTMLSelectElement).value as Sort); }}>
-            <option value="adjusted">{COPY.sortAdjusted}</option>
             <option value="complaints">{COPY.complaints}</option>
+            <option value="adjusted">{COPY.sortAdjusted}</option>
             <option value="perUnit">{COPY.perUnit}</option>
             <option value="citations">{COPY.citationDates}</option>
             <option value="cases">{COPY.openCases}</option>
@@ -112,7 +112,7 @@ export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props)
                   <tr>
                     <th scope="row"><button type="button" class="link-button" onClick={() => onOpen(r.b)} aria-label={`${COPY.viewRecords}: ${buildings.addr[r.b]}`}>{buildings.addr[r.b]}</button></th>
                     <td>{buildings.ownerStrings[buildings.owner[r.b]]}</td>
-                    <td class="n">{buildings.units[r.b] ?? ''}</td>
+                    <td class="n">{buildings.units[r.b] ?? <span class="no-count">{COPY.noUnitCount}</span>}</td>
                     <td class="n">{fmtInt(r.complaints)}</td>
                     <td class="n">{fmtPerUnit(perUnit(r.complaints, buildings.units[r.b]))}</td>
                     <td class="n">{fmtInt(r.citationDates)}</td>
@@ -127,6 +127,7 @@ export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props)
             <span role="status">{fmtInt(page * PAGE + 1)} to {fmtInt(Math.min(sorted.length, page * PAGE + PAGE))} {COPY.of} {fmtInt(sorted.length)} {COPY.buildings}</span>
             <button type="button" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>{COPY.next}</button>
           </div>
+          <p class="tile-source">{COPY.noUnitCountNote}</p>
           <p class="tile-source">
             {COPY.source}: {['311', 'rentsmart', 'isd', 'assessment'].map((id, i) => <>{i > 0 && ', '}<a href={core.meta.sources[id].url} rel="noopener">{core.meta.sources[id].name}</a></>)}
           </p>

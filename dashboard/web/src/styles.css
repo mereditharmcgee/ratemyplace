@@ -126,6 +126,7 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 thead th { font-weight: 600; color: var(--ink-2); font-size: 13px; position: sticky; top: 0; background: var(--surface); }
 tbody th { font-weight: 500; }
+.no-count { color: var(--ink-2); font-size: 13px; }
 .th-sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: inherit; }
 .th-sort:hover { color: var(--ink); text-decoration: underline; }
 th[aria-sort="descending"] .th-sort, th[aria-sort="ascending"] .th-sort { color: var(--ink); }

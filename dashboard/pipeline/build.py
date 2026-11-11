@@ -385,7 +385,8 @@ r["U"] = ~r.oo_sf
 r["oo_le6"] = r.OWN_OCC.eq("Y") & (r.units_num.fillna(99) <= 6)   # the method's test, used for the district numbers
 # The owner-name display rule is stricter where the unit count is missing: a one, two or three family class is
 # 6 or fewer by definition, and an owner-occupied building with no usable count is treated as small.
-r["oo_small_display"] = r.OWN_OCC.eq("Y") & ((r.units_num <= 6) | r.LU.isin(["R1", "R2", "R3"]) | r.units_num.isna())
+# An owner-occupant whose building has no verified count (units_shown) is also treated as small: lean toward privacy.
+r["oo_small_display"] = r.OWN_OCC.eq("Y") & ((r.units_num <= 6) | r.LU.isin(["R1", "R2", "R3"]) | r.units_num.isna() | r.units_shown.isna())
 
 res_ids = set(r.GIS_ID)
 m = d[d.GIS_ID.isin(res_ids)]
