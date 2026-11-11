@@ -1,5 +1,5 @@
 import { COPY } from './copy';
-import { defaultFilters, fullYears, monthLabel, type Core, type Filters } from './compute';
+import { defaultFilters, fullYears, monthLabel, OWNER_TYPES, type Core, type Filters, type OwnerType } from './compute';
 import { ISSUE_COLORS, ISSUE_KEYS } from './data';
 
 export function selectionLabel(core: Core, f: Filters): string {
@@ -56,7 +56,14 @@ export function FiltersBar({ core, filters: f, onChange }: Props) {
             {core.zips.map((z, i) => <option value={String(i)}>{z}</option>)}
           </select>
         </label>
+        <label>
+          <span>{COPY.ownerType}</span>
+          <select id="owner-type" value={f.owner} aria-describedby="owner-type-note" onChange={(e) => set({ owner: (e.target as HTMLSelectElement).value as OwnerType })}>
+            {OWNER_TYPES.map((t) => <option value={t}>{COPY.ownerTypes[t]}</option>)}
+          </select>
+        </label>
       </div>
+      <p class="filter-note" id="owner-type-note">{COPY.ownerTypeNote}</p>
 
       <fieldset class="chips">
         <legend>{COPY.issue}</legend>

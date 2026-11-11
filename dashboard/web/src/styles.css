@@ -48,6 +48,7 @@ h3 { font: 600 15px/1.35 var(--sans); margin: 0 0 4px; }
 .filters { background: var(--paper); border-radius: var(--radius); padding: 16px; margin: 0 0 16px; }
 .filters h2 { margin-bottom: 12px; }
 .filter-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.filter-note { margin: 8px 0 0; font-size: 13px; color: var(--ink-2); max-width: 75ch; }
 label > span, legend { display: block; font-size: 14px; font-weight: 500; margin-bottom: 4px; padding: 0; }
 select, input[type="search"] { width: 100%; min-height: 44px; padding: 8px 10px; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid #94a3b8; border-radius: var(--radius-input); }
 fieldset { border: 0; padding: 0; margin: 14px 0 0; min-width: 0; }
@@ -180,13 +181,14 @@ dialog.detail::backdrop { background: rgba(15, 23, 42, 0.45); }
 .site-footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 
 @media (min-width: 640px) {
-  .filter-grid { grid-template-columns: repeat(3, 1fr); }
+  .filter-grid { grid-template-columns: repeat(2, 1fr); }
   .tiles { grid-template-columns: repeat(3, 1fr); }
   .range { width: auto; margin-left: 4px; }
   .range select { min-height: 40px; }
   .map { height: 460px; }
 }
 @media (min-width: 1000px) {
+  .filter-grid { grid-template-columns: repeat(4, 1fr); }
   .split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
   .map { height: 520px; }
 }

@@ -66,7 +66,7 @@ export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props)
 
   const download = () => {
     if (!buildings) return;
-    const csv = `# ${COPY.pageTitle}. ${selectionLabel(core, filters)}. ${COPY.updated} ${core.meta.pulled}. ${COPY.source}: data.boston.gov\r\n` + tableCsv(core, buildings, sorted);
+    const csv = `# ${COPY.pageTitle}. ${selectionLabel(core, filters)}; ${COPY.ownerTypes[filters.owner]}. ${COPY.updated} ${core.meta.pulled}. ${COPY.source}: data.boston.gov\r\n` + tableCsv(core, buildings, sorted);
     const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url; a.download = `boston-housing-records-${core.meta.pulled}.csv`;

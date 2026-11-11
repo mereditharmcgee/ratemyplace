@@ -20,10 +20,26 @@ export interface Filters {
   district: number; neighborhood: number; zip: number;   // index, or -1 for all
   issues: boolean[];                                     // one per issue group; all false means all issues
   m0: number; m1: number;                                // inclusive month indexes
+  owner: OwnerType;                                      // map, table and download only; the tiles and the trend ignore it
+}
+
+export const OWNER_TYPES = ['private', 'all', 'public', 'nonprofit'] as const;
+export type OwnerType = typeof OWNER_TYPES[number];
+
+/**
+ * Whether a building passes the owner-type filter. `flags` is Buildings.flags: bit 1 is a public owner or public
+ * housing, bit 2 a nonprofit or income-restricted housing owner (never set together with bit 1).
+ * 'private' is every building whose owner is not marked public.
+ */
+export function ownerTypeOn(flags: number, t: OwnerType): boolean {
+  if (t === 'all') return true;
+  if (t === 'public') return (flags & 1) !== 0;
+  if (t === 'nonprofit') return (flags & 2) !== 0;
+  return (flags & 1) === 0;
 }
 
 export function defaultFilters(core: Core): Filters {
-  return { district: -1, neighborhood: -1, zip: -1, issues: core.meta.groups.map(() => false), m0: 0, m1: core.meta.months.length - 1 };
+  return { district: -1, neighborhood: -1, zip: -1, issues: core.meta.groups.map(() => false), m0: 0, m1: core.meta.months.length - 1, owner: 'private' };
 }
 
 export function hasGeo(f: Filters): boolean {

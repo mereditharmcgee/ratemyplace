@@ -1,4 +1,4 @@
-import type { Core, Filters } from './compute';
+import { OWNER_TYPES, type Core, type Filters, type OwnerType } from './compute';
 
 // The filters live in the address bar, so a filtered view can be shared as a link.
 export function writeHash(core: Core, f: Filters): void {
@@ -10,6 +10,7 @@ export function writeHash(core: Core, f: Filters): void {
   if (on.length) p.set('issue', on.join(','));
   if (f.m0 > 0) p.set('from', core.meta.months[f.m0]);
   if (f.m1 < core.meta.months.length - 1) p.set('to', core.meta.months[f.m1]);
+  if (f.owner !== 'private') p.set('owners', f.owner);
   const s = p.toString();
   const next = s ? `#${s}` : location.pathname + location.search;
   if ((location.hash || '') !== (s ? `#${s}` : '')) history.replaceState(null, '', next);
@@ -30,5 +31,7 @@ export function readHash(core: Core, base: Filters): Filters {
   if (m0 >= 0) f.m0 = m0;
   if (m1 >= 0) f.m1 = m1;
   if (f.m0 > f.m1) { f.m0 = base.m0; f.m1 = base.m1; }
+  const o = p.get('owners') as OwnerType | null;
+  f.owner = o && OWNER_TYPES.includes(o) ? o : base.owner;
   return f;
 }

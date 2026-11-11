@@ -49,6 +49,13 @@ cd ../web && npm ci && npm test && npm run build && npm run preview
 
 Mailing addresses are never exported under either setting.
 
+## Owner-type filter
+
+The map, the building table and the CSV download take an owner-type filter: private owners (the
+default, meaning every owner not marked public), all owners, public owners only, or nonprofit and
+income-restricted only. It uses the same public and nonprofit labels the page already shows. The
+comparison tiles, the trend, the owner lookup and the district numbers ignore it.
+
 ## Order of the building table
 
 The table opens ordered by total complaints. Any column can be chosen as the order instead, and so

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { adjustedPerUnit, buildingRows, cellMask, cityPerUnit, csvEscape, defaultFilters, fullYears, summarize, toCsv, trend, yearsInRange, type Core } from './compute';
+import { adjustedPerUnit, ownerTypeOn, buildingRows, cellMask, cityPerUnit, csvEscape, defaultFilters, fullYears, summarize, toCsv, trend, yearsInRange, type Core } from './compute';
 
 // A tiny hand-made dataset: two cells, three buildings, 2023-01 through 2024-02 (data ends Feb 14, 2024).
 const months: string[] = [];
@@ -62,6 +62,17 @@ describe('compute', () => {
     expect(csvEscape('a,b')).toBe('"a,b"');
     expect(csvEscape('=SUM(A1)')).toBe("'=SUM(A1)");
     expect(toCsv(['x'], [[1]])).toBe('x\r\n1\r\n');
+  });
+});
+
+describe('owner-type filter', () => {
+  it('private is everything not marked public; the default is private', () => {
+    expect(defaultFilters(core).owner).toBe('private');
+    const PUBLIC = 1, NONPROFIT = 2, OTHER = 8 | 128;
+    expect([PUBLIC, NONPROFIT, OTHER, 0].map((fl) => ownerTypeOn(fl, 'private'))).toEqual([false, true, true, true]);
+    expect([PUBLIC, NONPROFIT, OTHER, 0].map((fl) => ownerTypeOn(fl, 'all'))).toEqual([true, true, true, true]);
+    expect([PUBLIC | 8, NONPROFIT, OTHER, 0].map((fl) => ownerTypeOn(fl, 'public'))).toEqual([true, false, false, false]);
+    expect([PUBLIC, NONPROFIT | 64, OTHER, 0].map((fl) => ownerTypeOn(fl, 'nonprofit'))).toEqual([false, true, false, false]);
   });
 });
 

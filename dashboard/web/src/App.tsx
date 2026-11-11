@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'preact/compat';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { COPY } from './copy';
-import { buildingRows, cellMask, dayLabel, defaultFilters, hasGeo, summarize, type Core, type Filters } from './compute';
+import { buildingRows, cellMask, dayLabel, defaultFilters, hasGeo, ownerTypeOn, summarize, type Core, type Filters } from './compute';
 import { loadBuildings, loadCore, type Buildings } from './data';
 import { FiltersBar, selectionLabel } from './Filters';
 import { Tiles } from './Tiles';
@@ -39,7 +39,9 @@ export function App() {
   const bostonMask = useMemo(() => (core ? core.cells.map(() => true) : []), [core]);
   const summary = useMemo(() => (core && filters ? summarize(core, filters, mask) : null), [core, filters, mask]);
   const boston = useMemo(() => (core && filters ? summarize(core, filters, bostonMask) : null), [core, filters, bostonMask]);
-  const rows = useMemo(() => (core && filters ? buildingRows(core, filters, mask) : []), [core, filters, mask]);
+  const allRows = useMemo(() => (core && filters ? buildingRows(core, filters, mask) : []), [core, filters, mask]);
+  // The owner-type filter applies to the map, the table and the download. The tiles and the trend never see it.
+  const rows = useMemo(() => (buildings && filters ? allRows.filter((r) => ownerTypeOn(buildings.flags[r.b], filters.owner)) : allRows), [allRows, buildings, filters]);
 
   const showOwner = (id: number) => {
     setDetail(null);
