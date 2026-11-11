@@ -8,8 +8,8 @@
   boundaries.json      simplified district and neighborhood outlines
 
 Owner names are decided here (config.OWNER_NAME_POLICY), so a name that is not meant to be
-published never reaches a file. After writing, every file is scanned for the private
-exclusion entries; a hit fails the run and removes the output.
+published never reaches a file. After writing, a scan confirms that no hidden owner is listed
+under a name; a hit fails the run and removes the output.
 """
 import datetime, json, os, pickle, re, shutil, sys, time
 from collections import Counter, defaultdict
@@ -18,14 +18,13 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 from shapely.geometry import mapping, shape
 
-import exclusions
-from config import INDIVIDUAL_OWNER_LABEL, WITHHELD_OWNER_LABEL, OUT, OWNER_NAME_POLICY, RAW, SOURCES, WINDOW_START, WORK
+import quiet
+from config import INDIVIDUAL_OWNER_LABEL, OUT, OWNER_NAME_POLICY, RAW, SOURCES, WINDOW_START, WORK
 from rules import PUBLIC_PAT, nonprofit_name, owner_class, owner_norm, zip5
 
 if OWNER_NAME_POLICY not in ("ordinance", "all"):
     raise SystemExit("OWNER_NAME_POLICY must be 'ordinance' or 'all'")
-exclusions.quiet_errors()
-EX = exclusions.load()
+quiet.quiet_errors()
 bd = pickle.load(open(os.path.join(WORK, "build.pkl"), "rb"))
 if bd["as_of"]:
     raise SystemExit("build.pkl was built with --as-of; re-run build.py without it before exporting")
@@ -78,9 +77,8 @@ r["own_key"] = r.owner_raw.map(owner_norm)
 r["own_class"] = r.own_key.map(owner_class)
 r["hidden"] = (OWNER_NAME_POLICY == "ordinance") & r.oo_small_display & r.LU.ne("CM") & ~r.own_class.isin(NAMED_WHEN_OWNER_OCCUPIED)
 r["public_display"] = r.public | r.bha_link
-r["withheld"] = r.owner_raw.map(EX.hide_name)
 r["is_condo"] = r.LU.eq("CM")
-u = r[r.U].copy()            # the dashboard universe: residential, not excluded, not an owner-occupied single-family home
+u = r[r.U].copy()            # the dashboard universe: residential, not an owner-occupied single-family home
 gid_row = {g: i for i, g in enumerate(r.GIS_ID)}
 
 # geography cells
@@ -135,7 +133,7 @@ def bsum(row):
 
 
 for row in r.itertuples(index=False):
-    if row.hidden or row.withheld or not row.own_key:
+    if row.hidden or not row.own_key:
         continue
     if OWNER_NAME_POLICY == "ordinance" and row.oo_sf:
         continue   # owner-occupied single-family homes are outside the dashboard altogether
@@ -151,7 +149,7 @@ cu = bd["condo_units"].copy()
 cu["OWNER"] = cu.OWNER.map(clean)
 if OWNER_NAME_POLICY == "ordinance":
     cu = cu[cu.OWN_OCC != "Y"]
-cu = cu[(cu.own_n != "") & ~cu.OWNER.map(EX.hide_name)]
+cu = cu[cu.own_n != ""]
 unit_owners = defaultdict(list)   # GIS_ID -> [[name, units]]
 for (gid, key), grp in cu.groupby(["GIS_ID", "own_n"]):
     row = r.iloc[gid_row[gid]]
@@ -182,13 +180,12 @@ dump("owners-index.json", {"name": o_name, "n": o_n, "rec": o_rec, "flag": o_fla
 # ---------------- buildings.json (columnar) ----------------
 def owner_text(row):
     if row.hidden: return INDIVIDUAL_OWNER_LABEL
-    if row.withheld: return WITHHELD_OWNER_LABEL
     return row.owner_raw or "Not listed"
 
 
 def flags(row):
     return (1 if row.public_display else 0) | (2 if row.owner_sub and not row.public_display else 0) | (4 if row.hidden else 0) | (8 if row.is_condo else 0) \
-        | (16 if row.pp_units > 0 else 0) | (32 if row.ppo_units > 0 else 0) | (64 if row.ir_units > 0 else 0) | (128 if row.rental_bldg else 0) | (256 if row.withheld and not row.hidden else 0)
+        | (16 if row.pp_units > 0 else 0) | (32 if row.ppo_units > 0 else 0) | (64 if row.ir_units > 0 else 0) | (128 if row.rental_bldg else 0)
 
 
 owner_strings, owner_si = [], {}
@@ -204,7 +201,7 @@ for row in has.itertuples(index=False):
     B["lat"].append(None if pd.isna(row.y) else round(float(row.y), 5)); B["lon"].append(None if pd.isna(row.x) else round(float(row.x), 5))
     B["cell"].append(int(row.cell)); B["units"].append(None if pd.isna(row.units_num) else int(row.units_num))
     B["ru"].append(int(row.rental_units) if row.rental_bldg else 0)
-    B["owner"].append(sidx(owner_text(row))); B["oid"].append(-1 if (row.hidden or row.withheld or not row.own_key) else oid[row.own_key])
+    B["owner"].append(sidx(owner_text(row))); B["oid"].append(-1 if (row.hidden or not row.own_key) else oid[row.own_key])
     B["flags"].append(flags(row)); B["isd"].append(int(row.isd_cond3)); B["pwd"].append(int(row.pwd_tickets)); B["rod"].append(int(row.rodent3))
     B["pid"].append(row.PID)
 B["ownerStrings"] = owner_strings
@@ -235,6 +232,7 @@ core = {
         "pulled": pulled, "dataThrough": data_through[:10], "windowStart": WINDOW_START, "months": months, "groups": GROUPS,
         "ownerPolicy": OWNER_NAME_POLICY, "sources": SOURCES, "recordShards": N_RECORD_SHARDS, "ownerShards": N_OWNER_SHARDS,
         "universeBuildings": int(len(u)), "rentalBuildings": int(u.rental_bldg.sum()), "buildingsWithRecords": int(len(has)),
+        "universeUnits": int(u.units_num[u.units_num > 0].sum()),
         "unmappedNew311": int(sum(bd["unmapped_new_311"].values())),
         "matched311": {k: int(v) for k, v in bd["match_311"].items()},
     },
@@ -261,21 +259,11 @@ dump("boundaries.json", {"districts": outlines(os.path.join(RAW, "council_distri
                          "neighborhoods": outlines(os.path.join(RAW, "bpda_neighborhoods.geojson"), "name")})
 
 # ---------------- safety scan ----------------
-# 1. No published owner name may be an excluded name (the same exact-name test the exclusion uses).
-# 2. No file may contain an excluded parcel id or match an excluded addressee pattern.
-published_names = set(o_name) | set(owner_strings) | {n for g in groups.values() for n in g["names"]}
-bad = sum(1 for n in published_names if EX.by_owner(n) or EX.by_addressee(n) or EX.hide_name(n))
-# 3. No building whose owner is hidden or withheld may sit under a published owner name.
+# No building whose owner is shown as "Individual owner" may sit under a published owner name.
 _listed = {(k, h[0]) for k, g in groups.items() for h in g["holdings"] if not h[9]}
-bad += sum(1 for row in r[r.hidden | r.withheld].itertuples(index=False) if (row.own_key, row.GIS_ID) in _listed)
-for root, _, files in os.walk(tmp):
-    for fn in files:
-        text = open(os.path.join(root, fn), encoding="utf-8").read()
-        if any(p in text for p in EX.parcels) or EX.by_addressee(text):
-            bad += 1
-if bad:
+if any((row.own_key, row.GIS_ID) in _listed for row in r[r.hidden].itertuples(index=False)):
     rmtree(tmp)
-    raise SystemExit("safety scan: a private exclusion entry appears in the output; nothing was written")
+    raise SystemExit("safety scan: a hidden owner is listed under a published name; nothing was written")
 
 rmtree(OUT)
 os.replace(tmp, OUT)

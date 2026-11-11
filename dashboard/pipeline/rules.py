@@ -3,7 +3,7 @@ normalization, owner classes, public and nonprofit patterns, ISD description cla
 
 This is a straight port of the district method (v3, locked Nov 9, 2026). The district pages
 and the dashboard must agree, so do not adjust a rule here without re-running
-check_districts.py. Exclusions live in exclusions.py and are loaded from a secret.
+check_districts.py.
 """
 import re
 import pandas as pd
@@ -118,11 +118,11 @@ def owner_class(norm_name):
 def is_individualish(cls):
     return cls in ("Appears to be an individual", "Trust (may be an individual or family)")
 
-# ---------- entity key (used for exclusion matching) ----------
+# ---------- entity key ----------
 _JUR = r"(?:\s+A)?\s+(?:MASS|MA|MASSACHUSETTS|DEL|DE|DELAWARE|NY|NH|RI|CT|ME|VT|FL|NJ)\s+(?:LLC|LP|LPS|LTD|INC|CORP|CORPORATION|LIMITED PARTNERSHIP|TRUST)$"
 def entity_key(name):
     """Owner normalization plus suffix tolerance: drops a trailing jurisdiction tag ('MASS LLC', 'A MASS LLC', 'DEL LP') and
-    unifies CORPORATION/INCORPORATED/COMPANY/LIMITED LIABILITY COMPANY spellings. Used for exclusion and case-file entity matching."""
+    unifies CORPORATION/INCORPORATED/COMPANY/LIMITED LIABILITY COMPANY spellings. Used for case-file entity matching."""
     t = owner_norm(name)
     for _ in range(2): t = re.sub(_JUR, "", t)
     t = re.sub(r"\bLIMITED LIABILITY COMPANY\b", "LLC", t); t = re.sub(r"\bCORPORATION\b", "CORP", t)

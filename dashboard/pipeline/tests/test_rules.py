@@ -1,8 +1,7 @@
-"""Rule tests that need no data and no private files: python -m unittest discover -s tests"""
+"""Rule tests that need no data: python -m unittest discover -s tests"""
 import os, sys, unittest
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import rules
-from exclusions import Exclusions
 
 
 class Rules(unittest.TestCase):
@@ -30,27 +29,6 @@ class Rules(unittest.TestCase):
         self.assertEqual(rules.owner_class("BOSTON HOUSING AUTHORITY"), "Public or quasi-public")
         self.assertEqual(rules.owner_class("DOE JANE"), "Appears to be an individual")
         self.assertEqual(rules.isd_class("Failure to Obtain Permit"), "permit, use or administrative")
-
-    def test_exclusions_match_exact_names_only(self):
-        ex = Exclusions({"owner_names_exact": ["Sample Realty LLC"], "parcel_ids": ["123"], "mailing_anchors": [{"street_contains": "1 Sample Way", "zip": "02100"}],
-                         "addressee_patterns": ["c/o sample mgmt"]})
-        self.assertTrue(ex.by_owner("SAMPLE REALTY L.L.C."))
-        self.assertTrue(ex.by_owner("Sample Realty LLC A MASS LLC"))
-        self.assertFalse(ex.by_owner("SAMPLE REALTY TWO LLC"))
-        self.assertTrue(ex.by_mail("1 SAMPLE WAY STE 4", "02100"))
-        self.assertFalse(ex.by_mail("1 SAMPLE WAY", "02199"))
-        self.assertTrue(ex.by_addressee("C/O SAMPLE MGMT"))
-        self.assertIn("0000000123", ex.parcels)
-
-    def test_optional_name_withholding(self):
-        ex = Exclusions({"parcel_ids": ["1"], "owner_name_hide_patterns": [r"\bSAMPLENAME\b"]})
-        self.assertTrue(ex.hide_name("SAMPLENAME JANE"))
-        self.assertFalse(ex.hide_name("SAMPLENAMESON JANE"))
-        self.assertFalse(Exclusions({"parcel_ids": ["1"]}).hide_name("SAMPLENAME JANE"))
-
-    def test_an_empty_list_is_refused(self):
-        with self.assertRaises(SystemExit):
-            Exclusions({})
 
 
 if __name__ == "__main__":

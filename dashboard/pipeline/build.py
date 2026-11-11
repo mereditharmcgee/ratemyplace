@@ -12,15 +12,14 @@ import numpy as np, pandas as pd, shapely
 from scipy.spatial import cKDTree
 from shapely.geometry import shape
 
-import exclusions
+import quiet
 from config import RAW, WORK, WINDOW_START, NEW_311_BUCKETS
 from rules import *  # noqa: F401,F403  (the locked rules)
 from rules import BHA_MAIL_KEYS, BHA_NAME_PAT, PUBLIC_PAT, is_living, isd_class, living_bucket, mail_key, nonprofit_name, num_list, owner_class, owner_norm, street_norm, wnorm, zip5
 
 AS_OF = sys.argv[sys.argv.index("--as-of") + 1] if "--as-of" in sys.argv else None
 os.makedirs(WORK, exist_ok=True)
-exclusions.quiet_errors()
-EX = exclusions.load()
+quiet.quiet_errors()
 
 
 def raw(name):
@@ -133,15 +132,6 @@ def mail_for(r):
 
 mm = b.apply(mail_for, axis=1, result_type="expand")
 b["att_mail_addressee"], b["att_mail_street"], b["att_mail_zip"], b["att_own_occ"] = mm[0], mm[1], mm[2], mm[3]
-
-# exclusions (exact names, parcel ids, mailing anchors, addressee patterns; nothing derived)
-b["excl_parcel"] = b.GIS_ID.isin(EX.parcels) | b.PID.isin(EX.parcels) | b.GIS_ID.isin({pid2gis.get(x) for x in EX.parcels})
-b["excl_owner"] = [EX.by_owner(o, ao, mo) for o, ao, mo in zip(b.OWNER, b.attributed_owner, b.condo_majority_owner)]
-b["excl_addressee"] = [EX.by_addressee(o, ad, ma) for o, ad, ma in zip(b.OWNER, b.MAIL_ADDRESSEE, b.att_mail_addressee)]
-b["excl_mail"] = [EX.by_mail(x, z) or EX.by_mail(x2, z2) for x, z, x2, z2 in zip(b.MAIL_STREET_ADDRESS, b.MAIL_ZIP_CODE, b.att_mail_street, b.att_mail_zip)]
-guard_mail = b.MAIL_STREET_ADDRESS.map(EX.guard_mail)
-b["excl_addressee"] = b.excl_addressee & ~guard_mail   # the protected company's own mailing address wins over an addressee-only hit
-b["excluded"] = b.excl_parcel | b.excl_owner | b.excl_addressee | b.excl_mail
 
 
 # districts and neighborhoods by point in polygon
@@ -346,7 +336,7 @@ b["rate_ok"] = b.unit_confidence.isin(["exact", "estimate in class range"]) & (b
 b["oo_sf"] = (b.LU == "R1") & (b.OWN_OCC == "Y")
 
 n_res_all = int(b.residential.sum())
-r = b[b.residential & ~b.excluded].drop_duplicates("GIS_ID").copy()
+r = b[b.residential].drop_duplicates("GIS_ID").copy()
 r["subsidized_class"] = r.LUC.isin(["125", "126", "127"]) | r.LU.eq("EA")
 r["nonprofit_name"] = [nonprofit_name(o, ad) for o, ad in zip(r.attributed_owner.fillna(""), r.att_mail_addressee.fillna(""))]
 r["public"] = r.attributed_class.eq("Public or quasi-public") | r.LUC.eq("908")
@@ -405,11 +395,8 @@ r["owner_sub"] = [bool(sub_owner.get(o, False)) and not pub for o, pub in zip(r.
 
 say("universe", int(r.U.sum()), "rental buildings", int(r.rental_bldg.sum()), "flagged", int(r.flag3.sum()))
 
-# condo unit rows at kept residential lots (for the owner lookup). Excluded names never leave here.
-cdk = cd[cd.GIS_ID.isin(res_ids)][["GIS_ID", "PID", "OWNER", "own_n", "OWN_OCC", "MAIL_ADDRESSEE", "MAIL_STREET_ADDRESS", "MAIL_ZIP_CODE"]].copy()
-bad = [EX.by_owner(o) or EX.by_addressee(o, ad) or (EX.by_mail(ms, mz) and not EX.guard_mail(ms))
-       for o, ad, ms, mz in zip(cdk.OWNER, cdk.MAIL_ADDRESSEE, cdk.MAIL_STREET_ADDRESS, cdk.MAIL_ZIP_CODE)]
-cdk = cdk[~np.array(bad, dtype=bool)][["GIS_ID", "PID", "OWNER", "own_n", "OWN_OCC"]]
+# condo unit rows at residential lots (for the owner lookup)
+cdk = cd[cd.GIS_ID.isin(res_ids)][["GIS_ID", "PID", "OWNER", "own_n", "OWN_OCC"]].copy()
 
 pull_log = json.load(open(raw("pull_log.json")))
 out = {
@@ -417,7 +404,7 @@ out = {
     "pull_log": pull_log,
     "n_residential_all": n_res_all,
     "buildings": r.drop(columns=["MAIL_ADDRESSEE", "MAIL_STREET_ADDRESS", "MAIL_CITY", "MAIL_STATE", "MAIL_ZIP_CODE", "att_mail_addressee",
-                                 "att_mail_street", "att_mail_zip", "excl_parcel", "excl_owner", "excl_addressee", "excl_mail", "excluded"]),
+                                 "att_mail_street", "att_mail_zip"]),
     "complaints": m3[["case_enquiry_id", "GIS_ID", "open_day", "type", "bucket", "case_status", "closed_dt"]].copy(),
     "rodent": rod[["GIS_ID", "open_day"]].copy(),
     "citations": rsm[["GIS_ID", "day", "description"]].copy(),

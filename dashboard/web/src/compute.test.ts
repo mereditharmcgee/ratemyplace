@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { buildingRows, cellMask, csvEscape, defaultFilters, fullYears, summarize, toCsv, trend, yearsInRange, type Core } from './compute';
+import { adjustedPerUnit, buildingRows, cellMask, cityPerUnit, csvEscape, defaultFilters, fullYears, summarize, toCsv, trend, yearsInRange, type Core } from './compute';
 
 // A tiny hand-made dataset: two cells, three buildings, 2023-01 through 2024-02 (data ends Feb 14, 2024).
 const months: string[] = [];
 for (let y = 2023, m = 1; `${y}-${String(m).padStart(2, '0')}` <= '2024-02'; m === 12 ? (y++, (m = 1)) : m++) months.push(`${y}-${String(m).padStart(2, '0')}`);
 const core: Core = {
   meta: { pulled: '2024-02-15', dataThrough: '2024-02-14', windowStart: '2023-01-01', months, groups: ['pests', 'general', 'heat', 'other'], ownerPolicy: 'ordinance',
-    sources: {}, recordShards: 1, ownerShards: 1, universeBuildings: 30, rentalBuildings: 20, buildingsWithRecords: 3 },
+    sources: {}, recordShards: 1, ownerShards: 1, universeBuildings: 30, rentalBuildings: 20, buildingsWithRecords: 3, universeUnits: 60 },
   districts: ['1', '2'], neighborhoods: ['A', 'B'], zips: ['02111', '02112'],
   cells: [[0, 0, 0, 10, 8, 100], [1, 1, 1, 20, 12, 400]],
   bCell: [0, 0, 1], bRental: [1, 0, 1],
@@ -65,8 +65,24 @@ describe('compute', () => {
   });
 });
 
+describe('default table order', () => {
+  it('uses the citywide rate for the chosen dates and issues, at buildings with a unit count', () => {
+    const f = defaultFilters(core);
+    expect(cityPerUnit(core, f, [2, 10, null])).toBeCloseTo(3 / 60);   // building 2 has no unit count
+    expect(cityPerUnit(core, { ...f, issues: [false, true, false, false] }, [2, 10, 4])).toBeCloseTo(1 / 60);
+  });
+  it('pulls a small building toward the citywide rate more than a large one', () => {
+    const city = 0.1;
+    expect(adjustedPerUnit(2, 1, city)).toBeCloseTo((2 + 0.5) / 6);      // raw 2.00 per unit
+    expect(adjustedPerUnit(200, 100, city)).toBeCloseTo(200.5 / 105);    // raw 2.00 per unit
+    expect(adjustedPerUnit(200, 100, city)).toBeGreaterThan(adjustedPerUnit(2, 1, city));
+    expect(adjustedPerUnit(0, 3, city)).toBeLessThan(city);
+    expect(adjustedPerUnit(9, null, city)).toBe(city);
+  });
+});
+
 // When the real data files are present (after the pipeline has run), the page's own math must
-// reproduce the locked district-page numbers for calendar 2025.
+// reproduce the pipeline's benchmark numbers for calendar 2025.
 const real = 'public/data/core.json';
 describe.skipIf(!existsSync(real))('against the built data', () => {
   it('reproduces 2025 complaints per 1,000 rental units', () => {
@@ -76,7 +92,7 @@ describe.skipIf(!existsSync(real))('against the built data', () => {
       const f = { ...defaultFilters(c), district, m0, m1 };
       return Number(summarize(c, f, cellMask(c, f)).ratePerYear!.toFixed(1));
     };
-    expect(rate(-1)).toBe(26.1);
+    expect(rate(-1)).toBe(26.2);
     expect(c.districts.map((_, i) => rate(i))).toEqual([16.4, 16.0, 30.2, 41.6, 29.6, 25.3, 32.7, 18.9, 30.7]);
   });
 });

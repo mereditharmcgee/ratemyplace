@@ -1,42 +1,56 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { COPY } from './copy';
-import { fmtInt, toCsv, type BuildingRow, type Core, type Filters } from './compute';
+import { adjustedPerUnit, cityPerUnit, fmtInt, fmtPerUnit, perUnit, toCsv, type BuildingRow, type Core, type Filters } from './compute';
 import { assessingUrl, FLAG, ISSUE_KEYS, type Buildings } from './data';
 import { selectionLabel } from './Filters';
 
 interface Props { core: Core; buildings: Buildings | null; rows: BuildingRow[]; filters: Filters; onOpen: (b: number) => void }
-type Sort = 'complaints' | 'citations' | 'address';
+export type Sort = 'adjusted' | 'complaints' | 'perUnit' | 'citations' | 'cases' | 'units' | 'address' | 'owner';
 const PAGE = 25;
 const ADDRESS_ORDER = new Intl.Collator('en', { numeric: true });
 
-export function sortRows(rows: BuildingRow[], buildings: Buildings, sort: Sort): BuildingRow[] {
+/**
+ * `cityRate` is the citywide complaints per unit for the chosen dates and issues. The default order ('adjusted')
+ * uses each building's rate pulled toward it; every other order uses the number shown in its column.
+ */
+export function sortRows(rows: BuildingRow[], buildings: Buildings, sort: Sort, cityRate = 0): BuildingRow[] {
   // One shared collator: String.localeCompare with options builds a new one per call and is far slower.
   const byAddr = (a: BuildingRow, b: BuildingRow) => ADDRESS_ORDER.compare(buildings.addr[a.b], buildings.addr[b.b]);
+  const byComplaints = (a: BuildingRow, b: BuildingRow) => b.complaints - a.complaints || b.citationDates - a.citationDates || byAddr(a, b);
+  const units = (r: BuildingRow) => buildings.units[r.b];
   const out = [...rows];
   if (sort === 'address') out.sort(byAddr);
+  else if (sort === 'owner') out.sort((a, b) => ADDRESS_ORDER.compare(buildings.ownerStrings[buildings.owner[a.b]], buildings.ownerStrings[buildings.owner[b.b]]) || byAddr(a, b));
   else if (sort === 'citations') out.sort((a, b) => b.citationDates - a.citationDates || b.complaints - a.complaints || byAddr(a, b));
-  else out.sort((a, b) => b.complaints - a.complaints || b.citationDates - a.citationDates || byAddr(a, b));
+  else if (sort === 'cases') out.sort((a, b) => buildings.isd[b.b] - buildings.isd[a.b] || byComplaints(a, b));
+  else if (sort === 'units') out.sort((a, b) => (units(b) ?? -1) - (units(a) ?? -1) || byComplaints(a, b));
+  else if (sort === 'perUnit') out.sort((a, b) => (perUnit(b.complaints, units(b)) ?? -1) - (perUnit(a.complaints, units(a)) ?? -1) || byComplaints(a, b));
+  else if (sort === 'adjusted') {
+    const adj = new Map(out.map((r) => [r.b, adjustedPerUnit(r.complaints, units(r), cityRate)] as const));
+    out.sort((a, b) => adj.get(b.b)! - adj.get(a.b)! || byComplaints(a, b));
+  } else out.sort(byComplaints);
   return out;
 }
 
 /** The download holds exactly the rows and numbers in the on-screen table, plus place columns and source links. */
 export function tableCsv(core: Core, buildings: Buildings, rows: BuildingRow[]): string {
-  const header = [COPY.address, COPY.district, COPY.neighborhood, COPY.zip, COPY.owner, COPY.units, COPY.complaints,
+  const header = [COPY.address, COPY.district, COPY.neighborhood, COPY.zip, COPY.owner, COPY.units, COPY.complaints, COPY.perUnit,
     ...ISSUE_KEYS.map((k) => `${COPY.complaints}: ${COPY.issues[k]}`), COPY.citationDates, COPY.openCases, COPY.detailOwnerSource];
   const body = rows.map((r) => {
     const c = core.cells[buildings.cell[r.b]];
     return [buildings.addr[r.b], core.districts[c[0]] ?? '', core.neighborhoods[c[1]] ?? '', core.zips[c[2]] ?? '', buildings.ownerStrings[buildings.owner[r.b]],
-      buildings.units[r.b] ?? '', r.complaints, ...r.byGroup, r.citationDates, buildings.isd[r.b],
-      (buildings.flags[r.b] & (FLAG.hidden | FLAG.withheld)) !== 0 ? '' : assessingUrl(buildings.pid[r.b])];
+      buildings.units[r.b] ?? '', r.complaints, fmtPerUnit(perUnit(r.complaints, buildings.units[r.b])), ...r.byGroup, r.citationDates, buildings.isd[r.b],
+      (buildings.flags[r.b] & FLAG.hidden) !== 0 ? '' : assessingUrl(buildings.pid[r.b])];
   });
   return toCsv(header, body);
 }
 
 export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props) {
-  const [sort, setSort] = useState<Sort>('complaints');
+  const [sort, setSort] = useState<Sort>('adjusted');
   const [page, setPage] = useState(0);
   useEffect(() => setPage(0), [rows, sort]);
-  const sorted = useMemo(() => (buildings ? sortRows(rows, buildings, sort) : []), [rows, buildings, sort]);
+  const cityRate = useMemo(() => (buildings ? cityPerUnit(core, filters, buildings.units) : 0), [core, filters, buildings]);
+  const sorted = useMemo(() => (buildings ? sortRows(rows, buildings, sort, cityRate) : []), [rows, buildings, sort, cityRate]);
   const pages = Math.max(1, Math.ceil(sorted.length / PAGE));
   const shown = sorted.slice(page * PAGE, page * PAGE + PAGE);
 
@@ -57,9 +71,14 @@ export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props)
         <label class="inline">
           <span>{COPY.sortBy}</span>
           <select value={sort} onChange={(e) => setSort((e.target as HTMLSelectElement).value as Sort)}>
-            <option value="complaints">{COPY.sortComplaints}</option>
-            <option value="citations">{COPY.sortCitations}</option>
-            <option value="address">{COPY.sortAddress}</option>
+            <option value="adjusted">{COPY.sortAdjusted}</option>
+            <option value="complaints">{COPY.complaints}</option>
+            <option value="perUnit">{COPY.perUnit}</option>
+            <option value="citations">{COPY.citationDates}</option>
+            <option value="cases">{COPY.openCases}</option>
+            <option value="units">{COPY.units}</option>
+            <option value="address">{COPY.address}</option>
+            <option value="owner">{COPY.owner}</option>
           </select>
         </label>
       </div>
@@ -73,6 +92,7 @@ export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props)
                   <th scope="col">{COPY.owner}</th>
                   <th scope="col" class="n">{COPY.units}</th>
                   <th scope="col" class="n">{COPY.complaints}</th>
+                  <th scope="col" class="n">{COPY.perUnit}</th>
                   <th scope="col" class="n">{COPY.citationDates}</th>
                   <th scope="col" class="n">{COPY.openCases}</th>
                 </tr>
@@ -84,6 +104,7 @@ export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props)
                     <td>{buildings.ownerStrings[buildings.owner[r.b]]}</td>
                     <td class="n">{buildings.units[r.b] ?? ''}</td>
                     <td class="n">{fmtInt(r.complaints)}</td>
+                    <td class="n">{fmtPerUnit(perUnit(r.complaints, buildings.units[r.b]))}</td>
                     <td class="n">{fmtInt(r.citationDates)}</td>
                     <td class="n">{fmtInt(buildings.isd[r.b])}</td>
                   </tr>

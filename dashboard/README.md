@@ -15,34 +15,27 @@ dashboard/
 
 `pipeline/rules.py` is the district method (v3, locked November 9, 2026): the 311 type lists, the
 four issue groups, address and owner normalization, owner classes. The dashboard and the district
-pages must agree, so a change to a rule there needs a re-run of `check_districts.py`.
+pages use the same rules, so a change to a rule there needs a re-run of `check_districts.py`.
+
+Every residential lot in the assessing file is included. The district pages were published from a
+build that left out a small number of lots, so three citywide numbers differ slightly (see `pipeline/benchmarks.json`);
+the nine district rates are the same.
 
 | Step | File | What it does |
 |------|------|--------------|
 | 1 | `pull.py` | Read-only pulls into `pipeline/.cache/raw/` |
 | 2 | `build.py` | Buildings, record matching, units, owners, v3 rules |
 | 3 | `gate.py` | Stops the run if tonight's numbers drift too far from `benchmarks.json` |
-| 4 | `export.py` | Writes `web/public/data/`, then scans it for private entries |
+| 4 | `export.py` | Writes `web/public/data/`, then checks that no hidden owner is listed by name |
 
 Run locally (Python 3.13 or newer):
 
 ```bash
 cd dashboard/pipeline
 python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt
-export DASHBOARD_EXCLUSIONS_FILE=/path/to/the/private/list.json
 .venv/Scripts/python pull.py && .venv/Scripts/python build.py && .venv/Scripts/python gate.py && .venv/Scripts/python export.py
 cd ../web && npm ci && npm test && npm run build && npm run preview
 ```
-
-## Private exclusions
-
-A small private list of lots is left out of every output. It is never in this repo. The pipeline
-reads it from `DASHBOARD_EXCLUSIONS_JSON` (a GitHub Actions secret at night) or from the file named
-by `DASHBOARD_EXCLUSIONS_FILE`, and refuses to run without it. Nothing prints, logs or counts
-what it holds, and `export.py` deletes its own output if an entry is found in it.
-
-The same private file may carry an optional `owner_name_hide_patterns` list. An owner name that
-matches is published as "Owner name not shown"; the building and its records stay in every number.
 
 ## Owner names: one setting
 
@@ -55,6 +48,24 @@ matches is published as "Owner name not shown"; the building and its records sta
 - `all`: every owner of record is published by name.
 
 Mailing addresses are never exported under either setting.
+
+## Order of the building table
+
+The table opens ordered by an adjusted complaints-per-unit rate. The adjusted rate is not shown; the
+table shows the raw complaint count and the raw complaints per unit, and any column can be chosen
+as the order instead.
+
+```
+adjusted = (complaints + 5 x citywide rate) / (units + 5)
+```
+
+`complaints` is the building's count for the chosen dates and issues. `citywide rate` is complaints
+per unit across every building in the dashboard for the same dates and issues (place filters do not
+change it). The effect is that each building is treated as if it had 5 more units with an average
+record: a two-family with one complaint moves most of the way to the citywide rate, and a 100-unit
+building barely moves. The 5 comes from the data (how much buildings differ from each other beyond
+chance gives about 5.4) and is fixed in `web/src/compute.ts` as `SHRINK_UNITS`. A building with no
+unit count is placed at the citywide rate.
 
 ## The 311 switch on November 5, 2026
 

@@ -41,7 +41,7 @@ export function BuildingDetail({ core, buildings, target, onClose, onOwner }: Pr
   const oid = b >= 0 && buildings ? buildings.oid[b] : target.kind === 'holding' && !target.holding[9] ? target.ownerId : -1;
   const pid = b >= 0 && buildings ? buildings.pid[b] : gis;
   const hidden = (flags & FLAG.hidden) !== 0;
-  const noName = (flags & (FLAG.hidden | FLAG.withheld)) !== 0;
+  const noName = hidden;
   const r = rec && typeof rec === 'object' ? rec : null;
 
   return (
@@ -68,7 +68,7 @@ export function BuildingDetail({ core, buildings, target, onClose, onOwner }: Pr
             {(flags & FLAG.problemOwner) !== 0 && <span class="badge warn" title={COPY.labelProblemHelp}>{COPY.labelProblemOwner}</span>}
           </p>
           <p class="links">
-            {/* the city record names the owner, so it is not linked where the name is not shown */}
+            {/* the city record names the owner, so it is not linked for an individual owner */}
             {noName
               ? <a href={core.meta.sources.assessment.url} rel="noopener">{core.meta.sources.assessment.name}</a>
               : <a href={assessingUrl(pid)} rel="noopener">{COPY.detailOwnerSource}</a>}

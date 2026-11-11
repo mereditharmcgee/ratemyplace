@@ -1,5 +1,5 @@
-"""Nightly gate: stop the deploy if tonight's numbers have moved further from the locked district
-pages than normal drift explains (a broken pull, a renamed city column, a half-empty file).
+"""Nightly gate: stop the deploy if tonight's numbers have moved further from benchmarks.json
+than normal drift explains (a broken pull, a renamed city column, a half-empty file).
 
 Exit 0 lets the deploy go ahead. Exit 1 keeps yesterday's files and yesterday's date on the site.
 """

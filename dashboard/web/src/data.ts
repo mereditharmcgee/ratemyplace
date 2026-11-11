@@ -4,7 +4,7 @@ export interface Buildings {
   id: string[]; addr: string[]; lat: (number | null)[]; lon: (number | null)[]; cell: number[]; units: (number | null)[]; ru: number[];
   owner: number[]; oid: number[]; flags: number[]; isd: number[]; pwd: number[]; rod: number[]; pid: string[]; ownerStrings: string[];
 }
-export const FLAG = { public: 1, subsidized: 2, hidden: 4, condo: 8, problem: 16, problemOwner: 32, incomeRestricted: 64, rental: 128, withheld: 256 } as const;
+export const FLAG = { public: 1, subsidized: 2, hidden: 4, condo: 8, problem: 16, problemOwner: 32, incomeRestricted: 64, rental: 128 } as const;
 
 export interface OwnerIndex { name: string[]; n: number[]; rec: number[]; flag: number[]; shards: number }
 /** [gis id, address, district, neighborhood, zip, units, complaints, citation dates, open cases, condo units held, is condo main record] */

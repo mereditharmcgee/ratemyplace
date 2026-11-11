@@ -87,12 +87,11 @@ export const COPY = {
   owner: 'Owner of record',
   units: 'Units',
   complaints: 'Complaints',
+  perUnit: 'Complaints per unit',
   citationDates: 'Citation dates',
   openCases: 'Open violation cases',
   sortBy: 'Sort by',
-  sortComplaints: 'Complaints',
-  sortCitations: 'Citation dates',
-  sortAddress: 'Address',
+  sortAdjusted: 'Complaints per unit, adjusted for building size',
   download: 'Download these buildings (CSV)',
   prev: 'Previous',
   next: 'Next',
@@ -154,6 +153,7 @@ export const COPY = {
   // how this works
   howHeading: 'How this works',
   howPlaceholder: '[PLACEHOLDER: how this works, written by Meredith]',
+  howOrderPlaceholder: '[PLACEHOLDER: one sentence on the order of the building table, written by Meredith]',
   howPoints: [
     'Every number comes from City of Boston open data (Analyze Boston). Nothing here is a RateMyPlace rating.',
     'Complaints are 311 requests about living conditions since January 2023. Requests closed as duplicates are left out. Outdoor rodent, rat bite and pigeon reports are counted separately.',

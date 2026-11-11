@@ -6,6 +6,7 @@ export function HowItWorks({ core }: { core: Core }) {
     <section class="panel how" id="how" aria-labelledby="how-h">
       <h2 id="how-h">{COPY.howHeading}</h2>
       <p class="placeholder">{COPY.howPlaceholder}</p>
+      <p class="placeholder">{COPY.howOrderPlaceholder}</p>
       <ul>
         {COPY.howPoints.map((p) => <li>{p}</li>)}
       </ul>

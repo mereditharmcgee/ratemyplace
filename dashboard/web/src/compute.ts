@@ -5,6 +5,7 @@ export interface Core {
     pulled: string; dataThrough: string; windowStart: string; months: string[]; groups: string[];
     ownerPolicy: string; sources: Record<string, { name: string; url: string }>;
     recordShards: number; ownerShards: number; universeBuildings: number; rentalBuildings: number; buildingsWithRecords: number;
+    universeUnits: number;   // units at every building in the dashboard that has a unit count
   };
   districts: string[]; neighborhoods: string[]; zips: string[];
   /** [district index, neighborhood index, zip index, buildings, rental buildings, rental units] */
@@ -182,6 +183,34 @@ export function buildingRows(core: Core, f: Filters, mask: boolean[]): BuildingR
   return out;
 }
 
+/** How many average units are added to every building before its rate is used for the default table order. */
+export const SHRINK_UNITS = 5;
+
+/** Citywide complaints per unit for the chosen dates and issues (place filters do not apply). Buildings with no unit count are left out of both sides. */
+export function cityPerUnit(core: Core, f: Filters, units: (number | null)[]): number {
+  const { b, m, g } = core.complaints;
+  let n = 0;
+  for (let i = 0; i < b.length; i++) {
+    if (m[i] < f.m0 || m[i] > f.m1 || !issueOn(f, g[i]) || !units[b[i]]) continue;
+    n++;
+  }
+  return core.meta.universeUnits > 0 ? n / core.meta.universeUnits : 0;
+}
+
+/** Raw complaints per unit, or null when the building has no unit count. */
+export function perUnit(complaints: number, units: number | null): number | null {
+  return units ? complaints / units : null;
+}
+
+/**
+ * The rate used only to order the table: the building's complaints per unit, pulled toward the citywide rate.
+ * It is the rate the building would have with SHRINK_UNITS extra units that each had the citywide number of
+ * complaints. A small building moves a lot, a large one hardly at all. No unit count: the citywide rate.
+ */
+export function adjustedPerUnit(complaints: number, units: number | null, cityRate: number): number {
+  return units ? (complaints + SHRINK_UNITS * cityRate) / (units + SHRINK_UNITS) : cityRate;
+}
+
 export function csvEscape(v: unknown): string {
   const s = v === null || v === undefined ? '' : String(v);
   // a leading = + - @ would be read as a formula by a spreadsheet
@@ -195,6 +224,7 @@ export function toCsv(header: string[], rows: unknown[][]): string {
 
 export function fmtInt(n: number): string { return n.toLocaleString('en-US'); }
 export function fmtRate(n: number | null): string { return n === null ? '' : n.toFixed(1); }
+export function fmtPerUnit(n: number | null): string { return n === null ? '' : n.toFixed(2); }
 export function fmtPct(n: number | null, digits = 0): string { return n === null ? '' : `${(100 * n).toFixed(digits)}%`; }
 export function fmtChange(n: number | null): string { return n === null ? '' : `${n >= 0 ? '+' : '-'}${Math.abs(100 * n).toFixed(0)}%`; }
 
