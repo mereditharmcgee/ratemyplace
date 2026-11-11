@@ -63,12 +63,18 @@ names onto the method's buckets; a name that is not in the map is left out and c
 ## Nightly refresh and hosting
 
 `.github/workflows/dashboard-nightly.yml` runs the four steps, the tests and the site build, then
-deploys `web/dist` to the Cloudflare Pages project `ratemyplace-data` by direct upload. A failed
-step deploys nothing, so the site keeps the previous night's files and date. Scheduled workflows
-run only from `main`. GitHub pauses schedules in a repository with no activity for 60 days.
+deploys `web/dist` to Cloudflare as a static-assets Worker (`web/wrangler.jsonc`). A failed step
+deploys nothing, so the site keeps the previous night's files and date. Scheduled workflows run
+only from `main`. GitHub pauses schedules in a repository with no activity for 60 days.
+
+There are two deploy targets. `npx wrangler deploy --env preview` updates
+`ratemyplace-data-preview` on its unlisted `workers.dev` address. `npx wrangler deploy` updates
+`ratemyplace-data`, which has no `workers.dev` address and is reachable only through a custom
+domain attached in the Cloudflare dashboard. The nightly job deploys the preview target until the
+repository variable `DASHBOARD_DEPLOY_TARGET` is set to `production`.
 
 Every build is `noindex` unless `DASHBOARD_INDEXABLE=1`. `web/public/_headers` also sends
-`X-Robots-Tag: noindex` on every `pages.dev` address.
+`X-Robots-Tag: noindex` on every `workers.dev` address.
 
 ## Adding a layer later
 

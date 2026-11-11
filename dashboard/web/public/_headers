@@ -1,9 +1,6 @@
-# Any pages.dev address (production or preview) is never indexed. The custom domain is not matched by these rules.
-https://:project.pages.dev/*
-  X-Robots-Tag: noindex
-
-https://:version.:project.pages.dev/*
-  X-Robots-Tag: noindex
+# Any workers.dev address is never indexed. The custom domain is not matched by this rule.
+https://:worker.:account.workers.dev/*
+  X-Robots-Tag: noindex, nofollow
 
 /assets/*
   Cache-Control: public, max-age=31556952, immutable

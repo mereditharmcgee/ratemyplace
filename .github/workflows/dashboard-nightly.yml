@@ -1,15 +1,16 @@
 name: Dashboard nightly refresh
 
-# Pulls the city's open data, rebuilds the dashboard files and deploys them to the
-# ratemyplace-data Cloudflare Pages project. If any step fails nothing is deployed, so the
+# Pulls the city's open data, rebuilds the dashboard files and deploys them to Cloudflare as a
+# static-assets Worker (dashboard/web/wrangler.jsonc). If any step fails nothing is deployed, so the
 # site keeps yesterday's files and yesterday's "last updated" date.
 #
 # Needs three repository secrets (Settings > Secrets and variables > Actions):
 #   DASHBOARD_EXCLUSIONS_JSON   the private exclusions list, as JSON
-#   CLOUDFLARE_API_TOKEN        a token with Account > Cloudflare Pages > Edit
+#   CLOUDFLARE_API_TOKEN        a token with Account > Workers Scripts > Edit
 #   CLOUDFLARE_ACCOUNT_ID       the Cloudflare account id
 # and reads two optional repository variables:
-#   DASHBOARD_DEPLOY_BRANCH     Pages branch to deploy to. Default "preview". Set to "production" to go live.
+#   DASHBOARD_DEPLOY_TARGET     "preview" (default, the unlisted workers.dev address) or "production" (the
+#                               ratemyplace-data Worker that the custom domain points at).
 #   DASHBOARD_INDEXABLE         "1" lets search engines index the custom domain. Default is noindex.
 
 on:
@@ -85,10 +86,15 @@ jobs:
         env:
           DASHBOARD_INDEXABLE: ${{ vars.DASHBOARD_INDEXABLE }}
         run: npm run build
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy to Cloudflare
         working-directory: dashboard/web
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DEPLOY_BRANCH: ${{ vars.DASHBOARD_DEPLOY_BRANCH || 'preview' }}
-        run: npx --yes wrangler@4 pages deploy dist --project-name ratemyplace-data --branch "$DEPLOY_BRANCH" --commit-dirty=true
+          DEPLOY_TARGET: ${{ vars.DASHBOARD_DEPLOY_TARGET || 'preview' }}
+        run: |
+          if [ "$DEPLOY_TARGET" = "production" ]; then
+            npx --yes wrangler@4 deploy
+          else
+            npx --yes wrangler@4 deploy --env preview
+          fi
