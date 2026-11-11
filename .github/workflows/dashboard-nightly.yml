@@ -4,6 +4,7 @@ name: Dashboard nightly refresh
 # static-assets Worker (dashboard/web/wrangler.jsonc). If any step fails nothing is deployed, so the
 # site keeps yesterday's files and yesterday's "last updated" date.
 #
+# The exclusions secret is given only to the steps that read it, never to dependency installs or the deploy.
 # Needs three repository secrets (Settings > Secrets and variables > Actions):
 #   DASHBOARD_EXCLUSIONS_JSON   the private exclusions list, as JSON
 #   CLOUDFLARE_API_TOKEN        a token with Account > Workers Scripts > Edit
@@ -30,8 +31,6 @@ jobs:
     name: refresh
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      DASHBOARD_EXCLUSIONS_JSON: ${{ secrets.DASHBOARD_EXCLUSIONS_JSON }}
     steps:
       - name: Check out source
         uses: actions/checkout@v6
@@ -39,6 +38,7 @@ jobs:
           persist-credentials: false
       - name: Stop early if the secrets are missing
         env:
+          DASHBOARD_EXCLUSIONS_JSON: ${{ secrets.DASHBOARD_EXCLUSIONS_JSON }}
           CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
@@ -62,12 +62,16 @@ jobs:
         run: python pull.py
       - name: Build
         working-directory: dashboard/pipeline
+        env:
+          DASHBOARD_EXCLUSIONS_JSON: ${{ secrets.DASHBOARD_EXCLUSIONS_JSON }}
         run: python build.py
       - name: Gate against the locked district numbers
         working-directory: dashboard/pipeline
         run: python gate.py
       - name: Export data files (includes the private-entry scan)
         working-directory: dashboard/pipeline
+        env:
+          DASHBOARD_EXCLUSIONS_JSON: ${{ secrets.DASHBOARD_EXCLUSIONS_JSON }}
         run: python export.py
       - name: Use pinned Node.js
         uses: actions/setup-node@v7
@@ -94,7 +98,7 @@ jobs:
           DEPLOY_TARGET: ${{ vars.DASHBOARD_DEPLOY_TARGET || 'preview' }}
         run: |
           if [ "$DEPLOY_TARGET" = "production" ]; then
-            npx --yes wrangler@4 deploy
+            npx --yes wrangler@4.59.2 deploy
           else
-            npx --yes wrangler@4 deploy --env preview
+            npx --yes wrangler@4.59.2 deploy --env preview
           fi

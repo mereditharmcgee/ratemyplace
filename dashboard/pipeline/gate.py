@@ -21,6 +21,17 @@ for key in ["universe_buildings", "rental_buildings"]:
         problems.append(f"{key}: locked {bench[key]}, now {now}")
 if got["citywide"]["lc3_total"] < bench["complaints_total_at_lock"]:
     problems.append("fewer complaints than on the lock date; a 311 file is probably incomplete")
+# A truncated file should stop the run even when the headline numbers still look plausible.
+log = bd["pull_log"]
+FLOORS = {"rentsmart.csv": ("rows", 15000), "str_flags.csv": ("rows", 20000), "pwd_by_sam.csv": ("rows", 30000), "311_candidates.csv": ("rows", 60000),
+          "isd_violations.csv": ("bytes", 3_000_000), "assessment_fy2026.csv": ("bytes", 60_000_000), "sam_addresses.csv": ("bytes", 90_000_000)}
+for name, (field, floor) in FLOORS.items():
+    if int(log.get(name, {}).get(field, 0)) < floor:
+        problems.append(f"{name} is smaller than expected")
+by_month = bd["complaints"].open_day.str[:7].value_counts()
+for m in sorted(by_month.index)[-4:-1]:   # the three months before the current one
+    if by_month[m] < 250:
+        problems.append(f"only {int(by_month[m])} complaints matched in {m}; a 311 source is probably incomplete")
 for p in problems:
     print("GATE:", p)
 print("gate:", "FAILED" if problems else "passed", f"({len(problems)} problem(s))")

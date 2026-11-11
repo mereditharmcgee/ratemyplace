@@ -24,6 +24,7 @@ from rules import PUBLIC_PAT, nonprofit_name, owner_class, owner_norm, zip5
 
 if OWNER_NAME_POLICY not in ("ordinance", "all"):
     raise SystemExit("OWNER_NAME_POLICY must be 'ordinance' or 'all'")
+exclusions.quiet_errors()
 EX = exclusions.load()
 bd = pickle.load(open(os.path.join(WORK, "build.pkl"), "rb"))
 if bd["as_of"]:
@@ -31,7 +32,9 @@ if bd["as_of"]:
 N_OWNER_SHARDS, N_RECORD_SHARDS = 64, 256
 GROUPS = ["pests", "general", "heat", "other"]   # the four public issue groups, in display order
 BUCKET_GROUP = {"pests_interior": 0, "living_conditions": 1, "heat": 2}   # everything else is group 3
-HIDE_CLASSES = {"Appears to be an individual", "Trust (may be an individual or family)", "Trust (named entity)", "Unknown"}
+# Under the "ordinance" policy an owner-occupied small building is named only when its owner is plainly an entity.
+# Everything else is treated as a person: the name classifier reads surnames such as Hill or Park as organizations.
+NAMED_WHEN_OWNER_OCCUPIED = {"Company (LLC, corporation, or partnership)", "Public or quasi-public", "Condo association or trust"}
 
 OUT = os.path.abspath(OUT)
 tmp = OUT + ".tmp"
@@ -73,7 +76,8 @@ r["addr"] = r.address.map(nice_address)
 r["owner_raw"] = r.OWNER.map(clean)
 r["own_key"] = r.owner_raw.map(owner_norm)
 r["own_class"] = r.own_key.map(owner_class)
-r["hidden"] = (OWNER_NAME_POLICY == "ordinance") & r.oo_le6 & r.LU.ne("CM") & r.own_class.isin(HIDE_CLASSES)
+r["hidden"] = (OWNER_NAME_POLICY == "ordinance") & r.oo_small_display & r.LU.ne("CM") & ~r.own_class.isin(NAMED_WHEN_OWNER_OCCUPIED)
+r["public_display"] = r.public | r.bha_link
 r["withheld"] = r.owner_raw.map(EX.hide_name)
 r["is_condo"] = r.LU.eq("CM")
 u = r[r.U].copy()            # the dashboard universe: residential, not excluded, not an owner-occupied single-family home
@@ -133,10 +137,12 @@ def bsum(row):
 for row in r.itertuples(index=False):
     if row.hidden or row.withheld or not row.own_key:
         continue
+    if OWNER_NAME_POLICY == "ordinance" and row.oo_sf:
+        continue   # owner-occupied single-family homes are outside the dashboard altogether
     g = groups[row.own_key]
     g["names"][row.owner_raw] += 1
     g["holdings"].append(bsum(row) + [0, 1 if row.is_condo else 0])
-    if row.public or PUBLIC_PAT.search(row.own_key): g["public"] = True
+    if row.public_display or PUBLIC_PAT.search(row.own_key): g["public"] = True
     if (row.owner_sub and not row.is_condo) or own_b_sub.get(row.own_key) or nonprofit_name(row.own_key): g["sub"] = True
     if row.is_condo: g["condo_assoc"] += 1
 
@@ -181,7 +187,7 @@ def owner_text(row):
 
 
 def flags(row):
-    return (1 if row.public else 0) | (2 if row.owner_sub and not row.public else 0) | (4 if row.hidden else 0) | (8 if row.is_condo else 0) \
+    return (1 if row.public_display else 0) | (2 if row.owner_sub and not row.public_display else 0) | (4 if row.hidden else 0) | (8 if row.is_condo else 0) \
         | (16 if row.pp_units > 0 else 0) | (32 if row.ppo_units > 0 else 0) | (64 if row.ir_units > 0 else 0) | (128 if row.rental_bldg else 0) | (256 if row.withheld and not row.hidden else 0)
 
 
@@ -259,6 +265,9 @@ dump("boundaries.json", {"districts": outlines(os.path.join(RAW, "council_distri
 # 2. No file may contain an excluded parcel id or match an excluded addressee pattern.
 published_names = set(o_name) | set(owner_strings) | {n for g in groups.values() for n in g["names"]}
 bad = sum(1 for n in published_names if EX.by_owner(n) or EX.by_addressee(n) or EX.hide_name(n))
+# 3. No building whose owner is hidden or withheld may sit under a published owner name.
+_listed = {(k, h[0]) for k, g in groups.items() for h in g["holdings"] if not h[9]}
+bad += sum(1 for row in r[r.hidden | r.withheld].itertuples(index=False) if (row.own_key, row.GIS_ID) in _listed)
 for root, _, files in os.walk(tmp):
     for fn in files:
         text = open(os.path.join(root, fn), encoding="utf-8").read()

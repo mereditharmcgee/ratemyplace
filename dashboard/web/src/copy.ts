@@ -108,7 +108,7 @@ export const COPY = {
   detailSeeOwner: 'All buildings under this owner name',
   individualOwner: 'Individual owner',
   individualOwnerHelp: 'An individual owns and lives in this building, which has 6 or fewer units. The name is not shown.',
-  labelPublic: 'Public owner',
+  labelPublic: 'Public owner or public housing',
   labelSubsidized: 'Nonprofit or income-restricted housing owner',
   labelCondo: 'Condo building',
   labelCondoAssoc: 'Condo association',

@@ -15,10 +15,11 @@ from shapely.geometry import shape
 import exclusions
 from config import RAW, WORK, WINDOW_START, NEW_311_BUCKETS
 from rules import *  # noqa: F401,F403  (the locked rules)
-from rules import PUBLIC_PAT, is_living, isd_class, living_bucket, mail_key, nonprofit_name, num_list, owner_class, owner_norm, street_norm, wnorm, zip5
+from rules import BHA_MAIL_KEYS, BHA_NAME_PAT, PUBLIC_PAT, is_living, isd_class, living_bucket, mail_key, nonprofit_name, num_list, owner_class, owner_norm, street_norm, wnorm, zip5
 
 AS_OF = sys.argv[sys.argv.index("--as-of") + 1] if "--as-of" in sys.argv else None
 os.makedirs(WORK, exist_ok=True)
+exclusions.quiet_errors()
 EX = exclusions.load()
 
 
@@ -282,6 +283,13 @@ for r in d.itertuples(index=False):
     res.append(match_addr(num, st, r.location_zipcode, r.lon, r.lat))
 d["GIS_ID"], d["match_method"] = [x[0] for x in res], [x[1] for x in res]
 d["dup"] = d.closure_reason.fillna("").str.contains(r"duplicate", case=False)
+# The two 311 systems overlap for a few days around the Nov 5, 2026 switch. If the same building has the same
+# kind of request on the same day in both, keep the legacy row only.
+_new = d.case_enquiry_id.astype(str).str.startswith("BCS")
+_has = d.GIS_ID.notna()
+_legacy_keys = set(zip(d.GIS_ID[~_new & _has], d.open_day[~_new & _has], d.bucket[~_new & _has]))
+_both = _new & _has & pd.Series([k in _legacy_keys for k in zip(d.GIS_ID, d.open_day, d.bucket)], index=d.index)
+d = d[~_both].copy()
 d["rodent"] = d.bucket.eq("rodent_activity_isd") | d.type.eq("Pigeon Infestation")
 d["yr"] = d.open_day.str[:4]
 say("311 living", len(d), d.match_method.str.split(" \\(").str[0].value_counts().to_dict())
@@ -343,6 +351,10 @@ r["subsidized_class"] = r.LUC.isin(["125", "126", "127"]) | r.LU.eq("EA")
 r["nonprofit_name"] = [nonprofit_name(o, ad) for o, ad in zip(r.attributed_owner.fillna(""), r.att_mail_addressee.fillna(""))]
 r["public"] = r.attributed_class.eq("Public or quasi-public") | r.LUC.eq("908")
 r["condo_assoc_only"] = r.attributed_basis.eq("condo main record (association)")
+# public housing held through a partnership (display label only; the district counts use `public`)
+r["bha_link"] = r.LUC.eq("908") | r.attributed_owner.fillna("").map(lambda o: bool(PUBLIC_PAT.search(o) or BHA_NAME_PAT.search(o))) | \
+    r.att_mail_addressee.fillna("").str.upper().str.contains("BOSTON HOUSING AUTH") | \
+    pd.Series([mail_key(x, z) in BHA_MAIL_KEYS for x, z in zip(r.att_mail_street, r.att_mail_zip)], index=r.index)
 r["units_num"] = pd.to_numeric(r.units, errors="coerce")
 cd["rental"] = (cd.OWN_OCC != "Y").astype(int)
 cdg = cd.groupby("GIS_ID").agg(cd_units_all=("PID", "size"), cd_rental=("rental", "sum"))
@@ -352,7 +364,10 @@ r["rental_units"] = np.where(iscondo, r.cd_rental, np.where(r.OWN_OCC.eq("Y"), (
 r["known"] = r.rate_ok & r.rental_units.notna()
 r["rental_bldg"] = r.known & (r.rental_units > 0)
 r["U"] = ~r.oo_sf
-r["oo_le6"] = r.OWN_OCC.eq("Y") & (r.units_num.fillna(99) <= 6)
+r["oo_le6"] = r.OWN_OCC.eq("Y") & (r.units_num.fillna(99) <= 6)   # the method's test, used for the district numbers
+# The owner-name display rule is stricter where the unit count is missing: a one, two or three family class is
+# 6 or fewer by definition, and an owner-occupied building with no usable count is treated as small.
+r["oo_small_display"] = r.OWN_OCC.eq("Y") & ((r.units_num <= 6) | r.LU.isin(["R1", "R2", "R3"]) | r.units_num.isna())
 
 res_ids = set(r.GIS_ID)
 m = d[d.GIS_ID.isin(res_ids)]

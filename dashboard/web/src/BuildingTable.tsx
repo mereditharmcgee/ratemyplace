@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { COPY } from './copy';
 import { fmtInt, toCsv, type BuildingRow, type Core, type Filters } from './compute';
-import { assessingUrl, ISSUE_KEYS, type Buildings } from './data';
+import { assessingUrl, FLAG, ISSUE_KEYS, type Buildings } from './data';
 import { selectionLabel } from './Filters';
 
 interface Props { core: Core; buildings: Buildings | null; rows: BuildingRow[]; filters: Filters; onOpen: (b: number) => void }
@@ -26,7 +26,8 @@ export function tableCsv(core: Core, buildings: Buildings, rows: BuildingRow[]):
   const body = rows.map((r) => {
     const c = core.cells[buildings.cell[r.b]];
     return [buildings.addr[r.b], core.districts[c[0]] ?? '', core.neighborhoods[c[1]] ?? '', core.zips[c[2]] ?? '', buildings.ownerStrings[buildings.owner[r.b]],
-      buildings.units[r.b] ?? '', r.complaints, ...r.byGroup, r.citationDates, buildings.isd[r.b], assessingUrl(buildings.pid[r.b])];
+      buildings.units[r.b] ?? '', r.complaints, ...r.byGroup, r.citationDates, buildings.isd[r.b],
+      (buildings.flags[r.b] & (FLAG.hidden | FLAG.withheld)) !== 0 ? '' : assessingUrl(buildings.pid[r.b])];
   });
   return toCsv(header, body);
 }

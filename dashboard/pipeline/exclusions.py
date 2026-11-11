@@ -43,6 +43,20 @@ class Exclusions:
         return any(b in s.upper() for b in self.guard_boxes) or any(g in mnorm(s) for g in self.guard_streets)
 
 
+def quiet_errors():
+    """The nightly job's logs are public. An uncaught error prints where it happened, never the message,
+    because a message can carry a row value such as an owner name."""
+    import sys, traceback
+
+    def hook(etype, value, tb):
+        where = traceback.extract_tb(tb)[-1]
+        name = where.filename.replace(chr(92), "/").split("/")[-1]
+        print(f"pipeline error: {etype.__name__} at {name}:{where.lineno} (message withheld)", file=sys.stderr)
+
+    if not os.environ.get("DASHBOARD_VERBOSE_ERRORS"):
+        sys.excepthook = hook
+
+
 def load():
     raw = os.environ.get("DASHBOARD_EXCLUSIONS_JSON")
     path = os.environ.get("DASHBOARD_EXCLUSIONS_FILE")
