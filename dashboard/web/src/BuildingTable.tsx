@@ -7,10 +7,11 @@ import { selectionLabel } from './Filters';
 interface Props { core: Core; buildings: Buildings | null; rows: BuildingRow[]; filters: Filters; onOpen: (b: number) => void }
 type Sort = 'complaints' | 'citations' | 'address';
 const PAGE = 25;
+const ADDRESS_ORDER = new Intl.Collator('en', { numeric: true });
 
 export function sortRows(rows: BuildingRow[], buildings: Buildings, sort: Sort): BuildingRow[] {
-  const addr = (r: BuildingRow) => buildings.addr[r.b];
-  const byAddr = (a: BuildingRow, b: BuildingRow) => addr(a).localeCompare(addr(b), 'en', { numeric: true });
+  // One shared collator: String.localeCompare with options builds a new one per call and is far slower.
+  const byAddr = (a: BuildingRow, b: BuildingRow) => ADDRESS_ORDER.compare(buildings.addr[a.b], buildings.addr[b.b]);
   const out = [...rows];
   if (sort === 'address') out.sort(byAddr);
   else if (sort === 'citations') out.sort((a, b) => b.citationDates - a.citationDates || b.complaints - a.complaints || byAddr(a, b));

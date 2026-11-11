@@ -35,7 +35,7 @@ export function OwnerLookup({ core, ownerId, onPick, onOpen }: Props) {
     const hits: number[] = [];
     for (let i = 0; i < normed.length; i++) if (tokens.every((t) => normed[i].includes(t))) hits.push(i);
     // alphabetical, never ordered by record counts
-    hits.sort((a, b) => index.name[a].localeCompare(index.name[b]));
+    hits.sort((a, b) => (index.name[a] < index.name[b] ? -1 : index.name[a] > index.name[b] ? 1 : 0));
     return hits;
   }, [q, index, normed]);
 

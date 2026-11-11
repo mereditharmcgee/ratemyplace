@@ -12,7 +12,9 @@ import { OwnerLookup } from './OwnerLookup';
 import { HowItWorks } from './HowItWorks';
 import { readHash, writeHash } from './hash';
 
-const MapView = lazy(() => import('./MapView'));
+// Start fetching the map code as soon as the numbers are in, in parallel with the building list.
+const loadMap = () => import('./MapView');
+const MapView = lazy(loadMap);
 
 export function App() {
   const [core, setCore] = useState<Core | null>(null);
@@ -29,6 +31,7 @@ export function App() {
         setFilters(readHash(c, defaultFilters(c)));
         // the heavier building list loads after the numbers are on screen
         loadBuildings().then(setBuildings).catch(() => setFailed(true));
+        loadMap().catch(() => undefined);
       })
       .catch(() => setFailed(true));
   }, []);
