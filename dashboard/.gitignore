@@ -4,4 +4,6 @@ __pycache__/
 node_modules/
 dist/
 web/public/data/
+web/public/data.tmp/
+web/public/data.old/
 .wrangler/

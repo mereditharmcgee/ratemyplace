@@ -345,6 +345,11 @@ r["condo_assoc_only"] = r.attributed_basis.eq("condo main record (association)")
 r["bha_link"] = r.LUC.eq("908") | r.attributed_owner.fillna("").map(lambda o: bool(PUBLIC_PAT.search(o) or BHA_NAME_PAT.search(o))) | \
     r.att_mail_addressee.fillna("").str.upper().str.contains("BOSTON HOUSING AUTH") | \
     pd.Series([mail_key(x, z) in BHA_MAIL_KEYS for x, z in zip(r.att_mail_street, r.att_mail_zip)], index=r.index)
+# Lots marked public by hand (display label and the owner-type filter only; the district counts use `public`).
+# 0801720000 is 35 Northampton St: a condo lot whose main record names a condo association, while every other
+# assessment record on the lot is held by the Boston Public Health Commission and its development arm.
+OVERRIDE_PUBLIC_LOTS = {"0801720000"}
+r["public_override"] = r.GIS_ID.isin(OVERRIDE_PUBLIC_LOTS)
 r["units_num"] = pd.to_numeric(r.units, errors="coerce")
 cd["rental"] = (cd.OWN_OCC != "Y").astype(int)
 cdg = cd.groupby("GIS_ID").agg(cd_units_all=("PID", "size"), cd_rental=("rental", "sum"))

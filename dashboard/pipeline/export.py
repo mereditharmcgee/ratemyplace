@@ -11,7 +11,7 @@ Owner names are decided here (config.OWNER_NAME_POLICY), so a name that is not m
 published never reaches a file. After writing, a scan confirms that no hidden owner is listed
 under a name; a hit fails the run and removes the output.
 """
-import datetime, json, os, pickle, re, shutil, sys, time
+import datetime, json, os, pickle, re, shutil, stat, sys, time
 from collections import Counter, defaultdict
 from zoneinfo import ZoneInfo
 
@@ -43,8 +43,15 @@ tmp = OUT + ".tmp"
 
 def rmtree(path):
     """Windows can hold a handle for a moment (sync tools, antivirus); retry rather than leave a half-deleted folder."""
+    def writable(func, p, _exc):
+        # Windows refuses to remove a folder that carries the read-only attribute; clear it and try once more.
+        try:
+            os.chmod(p, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
+            func(p)
+        except OSError:
+            pass
     for i in range(6):
-        shutil.rmtree(path, ignore_errors=True)
+        shutil.rmtree(path, onerror=writable)
         if not os.path.exists(path): return
         time.sleep(1 + i)
     raise SystemExit("could not clear " + os.path.basename(path))
@@ -78,7 +85,7 @@ r["owner_raw"] = r.OWNER.map(clean)
 r["own_key"] = r.owner_raw.map(owner_norm)
 r["own_class"] = r.own_key.map(owner_class)
 r["hidden"] = (OWNER_NAME_POLICY == "ordinance") & r.oo_small_display & r.LU.ne("CM") & ~r.own_class.isin(NAMED_WHEN_OWNER_OCCUPIED)
-r["public_display"] = r.public | r.bha_link
+r["public_display"] = r.public | r.bha_link | r.public_override
 r["is_condo"] = r.LU.eq("CM")
 u = r[r.U].copy()            # the dashboard universe: residential, not an owner-occupied single-family home
 gid_row = {g: i for i, g in enumerate(r.GIS_ID)}
@@ -267,8 +274,22 @@ if any((row.own_key, row.GIS_ID) in _listed for row in r[r.hidden].itertuples(in
     rmtree(tmp)
     raise SystemExit("safety scan: a hidden owner is listed under a published name; nothing was written")
 
-rmtree(OUT)
-os.replace(tmp, OUT)
+# Swap the new files in. The old folder is moved aside first, so a slow delete on Windows cannot block the swap.
+old = OUT + ".old"
+if os.path.exists(old): rmtree(old)
+if os.path.exists(OUT):
+    try:
+        os.replace(OUT, old)
+    except OSError:
+        rmtree(OUT)
+for i in range(8):
+    try:
+        os.replace(tmp, OUT)
+        break
+    except PermissionError:   # a virus scanner can hold the freshly written files for a moment
+        if i == 7: raise
+        time.sleep(1 + i)
+if os.path.exists(old): rmtree(old)   # must not linger: the site build copies everything under public/
 sizes = {fn: os.path.getsize(os.path.join(OUT, fn)) for fn in os.listdir(OUT) if fn.endswith(".json")}
 print("pulled", pulled, "data through", data_through[:10])
 print("universe", len(u), "with records", len(has), "complaints", len(c), "citation building-months", len(cit_bm), "owners", len(keys), "cells", len(cells))
