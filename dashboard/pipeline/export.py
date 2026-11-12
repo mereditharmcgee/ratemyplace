@@ -172,19 +172,20 @@ for (gid, key), grp in cu.groupby(["GIS_ID", "own_n"]):
 
 keys = sorted(groups)
 oid = {k: i for i, k in enumerate(keys)}
-o_name, o_n, o_rec, o_flag = [], [], [], []
+o_name, o_n, o_u, o_rec, o_flag = [], [], [], [], []
 shards = defaultdict(dict)
 for k in keys:
     g = groups[k]
     name = g["names"].most_common(1)[0][0]
     hold = sorted(g["holdings"], key=lambda h: (-(h[6] + h[7] + h[8]), h[1]))
-    nb = len({h[0] for h in hold})
+    # a condo unit holding (h[9] > 0) is not counted as one of the owner's buildings
+    nb = len({h[0] for h in hold if not h[9]})
     flag = 1 if g["public"] else 2 if g["sub"] else 3 if g["condo_assoc"] == len(hold) else 0
-    o_name.append(name); o_n.append(nb); o_rec.append(sum(1 for h in hold if h[6] + h[7] + h[8] > 0)); o_flag.append(flag)
+    o_name.append(name); o_n.append(nb); o_u.append(sum(h[9] for h in hold)); o_rec.append(sum(1 for h in hold if not h[9] and h[6] + h[7] + h[8] > 0)); o_flag.append(flag)
     shards[oid[k] % N_OWNER_SHARDS][str(oid[k])] = {"name": name, "spellings": sorted(g["names"]), "flag": flag, "holdings": hold}
 for i in range(N_OWNER_SHARDS):
     dump(f"owners/{i}.json", shards.get(i, {}))
-dump("owners-index.json", {"name": o_name, "n": o_n, "rec": o_rec, "flag": o_flag, "shards": N_OWNER_SHARDS})
+dump("owners-index.json", {"name": o_name, "n": o_n, "u": o_u, "rec": o_rec, "flag": o_flag, "shards": N_OWNER_SHARDS})
 
 # ---------------- buildings.json (columnar) ----------------
 def owner_text(row):

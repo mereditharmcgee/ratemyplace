@@ -6,7 +6,8 @@ export interface Buildings {
 }
 export const FLAG = { public: 1, subsidized: 2, hidden: 4, condo: 8, problem: 16, problemOwner: 32, incomeRestricted: 64, rental: 128 } as const;
 
-export interface OwnerIndex { name: string[]; n: number[]; rec: number[]; flag: number[]; shards: number }
+/** n: buildings held outright; u: condo units held in other people's buildings (not counted in n) */
+export interface OwnerIndex { name: string[]; n: number[]; u: number[]; rec: number[]; flag: number[]; shards: number }
 /** [gis id, address, district, neighborhood, zip, units, complaints, citation dates, open cases, condo units held, is condo main record] */
 export type Holding = [string, string, string, string, string, number | null, number, number, number, number, number];
 export interface OwnerDetail { name: string; spellings: string[]; flag: number; holdings: Holding[] }

@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'preact/hooks';
 import { COPY } from './copy';
-import { fmtInt, monthLabel, trend, type Core, type Filters, type TrendPoint } from './compute';
+import { fmtInt, monthLabel, plural, trend, type Core, type Filters, type TrendPoint } from './compute';
 
-interface Props { core: Core; filters: Filters; mask: boolean[]; showArea: boolean }
+interface Props { core: Core; filters: Filters; mask: boolean[]; showArea: boolean; place: string }
 
-const W = 720, H = 280, PAD = { l: 44, r: 96, t: 16, b: 34 };
+const W = 720, H = 280, PAD_BASE = { l: 44, r: 96, t: 16, b: 34 };
+const END_LABEL_MAX = 26;   // longer place names are cut in the chart; the legend under it has the full name
 
 function niceMax(v: number): number {
   if (v <= 0) return 1;
@@ -13,12 +14,20 @@ function niceMax(v: number): number {
   return 10 * p;
 }
 
-export function Trend({ core, filters, mask, showArea }: Props) {
+export function Trend({ core, filters, mask, showArea, place }: Props) {
+  const endLabel = place.length > END_LABEL_MAX ? `${place.slice(0, END_LABEL_MAX - 1)}\u2026` : place;
+  // room on the right for the place name at the end of its line
+  const PAD = { ...PAD_BASE, r: showArea ? Math.max(PAD_BASE.r, 18 + 7 * endLabel.length) : PAD_BASE.r };
+  // what the rates are divided by, for the table view
+  let denomSel = 0, denomAll = 0;
   const [metric, setMetric] = useState<'complaints' | 'cited'>('complaints');
   const [by, setBy] = useState<'month' | 'year'>('year');
   const [hover, setHover] = useState<number | null>(null);
   const [table, setTable] = useState(false);
-  const pts = useMemo(() => trend(core, filters, mask, metric, by), [core, filters, mask, metric, by]);
+  const ptsMemo = useMemo(() => trend(core, filters, mask, metric, by), [core, filters, mask, metric, by]);
+  const pts = ptsMemo;
+  core.cells.forEach((c, i) => { const v = metric === 'complaints' ? c[5] : c[4]; denomAll += v; if (mask[i]) denomSel += v; });
+  const denomWords = (n: number) => `${fmtInt(n)} ${plural(n, metric === 'complaints' ? COPY.rentalUnits : COPY.rentalBuildingsCount)}`;
   const label = (p: TrendPoint) => (by === 'month' ? monthLabel(p.label) : p.label) + (p.partial ? ` (${COPY.partial})` : '');
   const axis = metric === 'complaints' ? COPY.trendComplaintsAxis : COPY.trendCitedAxis;
   const srcId = metric === 'complaints' ? '311' : 'rentsmart';
@@ -57,8 +66,8 @@ export function Trend({ core, filters, mask, showArea }: Props) {
           <button type="button" aria-pressed={by === 'month'} onClick={() => setBy('month')}>{COPY.byMonth}</button>
         </div>
       </div>
-      <p class="sub">{axis}</p>
-      <div class="chart-wrap">
+      <p class="sub"><span key={axis}>{axis}.</span> <span>{COPY.chartAllOwners}</span></p>
+      <div class="chart-wrap" translate={false}>
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${axis}. ${COPY.showTable}.`} onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
           {ticks.map((t) => (
             <g>
@@ -80,42 +89,46 @@ export function Trend({ core, filters, mask, showArea }: Props) {
           {pts.length > 0 && (
             <>
               <text x={x(last) + 10} y={yB + 4} class="end-label">{COPY.boston}</text>
-              {showArea && <text x={x(last) + 10} y={yA + 4} class="end-label strong">{COPY.thisArea}</text>}
+              {showArea && <text x={x(last) + 10} y={yA + 4} class="end-label strong">{endLabel}</text>}
             </>
           )}
           {h && hover !== null && <line x1={x(hover)} x2={x(hover)} y1={PAD.t} y2={PAD.t + ih} class="cross" />}
         </svg>
         {h && hover !== null && (
-          <div class="tip" style={{ left: `${(x(hover) / W) * 100}%` }} role="presentation">
+          <div class="tip" translate={false} style={{ left: `${(x(hover) / W) * 100}%` }} role="presentation">
             <strong>{label(h)}</strong>
-            {showArea && <span><i class="sw area" /> {COPY.thisArea}: {fmt(h.rate)} ({fmtInt(h.count)})</span>}
+            {showArea && <span><i class="sw area" /> {place}: {fmt(h.rate)} ({fmtInt(h.count)})</span>}
             <span><i class={showArea ? 'sw boston' : 'sw area'} /> {COPY.boston}: {fmt(h.bostonRate)} ({fmtInt(h.bostonCount)})</span>
           </div>
         )}
       </div>
       {showArea && (
         <p class="legend">
-          <span><i class="sw area" /> {COPY.thisArea}</span>
-          <span><i class="sw boston" /> {COPY.boston}</span>
+          <span translate={false}><i class="sw area" /> {place}</span>
+          <span><i class="sw boston" /> <span>{COPY.boston}</span></span>
         </p>
       )}
       <p class="tile-source">
-        {COPY.source}: <a href={core.meta.sources[srcId].url} rel="noopener">{core.meta.sources[srcId].name}</a>, <a href={core.meta.sources.assessment.url} rel="noopener">{core.meta.sources.assessment.name}</a>
-        {' '}<button type="button" class="link-button" aria-expanded={table} onClick={() => setTable(!table)}>{table ? COPY.hideTable : COPY.showTable}</button>
+        <span>{COPY.source}: </span><a key={srcId} href={core.meta.sources[srcId].url} rel="noopener">{core.meta.sources[srcId].name}</a><span>, </span><a href={core.meta.sources.assessment.url} rel="noopener">{core.meta.sources.assessment.name}</a>
+        <span> </span><button type="button" class="link-button" aria-expanded={table} onClick={() => setTable(!table)}><span key={table ? 'hide' : 'show'}>{table ? COPY.hideTable : COPY.showTable}</span></button>
       </p>
       {table && (
-        <div class="table-scroll">
+        <div class="table-scroll" id="trend-table">
+          <p class="denominators" translate={false}>
+            {showArea && <span>{place}: {denomWords(denomSel)}. </span>}
+            <span>{COPY.boston}: {denomWords(denomAll)}.</span>
+          </p>
           <table>
             <thead>
-              <tr>
+              <tr key={`${metric}|${place}`}>
                 <th scope="col">{COPY.period}</th>
-                {showArea && <th scope="col" class="n">{COPY.thisArea}: {metric === 'complaints' ? COPY.trendComplaints : COPY.trendCited}</th>}
-                {showArea && <th scope="col" class="n">{COPY.thisArea}: {axis}</th>}
+                {showArea && <th scope="col" class="n"><span translate={false}>{place}</span><span>: {metric === 'complaints' ? COPY.trendComplaints : COPY.trendCited}</span></th>}
+                {showArea && <th scope="col" class="n"><span translate={false}>{place}</span><span>: {axis}</span></th>}
                 <th scope="col" class="n">{COPY.boston}: {metric === 'complaints' ? COPY.trendComplaints : COPY.trendCited}</th>
                 <th scope="col" class="n">{COPY.boston}: {axis}</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody translate={false}>
               {pts.map((p) => (
                 <tr>
                   <th scope="row">{label(p)}</th>

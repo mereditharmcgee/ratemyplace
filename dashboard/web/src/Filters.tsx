@@ -1,13 +1,19 @@
 import { COPY } from './copy';
 import { defaultFilters, fullYears, monthLabel, OWNER_TYPES, type Core, type Filters, type OwnerType } from './compute';
-import { ISSUE_COLORS, ISSUE_KEYS } from './data';
+import { ISSUE_COLORS, ISSUE_KEYS, type Buildings } from './data';
+import { FindBuilding } from './FindBuilding';
 
-export function selectionLabel(core: Core, f: Filters): string {
-  const place = [
+/** The chosen place in words, for example "District 7, Roxbury". All of Boston when no place is chosen. */
+export function placeLabel(core: Core, f: Pick<Filters, 'district' | 'neighborhood' | 'zip'>): string {
+  return [
     f.district >= 0 ? `${COPY.districtN} ${core.districts[f.district]}` : '',
     f.neighborhood >= 0 ? core.neighborhoods[f.neighborhood] : '',
     f.zip >= 0 ? core.zips[f.zip] : '',
   ].filter(Boolean).join(', ') || COPY.allBoston;
+}
+
+export function selectionLabel(core: Core, f: Filters): string {
+  const place = placeLabel(core, f);
   const on = ISSUE_KEYS.filter((_, i) => f.issues[i]).map((k) => COPY.issuesShort[k]);
   const issue = on.length ? on.join(' + ') : COPY.issueAll;
   const months = core.meta.months;
@@ -15,9 +21,9 @@ export function selectionLabel(core: Core, f: Filters): string {
   return `${place}; ${issue}; ${dates}`;
 }
 
-interface Props { core: Core; filters: Filters; onChange: (f: Filters) => void }
+interface Props { core: Core; buildings: Buildings | null; filters: Filters; onChange: (f: Filters) => void; onOpen: (b: number) => void }
 
-export function FiltersBar({ core, filters: f, onChange }: Props) {
+export function FiltersBar({ core, buildings, filters: f, onChange, onOpen }: Props) {
   const months = core.meta.months;
   const set = (patch: Partial<Filters>) => onChange({ ...f, ...patch });
   const years = [...new Set(months.map((m) => m.slice(0, 4)))];
@@ -34,26 +40,27 @@ export function FiltersBar({ core, filters: f, onChange }: Props) {
   return (
     <section class="filters" aria-labelledby="filters-h">
       <h2 id="filters-h">{COPY.filtersHeading}</h2>
+      <FindBuilding buildings={buildings} onOpen={onOpen} />
       <div class="filter-grid">
         <label>
           <span>{COPY.district}</span>
           <select value={String(f.district)} onChange={(e) => set({ district: Number((e.target as HTMLSelectElement).value) })}>
             <option value="-1">{COPY.all}</option>
-            {core.districts.map((d, i) => <option value={String(i)}>{COPY.districtN} {d}</option>)}
+            {core.districts.map((d, i) => <option value={String(i)} translate={false}>{COPY.districtN} {d}</option>)}
           </select>
         </label>
         <label>
           <span>{COPY.neighborhood}</span>
           <select value={String(f.neighborhood)} onChange={(e) => set({ neighborhood: Number((e.target as HTMLSelectElement).value) })}>
             <option value="-1">{COPY.all}</option>
-            {core.neighborhoods.map((n, i) => <option value={String(i)}>{n}</option>)}
+            {core.neighborhoods.map((n, i) => <option value={String(i)} translate={false}>{n}</option>)}
           </select>
         </label>
         <label>
           <span>{COPY.zip}</span>
           <select value={String(f.zip)} onChange={(e) => set({ zip: Number((e.target as HTMLSelectElement).value) })}>
             <option value="-1">{COPY.all}</option>
-            {core.zips.map((z, i) => <option value={String(i)}>{z}</option>)}
+            {core.zips.map((z, i) => <option value={String(i)} translate={false}>{z}</option>)}
           </select>
         </label>
         <label>

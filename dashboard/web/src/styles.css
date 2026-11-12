@@ -38,6 +38,11 @@ h3 { font: 600 15px/1.35 var(--sans); margin: 0 0 4px; }
 .intro { max-width: 68ch; margin: 0 0 12px; font-size: 17px; }
 .intro:last-of-type { margin-bottom: 20px; }
 .how-text { max-width: 75ch; margin: 10px 0; }
+/* text the owner has still to write */
+.placeholder { background: #fef08a; border: 1px dashed #a16207; color: #422006; padding: 6px 10px; border-radius: var(--radius-input); font-size: 14px; max-width: 75ch; margin: 0 0 16px; }
+span.placeholder { margin: 0; }
+.scope-note { margin: 0 0 8px; font-size: 14px; color: var(--ink-2); }
+.denominators { margin: 8px 0; font-size: 14px; }
 .sub { margin: 2px 0 10px; color: var(--ink-2); font-size: 14px; }
 .muted { color: var(--ink-2); font-size: 14px; }
 .loading, .empty { color: var(--ink-2); padding: 12px 0; margin: 0; }
@@ -48,6 +53,14 @@ h3 { font: 600 15px/1.35 var(--sans); margin: 0 0 4px; }
 .filters { background: var(--paper); border-radius: var(--radius); padding: 16px; margin: 0 0 16px; }
 .filters h2 { margin-bottom: 12px; }
 .filter-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.find { margin: 0 0 14px; }
+.find .search { max-width: 520px; }
+.find-status { margin: 8px 0 0; font-size: 14px; }
+.find-none { margin: 8px 0 0; font-size: 14px; max-width: 75ch; }
+.find-results { list-style: none; padding: 0; margin: 6px 0 0; max-height: 320px; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-input); max-width: 720px; }
+.find-results li { padding: 8px 10px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; }
+.find-results li:last-child { border-bottom: 0; }
+.unit-row-note { color: var(--ink-2); font-size: 13px; text-align: left; white-space: normal; }
 .filter-note { margin: 8px 0 0; font-size: 13px; color: var(--ink-2); max-width: 75ch; }
 label > span, legend { display: block; font-size: 14px; font-weight: 500; margin-bottom: 4px; padding: 0; }
 select, input[type="search"] { width: 100%; min-height: 44px; padding: 8px 10px; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid #94a3b8; border-radius: var(--radius-input); }

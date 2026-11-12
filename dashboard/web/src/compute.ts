@@ -251,3 +251,63 @@ export function dayLabel(ymd: string): string {
   const [y, m, d] = ymd.split('-').map(Number);
   return `${MONTH_NAMES[m - 1]} ${d}, ${y}`;
 }
+
+/** Picks the singular or plural wording for a count. */
+export function plural(n: number, w: { one: string; many: string }): string {
+  return n === 1 ? w.one : w.many;
+}
+
+// Street words as people type them, mapped to the way the city lists them. Applied to both the typed text and the
+// city address, so "Street", "St" and "st" all meet.
+const STREET_WORDS: Record<string, string> = {
+  STREET: 'ST', AVENUE: 'AV', AVE: 'AV', ROAD: 'RD', TERRACE: 'TE', TER: 'TE', PLACE: 'PL', PARK: 'PK', SQUARE: 'SQ', WAY: 'WY',
+  COURT: 'CT', HIGHWAY: 'HW', HWY: 'HW', DRIVE: 'DR', BOULEVARD: 'BLVD', CIRCLE: 'CI', CIR: 'CI', PARKWAY: 'PW', PKWY: 'PW',
+  LANE: 'LA', LN: 'LA', EAST: 'E', WEST: 'W', NORTH: 'N', SOUTH: 'S', SAINT: 'ST', MOUNT: 'MT',
+};
+const streetWords = (s: string) => s.toUpperCase().replace(/[^A-Z0-9 -]/g, ' ').split(/\s+/).filter(Boolean).map((w) => STREET_WORDS[w] ?? w);
+
+export interface AddressIndex { words: string[][]; lo: number[]; hi: number[] }   // lo is -1 when the city lists no number
+
+/** Splits each city address into its number (or range) and its street words. */
+export function addressIndex(addrs: string[]): AddressIndex {
+  const words: string[][] = [], lo: number[] = [], hi: number[] = [];
+  for (const a of addrs) {
+    const w = streetWords(a);
+    const m = w.length > 1 ? /^(\d+)[A-Z]?(?:-(\d+)[A-Z]?)?$/.exec(w[0]) : null;
+    if (m) {
+      const x = Number(m[1]), y = m[2] ? Number(m[2]) : x;
+      lo.push(Math.min(x, y)); hi.push(Math.max(x, y)); words.push(w.slice(1));
+    } else { lo.push(-1); hi.push(-1); words.push(w); }
+  }
+  return { words, lo, hi };
+}
+
+export interface AddressMatches { hits: number[]; numberMissed: boolean }
+
+/**
+ * Buildings on the street someone typed. The street words must appear in a row, in the city's order; the last word
+ * may be unfinished. A typed number only narrows the list: it keeps that number, any range that holds it, and rows
+ * the city lists with no number. If no row on the street fits the number, the whole street is listed and
+ * `numberMissed` is set. Returns null until there is a street word of two letters or more.
+ */
+export function findAddresses(ix: AddressIndex, query: string): AddressMatches | null {
+  const typed = streetWords(query);
+  const numbers: number[] = [];
+  while (typed.length && /^\d+[A-Z]?(-\d+[A-Z]?)?$/.test(typed[0])) numbers.push(parseInt(typed.shift()!, 10));
+  if (!typed.length || typed.join('').length < 2) return null;
+  const n = typed.length;
+  const street: number[] = [];
+  for (let i = 0; i < ix.words.length; i++) {
+    const w = ix.words[i];
+    for (let s = 0; s + n <= w.length; s++) {
+      let ok = true;
+      for (let j = 0; j < n && ok; j++) ok = j === n - 1 ? w[s + j].startsWith(typed[j]) : w[s + j] === typed[j];
+      if (ok) { street.push(i); break; }
+    }
+  }
+  if (!numbers.length) return { hits: street, numberMissed: false };
+  const num = numbers[0];
+  const fits = street.filter((i) => ix.lo[i] < 0 || (num >= ix.lo[i] && num <= ix.hi[i]));
+  const numbered = fits.some((i) => ix.lo[i] >= 0);
+  return numbered ? { hits: fits, numberMissed: false } : { hits: street, numberMissed: true };
+}

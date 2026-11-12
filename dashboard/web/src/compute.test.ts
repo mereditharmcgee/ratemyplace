@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { adjustedPerUnit, ownerTypeOn, buildingRows, cellMask, cityPerUnit, csvEscape, defaultFilters, fullYears, summarize, toCsv, trend, yearsInRange, type Core } from './compute';
+import { addressIndex, adjustedPerUnit, findAddresses, ownerTypeOn, plural, buildingRows, cellMask, cityPerUnit, csvEscape, defaultFilters, fullYears, summarize, toCsv, trend, yearsInRange, type Core } from './compute';
 
 // A tiny hand-made dataset: two cells, three buildings, 2023-01 through 2024-02 (data ends Feb 14, 2024).
 const months: string[] = [];
@@ -105,5 +105,44 @@ describe.skipIf(!existsSync(real))('against the built data', () => {
     };
     expect(rate(-1)).toBe(26.2);
     expect(c.districts.map((_, i) => rate(i))).toEqual([16.4, 16.0, 30.2, 41.6, 29.6, 25.3, 32.7, 18.9, 30.7]);
+  });
+});
+
+describe('find a building', () => {
+  const addrs = ['233 Blue Hill Av', '312-316 Blue Hill Av', 'Blue Hill Av', '75 St Alphonsus St', '12 Hillside St', '10-638 Georgetowne Dr', '5 Hyde Park Av', '9 Washington St', '14A Mt Washington Av'];
+  const ix = addressIndex(addrs);
+  const names = (q: string) => findAddresses(ix, q)!.hits.map((i) => addrs[i]);
+  it('matches the street as the city lists it, in any case and with St, Street, Av, Ave or Avenue', () => {
+    expect(names('blue hill')).toEqual(['233 Blue Hill Av', '312-316 Blue Hill Av', 'Blue Hill Av']);
+    expect(names('BLUE HILL AVENUE')).toEqual(names('blue hill'));
+    expect(names('Blue Hill Ave')).toEqual(names('blue hill'));
+    expect(names('st. alphonsus street')).toEqual(['75 St Alphonsus St']);
+    expect(names('hill')).toEqual(['233 Blue Hill Av', '312-316 Blue Hill Av', 'Blue Hill Av', '12 Hillside St']);
+    expect(names('hyde park ave')).toEqual(['5 Hyde Park Av']);
+    expect(names('washington')).toEqual(['9 Washington St', '14A Mt Washington Av']);
+  });
+  it('a number only narrows: it keeps the number, ranges that hold it and rows with no number', () => {
+    expect(names('233 Blue Hill Ave')).toEqual(['233 Blue Hill Av', 'Blue Hill Av']);
+    expect(names('314 blue hill av')).toEqual(['312-316 Blue Hill Av', 'Blue Hill Av']);
+    expect(names('200 Georgetowne Drive')).toEqual(['10-638 Georgetowne Dr']);
+    expect(names('14 mount washington')).toEqual(['14A Mt Washington Av']);
+  });
+  it('lists the whole street when no row fits the number, and says so', () => {
+    const r = findAddresses(ix, '999 Blue Hill Av')!;
+    expect(r.numberMissed).toBe(true);
+    expect(r.hits.map((i) => addrs[i])).toEqual(['233 Blue Hill Av', '312-316 Blue Hill Av', 'Blue Hill Av']);
+    expect(findAddresses(ix, '233 Blue Hill')!.numberMissed).toBe(false);
+  });
+  it('waits for a street word, and returns no rows for a street that is not listed', () => {
+    expect(findAddresses(ix, '233')).toBeNull();
+    expect(findAddresses(ix, 'b')).toBeNull();
+    expect(findAddresses(ix, '1 Nowhere Rd')!.hits).toEqual([]);
+  });
+});
+
+describe('singulars', () => {
+  it('uses the singular for exactly one', () => {
+    const w = { one: 'citation date', many: 'citation dates' };
+    expect([0, 1, 2].map((n) => plural(n, w))).toEqual(['citation dates', 'citation date', 'citation dates']);
   });
 });

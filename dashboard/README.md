@@ -56,6 +56,27 @@ default, meaning every owner not marked public), all owners, public owners only,
 income-restricted only. It uses the same public and nonprofit labels the page already shows. The
 comparison tiles, the trend, the owner lookup and the district numbers ignore it.
 
+## Find a building
+
+The first control in the filters searches the buildings already loaded, by street, across all owner
+types. Street words are matched in the city's order, with common endings accepted either way (St or
+Street, Av or Ave or Avenue). A typed number narrows the list to that number, any range that holds
+it, and rows the city lists with no number; if nothing on the street fits the number, the whole
+street is listed. The logic is `addressIndex` and `findAddresses` in `web/src/compute.ts`.
+
+## Counts on the tiles
+
+The rate and the cited share are built from rental buildings with a usable unit count. Each of those
+tiles prints that count and the count at all buildings, and "Show as a table" under the chart gives
+the denominators. The change tile counts every building with a citation. The tiles and the chart
+cover all owners; the owner-type filter does not apply to them.
+
+## Page translation
+
+Browser translators replace text nodes with their own elements. Anything the script rewrites is
+either marked `translate={false}` (numbers, names, addresses, table bodies) or sits in its own keyed
+element so it is replaced whole. Keep to that when adding anything that changes after load.
+
 ## Order of the building table
 
 The table opens ordered by total complaints. Any column can be chosen as the order instead, and so

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { COPY } from './copy';
 import { buildingRows, cellMask, dayLabel, defaultFilters, hasGeo, ownerTypeOn, summarize, type Core, type Filters } from './compute';
 import { loadBuildings, loadCore, type Buildings } from './data';
-import { FiltersBar, selectionLabel } from './Filters';
+import { FiltersBar, placeLabel, selectionLabel } from './Filters';
 import { Tiles } from './Tiles';
 import { Trend } from './Trend';
 import { BuildingTable } from './BuildingTable';
@@ -65,23 +65,24 @@ export function App() {
       <main class="wrap">
         <h1>{COPY.pageTitle}</h1>
         {COPY.introPlaceholder.map((p) => <p class="intro">{p}</p>)}
+        <p class="placeholder">{COPY.placeholders.notTheList}</p>
 
         {failed && <p class="error" role="alert">{COPY.loadError}</p>}
         {!core && !failed && <p class="loading" role="status">{COPY.loading}</p>}
 
         {core && filters && summary && boston && (
           <>
-            <FiltersBar core={core} filters={filters} onChange={setFilters} />
+            <FiltersBar core={core} buildings={buildings} filters={filters} onChange={setFilters} onOpen={(b) => setDetail({ kind: 'index', b })} />
             <div id="results" tabIndex={-1}>
-              <p class="selection" role="status">
-                {COPY.selection}: <strong>{selectionLabel(core, filters)}</strong>
+              <p class="selection" role="status" translate={false}>
+                {COPY.selection}: <strong>{selectionLabel(core, filters)}</strong>. {COPY.ownerType}: <strong>{COPY.ownerTypes[filters.owner]}</strong> ({COPY.selectionOwnerScope}).
               </p>
               {summary.buildings === 0 ? (
                 <p class="empty">{COPY.noMatch}</p>
               ) : (
                 <>
-                  <Tiles core={core} filters={filters} summary={summary} boston={boston} showArea={hasGeo(filters)} />
-                  <Trend core={core} filters={filters} mask={mask} showArea={hasGeo(filters)} />
+                  <Tiles core={core} filters={filters} summary={summary} boston={boston} showArea={hasGeo(filters)} place={placeLabel(core, filters)} />
+                  <Trend core={core} filters={filters} mask={mask} showArea={hasGeo(filters)} place={placeLabel(core, filters)} />
                   <section class="split" aria-label={COPY.mapHeading}>
                     <div class="panel map-panel">
                       <h2>{COPY.mapHeading}</h2>
@@ -107,6 +108,7 @@ export function App() {
       <footer class="site-footer">
         <div class="wrap">
           <a href="https://ratemyplace.org">{COPY.footer}</a>
+          <span class="placeholder">{COPY.placeholders.whoMadeThis}</span>
           {core && <span>{COPY.dataThrough} {dayLabel(core.meta.dataThrough)}</span>}
         </div>
       </footer>

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { COPY } from './copy';
-import { adjustedPerUnit, cityPerUnit, fmtInt, fmtPerUnit, perUnit, toCsv, type BuildingRow, type Core, type Filters } from './compute';
+import { adjustedPerUnit, cityPerUnit, fmtInt, fmtPerUnit, perUnit, plural, toCsv, type BuildingRow, type Core, type Filters } from './compute';
 import { assessingUrl, FLAG, ISSUE_KEYS, type Buildings } from './data';
 import { selectionLabel } from './Filters';
 
@@ -51,6 +51,18 @@ export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props)
   const [reverse, setReverse] = useState(false);   // a second click on a column header flips its order
   const [page, setPage] = useState(0);
   useEffect(() => setPage(0), [rows, sort, reverse]);
+  const top = useRef<HTMLDivElement>(null);
+  // Next and Previous bring the top of the list back into view
+  const turn = (p: number) => {
+    setPage(p);
+    requestAnimationFrame(() => {
+      const el = top.current;
+      if (!el) return;
+      const scroller = el.querySelector('.table-scroll');
+      if (scroller) scroller.scrollTop = 0;
+      el.scrollIntoView({ block: 'start' });
+    });
+  };
   const pick = (s: Sort) => { setReverse(s === sort ? !reverse : false); setSort(s); };
   const TEXT: Sort[] = ['address', 'owner'];       // these start A to Z; number columns start highest first
   const head = (s: Sort, label: string, numeric: boolean) => (
@@ -75,7 +87,7 @@ export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props)
   };
 
   return (
-    <div class="panel table-panel">
+    <div class="panel table-panel" ref={top}>
       <div class="panel-head">
         <h2>{COPY.tableHeading}</h2>
         <label class="inline">
@@ -107,7 +119,7 @@ export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props)
                   {head('cases', COPY.openCases, true)}
                 </tr>
               </thead>
-              <tbody>
+              <tbody translate={false}>
                 {shown.map((r) => (
                   <tr>
                     <th scope="row"><button type="button" class="link-button" onClick={() => onOpen(r.b)} aria-label={`${COPY.viewRecords}: ${buildings.addr[r.b]}`}>{buildings.addr[r.b]}</button></th>
@@ -123,9 +135,9 @@ export function BuildingTable({ core, buildings, rows, filters, onOpen }: Props)
             </table>
           </div>
           <div class="pager">
-            <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>{COPY.prev}</button>
-            <span role="status">{fmtInt(page * PAGE + 1)} to {fmtInt(Math.min(sorted.length, page * PAGE + PAGE))} {COPY.of} {fmtInt(sorted.length)} {COPY.buildings}</span>
-            <button type="button" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>{COPY.next}</button>
+            <button type="button" disabled={page === 0} onClick={() => turn(page - 1)}>{COPY.prev}</button>
+            <span role="status" translate={false}>{fmtInt(page * PAGE + 1)} to {fmtInt(Math.min(sorted.length, page * PAGE + PAGE))} {COPY.of} {fmtInt(sorted.length)} {plural(sorted.length, COPY.buildings)}</span>
+            <button type="button" disabled={page >= pages - 1} onClick={() => turn(page + 1)}>{COPY.next}</button>
           </div>
           <p class="tile-source">{COPY.noUnitCountNote}</p>
           <p class="tile-source">

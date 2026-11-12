@@ -7,6 +7,7 @@ export function HowItWorks({ core }: { core: Core }) {
       <h2 id="how-h">{COPY.howHeading}</h2>
       <p class="how-text">{COPY.howPlaceholder}</p>
       <p class="how-text">{COPY.howOrderPlaceholder}</p>
+      <p class="placeholder">{COPY.placeholders.ratesNote}</p>
       <ul>
         {COPY.howPoints.map((p) => <li>{p}</li>)}
       </ul>
@@ -16,7 +17,6 @@ export function HowItWorks({ core }: { core: Core }) {
       <h3>{COPY.sourcesHeading}</h3>
       <ul class="sources">
         {Object.values(core.meta.sources).map((s) => <li><a href={s.url} rel="noopener">{s.name}</a></li>)}
-        <li><a href="https://ratemyplace.org/methodology" rel="noopener">{COPY.methodLink}</a></li>
       </ul>
     </section>
   );
