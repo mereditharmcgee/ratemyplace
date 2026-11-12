@@ -10,12 +10,8 @@ export const COPY = {
     `This page was created in November 2026, ahead of the Boston City Council's hearing on the proposed "Bad Landlords List" ordinance, Docket #1958, to give tenants a tool to understand housing complaints and code enforcement in their own communities.`,
     `Our tax dollars already pay for the city to collect this data, but it's spread across spreadsheets that are hard to read, so tenants rarely get to use it. Here you can see what the city knows about rental housing: the complaints tenants file through 311, the citations inspectors write, and the violation cases that are still open. Look up your district, your neighborhood or a single building, and see how it compares to the rest of the city. Everything comes from public city records going back to January 2023, and it updates every night.`,
   ],
-  // Waiting for Meredith's words. Each one shows on the page in a yellow box until it is replaced.
-  placeholders: {
-    notTheList: 'PLACEHOLDER notTheList: text to come',
-    ratesNote: 'PLACEHOLDER ratesNote: one sentence to come',
-    whoMadeThis: 'PLACEHOLDER whoMadeThis: one line and a contact link to come',
-  },
+  // Written by Meredith. Do not edit the wording.
+  notTheList: `This page isn't the list the ordinance would create, and it can't tell you who would be on it. The city would score owners on things like unpaid fines, unregistered units and violations that end up in court, and most of those records aren't public yet. Being on this page doesn't mean an owner is on any city list or would be.`,
   updated: 'Last updated',
   dataThrough: 'Records through',
   loading: 'Loading records',
@@ -189,6 +185,8 @@ export const COPY = {
   // Written by Meredith. Do not edit the wording.
   howPlaceholder: `These numbers show what got reported and what inspectors found. They don't tell a building's whole story. A complaint is a tenant asking the city for help, and some buildings have fewer complaints because tenants are afraid to call. A citation means an inspector came out and found a violation. Rates are per 1,000 rental units per year, so a neighborhood full of apartment buildings doesn't look worse just because more people rent there.`,
   howOrderPlaceholder: `Buildings are listed by how many complaints they have. Click any column to sort it your own way, including complaints per unit.`,
+  // Written by Meredith. Do not edit the wording.
+  ratesNote: `Every building with a city record is on this page. The per-1,000 rates only use rental buildings where the unit count could be checked, so about 45 percent of complaints aren't in the rates. Most of those are at large apartment buildings, mixed-use buildings and tax-exempt properties like public housing.`,
   howPoints: [
     'Every number comes from City of Boston open data (Analyze Boston). Nothing here is a RateMyPlace rating.',
     'Complaints are 311 requests about living conditions since January 2023. Requests closed as duplicates are left out. Outdoor rodent, rat bite and pigeon reports are counted separately.',
@@ -199,5 +197,15 @@ export const COPY = {
     'A complaint or a citation is a record of a report or an inspection. It is not a finding about an owner.',
   ],
   sourcesHeading: 'Sources',
-  footer: 'A project of RateMyPlace',
+  // Written by Meredith. Do not edit the wording. The footer line in seven pieces: the second, fourth and sixth are links
+  // (ratemyplace.org/about, ratemyplace.org, ratemyplace.org/contact).
+  whoMadeThis: [
+    `Built by `,
+    `Meredith McGee`,
+    `, the public health researcher behind `,
+    `RateMyPlace`,
+    `. See a mistake or have a question? `,
+    `Get in touch`,
+    `.`,
+  ],
 } as const;

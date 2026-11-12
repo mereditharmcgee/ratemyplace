@@ -127,10 +127,11 @@ describe('find a building', () => {
     expect(names('200 Georgetowne Drive')).toEqual(['10-638 Georgetowne Dr']);
     expect(names('14 mount washington')).toEqual(['14A Mt Washington Av']);
   });
-  it('lists the whole street when no row fits the number, and says so', () => {
+  it('lists the whole street, closest numbers first, when no row fits the number, and says so', () => {
     const r = findAddresses(ix, '999 Blue Hill Av')!;
     expect(r.numberMissed).toBe(true);
-    expect(r.hits.map((i) => addrs[i])).toEqual(['233 Blue Hill Av', '312-316 Blue Hill Av', 'Blue Hill Av']);
+    expect(r.hits.map((i) => addrs[i])).toEqual(['312-316 Blue Hill Av', '233 Blue Hill Av', 'Blue Hill Av']);
+    expect(findAddresses(ix, '240 Blue Hill Av')!.hits.map((i) => addrs[i])).toEqual(['233 Blue Hill Av', '312-316 Blue Hill Av', 'Blue Hill Av']);
     expect(findAddresses(ix, '233 Blue Hill')!.numberMissed).toBe(false);
   });
   it('waits for a street word, and returns no rows for a street that is not listed', () => {

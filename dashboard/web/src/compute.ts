@@ -287,8 +287,8 @@ export interface AddressMatches { hits: number[]; numberMissed: boolean }
 /**
  * Buildings on the street someone typed. The street words must appear in a row, in the city's order; the last word
  * may be unfinished. A typed number only narrows the list: it keeps that number, any range that holds it, and rows
- * the city lists with no number. If no row on the street fits the number, the whole street is listed and
- * `numberMissed` is set. Returns null until there is a street word of two letters or more.
+ * the city lists with no number. If no row on the street fits the number, the whole street is listed with the
+ * closest numbers first (rows with no number last) and `numberMissed` is set. Returns null until there is a street word of two letters or more.
  */
 export function findAddresses(ix: AddressIndex, query: string): AddressMatches | null {
   const typed = streetWords(query);
@@ -309,5 +309,7 @@ export function findAddresses(ix: AddressIndex, query: string): AddressMatches |
   const num = numbers[0];
   const fits = street.filter((i) => ix.lo[i] < 0 || (num >= ix.lo[i] && num <= ix.hi[i]));
   const numbered = fits.some((i) => ix.lo[i] >= 0);
-  return numbered ? { hits: fits, numberMissed: false } : { hits: street, numberMissed: true };
+  if (numbered) return { hits: fits, numberMissed: false };
+  const away = (i: number) => (ix.lo[i] < 0 ? Infinity : Math.min(Math.abs(num - ix.lo[i]), Math.abs(num - ix.hi[i])));
+  return { hits: [...street].sort((a, b) => away(a) - away(b) || ix.lo[a] - ix.lo[b]), numberMissed: true };
 }

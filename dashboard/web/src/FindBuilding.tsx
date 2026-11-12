@@ -17,7 +17,8 @@ export function FindBuilding({ buildings, onOpen }: Props) {
     if (!index || !buildings) return null;
     const r = findAddresses(index, q);
     if (!r) return null;
-    return { ...r, hits: [...r.hits].sort((a, b) => ADDRESS_ORDER.compare(buildings.addr[a], buildings.addr[b])) };
+    // in address order, except when the typed number fits nothing: then the closest numbers come first
+    return r.numberMissed ? r : { ...r, hits: [...r.hits].sort((a, b) => ADDRESS_ORDER.compare(buildings.addr[a], buildings.addr[b])) };
   }, [index, buildings, q]);
   const none = found !== null && (found.hits.length === 0 || found.numberMissed);
 

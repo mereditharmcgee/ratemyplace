@@ -38,9 +38,6 @@ h3 { font: 600 15px/1.35 var(--sans); margin: 0 0 4px; }
 .intro { max-width: 68ch; margin: 0 0 12px; font-size: 17px; }
 .intro:last-of-type { margin-bottom: 20px; }
 .how-text { max-width: 75ch; margin: 10px 0; }
-/* text the owner has still to write */
-.placeholder { background: #fef08a; border: 1px dashed #a16207; color: #422006; padding: 6px 10px; border-radius: var(--radius-input); font-size: 14px; max-width: 75ch; margin: 0 0 16px; }
-span.placeholder { margin: 0; }
 .scope-note { margin: 0 0 8px; font-size: 14px; color: var(--ink-2); }
 .denominators { margin: 8px 0; font-size: 14px; }
 .sub { margin: 2px 0 10px; color: var(--ink-2); font-size: 14px; }
@@ -191,6 +188,7 @@ dialog.detail::backdrop { background: rgba(15, 23, 42, 0.45); }
 .updated-line { font-size: 14px; color: var(--ink-2); }
 
 .site-footer { border-top: 1px solid var(--line); margin-top: 24px; padding: 20px 0 32px; font-size: 14px; color: var(--ink-2); }
+.who { margin: 0; max-width: 75ch; }
 .site-footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 
 @media (min-width: 640px) {

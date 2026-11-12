@@ -7,7 +7,7 @@ export function HowItWorks({ core }: { core: Core }) {
       <h2 id="how-h">{COPY.howHeading}</h2>
       <p class="how-text">{COPY.howPlaceholder}</p>
       <p class="how-text">{COPY.howOrderPlaceholder}</p>
-      <p class="placeholder">{COPY.placeholders.ratesNote}</p>
+      <p class="how-text" id="rates-note">{COPY.ratesNote}</p>
       <ul>
         {COPY.howPoints.map((p) => <li>{p}</li>)}
       </ul>

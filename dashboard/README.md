@@ -62,7 +62,7 @@ The first control in the filters searches the buildings already loaded, by stree
 types. Street words are matched in the city's order, with common endings accepted either way (St or
 Street, Av or Ave or Avenue). A typed number narrows the list to that number, any range that holds
 it, and rows the city lists with no number; if nothing on the street fits the number, the whole
-street is listed. The logic is `addressIndex` and `findAddresses` in `web/src/compute.ts`.
+street is listed with the closest numbers first. The logic is `addressIndex` and `findAddresses` in `web/src/compute.ts`.
 
 ## Counts on the tiles
 

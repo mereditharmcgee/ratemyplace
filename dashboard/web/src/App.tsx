@@ -65,7 +65,7 @@ export function App() {
       <main class="wrap">
         <h1>{COPY.pageTitle}</h1>
         {COPY.introPlaceholder.map((p) => <p class="intro">{p}</p>)}
-        <p class="placeholder">{COPY.placeholders.notTheList}</p>
+        <p class="intro" id="not-the-list">{COPY.notTheList}</p>
 
         {failed && <p class="error" role="alert">{COPY.loadError}</p>}
         {!core && !failed && <p class="loading" role="status">{COPY.loading}</p>}
@@ -107,8 +107,9 @@ export function App() {
       </main>
       <footer class="site-footer">
         <div class="wrap">
-          <a href="https://ratemyplace.org">{COPY.footer}</a>
-          <span class="placeholder">{COPY.placeholders.whoMadeThis}</span>
+          <p class="who" id="who-made-this">
+            <span>{COPY.whoMadeThis[0]}</span><a href="https://ratemyplace.org/about">{COPY.whoMadeThis[1]}</a><span>{COPY.whoMadeThis[2]}</span><a href="https://ratemyplace.org/">{COPY.whoMadeThis[3]}</a><span>{COPY.whoMadeThis[4]}</span><a href="https://ratemyplace.org/contact">{COPY.whoMadeThis[5]}</a><span>{COPY.whoMadeThis[6]}</span>
+          </p>
           {core && <span>{COPY.dataThrough} {dayLabel(core.meta.dataThrough)}</span>}
         </div>
       </footer>
