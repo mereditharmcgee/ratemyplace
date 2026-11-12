@@ -1,0 +1,19 @@
+// The dashboard is a Worker with static assets only (no script). Two deploy targets:
+//   npx wrangler deploy --env preview   -> ratemyplace-data-preview on workers.dev (unlisted, noindex)
+//   npx wrangler deploy                 -> ratemyplace-data, served only on its custom domain
+// The custom domain (data.ratemyplace.org) is attached in the Cloudflare dashboard, not here,
+// so a deploy can never create a public address by itself.
+{
+	"name": "ratemyplace-data",
+	"compatibility_date": "2026-10-01",
+	"assets": { "directory": "./dist", "not_found_handling": "404-page" },
+	"workers_dev": false,
+	"preview_urls": false,
+	"env": {
+		"preview": {
+			"name": "ratemyplace-data-preview",
+			"workers_dev": true,
+			"preview_urls": false
+		}
+	}
+}
