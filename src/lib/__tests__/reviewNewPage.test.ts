@@ -59,7 +59,7 @@ function makeDatabase(): SQLiteDatabase {
 
 function locals(database: SQLiteDatabase, signedIn: boolean): App.Locals {
   return {
-    user: signedIn ? { id: 'u-1', email: 'u@example.com', isAdmin: false } : null,
+    user: signedIn ? { id: 'u-1', email: 'u@example.com', emailVerified: true, isAdmin: false } : null,
     session: signedIn ? { id: 's-1' } : null,
     runtime: { env: { DB: new TestD1Database(database) } },
   } as unknown as App.Locals;
@@ -164,7 +164,7 @@ suite('/review/new handoff', () => {
 
   function withEnv(db: TestD1Database, env: Record<string, unknown> = {}): App.Locals {
     return {
-      user: { id: 'u-1', email: 'u@example.com', isAdmin: false },
+      user: { id: 'u-1', email: 'u@example.com', emailVerified: true, isAdmin: false },
       session: { id: 's-1' },
       runtime: { env: { DB: db, ...env } },
     } as unknown as App.Locals;
