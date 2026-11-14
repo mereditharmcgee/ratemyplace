@@ -1,0 +1,97 @@
+name: Dashboard nightly refresh
+
+# Pulls the city's open data, rebuilds the dashboard files and deploys them to Cloudflare as a
+# static-assets Worker (dashboard/web/wrangler.jsonc). If any step fails nothing is deployed, so the
+# site keeps yesterday's files and yesterday's "last updated" date.
+#
+# Needs two repository secrets (Settings > Secrets and variables > Actions):
+#   CLOUDFLARE_API_TOKEN        a token with Account > Workers Scripts > Edit
+#   CLOUDFLARE_ACCOUNT_ID       the Cloudflare account id
+# and reads two optional repository variables:
+#   DASHBOARD_DEPLOY_TARGET     "preview" (default, the unlisted workers.dev address) or "production" (the
+#                               ratemyplace-data Worker that the custom domain points at).
+#   DASHBOARD_INDEXABLE         "1" lets search engines index the custom domain. Default is noindex.
+
+on:
+  schedule:
+    - cron: "17 8 * * *"   # about 3:17 or 4:17 a.m. in Boston
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dashboard-nightly
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Stop early if the secrets are missing
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CF_TOKEN" ] || [ -z "$CF_ACCOUNT" ]; then
+            echo "A required secret is not set. Nothing was pulled or deployed."
+            exit 1
+          fi
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: dashboard/pipeline/requirements.txt
+      - name: Install pipeline dependencies
+        run: pip install -r dashboard/pipeline/requirements.txt
+      - name: Rule tests
+        working-directory: dashboard/pipeline
+        run: python -m unittest discover -s tests
+      - name: Pull city data
+        working-directory: dashboard/pipeline
+        run: python pull.py
+      - name: Build
+        working-directory: dashboard/pipeline
+        run: python build.py
+      - name: Gate against the locked district numbers
+        working-directory: dashboard/pipeline
+        run: python gate.py
+      - name: Export data files
+        working-directory: dashboard/pipeline
+        run: python export.py
+      - name: Use pinned Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: dashboard/web/package-lock.json
+      - name: Install web dependencies
+        working-directory: dashboard/web
+        run: npm ci
+      - name: Web tests (the page math must reproduce the benchmark 2025 rates from tonight's files)
+        working-directory: dashboard/web
+        run: npm test
+      - name: Build the site
+        working-directory: dashboard/web
+        env:
+          DASHBOARD_INDEXABLE: ${{ vars.DASHBOARD_INDEXABLE }}
+        run: npm run build
+      - name: Deploy to Cloudflare
+        working-directory: dashboard/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_TARGET: ${{ vars.DASHBOARD_DEPLOY_TARGET || 'preview' }}
+        run: |
+          if [ "$DEPLOY_TARGET" = "production" ]; then
+            npx --yes wrangler@4.59.2 deploy
+          else
+            npx --yes wrangler@4.59.2 deploy --env preview
+          fi
