@@ -13,6 +13,7 @@ import {
   type HandoffPlace,
   type ReviewFormBuilding,
 } from '../../lib/reviewHandoff';
+import { ownReviewOfBuilding, REVIEW_LIMIT_COPY, reviewEditPath } from '../../lib/reviewLimits';
 import { existingBuildingReviewPath } from '../../lib/reviewPaths';
 import { loadReviewSigninContext } from '../../lib/reviewSignin';
 
@@ -43,6 +44,10 @@ let building: ReviewFormBuilding | null = null;
 let initialPlace: HandoffPlace | null = null;
 let resolveError: string | null = null;
 let resolveNote: string | null = null;
+// The account's own review of this building, when it has one: the page then links to it
+// instead of rendering a second form (src/lib/reviewLimits.ts; POST /api/reviews refuses a
+// second review either way).
+let existingReviewId: string | null = null;
 
 const env = Astro.locals.runtime.env;
 const db = env.DB;
@@ -61,6 +66,14 @@ if (gated) {
   } catch (error) {
     logError('review_form_load_failed', { error: error instanceof Error ? error.message : String(error) });
     resolveError = HANDOFF_COPY.failed;
+  }
+  if (building) {
+    // Read only. A failed check shows the form; the insert's guard still refuses a second review.
+    try {
+      existingReviewId = await ownReviewOfBuilding(db, user.id, building.id);
+    } catch (error) {
+      logError('review_preflight_failed', { error: error instanceof Error ? error.message : String(error) });
+    }
   }
 } else if (placeIdParam) {
   // ?placeId=... handoff from the homepage "Add a review for this address" path.
@@ -93,6 +106,16 @@ if (gated) {
 
     {gated ? (
       <EmailVerificationGate place={gatePlace} />
+    ) : existingReviewId ? (
+      <div class="bg-teal-50 border border-teal-200 rounded-[6px] p-4 mb-6 text-teal-800 text-sm" data-existing-review>
+        <p>{REVIEW_LIMIT_COPY.alreadyReviewed}</p>
+        <p class="mt-2">
+          <a
+            href={reviewEditPath(existingReviewId)}
+            class="font-semibold text-teal-700 underline underline-offset-2 hover:text-teal-800"
+          >{REVIEW_LIMIT_COPY.editLink}</a>
+        </p>
+      </div>
     ) : (
       <Fragment>
         {resolveError && (
@@ -122,7 +145,7 @@ if (gated) {
   </div>
 </BaseLayout>
 
-{!gated && (
+{!gated && !existingReviewId && (
   <Fragment>
     <script is:inline data-rmp-turnstile-guard>
       // A Turnstile script that fails to load removes itself, so ConfirmStep's "Try again" can tell a
