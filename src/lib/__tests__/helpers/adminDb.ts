@@ -37,6 +37,7 @@ export function createAdminTestDb(): TestD1Database {
     ALTER TABLE reviews ADD COLUMN unit_number TEXT;
     ALTER TABLE reviews ADD COLUMN rent_amount INTEGER;
     ALTER TABLE reviews ADD COLUMN would_recommend_new TEXT;
+    ALTER TABLE reviews ADD COLUMN property_manager_name TEXT;
   `);
   return db;
 }

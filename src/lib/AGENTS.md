@@ -226,6 +226,23 @@ season control. `review_text` / `comments` and the laundry type and cost are rea
 so each pair is kept only whole (`KEPT_PAIRS_WHEN_ABSENT`): a body that sends neither half
 keeps both, and a body that sends either half writes both as sent.
 
+### Review limits and advisory signals
+
+- **`reviewLimits.ts` is server only and binds every number.** The one-review, daily-limit
+  and pause rules are the WHERE of the insert in `POST /api/reviews`, counted from
+  `reviews.created_at` against `unixepoch()` in the same statement, never `Date.now()`, a SQL
+  literal or a trigger. A rejected review still counts; an edit never does; an admin deletion
+  frees the slot. `classifyReviewRefusal` names a refused insert with one read-only SELECT,
+  and `ownReviewOfBuilding` is the `/review/new` preflight. Its copy reuses existing strings,
+  and its tests hold them equal.
+- **`reviewFlags.ts` is a client leaf** (the admin badge island imports its labels). Signals
+  are computed only when `GET /api/admin/reviews` is read, returned as codes, and never stored
+  or shown outside the admin table. They never decide approval, rejection or visibility.
+  Every pattern runs in linear time and avoids lookbehind, which older Safari cannot parse in
+  the island's bundle; a row whose scan throws gets no signals and the list still loads.
+  There is no profanity signal: its term list would ship in plain text in this public repo,
+  so it waits for an owner-approved list.
+
 ### `validation.ts` — use the shared primitives
 
 `isValidEmail`, `isSafeHttpUrl`, `validateReviewText`, `enforceMaxLength`,

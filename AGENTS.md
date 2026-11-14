@@ -184,8 +184,9 @@ Success `{ data }` / client error `{ error, details }` / server error `{ error }
 `Content-Type: application/json`. Never return a stack trace, file path, SQL fragment, or
 internal field name — log detail server-side with `logError` from `lib/logger.ts`.
 `details` is an array of `{ field, message }` for validation errors, and an object with a
-`reason` (the reason envelope, shared with Phase 26) for 401/403/409 outcomes a client acts
-on, for example `{ error, details: { reason: 'email_verification_required' } }`.
+`reason` (the reason envelope) for 401/403/409/429 outcomes a client acts on, for example
+`{ error, details: { reason: 'email_verification_required' } }` (403), `already_reviewed`
+(409, with an `editPath`), and `daily_limit` and `submission_pause` (429).
 
 Select columns explicitly on anything public-facing. `admin_notes` leaked through a search
 endpoint once because the query used `SELECT *`.
@@ -465,6 +466,16 @@ Things that have already cost time. Read before debugging.
   email-change route also deletes outstanding verification links. A resend keeps the previous
   unexpired link (at most two live), and a verification deletes both. Route tests must sign in
   with `emailVerified: true`. Existing reviews by unverified accounts are not hidden or changed.
+- **One review per account and building is enforced by the statement that writes it.**
+  `POST /api/reviews` inserts with `INSERT ... SELECT ... WHERE ${REVIEW_GUARD_SQL}`
+  (`src/lib/reviewLimits.ts`): no review of that building by the account, fewer than
+  `REVIEW_DAILY_LIMIT` of its reviews in the rolling 24 hours, none in the last
+  `REVIEW_SUBMIT_PAUSE_SECONDS`. It counts `reviews` rows, so existing duplicates stay as
+  stored and an admin deletion frees the slot. A zero-change insert is answered 409 or 429 in
+  the reason envelope. Any new path that creates a review uses the same guard; never add a
+  trigger. A route test that needs two reviews submits the second as another account, and an
+  e2e spec that submits, or opens the building-30 form, as the seed account calls
+  `resetE2eAccountReviews()` (`e2e/fixtures.ts`), or a review left by another spec refuses it.
 - **React islands import only leaf modules from `src/lib`.** `reviewPaths`,
   `reviewSubmitOutcome` and `authRedirect` have no runtime imports, which
   `clientLeafModules.test.ts` enforces. Importing a server module such as `reviewHandoff`,

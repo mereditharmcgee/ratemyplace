@@ -22,6 +22,8 @@ const LEAF_MODULES = [
   'src/lib/passwordPolicy.ts',
   // The review edit form and the admin reviews table format the move-in with it.
   'src/lib/privacy.ts',
+  // The admin reviews table labels its moderation signals with it.
+  'src/lib/reviewFlags.ts',
   'src/lib/reviewPaths.ts',
   'src/lib/reviewSubmitOutcome.ts',
   // The review edit form starts its tenure select with it.

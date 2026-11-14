@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getScoreChipColor, getScoreTextColor } from '../../lib/scoring-colors';
 import type { LandlordGeo } from '../../lib/admin/landlordMatch';
 import LandlordLinkPanel from './LandlordLinkPanel';
+import ReviewFlags from './ReviewFlags';
 import { formatMoveIn, MOVE_IN_NOT_GIVEN } from '../../lib/privacy';
 
 interface Review {
@@ -29,6 +30,7 @@ interface Review {
   unit_number: string | null;
   rent_amount: number | null;
   would_recommend_new: string | null;
+  integrity_flags?: string[];
 }
 
 interface Props {
@@ -269,6 +271,7 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
                       Landlord needs linking
                     </span>
                   )}
+                  <ReviewFlags flags={review.integrity_flags} />
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <div className="text-right">
