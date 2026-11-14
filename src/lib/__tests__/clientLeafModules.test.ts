@@ -10,6 +10,8 @@ const LEAF_MODULES = [
   'src/lib/authRedirect.ts',
   // Both address searches take their combobox keyboard rules and status wording from it.
   'src/lib/combobox.ts',
+  // The email verification step's page script takes its copy and status rule from it.
+  'src/lib/contributionCopy.ts',
   'src/lib/homeSearchItems.ts',
   'src/lib/mapCluster.ts',
   // The map checks the reduced-motion preference with it.
