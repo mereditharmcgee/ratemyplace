@@ -289,6 +289,14 @@ Things that have already cost time. Read before debugging.
   September 2026 on one transient fixture failure, which is why. Deploy the Worker with
   the flag set, and never assume a quiet queue means the Worker is broken until you have
   checked it. Resuming by hand means clearing the cause row too (see the runbook).
+- **A fixture check can fail because the city's data moved, not because a pull broke.** Any
+  failed check pauses the fill, and a fixture pause clears only when the check passes, so a
+  check that depends on one parcel's city data re-pauses the fill every morning once the city
+  drops that data. The city reloaded RentSmart on 2026-11-13 and the fixture parcel's rows
+  went with it; the RentSmart checks now ask that the source answers and has recent rows
+  city-wide (see `src/lib/AGENTS.md`). Read what `npm run records:check` prints before you
+  change a check. `fixture.ts` runs inside the records-scheduler Worker, so a change to it
+  reaches the 06:00 planner only after `npm run records:worker:deploy`.
 - **"Delete orphan buildings" in `/admin/buildings` deletes exactly what the "Outside
   Boston / New Haven, no reviews" toggle shows.** Both use `orphanBuildingsWhere()` in
   `src/lib/admin/orphanBuildings.ts`: `source = 'user'`, no review of any status, not
