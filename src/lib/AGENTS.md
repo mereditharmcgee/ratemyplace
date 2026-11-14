@@ -627,7 +627,15 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   value in the badge style, and no score of any kind is computed for a cluster. The map
   legend shows the same circle as a "Group of buildings" row below the four score rows
   (`CLUSTER_LEGEND_SWATCH_STYLE`); `buildingMapClusters.test.tsx` mounts the island on a
-  stubbed map to check the legend and the badge, since no Maps key exists off production.
+  stubbed map to check the legend, the badge and the pins, since no Maps key exists off
+  production.
+- **A map marker's `title` is its accessible name, so it starts with what the marker
+  shows.** Google uses the title as both the hover tooltip and the `aria-label`, and WCAG
+  2.5.3 Label in Name needs the visible text inside the name. A pin shows its score, so
+  `markerTitle` (`mapMarker.ts`) gives "1.1 Poor, 3368 Washington Street", with the drawn
+  text and the name both from `markerScoreText`; a cluster's "N buildings" starts with its
+  count. The band label alone does not satisfy axe: a pin titled with the address only, or
+  with the label before the address, still fails `label-content-name-mismatch`.
 - **`admin/landlordMatch.ts` decides whether a tenant-typed landlord name is "the same
   landlord".** `classifyLandlordCandidates` preselects an existing landlord only when exactly
   one same-name landlord shares the building's state and city (Boston localities count as
