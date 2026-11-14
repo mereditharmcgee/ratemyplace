@@ -1,0 +1,13 @@
+# Any workers.dev address is never indexed. The custom domain is not matched by this rule.
+https://:worker.:account.workers.dev/*
+  X-Robots-Tag: noindex, nofollow
+
+/assets/*
+  Cache-Control: public, max-age=31556952, immutable
+
+/data/*
+  Cache-Control: public, max-age=300
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

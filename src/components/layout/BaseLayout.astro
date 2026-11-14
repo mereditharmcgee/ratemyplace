@@ -4,19 +4,27 @@ import Header from './Header.astro';
 import Footer from './Footer.astro';
 import { maybeEnv } from '../../lib/runtime';
 import { DEFAULT_DESCRIPTION, headMeta, siteOriginFrom } from '../../lib/seo';
+import { serializeJsonLd, structuredData, type Breadcrumb } from '../../lib/jsonLd';
 
 interface Props {
   title: string;
   description?: string;
-  /** robots noindex, with no canonical and no og:url. Never on a sitemap page (pageIndexing.test.ts). */
+  /** robots noindex, with no canonical, no og:url and no structured data. Never on a sitemap page (pageIndexing.test.ts). */
   noindex?: boolean;
+  /** The trail the page shows above its heading, for the BreadcrumbList. Build it with `entityBreadcrumbs`. */
+  breadcrumbs?: readonly Breadcrumb[];
 }
 
-const { title, description = DEFAULT_DESCRIPTION, noindex = false } = Astro.props;
+const { title, description = DEFAULT_DESCRIPTION, noindex = false, breadcrumbs } = Astro.props;
 // maybeEnv, not getEnv: this renders every page, including in the unit-test container with no
 // runtime and under the Astro 6+ adapter, so it must not throw. siteOriginFrom falls back to
 // https://ratemyplace.org.
-const meta = headMeta({ title, description, pathname: Astro.url.pathname, siteOrigin: siteOriginFrom(maybeEnv(Astro.locals)), noindex });
+const siteOrigin = siteOriginFrom(maybeEnv(Astro.locals));
+const meta = headMeta({ title, description, pathname: Astro.url.pathname, siteOrigin, noindex });
+// SEO-05. serializeJsonLd is the only way into set:html (structuredDataSource.test.ts): it
+// escapes <, >, & and U+2028/U+2029, so a name such as "</script>" stays inert data. A noindex
+// page has no canonical and gets no structured data either.
+const jsonLd = meta.url ? serializeJsonLd(structuredData({ siteOrigin, url: meta.url, name: title, description, breadcrumbs })) : null;
 ---
 
 <!doctype html>
@@ -45,6 +53,7 @@ const meta = headMeta({ title, description, pathname: Astro.url.pathname, siteOr
     <meta name="twitter:description" content={meta.description} />
     <meta name="twitter:image" content={meta.image.url} />
     <meta name="twitter:image:alt" content={meta.image.alt} />
+    {jsonLd && <script type="application/ld+json" is:inline set:html={jsonLd} />}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
