@@ -42,7 +42,10 @@ export function generatePasswordResetExpiry(): number {
 
 /**
  * Creates a verification token for a user.
- * Deletes any existing tokens for this user (one active token per user policy).
+ * At most two live tokens per user: a resend keeps the previous unexpired link working, so
+ * the review pages' resend button does not kill the link the sign-up email just sent. Every
+ * older or expired token of the user is deleted first. A successful verification deletes
+ * every token of the user (verify-email.ts), and so does an email change (api/user/email.ts).
  *
  * @param db - D1 database instance
  * @param userId - User ID to associate token with
@@ -56,11 +59,17 @@ export async function createVerificationToken(
     const token = generateVerificationToken();
     const id = generateIdFromEntropySize(10);
     const expiresAt = generateTokenExpiry();
+    const now = Math.floor(Date.now() / 1000);
 
-    // Delete any existing tokens for this user (one active token per user)
+    // Keep only the newest unexpired token; it and the new one are the two live links.
+    // rowid breaks a tie between two tokens created in the same second.
     await db
-      .prepare('DELETE FROM verification_tokens WHERE user_id = ?')
-      .bind(userId)
+      .prepare(
+        'DELETE FROM verification_tokens WHERE user_id = ? AND id NOT IN (' +
+          'SELECT id FROM verification_tokens WHERE user_id = ? AND expires_at > ? ' +
+          'ORDER BY created_at DESC, rowid DESC LIMIT 1)'
+      )
+      .bind(userId, userId, now)
       .run();
 
     // Insert new token
@@ -110,28 +119,6 @@ export async function validateVerificationToken(
   } catch (error) {
     console.error('Error validating verification token:', error);
     return { valid: false, reason: 'error' };
-  }
-}
-
-/**
- * Deletes a verification token from the database.
- * Called after successful email verification.
- *
- * @param db - D1 database instance
- * @param token - Token string to delete
- */
-export async function deleteVerificationToken(
-  db: D1Database,
-  token: string
-): Promise<void> {
-  try {
-    await db
-      .prepare('DELETE FROM verification_tokens WHERE token = ?')
-      .bind(token)
-      .run();
-  } catch (error) {
-    console.error('Error deleting verification token:', error);
-    throw new Error('Failed to delete verification token');
   }
 }
 
