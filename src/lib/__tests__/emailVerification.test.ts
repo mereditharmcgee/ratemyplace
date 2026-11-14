@@ -57,7 +57,7 @@ describe('emailVerificationRequired', () => {
 describe('gate copy', () => {
   it('copy follows the house rules', () => {
     for (const value of [...Object.values(EMAIL_GATE_COPY), VERIFY_TO_POST_ERROR]) {
-      expect(value).not.toMatch(/—|!/);
+      expect(value).not.toMatch(/\u2014|!/);
     }
   });
 
