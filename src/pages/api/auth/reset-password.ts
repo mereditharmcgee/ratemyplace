@@ -3,6 +3,7 @@ import { getDB } from '../../../lib/db';
 import { hashPassword } from '../../../lib/password';
 import { initializeLucia } from '../../../lib/auth';
 import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
+import { PASSWORD_MIN_LENGTH } from '../../../lib/passwordPolicy';
 
 export async function POST(context: APIContext): Promise<Response> {
   const db = getDB(context);
@@ -35,8 +36,8 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
-    if (!password || password.length < 8) {
-      return new Response(JSON.stringify({ error: 'Password must be at least 8 characters' }), {
+    if (!password || password.length < PASSWORD_MIN_LENGTH) {
+      return new Response(JSON.stringify({ error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters` }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });

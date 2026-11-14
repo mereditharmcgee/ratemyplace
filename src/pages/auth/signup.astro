@@ -3,6 +3,7 @@ import BaseLayout from '../../components/layout/BaseLayout.astro';
 import ReviewSigninNote from '../../components/auth/ReviewSigninNote.astro';
 import { redirectQuery, safeRedirectPath } from '../../lib/authRedirect';
 import { loadReviewSigninContext } from '../../lib/reviewSignin';
+import { PASSWORD_MIN_LENGTH, SIGNUP_PASSWORD_HINT } from '../../lib/passwordPolicy';
 import { maybeEnv } from '../../lib/runtime';
 
 // Where to go after signing in. Validated here and again in the page script before it
@@ -85,7 +86,7 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
                 type="password"
                 autocomplete="new-password"
                 required
-                minlength="6"
+                minlength={PASSWORD_MIN_LENGTH}
                 class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-teal-500"
               />
               <button
@@ -104,7 +105,7 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
                 </svg>
               </button>
             </div>
-            <p class="mt-1 text-xs text-gray-600">At least 6 characters</p>
+            <p class="mt-1 text-xs text-gray-600">{SIGNUP_PASSWORD_HINT}</p>
           </div>
 
           <div>
@@ -118,7 +119,7 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
                 type="password"
                 autocomplete="new-password"
                 required
-                minlength="6"
+                minlength={PASSWORD_MIN_LENGTH}
                 class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-[4px] shadow-sm placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-teal-500"
               />
               <button
