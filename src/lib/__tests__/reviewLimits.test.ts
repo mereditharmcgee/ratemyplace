@@ -267,10 +267,12 @@ describe('review refusal responses', () => {
 
 describe('review limit copy', () => {
   it('has no em dash and no exclamation point', () => {
+    const EM_DASH = String.fromCharCode(0x2014);
+    const EXCLAMATION = String.fromCharCode(0x21);
     for (const value of Object.values(REVIEW_LIMIT_COPY)) {
       expect(value).not.toBe('');
-      expect(value).not.toMatch(/—/);
-      expect(value).not.toMatch(/!/);
+      expect(value).not.toContain(EM_DASH);
+      expect(value).not.toContain(EXCLAMATION);
     }
   });
 

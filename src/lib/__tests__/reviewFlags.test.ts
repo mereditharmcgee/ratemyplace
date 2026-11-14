@@ -46,7 +46,8 @@ describe('textFlags', () => {
   it('scans every listed field, after NFKC and lowercasing', () => {
     expect(textFlags({ review_title: 'SOMEONE@EXAMPLE.COM' })).toEqual(['possible_email']);
     // Fullwidth digits fold to ASCII under NFKC.
-    expect(textFlags({ review_text: '６１７-555-0123' })).toEqual(['possible_phone']);
+    const fullwidth617 = String.fromCharCode(0xff16, 0xff11, 0xff17);
+    expect(textFlags({ review_text: `${fullwidth617}-555-0123` })).toEqual(['possible_phone']);
     expect(textFlags({ landlord_name: 'Example Realty', comments: 'see www.example.com' })).toEqual(['possible_link']);
   });
 
@@ -121,10 +122,12 @@ describe('reviewFlags', () => {
 
 describe('review flag labels', () => {
   it('labels every code in plain text, with no em dash and no exclamation point', () => {
+    const EM_DASH = String.fromCharCode(0x2014);
+    const EXCLAMATION = String.fromCharCode(0x21);
     for (const label of [REVIEW_FLAGS_LIST_LABEL, ...REVIEW_FLAG_CODES.map((code) => REVIEW_FLAG_LABELS[code])]) {
       expect(label).not.toBe('');
-      expect(label).not.toMatch(/—/);
-      expect(label).not.toMatch(/!/);
+      expect(label).not.toContain(EM_DASH);
+      expect(label).not.toContain(EXCLAMATION);
     }
   });
 
