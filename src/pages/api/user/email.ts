@@ -106,12 +106,15 @@ export async function PATCH(context: APIContext): Promise<Response> {
       });
     }
 
-    // Update email and reset verification status
-    await db.prepare(
-      'UPDATE users SET email = ?, email_verified = 0, updated_at = unixepoch() WHERE id = ?'
-    )
-      .bind(normalizedEmail, userId)
-      .run();
+    // Update email and reset verification status. The account's outstanding verification
+    // links go in the same batch: a link sent to the previous address must not verify the
+    // new, unproven one.
+    await db.batch([
+      db.prepare(
+        'UPDATE users SET email = ?, email_verified = 0, updated_at = unixepoch() WHERE id = ?'
+      ).bind(normalizedEmail, userId),
+      db.prepare('DELETE FROM verification_tokens WHERE user_id = ?').bind(userId),
+    ]);
 
     return new Response(
       JSON.stringify({ success: true, message: 'Email updated. Please verify your new email address.' }),
