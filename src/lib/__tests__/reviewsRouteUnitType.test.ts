@@ -19,7 +19,7 @@ function context(db: unknown, request: Request): APIContext {
   return {
     request,
     params: {},
-    locals: { user: { id: 'u1' }, runtime: { env: { DB: db, TURNSTILE_SECRET_KEY: 'secret' } } },
+    locals: { user: { id: 'u1', emailVerified: true }, runtime: { env: { DB: db, TURNSTILE_SECRET_KEY: 'secret' } } },
   } as unknown as APIContext;
 }
 

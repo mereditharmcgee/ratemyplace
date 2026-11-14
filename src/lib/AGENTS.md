@@ -179,6 +179,26 @@ Outbound email does not call it directly: it goes through `trackSend`, which wra
   subqueries. It is the safety net for a notice that was capped or filtered. Contact messages
   are excluded: they have no resolve action, so the count could never clear.
 
+### Auth and contribution modules
+
+A leaf imports nothing at runtime (type-only imports are fine), because a page script or a
+React island imports it; `clientLeafModules.test.ts` enforces each one.
+
+- **`authRedirect.ts`** (leaf) is the one return-path validator, `safeRedirectPath`. Every
+  reader of `?redirect=` or the Google return cookie goes through it (root `AGENTS.md`, Traps).
+- **`reviewSignin.ts`** (server) is the note the auth pages show to someone sent by "Write a
+  review": which building, with a read-only two-column lookup. The email verification step
+  reuses its lookup and its "You're reviewing ..." line.
+- **`contributionCopy.ts`** (leaf) holds the email verification step's copy and
+  `gateResendOutcome`, the one rule for what its resend button shows after the server
+  answers. The step's page script imports it. Reused strings are pinned to their sources in
+  `emailVerification.test.ts`; `residencyNote` is the owner's words.
+- **`emailVerification.ts`** (server) is the 403 gate: `hasVerifiedEmail` (strict
+  `emailVerified === true`) and `emailVerificationRequired()`, called right after the 401 in
+  every review write and on both review pages.
+- **`passwordPolicy.ts`** (leaf) is the password minimum (8) for sign-up, reset and settings,
+  and sign-in's legacy floor (6) for passwords made before March 2026.
+
 ### `privacy.ts` — fuzzing is a safety control
 
 `formatRecency()` and the season/year formatters exist so exact tenancy dates never reach

@@ -1,7 +1,10 @@
 ---
 import BaseLayout from '../../../components/layout/BaseLayout.astro';
+import EmailVerificationGate from '../../../components/auth/EmailVerificationGate.astro';
 import ReviewEditForm from '../../../components/reviews/ReviewEditForm';
 import { getDB } from '../../../lib/db';
+import { hasVerifiedEmail } from '../../../lib/emailVerification';
+import type { ReviewDetail } from '../../api/reviews/[id]';
 
 const { id } = Astro.params;
 const user = Astro.locals.user;
@@ -12,41 +15,49 @@ if (!user) {
   return Astro.redirect('/auth/signin?redirect=' + encodeURIComponent(Astro.url.pathname));
 }
 
-// Fetch review
-const db = getDB(Astro);
-const review = await db.prepare(`
-  SELECT
-    r.*,
-    b.address as building_address,
-    b.slug as building_slug,
-    b.neighborhood,
-    b.city
-  FROM reviews r
-  JOIN buildings b ON r.building_id = b.id
-  WHERE r.id = ?
-`).bind(id).first<any>();
+// An account without a verified email sees the email verification step instead of the form
+// (src/lib/emailVerification.ts), and the page reads nothing: not the review, not whether it
+// exists.
+const gated = !hasVerifiedEmail(user);
+let reviewData: ReviewDetail | null = null;
 
-// Check if review exists
-if (!review) {
-  return Astro.redirect('/profile?error=not-found');
+if (!gated) {
+  // Fetch review
+  const db = getDB(Astro);
+  const review = await db.prepare(`
+    SELECT
+      r.*,
+      b.address as building_address,
+      b.slug as building_slug,
+      b.neighborhood,
+      b.city
+    FROM reviews r
+    JOIN buildings b ON r.building_id = b.id
+    WHERE r.id = ?
+  `).bind(id).first<any>();
+
+  // Check if review exists
+  if (!review) {
+    return Astro.redirect('/profile?error=not-found');
+  }
+
+  // Check ownership
+  if (review.user_id !== user.id) {
+    return Astro.redirect('/profile?error=unauthorized');
+  }
+
+  // Convert integer booleans
+  reviewData = {
+    ...review,
+    is_current_tenant: review.is_current_tenant === 1,
+    had_pest_issues: review.had_pest_issues === 1,
+    had_heat_issues: review.had_heat_issues === 1,
+    had_water_issues: review.had_water_issues === 1,
+    had_security_deposit_issues: review.had_security_deposit_issues === 1,
+    had_eviction_threat: review.had_eviction_threat === 1,
+    is_verified: review.is_verified === 1
+  };
 }
-
-// Check ownership
-if (review.user_id !== user.id) {
-  return Astro.redirect('/profile?error=unauthorized');
-}
-
-// Convert integer booleans
-const reviewData = {
-  ...review,
-  is_current_tenant: review.is_current_tenant === 1,
-  had_pest_issues: review.had_pest_issues === 1,
-  had_heat_issues: review.had_heat_issues === 1,
-  had_water_issues: review.had_water_issues === 1,
-  had_security_deposit_issues: review.had_security_deposit_issues === 1,
-  had_eviction_threat: review.had_eviction_threat === 1,
-  is_verified: review.is_verified === 1
-};
 ---
 
 <BaseLayout title="Edit Review" description="Edit your review on RateMyPlace." noindex>
@@ -62,6 +73,10 @@ const reviewData = {
 
     <h1 class="text-2xl font-bold text-gray-900 mb-6">Edit Review</h1>
 
-    <ReviewEditForm client:load review={reviewData} />
+    {reviewData ? (
+      <ReviewEditForm client:load review={reviewData} />
+    ) : (
+      <EmailVerificationGate place={null} />
+    )}
   </div>
 </BaseLayout>

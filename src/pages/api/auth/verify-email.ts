@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
-import { validateVerificationToken, deleteVerificationToken } from '../../../lib/tokens';
+import { validateVerificationToken } from '../../../lib/tokens';
 
 export async function GET(context: APIContext): Promise<Response> {
   const token = context.url.searchParams.get('token');
@@ -20,13 +20,12 @@ export async function GET(context: APIContext): Promise<Response> {
       return context.redirect(`/auth/signin?error=${errorParam}`);
     }
 
-    // Mark email as verified
-    await db.prepare(
-      'UPDATE users SET email_verified = 1 WHERE id = ?'
-    ).bind(result.userId).run();
-
-    // Delete used token (single-use)
-    await deleteVerificationToken(db, token);
+    // Mark email as verified and delete every verification token of the account, the used
+    // one and the other live link a resend kept (tokens.ts), so neither works again.
+    await db.batch([
+      db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').bind(result.userId),
+      db.prepare('DELETE FROM verification_tokens WHERE user_id = ?').bind(result.userId),
+    ]);
 
     // Redirect to success page
     return context.redirect('/email-verified');

@@ -11,7 +11,7 @@ function createContext(db: TestD1Database, body: unknown, contentType: string | 
   const headers: Record<string, string> = {};
   if (contentType) headers['Content-Type'] = contentType;
   const request = new Request('https://ratemyplace.org/api/buildings', { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
-  return { request, locals: { user: { id: 'user-1' }, runtime: { env: { DB: db } } } } as unknown as APIContext;
+  return { request, locals: { user: { id: 'user-1', emailVerified: true }, runtime: { env: { DB: db } } } } as unknown as APIContext;
 }
 
 interface BuildingRow { id: string; slug: string; source: string; street_key: string | null; st_num_lo: number | null; st_num_hi: number | null; google_place_id: string | null; latitude: number | null; longitude: number | null }
