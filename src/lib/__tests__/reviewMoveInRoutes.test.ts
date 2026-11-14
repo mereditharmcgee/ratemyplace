@@ -1,9 +1,10 @@
 import type { APIContext } from 'astro';
 import { experimental_AstroContainer as AstroContainer } from 'astro/container';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createMemoryDatabase, sqliteAvailable, TestD1Database } from './helpers/sqliteD1';
+import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
+import { migrationFiles, schemaDb } from './helpers/migratedDb';
 import ReviewCard from '../../components/reviews/ReviewCard.astro';
 import { getCurrentYear } from '../privacy';
 
@@ -26,19 +27,6 @@ import { PATCH } from '../../pages/api/reviews/[id]';
 const MIGRATIONS = join(process.cwd(), 'migrations');
 const MOVE_IN_MIGRATION = '0035_review_move_in_given.sql';
 const year = getCurrentYear();
-
-function migrationFiles(): string[] {
-  return readdirSync(MIGRATIONS).filter((file) => file.endsWith('.sql')).sort();
-}
-
-function schemaDb(options: { through?: string } = {}): TestD1Database {
-  const db = new TestD1Database(createMemoryDatabase());
-  for (const file of migrationFiles()) {
-    if (options.through && file > options.through) break;
-    db.exec(readFileSync(join(MIGRATIONS, file), 'utf8'));
-  }
-  return db;
-}
 
 async function seed(db: TestD1Database): Promise<void> {
   await db.prepare("INSERT INTO users (id, email) VALUES ('u1', 'tenant@example.com')").run();
