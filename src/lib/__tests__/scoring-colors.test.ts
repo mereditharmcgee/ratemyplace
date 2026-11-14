@@ -1,13 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import {
   getScoreColor,
+  getScoreChipColor,
   getScoreTextColor,
   getEarlyScoreStyle,
   EARLY_SCORE_TEXT_HEX,
   getScoreHex,
+  getScoreTextHex,
   getScoreBgTint,
   SCORE_HEX,
+  SCORE_TEXT_HEX,
 } from '../scoring-colors';
+import { composite, contrast as paintedContrast, tailwindHex, tokenOf } from './helpers/contrast';
 
 describe('getScoreColor (canonical band)', () => {
   it('Good band (≥4) → emerald-600 fill, "Good" label', () => {
@@ -66,12 +70,12 @@ describe('getEarlyScoreStyle (muted early rating)', () => {
 
   it('keeps the band on the dot, with the same boundaries as getScoreColor and getScoreHex', () => {
     for (const score of [1, 1.4, 1.9, 2, 2.9, 3, 3.1, 3.9, 4, 5]) {
-      expect(getEarlyScoreStyle(score).marker).toBe(getScoreColor(score).bg);
+      expect(getEarlyScoreStyle(score).marker.split(' ')[0]).toBe(getScoreColor(score).bg);
       expect(getEarlyScoreStyle(score).markerHex).toBe(getScoreHex(score));
     }
     expect(getEarlyScoreStyle(1.4).marker).toBe('bg-red-700');
     expect(getEarlyScoreStyle(2.5).marker).toBe('bg-amber-700');
-    expect(getEarlyScoreStyle(3.9).marker).toBe('bg-amber-500');
+    expect(getEarlyScoreStyle(3.9).marker).toBe('bg-amber-500 ring-1 ring-amber-700');
     expect(getEarlyScoreStyle(4).marker).toBe('bg-emerald-600');
   });
 
@@ -111,5 +115,90 @@ describe('getScoreBgTint (4-tier soft tint)', () => {
     expect(getScoreBgTint(3.5)).toBe('bg-amber-50');
     expect(getScoreBgTint(2.5)).toBe('bg-amber-100');
     expect(getScoreBgTint(1.5)).toBe('bg-red-50');
+  });
+});
+
+const BAND_SAMPLES = [1, 1.4, 1.9, 2, 2.5, 2.9, 3, 3.5, 3.9, 4, 4.5, 5];
+
+describe('getScoreChipColor (tint chip for small score text)', () => {
+  it('keeps the band boundaries and labels of getScoreColor', () => {
+    for (const score of BAND_SAMPLES) {
+      expect(getScoreChipColor(score).label).toBe(getScoreColor(score).label);
+    }
+    expect(getScoreChipColor(4)).toEqual({
+      bg: 'bg-emerald-50',
+      text: 'text-emerald-800',
+      border: 'border-emerald-600',
+      label: 'Good',
+    });
+  });
+
+  it('sits on the band tint and is outlined in the band fill', () => {
+    for (const score of BAND_SAMPLES) {
+      const chip = getScoreChipColor(score);
+      expect(chip.bg).toBe(getScoreBgTint(score));
+      expect(tokenOf(chip.border)).toBe(tokenOf(getScoreColor(score).bg));
+    }
+  });
+
+  // White on the Mixed fill was 2.13 and on the Good fill 3.65. The chip text is small, so it
+  // needs 4.5:1 on its own tint.
+  it('clears WCAG AA for normal text, measured on the painted colours', () => {
+    for (const score of BAND_SAMPLES) {
+      const chip = getScoreChipColor(score);
+      expect(chip.text).not.toBe('text-white');
+      const ratio = paintedContrast(tailwindHex(tokenOf(chip.text)), tailwindHex(tokenOf(chip.bg)));
+      expect(ratio, `${chip.label}: ${chip.text} on ${chip.bg}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
+
+describe('early-rating dot contrast', () => {
+  // The dot is the only place an early score shows its band, so it needs 3:1 against what it
+  // sits on (WCAG 1.4.11): white cards, the Paper page, gray-50 and the band tint of the home
+  // search chip. Where a ring is drawn, the ring is the dot's edge.
+  it('is 3:1 or better on every surface, by its ring where it has one', () => {
+    for (const score of BAND_SAMPLES) {
+      const classes = getEarlyScoreStyle(score).marker.split(' ');
+      const ring = classes.find((cls) => /^ring-[a-z]+-\d+$/.test(cls));
+      const fill = classes.find((cls) => cls.startsWith('bg-'))!;
+      const edge = tailwindHex(tokenOf(ring ?? fill));
+      for (const surface of ['white', 'paper', 'gray-50', tokenOf(getScoreBgTint(score))]) {
+        const ratio = paintedContrast(edge, tailwindHex(surface));
+        expect(ratio, `${getScoreColor(score).label} dot on ${surface}`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it('rings only the Mixed dot, whose amber-500 fill is 2.13 on white', () => {
+    expect(paintedContrast(tailwindHex('amber-500'), tailwindHex('white'))).toBeLessThan(3);
+    for (const score of BAND_SAMPLES) {
+      const hasRing = getEarlyScoreStyle(score).marker.includes('ring-');
+      expect(hasRing).toBe(getScoreColor(score).label === 'Mixed');
+    }
+  });
+});
+
+describe('getScoreTextHex (band label on its marker tint)', () => {
+  it('has the same boundaries as getScoreHex', () => {
+    expect(getScoreTextHex(4.5)).toBe(SCORE_TEXT_HEX.good);
+    expect(getScoreTextHex(4)).toBe(SCORE_TEXT_HEX.good);
+    expect(getScoreTextHex(3.9)).toBe(SCORE_TEXT_HEX.mixed);
+    expect(getScoreTextHex(3)).toBe(SCORE_TEXT_HEX.mixed);
+    expect(getScoreTextHex(2.9)).toBe(SCORE_TEXT_HEX.concerning);
+    expect(getScoreTextHex(2)).toBe(SCORE_TEXT_HEX.concerning);
+    expect(getScoreTextHex(1.9)).toBe(SCORE_TEXT_HEX.poor);
+    expect(getScoreTextHex(null)).toBe(SCORE_TEXT_HEX.none);
+  });
+
+  // BuildingMap paints the label's background as the marker hex at alpha 0x20 over the white
+  // info window. The marker colour itself was 1.95 (Mixed) and 3.24 (Good) as text there.
+  it('clears WCAG AA for normal text on its own band tint', () => {
+    for (const score of [null, ...BAND_SAMPLES]) {
+      const tint = composite(getScoreHex(score), 0x20 / 255, '#ffffff');
+      const ratio = paintedContrast(getScoreTextHex(score), tint);
+      expect(ratio, `${score}: ${getScoreTextHex(score)} on ${tint}`).toBeGreaterThanOrEqual(4.5);
+      expect(getScoreTextHex(score)).not.toBe(getScoreHex(score));
+    }
   });
 });

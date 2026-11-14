@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getScoreColor as getScoreColorPair, getScoreTextColor } from '../../lib/scoring-colors';
+import { getScoreChipColor, getScoreTextColor } from '../../lib/scoring-colors';
 import type { LandlordGeo } from '../../lib/admin/landlordMatch';
 import LandlordLinkPanel from './LandlordLinkPanel';
 import { formatMoveIn, MOVE_IN_NOT_GIVEN } from '../../lib/privacy';
@@ -159,8 +159,8 @@ export default function ReviewsTable({ initialStatus = 'all' }: Props) {
   };
 
   const getScoreBadgeColor = (score: number) => {
-    const c = getScoreColorPair(score);
-    return `${c.bg} ${c.text}`;
+    const c = getScoreChipColor(score);
+    return `${c.bg} ${c.text} border ${c.border}`;
   };
 
   const formatScoreLabel = (key: string) => {

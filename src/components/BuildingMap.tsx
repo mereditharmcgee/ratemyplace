@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { MarkerClusterer, SuperClusterAlgorithm, type Renderer } from '@googlemaps/markerclusterer';
-import { getEarlyScoreStyle, getScoreColor, getScoreHex } from '../lib/scoring-colors';
+import { getEarlyScoreStyle, getScoreColor, getScoreHex, getScoreTextHex } from '../lib/scoring-colors';
 import { displayLocality } from '../lib/locality';
 import { isEarlyRating, mapReviewLine } from '../lib/earlyRating';
 import { initialMapView, shouldPanToUser, type InitialMapView, type LatLngBox, type LatLngPoint } from '../lib/mapView';
@@ -451,7 +451,7 @@ export default function BuildingMap({
           scoreBadge.appendChild(dot);
           scoreBadge.appendChild(document.createTextNode(scoreLabel));
         } else {
-          scoreBadge.style.cssText = `display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; background: ${scoreColor}20; color: ${scoreColor};`;
+          scoreBadge.style.cssText = `display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; background: ${scoreColor}20; color: ${getScoreTextHex(building.avgScore)};`;
           scoreBadge.textContent = scoreLabel;
         }
         scoreRow.appendChild(scoreBadge);
