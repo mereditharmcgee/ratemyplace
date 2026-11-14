@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ReviewsTable from '../../components/admin/ReviewsTable';
-import { getScoreTextColor } from '../scoring-colors';
+import { getScoreChipColor, getScoreColor, getScoreTextColor } from '../scoring-colors';
 
 /**
  * The admin reviews row prints the review's overall score in its band colour. A review with no
@@ -64,5 +64,53 @@ describe('ReviewsTable overall score colour', () => {
 
     const scored = screen.getByText('1.5');
     expect(scored.className).toContain(getScoreTextColor(1.5));
+  });
+});
+
+/**
+ * The expanded row lists each item score as a small chip. They were white text on the band
+ * fill, which is 2.13:1 on Mixed amber-500 and 3.65:1 on Good emerald-600. They are now the
+ * band tint with dark band text and a border in the band fill (getScoreChipColor).
+ */
+describe('ReviewsTable item score chips', () => {
+  it('draws every band as a tint chip with dark text, never white on the fill', async () => {
+    const scores = { unit_structural: 5, unit_plumbing: 4, unit_electrical: 3, unit_climate: 2, unit_ventilation: 1 };
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.startsWith('/api/admin/reviews?')) {
+        return {
+          ok: true,
+          json: async () => ({
+            reviews: [reviewRow('scored', 3.2)],
+            statusCounts: { all: 1, pending: 1, approved: 0, rejected: 0, flagged: 0 },
+            total: 1,
+          }),
+        };
+      }
+      if (url === '/api/admin/reviews/scored') {
+        return { ok: true, json: async () => ({ review: { ...reviewRow('scored', 3.2), ...scores } }) };
+      }
+      return { ok: true, json: async () => ({ landlords: [] }) };
+    }));
+
+    const { container } = render(<ReviewsTable />);
+    await waitFor(() => expect(screen.getByText('3.2')).toBeTruthy());
+    fireEvent.click(container.querySelector('button[aria-labelledby="review-title-scored"]')!);
+
+    const panel = await waitFor(() => {
+      const found = container.querySelector('#review-panel-scored');
+      expect(found?.textContent).toContain('Structural');
+      return found!;
+    });
+
+    const chips = Array.from(panel.querySelectorAll<HTMLElement>('span.inline-flex.flex-col'));
+    expect(chips).toHaveLength(Object.keys(scores).length);
+    for (const chip of chips) {
+      const value = Number(chip.lastElementChild?.textContent);
+      const expected = getScoreChipColor(value);
+      const classes = chip.className.split(/\s+/);
+      expect(classes).toEqual(expect.arrayContaining([expected.bg, expected.text, 'border', expected.border]));
+      expect(classes).not.toContain('text-white');
+      expect(classes).not.toContain(getScoreColor(value).bg);
+    }
   });
 });

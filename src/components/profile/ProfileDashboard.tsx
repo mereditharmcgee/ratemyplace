@@ -6,7 +6,7 @@ import SettingsTab from './SettingsTab';
 import EmptyState from '../ui/EmptyState';
 import type { Notification } from './NotificationsTab';
 import type { UserReview, UserReviewsResponse, SavedBuilding, SavedBuildingsResponse } from '../../lib/api-types';
-import { getScoreColor } from '../../lib/scoring-colors';
+import { getScoreChipColor } from '../../lib/scoring-colors';
 import { localityLine } from '../../lib/locality';
 
 interface Props {
@@ -231,8 +231,8 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
   };
 
   const getScoreBadgeClass = (score: number) => {
-    const c = getScoreColor(score);
-    return `${c.bg} ${c.text}`;
+    const c = getScoreChipColor(score);
+    return `${c.bg} ${c.text} border ${c.border}`;
   };
 
   return (

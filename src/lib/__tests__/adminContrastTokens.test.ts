@@ -12,7 +12,9 @@ import { join, relative } from 'node:path';
 // a text label, and a disabled button. Each one names an exact fragment of its line.
 //
 // Not covered here: gray-500 on the gray-100 page (4.39), which needs the real background to
-// judge, and the score chips, whose fills come from src/lib/scoring-colors.ts at run time.
+// judge, and the score chips, whose classes come from src/lib/scoring-colors.ts at run time.
+// The chips are guarded in contrastTokens.test.ts (no source prints getScoreColor's white
+// text on its fill, admin included) and in reviewsTableScoreColor.test.tsx (the rendered chips).
 
 const ROOT = process.cwd();
 const EXTENSIONS = ['.astro', '.tsx', '.ts'];
