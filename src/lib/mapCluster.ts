@@ -54,7 +54,10 @@ export function clusterBadgeStyle(size: number): string {
   ].join('; ');
 }
 
-/** Hover title and accessible name for a cluster badge: the count, nothing else. */
+/**
+ * Hover title and accessible name for a cluster badge: the count, nothing else. It starts
+ * with the number the badge shows, as WCAG 2.5.3 Label in Name asks (see mapMarker.ts).
+ */
 export function clusterTitle(count: number): string {
   return `${count} ${count === 1 ? 'building' : 'buildings'}`;
 }

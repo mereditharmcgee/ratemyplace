@@ -14,10 +14,12 @@ const LEAF_MODULES = [
   'src/lib/contributionCopy.ts',
   'src/lib/homeSearchItems.ts',
   'src/lib/mapCluster.ts',
-  // The sign-up page renders the password minimum and its hint from it.
-  'src/lib/passwordPolicy.ts',
+  // The map names each building pin with it.
+  'src/lib/mapMarker.ts',
   // The map checks the reduced-motion preference with it.
   'src/lib/motion.ts',
+  // The sign-up page renders the password minimum and its hint from it.
+  'src/lib/passwordPolicy.ts',
   // The review edit form and the admin reviews table format the move-in with it.
   'src/lib/privacy.ts',
   'src/lib/reviewPaths.ts',
