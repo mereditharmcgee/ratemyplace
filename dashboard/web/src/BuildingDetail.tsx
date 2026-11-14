@@ -8,6 +8,26 @@ export type DetailTarget = { kind: 'index'; b: number } | { kind: 'holding'; hol
 
 interface Props { core: Core; buildings: Buildings | null; target: DetailTarget; onClose: () => void; onOwner: (id: number) => void }
 
+// The browser's Back button (and the back swipe on a phone) closes an open panel instead of leaving the page.
+// While a panel is open it owns one history entry, marked with its id. Closing it any other way takes that entry
+// back out, so Back never has to be pressed twice. The address bar does not change: the filters stay in the link.
+interface OpenPanel { id: number; close: () => void; byBack: boolean }
+let openPanel: OpenPanel | null = null;
+let entriesToDrop = 0; // history.back() calls of our own that have not landed yet
+const panelIdOf = (state: unknown): number | null =>
+  state && typeof state === 'object' && typeof (state as { rmpPanel?: unknown }).rmpPanel === 'number' ? (state as { rmpPanel: number }).rmpPanel : null;
+if (typeof window !== 'undefined') {
+  window.addEventListener('popstate', () => {
+    if (entriesToDrop > 0) {
+      // Our own clean-up landing. A panel opened in the meantime still needs its entry.
+      entriesToDrop--;
+      if (openPanel && panelIdOf(history.state) !== openPanel.id) history.pushState({ rmpPanel: openPanel.id }, '');
+      return;
+    }
+    if (openPanel && panelIdOf(history.state) !== openPanel.id) { openPanel.byBack = true; openPanel.close(); }
+  });
+}
+
 export function BuildingDetail({ core, buildings, target, onClose, onOwner }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const [rec, setRec] = useState<BuildingRecords | null | 'loading' | 'error'>('loading');
@@ -21,6 +41,18 @@ export function BuildingDetail({ core, buildings, target, onClose, onOwner }: Pr
   useEffect(() => {
     const d = ref.current;
     if (d && !d.open) d.showModal();
+    const me: OpenPanel = { id: Date.now() + Math.random(), close: () => ref.current?.close(), byBack: false };
+    openPanel = me;
+    if (entriesToDrop === 0) {
+      // Reuse a panel entry left over from a reload or a Forward press, otherwise add one.
+      if (panelIdOf(history.state) !== null) history.replaceState({ rmpPanel: me.id }, '');
+      else history.pushState({ rmpPanel: me.id }, '');
+    }
+    return () => {
+      if (openPanel === me) openPanel = null;
+      // Closed with the button, Esc or a click outside: take the panel's entry back out.
+      if (!me.byBack && panelIdOf(history.state) === me.id) { entriesToDrop++; history.back(); }
+    };
   }, []);
   useEffect(() => {
     if (!gis) return;
