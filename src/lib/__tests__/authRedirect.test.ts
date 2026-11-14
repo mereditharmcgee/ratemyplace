@@ -153,7 +153,9 @@ describe('safeRedirectPath', () => {
         throw new Error(`fuzz input ${JSON.stringify(candidate)} gave ${JSON.stringify(out)}: ${String(error)}`);
       }
     }
-  });
+    // Well under a second alone, but past vitest's 5 s default when the whole suite runs on
+    // a busy machine, which failed unrelated PRs. The cases are fixed, so this only adds room.
+  }, 30_000);
 });
 
 describe('redirectQuery and signinErrorPath', () => {
