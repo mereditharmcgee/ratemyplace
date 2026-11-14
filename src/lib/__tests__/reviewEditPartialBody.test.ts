@@ -31,17 +31,17 @@ function schemaDb(): TestD1Database {
 }
 
 async function seed(db: TestD1Database): Promise<void> {
-  await db.prepare("INSERT INTO users (id, email) VALUES ('u1', 'tenant@example.com')").run();
+  await db.prepare("INSERT INTO users (id, email) VALUES ('u1', 'tenant@example.com'), ('u2', 'tenant2@example.com')").run();
   await db
     .prepare("INSERT INTO buildings (id, address, slug, city, state) VALUES ('b1', '12 Example Rd', '12-example-rd-boston', 'Boston', 'MA')")
     .run();
 }
 
-function context(db: TestD1Database, request: Request, params: Record<string, string> = {}): APIContext {
+function context(db: TestD1Database, request: Request, params: Record<string, string> = {}, userId = 'u1'): APIContext {
   return {
     request,
     params,
-    locals: { user: { id: 'u1', emailVerified: true }, runtime: { env: { DB: db, TURNSTILE_SECRET_KEY: 'secret' } } },
+    locals: { user: { id: userId, emailVerified: true }, runtime: { env: { DB: db, TURNSTILE_SECRET_KEY: 'secret' } } },
   } as unknown as APIContext;
 }
 
@@ -76,22 +76,23 @@ const FULL_REVIEW: Record<string, string> = {
   safely_lit_at_night: 'no',
 };
 
-async function submit(db: TestD1Database, fields: Record<string, string> = FULL_REVIEW): Promise<string> {
+// One review per account and building: a test that needs two reviews submits the second as u2.
+async function submit(db: TestD1Database, fields: Record<string, string> = FULL_REVIEW, userId = 'u1'): Promise<string> {
   const form = new FormData();
   const all = { building_id: 'b1', unit_structural: '4', 'cf-turnstile-response': 'good', ...fields };
   for (const [key, value] of Object.entries(all)) form.set(key, value);
-  const response = await POST(context(db, new Request('https://ratemyplace.org/api/reviews', { method: 'POST', body: form })));
+  const response = await POST(context(db, new Request('https://ratemyplace.org/api/reviews', { method: 'POST', body: form }), {}, userId));
   expect(response.status).toBe(200);
   return ((await response.json()) as { reviewId: string }).reviewId;
 }
 
-async function edit(db: TestD1Database, id: string, body: Record<string, unknown>): Promise<void> {
+async function edit(db: TestD1Database, id: string, body: Record<string, unknown>, userId = 'u1'): Promise<void> {
   const request = new Request(`https://ratemyplace.org/api/reviews/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const response = await PATCH(context(db, request, { id }));
+  const response = await PATCH(context(db, request, { id }, userId));
   expect(response.status).toBe(200);
 }
 
@@ -222,9 +223,9 @@ suite('tenure on edit', () => {
     const db = schemaDb();
     await seed(db);
     const blank = await submit(db);
-    const nulled = await submit(db);
+    const nulled = await submit(db, FULL_REVIEW, 'u2');
     await edit(db, blank, { unit_structural: 4, tenure_months: '' });
-    await edit(db, nulled, { unit_structural: 4, tenure_months: null });
+    await edit(db, nulled, { unit_structural: 4, tenure_months: null }, 'u2');
     expect(await tenure(db, blank)).toBeNull();
     expect(await tenure(db, nulled)).toBeNull();
   });
@@ -233,9 +234,9 @@ suite('tenure on edit', () => {
     const db = schemaDb();
     await seed(db);
     const fromSelect = await submit(db);
-    const fromNumber = await submit(db);
+    const fromNumber = await submit(db, FULL_REVIEW, 'u2');
     await edit(db, fromSelect, { unit_structural: 4, tenure_months: '72' });
-    await edit(db, fromNumber, { unit_structural: 4, tenure_months: 9 });
+    await edit(db, fromNumber, { unit_structural: 4, tenure_months: 9 }, 'u2');
     expect(await tenure(db, fromSelect)).toBe(72);
     expect(await tenure(db, fromNumber)).toBe(9);
   });

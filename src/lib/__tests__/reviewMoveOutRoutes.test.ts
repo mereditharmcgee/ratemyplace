@@ -33,36 +33,37 @@ function schemaDb(): TestD1Database {
 }
 
 async function seed(db: TestD1Database): Promise<void> {
-  await db.prepare("INSERT INTO users (id, email) VALUES ('u1', 'tenant@example.com')").run();
+  await db.prepare("INSERT INTO users (id, email) VALUES ('u1', 'tenant@example.com'), ('u2', 'tenant2@example.com')").run();
   await db
     .prepare("INSERT INTO buildings (id, address, slug, city, state) VALUES ('b1', '12 Example Rd', '12-example-rd-boston', 'Boston', 'MA')")
     .run();
 }
 
-function context(db: TestD1Database, request: Request, params: Record<string, string> = {}): APIContext {
+function context(db: TestD1Database, request: Request, params: Record<string, string> = {}, userId = 'u1'): APIContext {
   return {
     request,
     params,
-    locals: { user: { id: 'u1', emailVerified: true }, runtime: { env: { DB: db, TURNSTILE_SECRET_KEY: 'secret' } } },
+    locals: { user: { id: userId, emailVerified: true }, runtime: { env: { DB: db, TURNSTILE_SECRET_KEY: 'secret' } } },
   } as unknown as APIContext;
 }
 
-async function submit(db: TestD1Database, fields: Record<string, string>): Promise<string> {
+// One review per account and building: a test that needs two reviews submits the second as u2.
+async function submit(db: TestD1Database, fields: Record<string, string>, userId = 'u1'): Promise<string> {
   const form = new FormData();
   const all = { building_id: 'b1', unit_structural: '4', 'cf-turnstile-response': 'good', ...fields };
   for (const [key, value] of Object.entries(all)) form.set(key, value);
-  const response = await POST(context(db, new Request('https://ratemyplace.org/api/reviews', { method: 'POST', body: form })));
+  const response = await POST(context(db, new Request('https://ratemyplace.org/api/reviews', { method: 'POST', body: form }), {}, userId));
   expect(response.status).toBe(200);
   return ((await response.json()) as { reviewId: string }).reviewId;
 }
 
-async function edit(db: TestD1Database, id: string, body: Record<string, unknown>): Promise<void> {
+async function edit(db: TestD1Database, id: string, body: Record<string, unknown>, userId = 'u1'): Promise<void> {
   const request = new Request(`https://ratemyplace.org/api/reviews/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ unit_structural: 4, ...body }),
   });
-  const response = await PATCH(context(db, request, { id }));
+  const response = await PATCH(context(db, request, { id }, userId));
   expect(response.status).toBe(200);
 }
 
@@ -102,9 +103,9 @@ suite('stored move-out round trip', () => {
     const db = schemaDb();
     await seed(db);
     const past = await submit(db, { move_out_year: '2024' });
-    const current = await submit(db, { move_out_year: 'current' });
+    const current = await submit(db, { move_out_year: 'current' }, 'u2');
     await edit(db, past, {});
-    await edit(db, current, {});
+    await edit(db, current, {}, 'u2');
     expect(await stored(db, past)).toEqual({ move_out_year_new: '2024', is_current_tenant: 0 });
     expect(await stored(db, current)).toEqual({ move_out_year_new: 'current', is_current_tenant: 1 });
   });
@@ -131,10 +132,10 @@ suite('stored move-out round trip', () => {
     const db = schemaDb();
     await seed(db);
     const past = await submit(db, { move_out_year: '2020_or_earlier' });
-    const current = await submit(db, { move_out_year: 'current' });
+    const current = await submit(db, { move_out_year: 'current' }, 'u2');
 
     await edit(db, past, { move_out_year_new: await editStart(db, past) });
-    await edit(db, current, { move_out_year_new: await editStart(db, current) });
+    await edit(db, current, { move_out_year_new: await editStart(db, current) }, 'u2');
 
     expect(await stored(db, past)).toEqual({ move_out_year_new: '2020_or_earlier', is_current_tenant: 0 });
     expect(await stored(db, current)).toEqual({ move_out_year_new: 'current', is_current_tenant: 1 });
@@ -148,8 +149,8 @@ suite('stored move-out round trip', () => {
  * never given for (stored fall 2019, edited to 2023, used to read "Move-out: Fall 2023").
  */
 suite('stored move-out season on edit', () => {
-  async function olderReview(db: TestD1Database): Promise<string> {
-    const id = await submit(db, { move_out_year: '2019' });
+  async function olderReview(db: TestD1Database, userId = 'u1'): Promise<string> {
+    const id = await submit(db, { move_out_year: '2019' }, userId);
     // The submit route stores no season any more; this sets the row up as an older one.
     await db.prepare("UPDATE reviews SET move_out_season = 'fall' WHERE id = ?").bind(id).run();
     return id;
@@ -174,9 +175,9 @@ suite('stored move-out season on edit', () => {
     const db = schemaDb();
     await seed(db);
     const toCurrent = await olderReview(db);
-    const toBlank = await olderReview(db);
+    const toBlank = await olderReview(db, 'u2');
     await edit(db, toCurrent, { move_out_year_new: 'current' });
-    await edit(db, toBlank, { move_out_year_new: '' });
+    await edit(db, toBlank, { move_out_year_new: '' }, 'u2');
     expect(await season(db, toCurrent)).toBeNull();
     expect(await season(db, toBlank)).toBeNull();
   });
@@ -185,9 +186,9 @@ suite('stored move-out season on edit', () => {
     const db = schemaDb();
     await seed(db);
     const sameYear = await olderReview(db);
-    const noMoveOut = await olderReview(db);
+    const noMoveOut = await olderReview(db, 'u2');
     await edit(db, sameYear, { move_out_year_new: await editStart(db, sameYear) });
-    await edit(db, noMoveOut, {});
+    await edit(db, noMoveOut, {}, 'u2');
     for (const id of [sameYear, noMoveOut]) {
       expect(await stored(db, id)).toEqual({ move_out_year_new: '2019', is_current_tenant: 0 });
       expect(await season(db, id)).toBe('fall');
