@@ -261,6 +261,13 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   script-only and has no such constraint. The fixture runs all eleven Boston sources
   concurrently and applies the results in source order afterwards, so two runs compare label
   for label; it never throws, because the breaker needs a result, not an exception.
+  The RentSmart checks do not ask for the fixture parcel's rows. RentSmart is the city's
+  current export, not a history: the city reloaded it on 2026-11-13, the parcel's rows went
+  with it, and the old "RentSmart rows present" check paused the fill every morning while the
+  source worked. The checks now ask that the adapter's parcel query answers (zero rows is an
+  answer) and that a city-wide query on the same resource finds a row from the last 60 days
+  with a ten-digit parcel. Before a new check pins one parcel's value, ask whether a reload of
+  that dataset could take the value away.
 - **`queue.ts` is the pull queue, and `attempts` counts CLAIMS, not failures.** One pending
   row per building (0031's partial unique index). `claimBatch` takes a lease by conditional
   `UPDATE`, incrementing `attempts` as it goes; `completeRow` resets it to 0; `failRow`

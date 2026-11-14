@@ -1,9 +1,10 @@
-import { FETCH_TIMEOUT_MS, fetchAllRows } from './ckan';
+import { FETCH_TIMEOUT_MS, ckanSql, fetchAllRows, sqlLiteral, textOrNull } from './ckan';
 import { buildIdentity } from './identity';
 import { sourcesForCity } from './jurisdictions';
 import { SAM_FIELDS, SAM_RESOURCE_ID, indexSamByParcel } from './seed/sam';
 import type { SamRow } from './seed/types';
 import { resolveParcel } from './sources/boston/assessor';
+import { RENTSMART_RESOURCE_ID } from './sources/boston/rentsmart';
 import type {
   AssessmentPayload,
   BuildingIdentity,
@@ -24,6 +25,8 @@ export interface FixtureOptions {
   timeoutMs?: number;
   /** Injected so tests exercise the SAM retry path without waiting out the backoff. */
   sleep?: (ms: number) => Promise<void>;
+  /** Milliseconds since the epoch; defaults to `Date.now`. Injected so tests pin the RentSmart window. */
+  clockMs?: () => number;
 }
 
 export interface FixtureResult {
@@ -60,6 +63,37 @@ function serviceRequestRows(rows: RecordRow[]): ServiceRequestPayload[] {
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * How recent the newest RentSmart row in the whole resource has to be. The city's 2026-11-13
+ * reload carried rows up to the day before, so sixty days is room for a slow stretch of
+ * publishing, not a target.
+ */
+export const RENTSMART_RECENT_DAYS = 60;
+
+const DAY_MS = 86_400_000;
+
+type CkanRow = Record<string, string | number | null>;
+
+/**
+ * The newest RentSmart row dated on or after `since` (YYYY-MM-DD), anywhere in the city. The
+ * same resource, the same `ckanSql` helper and the same quoting as the adapter. Interpolation
+ * invariant: `since` is computed from the clock, never taken from input, and still passes
+ * through `sqlLiteral`; the resource id and column names are code constants. The `date` column
+ * is text ('2026-11-12 00:00:00+00'), so `>=` against an ISO day compares correctly.
+ *
+ * Never rejects, so it can run alongside the sources and be awaited later.
+ */
+async function newestRentSmartRow(since: string, fetchImpl: FetchLike): Promise<{ rows: CkanRow[] } | { error: string }> {
+  const sql =
+    `SELECT "date","parcel" FROM "${RENTSMART_RESOURCE_ID}" ` +
+    `WHERE "date" >= ${sqlLiteral(since)} ORDER BY "date" DESC LIMIT 1`;
+  try {
+    return { rows: await ckanSql<CkanRow>(sql, fetchImpl) };
+  } catch (err) {
+    return { error: messageOf(err) };
+  }
 }
 
 /**
@@ -112,6 +146,13 @@ export async function runLanarkFixture(fetchImpl: FetchLike, options: FixtureOpt
   // Results are applied AFTERWARDS, walking the source list in order, so `sourceErrors`,
   // `allRows` and the insertion order of `rowsBySource` read the same on every run whatever
   // order the responses arrived in. Two fixture runs have to compare label for label.
+  //
+  // The city-wide RentSmart query starts with them for the same reason. It catches its own
+  // failure, so nothing rejects while it waits to be awaited at the RentSmart checks.
+  const rentsmartSince = new Date((options.clockMs ?? Date.now)() - RENTSMART_RECENT_DAYS * DAY_MS)
+    .toISOString()
+    .slice(0, 10);
+  const newestRentSmart = newestRentSmartRow(rentsmartSince, fetchImpl);
   const sources = sourcesForCity('Boston');
   const settled = await Promise.all(
     sources.map(async (source): Promise<{ rows: RecordRow[] } | { error: string }> => {
@@ -239,8 +280,42 @@ export async function runLanarkFixture(fetchImpl: FetchLike, options: FixtureOpt
   );
 
   // --- RentSmart ---
-  const rentsmartRows = rowsBySourceLabel.get('RentSmart') ?? [];
-  check('RentSmart rows present', rentsmartRows.length > 0, `got ${rentsmartRows.length} rows`);
+  // RentSmart is the city's current export, not a history. On 2026-11-13 the city reloaded it
+  // and the fixture parcel's four rows went with it, so a check that this one parcel has rows
+  // paused the fill every morning while the source worked. These two checks ask what a pull
+  // depends on instead: the adapter's own parcel query runs and answers (zero rows is an
+  // answer), and the same resource still has recent rows keyed by a ten-digit parcel, the
+  // form that query sends.
+  const rentsmartParcelLabel = 'RentSmart answers the parcel query';
+  const rentsmartParcelRows = rowsForOrFail('RentSmart', rentsmartParcelLabel);
+  if (rentsmartParcelRows !== null) {
+    // With no parcel id the adapter returns no rows without asking the city.
+    check(
+      rentsmartParcelLabel,
+      identity.parcelId !== null,
+      identity.parcelId !== null
+        ? `got ${rentsmartParcelRows.length} rows for parcel ${identity.parcelId}`
+        : 'no parcel id, so the parcel query never ran',
+    );
+  }
+
+  const newest = await newestRentSmart;
+  let recentOk = false;
+  let recentDetail: string;
+  if ('error' in newest) {
+    // No source entry to fail into, as with SAM below: counted once, as this check.
+    recentDetail = `RentSmart recent-rows query failed: ${newest.error}`;
+  } else if (newest.rows.length === 0) {
+    recentDetail = `no rows dated on or after ${rentsmartSince}`;
+  } else {
+    const date = textOrNull(newest.rows[0].date);
+    const parcel = textOrNull(newest.rows[0].parcel);
+    // Checked here as well as in the SQL, so the check never rests on the query's filter alone.
+    const day = date !== null ? (/^\d{4}-\d{2}-\d{2}/.exec(date)?.[0] ?? null) : null;
+    recentOk = day !== null && day >= rentsmartSince && parcel !== null && /^\d{10}$/.test(parcel);
+    recentDetail = `newest row dated ${date ?? 'none'}, parcel ${parcel ?? 'none'} (window starts ${rentsmartSince})`;
+  }
+  check(`RentSmart has a row from the last ${RENTSMART_RECENT_DAYS} days with a ten-digit parcel`, recentOk, recentDetail);
 
   // --- SAM address points ---
   // SAM is the seed's coordinate, neighborhood, and zip source (src/lib/records/seed/sam.ts).
