@@ -1,8 +1,17 @@
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { test, expect, clearRateLimits } from './fixtures';
-import { executeLocalD1, installTurnstileStub, TURNSTILE_SCRIPT } from './test-harness';
+import {
+  executeLocalD1,
+  installTurnstileStub,
+  resolveLocalE2EBaseURL,
+  TURNSTILE_SCRIPT,
+  TURNSTILE_TEST_TOKEN,
+} from './test-harness';
 import { rateAllItemsInStep } from './review-helpers';
+import { EMAIL_GATE_COPY } from '../src/lib/contributionCopy';
+
+const BASE_URL = resolveLocalE2EBaseURL();
 
 // Derive Page type from the fixture to avoid importing from @playwright/test directly
 type Page = Parameters<Parameters<typeof test>[1]>[0]['authedPage'];
@@ -404,17 +413,120 @@ test.describe('Review form funnel', () => {
     await page.waitForURL(BUILDING_FORM_URL, { timeout: 15000 });
   });
 
-  test('sign-up from that page returns to the review form too', async ({ page }) => {
-    clearRateLimits();
+  /** Sign up from the review page's sign-in link; returns the new account's email. */
+  async function signUpFromReviewPage(page: Page): Promise<string> {
+    const email = `funnel-${Date.now()}@test.local`;
     await page.goto('/review/new?building=building-30');
     await page.waitForURL(/\/auth\/signin\?redirect=/, { timeout: 10000 });
     await page.locator('main a[href^="/auth/signup?redirect="]').click();
     await page.waitForURL(/\/auth\/signup\?redirect=/, { timeout: 10000 });
-    await page.fill('input[name="email"]', `funnel-${Date.now()}@test.local`);
+    await page.fill('input[name="email"]', email);
     await page.fill('input[name="password"]', SEED_PASSWORD);
     await page.fill('input[name="confirmPassword"]', SEED_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL(BUILDING_FORM_URL, { timeout: 15000 });
+    return email;
+  }
+
+  function buildingAddress(): string {
+    return JSON.parse(executeLocalD1("SELECT address FROM buildings WHERE id = 'building-30'"))[0].results[0].address;
+  }
+
+  /** The account's verification links, oldest first. Emails here are generated, never user input. */
+  function verificationTokens(email: string): string[] {
+    const rows = JSON.parse(
+      executeLocalD1(
+        `SELECT t.token FROM verification_tokens t JOIN users u ON u.id = t.user_id WHERE u.email = '${email}' ORDER BY t.created_at, t.rowid`
+      )
+    )[0].results as Array<{ token: string }>;
+    return rows.map((row) => row.token);
+  }
+
+  test('sign-up returns to the building, which asks for email verification first', async ({ page }) => {
+    clearRateLimits();
+    await signUpFromReviewPage(page);
+    const step = page.locator('[data-email-verification-gate]');
+    await expect(step).toBeVisible({ timeout: 15000 });
+    await expect(step).toContainText(buildingAddress());
+    await expect(page.locator('#review-bedrooms')).toHaveCount(0);
+  });
+
+  test('the sign-up link survives a resend, and resend after verifying elsewhere shows the form', async ({ page }) => {
+    clearRateLimits();
+    const email = await signUpFromReviewPage(page);
+    const [signUpLink] = verificationTokens(email);
+    expect(signUpLink).toBeTruthy();
+
+    // Resend from the step: the sign-up email's link must keep working (at most two live).
+    await page.locator('[data-email-gate-resend]').click();
+    await expect(page.locator('[data-email-gate-status]')).toHaveText(EMAIL_GATE_COPY.sent, { timeout: 10000 });
+    expect(verificationTokens(email)).toHaveLength(2);
+
+    // Open the sign-up email's link in another tab of the same browser.
+    const other = await page.context().newPage();
+    await other.goto(`/api/auth/verify-email?token=${encodeURIComponent(signUpLink)}`);
+    await other.waitForURL((url) => url.pathname === '/email-verified', { timeout: 15000 });
+    expect(verificationTokens(email)).toEqual([]);
+    await other.close();
+
+    // Back on the step, the resend button learns the account is verified and reloads to the form.
+    await page.locator('[data-email-gate-resend]').click();
+    await expect(page.locator('#review-bedrooms')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-email-verification-gate]')).toHaveCount(0);
+  });
+
+  // The seed's unverified account. Never verify it in a test: these cases depend on it.
+  const UNVERIFIED_EMAIL = 'pending@test.ratemyplace.local';
+
+  async function signInUnverified(page: Page): Promise<void> {
+    clearRateLimits();
+    await page.goto('/review/new?building=building-30');
+    await page.waitForURL(/\/auth\/signin\?redirect=/, { timeout: 10000 });
+    await signIn(page, UNVERIFIED_EMAIL);
+    await page.waitForURL(BUILDING_FORM_URL, { timeout: 15000 });
+  }
+
+  function reviewCountOf(email: string): number {
+    return JSON.parse(
+      executeLocalD1(`SELECT COUNT(*) AS n FROM reviews r JOIN users u ON u.id = r.user_id WHERE u.email = '${email}'`)
+    )[0].results[0].n;
+  }
+
+  test('an unverified account sees the verification step, not the form', async ({ page }) => {
+    await signInUnverified(page);
+    const step = page.locator('[data-email-verification-gate]');
+    await expect(step).toBeVisible({ timeout: 15000 });
+    await expect(step).toContainText(buildingAddress());
+    await expect(page.locator('#review-bedrooms')).toHaveCount(0);
+    await expect(page.locator('script[src*="challenges.cloudflare.com"]')).toHaveCount(0);
+
+    // Local has no Resend key; the route still answers 200 and the step says so.
+    await page.locator('[data-email-gate-resend]').click();
+    await expect(page.locator('[data-email-gate-status]')).toHaveText(EMAIL_GATE_COPY.sent, { timeout: 10000 });
+    await expect(page.locator('[data-email-gate-resend]')).toBeEnabled();
+    await expect(page.locator('[data-email-gate-resend]')).toHaveText(EMAIL_GATE_COPY.resend);
+  });
+
+  test('the review APIs refuse an unverified account', async ({ page }) => {
+    await signInUnverified(page);
+    const before = reviewCountOf(UNVERIFIED_EMAIL);
+
+    const responses = [
+      // A form POST needs the Origin header, or Astro's own origin check answers first.
+      await page.request.post('/api/reviews', {
+        multipart: { building_id: 'building-30', 'cf-turnstile-response': TURNSTILE_TEST_TOKEN },
+        headers: { Origin: BASE_URL },
+      }),
+      await page.request.patch('/api/reviews/any-id', { data: {} }),
+      await page.request.post('/api/buildings', { data: { streetAddress: '12 Example Rd', city: 'Boston' } }),
+    ];
+    for (const res of responses) {
+      // The JSON body and its reason rule out Astro's plain-text 403.
+      expect(res.status()).toBe(403);
+      expect(res.headers()['content-type']).toContain('application/json');
+      expect((await res.json()).details.reason).toBe('email_verification_required');
+    }
+    expect(reviewCountOf(UNVERIFIED_EMAIL)).toBe(before);
   });
 
   const HOSTILE = [

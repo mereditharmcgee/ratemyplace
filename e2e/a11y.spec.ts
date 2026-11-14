@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
-import { test, expect } from './fixtures';
+import { test, expect, clearRateLimits } from './fixtures';
 import { executeLocalD1 } from './test-harness';
 import { prepare, rateAllItemsInStep } from './review-helpers';
 import { FY2026_RESOURCE_ID } from '../src/lib/records/sources/boston/assessor';
@@ -34,8 +34,9 @@ import type {
 // Local only, like every spec here. Google Maps and Places are refused at the browser and the
 // two Places proxies answer with one fictional suggestion, so no Google API is called. Turnstile
 // is the e2e stub. The review walk never submits: the one Submit press is answered by a routed
-// 500. The only database write is a synthetic city-records fixture on one seed building, so the
-// records ledger has rows to open; it is removed in afterAll.
+// 500. The only database writes are a synthetic city-records fixture on one seed building, so the
+// records ledger has rows to open (removed in afterAll), and the session and rate-limit rows of
+// the email verification step's sign-in as the seed's unverified account.
 
 const ENFORCE_CONTRIBUTION_PATH = true;
 
@@ -61,6 +62,8 @@ const BUILDING_ID = 'building-01';
 const BUILDING_SLUG = '12-brighton-ave';
 const SEED_REVIEW_ID = 'review-001';
 const REVIEW_BUILDING_ID = 'building-30';
+// The seed's unverified account, for the email verification step. Never verified by a test.
+const UNVERIFIED_SEED = { email: 'pending@test.ratemyplace.local', password: 'TestPassword123!' };
 const LANDLORD_SLUG = 'allston-management-group-llc';
 
 // --- Recording ---
@@ -670,6 +673,27 @@ for (const viewport of VIEWPORTS) {
       await page.goto(`/review/edit/${SEED_REVIEW_ID}`);
       await page.locator('#review-edit-bedrooms').waitFor({ timeout: 15_000 });
       await scan(page, viewport, { ...target, state: 'default' });
+    });
+
+    test(`email verification step (${viewport.name})`, async ({ page }) => {
+      test.setTimeout(60_000);
+      await prepare(page, viewport);
+      // An unverified account sees this step in place of the form on both review pages.
+      const target = { page: 'email verification step', surface: 'signed-in', contributionPath: true } as const;
+
+      clearRateLimits();
+      await page.goto(`/review/new?building=${REVIEW_BUILDING_ID}`);
+      await page.waitForURL(/\/auth\/signin\?redirect=/);
+      await page.fill('input[name="email"]', UNVERIFIED_SEED.email);
+      await page.fill('input[name="password"]', UNVERIFIED_SEED.password);
+      await page.click('button[type="submit"]');
+      await page.locator('[data-email-verification-gate]').waitFor({ timeout: 15_000 });
+      await scan(page, viewport, { ...target, state: 'new review' });
+
+      // The edit page shows the same step and reads no review, so any review id will do.
+      await page.goto(`/review/edit/${SEED_REVIEW_ID}`);
+      await page.locator('[data-email-verification-gate]').waitFor({ timeout: 15_000 });
+      await scan(page, viewport, { ...target, state: 'edit review' });
     });
 
     test(`admin pages (${viewport.name})`, async ({ adminPage: page }) => {
