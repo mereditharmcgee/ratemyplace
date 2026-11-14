@@ -227,6 +227,16 @@ answer. Boston retiring a 311 resource id is a common cause and does not heal on
 `LEGACY_311_RESOURCES` in the 311 source has to be updated, and both the site and the Worker
 redeployed.
 
+A failed check can also mean the city's data moved while nothing broke. On 2026-11-13 the
+city reloaded RentSmart and the fixture parcel's rows went with it, so the old check,
+"RentSmart rows present", failed every morning and paused the fill again each time. The
+RentSmart checks now ask two things: that the adapter's parcel query answers (zero rows is an
+answer), and that a city-wide query on the same resource finds a row from the last 60 days
+with a ten-digit parcel. When a check fails this way, fix the check in
+`src/lib/records/fixture.ts`, then deploy the Worker with `npm run records:worker:deploy`. The
+fixture runs inside the Worker, so a site deploy alone does not change what the 06:00 planner
+checks.
+
 Then unpause from `/admin/records` with the Resume fill button, or, if the site is not
 reachable:
 
