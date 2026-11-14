@@ -5,6 +5,7 @@ import { checkRateLimit, buildRateLimitHeaders, getClientIP } from '../../lib/ra
 import { escapeLikePattern, sanitizeText } from '../../lib/validation';
 import { addressKey } from '../../lib/records/identity';
 import { findExistingBuilding, resolveInputFrom } from '../../lib/buildingResolve';
+import { emailVerificationRequired, hasVerifiedEmail } from '../../lib/emailVerification';
 
 export async function GET(context: APIContext): Promise<Response> {
   const query = (context.url.searchParams.get('q') || '').trim();
@@ -90,6 +91,11 @@ export async function POST(context: APIContext): Promise<Response> {
       headers: { 'Content-Type': 'application/json' }
     });
   }
+
+  // Order: authentication (401), verified email (403), then the content-type guard, the
+  // limiter and the write. Only the review form's address step calls this, and that page
+  // shows the email verification step instead of the form to an unverified account.
+  if (!hasVerifiedEmail(context.locals.user)) return emailVerificationRequired();
 
   // Content-type guard — MUST come before request.json() (which throws SyntaxError on
   // non-JSON) and before the rate limit, so a wrong content type does not spend a slot.

@@ -6,6 +6,7 @@ import { verifyPassword } from '../../../lib/password';
 import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { logError } from '../../../lib/logger';
 import { verifyTurnstile } from '../../../lib/turnstile';
+import { LEGACY_SIGNIN_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '../../../lib/passwordPolicy';
 
 export async function POST(context: APIContext): Promise<Response> {
   const formData = await context.request.formData();
@@ -26,7 +27,8 @@ export async function POST(context: APIContext): Promise<Response> {
     });
   }
 
-  if (password.length < 6 || password.length > 255) {
+  // Sign-up accepted 6 characters until March 2026; existing passwords that short must still sign in.
+  if (password.length < LEGACY_SIGNIN_MIN_LENGTH || password.length > PASSWORD_MAX_LENGTH) {
     return new Response(JSON.stringify({ error: 'Invalid password' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' }

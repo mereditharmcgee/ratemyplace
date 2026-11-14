@@ -11,6 +11,7 @@ import { trackSend } from '../../../lib/trackSend';
 import { logError } from '../../../lib/logger';
 import { verifyTurnstile } from '../../../lib/turnstile';
 import { isValidEmail } from '../../../lib/validation';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../../../lib/passwordPolicy';
 
 export async function POST(context: APIContext): Promise<Response> {
   const formData = await context.request.formData();
@@ -34,8 +35,8 @@ export async function POST(context: APIContext): Promise<Response> {
     });
   }
 
-  if (password.length < 8 || password.length > 255) {
-    return new Response(JSON.stringify({ error: 'Password must be at least 8 characters' }), {
+  if (password.length < PASSWORD_MIN_LENGTH || password.length > PASSWORD_MAX_LENGTH) {
+    return new Response(JSON.stringify({ error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters` }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' }
     });

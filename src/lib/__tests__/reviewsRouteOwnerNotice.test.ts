@@ -22,7 +22,7 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
-function context(db: unknown, request: Request, user: { id: string } | null, params: Record<string, string> = {}): APIContext {
+function context(db: unknown, request: Request, user: { id: string; emailVerified: boolean } | null, params: Record<string, string> = {}): APIContext {
   return {
     request,
     params,
@@ -54,7 +54,7 @@ function postDb(options: { building?: boolean; insertFails?: boolean } = {}) {
 describe('POST /api/reviews owner notice', () => {
   it('queues exactly a review_submitted notice for the building after the insert', async () => {
     const { db, calls } = postDb();
-    const response = await POST(context(db, postRequest(reviewForm()), { id: 'u1' }));
+    const response = await POST(context(db, postRequest(reviewForm()), { id: 'u1', emailVerified: true }));
 
     expect(response.status).toBe(200);
     expect(calls.some((call) => call.sql.includes('INSERT INTO reviews'))).toBe(true);
@@ -64,28 +64,28 @@ describe('POST /api/reviews owner notice', () => {
 
   it('does not queue for an unknown building', async () => {
     const { db } = postDb({ building: false });
-    const response = await POST(context(db, postRequest(reviewForm()), { id: 'u1' }));
+    const response = await POST(context(db, postRequest(reviewForm()), { id: 'u1', emailVerified: true }));
     expect(response.status).toBe(404);
     expect(queued).not.toHaveBeenCalled();
   });
 
   it('does not queue for an out-of-range score', async () => {
     const { db } = postDb();
-    const response = await POST(context(db, postRequest(reviewForm({ unit_structural: '9' })), { id: 'u1' }));
+    const response = await POST(context(db, postRequest(reviewForm({ unit_structural: '9' })), { id: 'u1', emailVerified: true }));
     expect(response.status).toBe(400);
     expect(queued).not.toHaveBeenCalled();
   });
 
   it('does not queue when Turnstile fails', async () => {
     const { db } = postDb();
-    const response = await POST(context(db, postRequest(reviewForm({ 'cf-turnstile-response': 'bad' })), { id: 'u1' }));
+    const response = await POST(context(db, postRequest(reviewForm({ 'cf-turnstile-response': 'bad' })), { id: 'u1', emailVerified: true }));
     expect(response.status).toBe(400);
     expect(queued).not.toHaveBeenCalled();
   });
 
   it('does not queue when the insert fails (the notice comes after the write)', async () => {
     const { db } = postDb({ insertFails: true });
-    const response = await POST(context(db, postRequest(reviewForm()), { id: 'u1' }));
+    const response = await POST(context(db, postRequest(reviewForm()), { id: 'u1', emailVerified: true }));
     expect(response.status).toBe(500);
     expect(queued).not.toHaveBeenCalled();
   });
@@ -124,7 +124,7 @@ describe('PATCH /api/reviews/[id] owner notice', () => {
 
   it.each(['approved', 'rejected', 'flagged'])('queues review_edited when an %s review is edited back to pending', async (status) => {
     const { db } = patchDb(status);
-    const response = await PATCH(context(db, patchRequest(), { id: 'u1' }, { id: 'r1' }));
+    const response = await PATCH(context(db, patchRequest(), { id: 'u1', emailVerified: true }, { id: 'r1' }));
     expect(response.status).toBe(200);
     expect(queued).toHaveBeenCalledOnce();
     expect(queued.mock.calls[0][1]).toEqual({ kind: 'review_edited', buildingId: 'b1' });
@@ -132,21 +132,21 @@ describe('PATCH /api/reviews/[id] owner notice', () => {
 
   it('does not queue when the review was already pending', async () => {
     const { db } = patchDb('pending');
-    const response = await PATCH(context(db, patchRequest(), { id: 'u1' }, { id: 'r1' }));
+    const response = await PATCH(context(db, patchRequest(), { id: 'u1', emailVerified: true }, { id: 'r1' }));
     expect(response.status).toBe(200);
     expect(queued).not.toHaveBeenCalled();
   });
 
   it("does not queue for someone else's review", async () => {
     const { db } = patchDb('approved', { owner: 'someone-else' });
-    const response = await PATCH(context(db, patchRequest(), { id: 'u1' }, { id: 'r1' }));
+    const response = await PATCH(context(db, patchRequest(), { id: 'u1', emailVerified: true }, { id: 'r1' }));
     expect(response.status).toBe(403);
     expect(queued).not.toHaveBeenCalled();
   });
 
   it('does not queue when the update fails', async () => {
     const { db } = patchDb('approved', { updateFails: true });
-    const response = await PATCH(context(db, patchRequest(), { id: 'u1' }, { id: 'r1' }));
+    const response = await PATCH(context(db, patchRequest(), { id: 'u1', emailVerified: true }, { id: 'r1' }));
     expect(response.status).toBe(500);
     expect(queued).not.toHaveBeenCalled();
   });

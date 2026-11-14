@@ -12,7 +12,7 @@ import { fakeD1 } from './helpers/fakeD1';
 
 const SIGNED_OUT = { user: null, session: null } as unknown as App.Locals;
 const SIGNED_IN = {
-  user: { id: 'u-1', email: 'u@example.com', isAdmin: false },
+  user: { id: 'u-1', email: 'u@example.com', emailVerified: true, isAdmin: false },
   session: { id: 's-1' },
 } as unknown as App.Locals;
 

@@ -125,6 +125,7 @@ validation, and rate limiting. A missing check is a live vulnerability, not a st
 
 - [ ] Auth check if it needs one (`context.locals.user`)
 - [ ] Admin check if admin-only (`context.locals.user?.isAdmin`)
+- [ ] Verified email if it writes review content or creates a building (`emailVerificationRequired()` right after the 401)
 - [ ] Content-type guard if it accepts JSON
 - [ ] Rate limiting if it is public
 - [ ] Turnstile if it is an unauthenticated public POST
@@ -182,6 +183,9 @@ be verified as the *author* of that review, not merely logged in.
 Success `{ data }` / client error `{ error, details }` / server error `{ error }`, all with
 `Content-Type: application/json`. Never return a stack trace, file path, SQL fragment, or
 internal field name — log detail server-side with `logError` from `lib/logger.ts`.
+`details` is an array of `{ field, message }` for validation errors, and an object with a
+`reason` (the reason envelope, shared with Phase 26) for 401/403/409 outcomes a client acts
+on, for example `{ error, details: { reason: 'email_verification_required' } }`.
 
 Select columns explicitly on anything public-facing. `admin_notes` leaked through a search
 endpoint once because the query used `SELECT *`.
@@ -452,6 +456,15 @@ Things that have already cost time. Read before debugging.
   `oauth_state`). Any other reader of a return path must use it, or it is an open redirect.
   A naive "resolve with `new URL` and take the pathname" turns `/.//evil.example` into
   `//evil.example`, which a browser reads as another host.
+- **Review pages and review writes need a verified email.** `/review/new`,
+  `/review/edit/[id]`, `POST /api/reviews`, `PATCH /api/reviews/[id]` and `POST /api/buildings`
+  check `hasVerifiedEmail` (`src/lib/emailVerification.ts`) right after authentication, before
+  any statement; the pages render `EmailVerificationGate` in place of the form and the routes
+  answer 403 with `details.reason` `email_verification_required`. Lucia re-reads
+  `users.email_verified` on every request, so an email change gates the next request; the
+  email-change route also deletes outstanding verification links. A resend keeps the previous
+  unexpired link (at most two live), and a verification deletes both. Route tests must sign in
+  with `emailVerified: true`. Existing reviews by unverified accounts are not hidden or changed.
 - **React islands import only leaf modules from `src/lib`.** `reviewPaths`,
   `reviewSubmitOutcome` and `authRedirect` have no runtime imports, which
   `clientLeafModules.test.ts` enforces. Importing a server module such as `reviewHandoff`,

@@ -3,6 +3,8 @@
  * Pure functions — no side effects — so they can be unit tested directly.
  */
 
+import { PASSWORD_MIN_LENGTH } from './passwordPolicy';
+
 export interface ValidationResult<T = string | null> {
   valid: boolean;
   value?: T;
@@ -28,11 +30,11 @@ export function validateDisplayName(raw: string): ValidationResult<string | null
 
 /**
  * Validate a password.
- * - Minimum 8 characters
+ * - Minimum PASSWORD_MIN_LENGTH (8) characters
  */
 export function validatePassword(password: string): ValidationResult<string> {
-  if (password.length < 8) {
-    return { valid: false, error: 'Password must be at least 8 characters' };
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return { valid: false, error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters` };
   }
   return { valid: true, value: password };
 }
