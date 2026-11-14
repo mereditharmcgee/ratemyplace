@@ -11,6 +11,7 @@ import {
   clusterBadgeStyle,
   clusterTitle,
 } from '../lib/mapCluster';
+import { markerScoreText, markerTitle } from '../lib/mapMarker';
 import { prefersReducedMotion } from '../lib/motion';
 
 interface Building {
@@ -276,7 +277,7 @@ export default function BuildingMap({
       <path d="M16 0C7.163 0 0 7.163 0 16c0 12 16 24 16 24s16-12 16-24c0-8.837-7.163-16-16-16z" fill="${color}"/>
       <circle cx="16" cy="14" r="8" fill="white" opacity="0.9"/>
       <text x="16" y="18" text-anchor="middle" font-size="10" font-weight="bold" fill="${color}">
-        ${building.avgScore !== null ? building.avgScore.toFixed(1) : '?'}
+        ${markerScoreText(building.avgScore)}
       </text>
     `;
 
@@ -397,17 +398,19 @@ export default function BuildingMap({
     // alone or inside a cluster badge, depending on zoom.
     buildings.forEach(building => {
       const markerElement = createMarkerElement(building);
+      const scoreLabel = getMarkerLabel(building.avgScore);
 
+      // The title is the marker's tooltip and accessible name, so it starts with the score
+      // the pin shows (WCAG 2.5.3 Label in Name; see src/lib/mapMarker.ts).
       const marker = new google.maps.marker.AdvancedMarkerElement({
         position: { lat: building.latitude, lng: building.longitude },
         content: markerElement,
-        title: building.address
+        title: markerTitle(building.address, building.avgScore, scoreLabel)
       });
 
       marker.addListener('click', () => {
         setSelectedBuilding(building);
 
-        const scoreLabel = getMarkerLabel(building.avgScore);
         const scoreColor = getMarkerHex(building.avgScore);
 
         // Build the InfoWindow with DOM nodes + textContent rather than an HTML
