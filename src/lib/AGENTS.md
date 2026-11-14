@@ -51,13 +51,22 @@ Four bands: Good 4.0–5.0, Mixed 3.0–3.9, Concerning 2.0–2.9, Poor 1.0–1.
 
 Use the helpers — never hardcode a threshold or a color:
 
-- `getScoreColor(score)` → `{ bg, text, label }` for filled badges and pills
+- `getScoreColor(score)` → `{ bg, text, label }` for filled badges and pills. Its `text` is
+  white, which is under AA on the Mixed (2.13:1) and Good (3.65:1) fills, so no surface prints
+  it: `contrastTokens.test.ts` fails on any source that reads it, admin included
+- `getScoreChipColor(score)` → `{ bg, text, border, label }`: the band tint, dark band text
+  (800, or 900 on the Concerning amber-100) and a border in the band fill. Use it for small
+  score text on a band colour; the admin review chips and the profile saved tile do
 - `getScoreTextColor(score)` → Tailwind class for a colored score number
 - `getScoreBgTint(score)` → soft-tinted background for score detail tiles
-- `getScoreHex(score)` / `SCORE_HEX` → hex for non-Tailwind contexts (Maps markers, OG images)
+- `getScoreHex(score)` / `SCORE_HEX` → hex for non-Tailwind contexts (Maps markers, OG images).
+  These are fills; a band label in text uses `getScoreTextHex` / `SCORE_TEXT_HEX` (each
+  band's 800), which the map info window draws on the marker tint
 - `getEarlyScoreStyle(score)` → the muted look of an early rating: `text` / `textHex` is a
   neutral gray-600 for the number (AA at any size on white, Paper and the score tints), and
-  `marker` / `markerHex` is the band fill for the small dot beside it, so the band still reads
+  `marker` / `markerHex` is the band fill for the small dot beside it, so the band still reads.
+  The dot is the only band cue, so it needs 3:1: Mixed's amber-500 is not, and its `marker`
+  adds a 1px amber-700 ring (`scoring-colors.test.ts` measures every band on every surface)
 
 ### `earlyRating.ts` is how a thin score is displayed, not computed
 

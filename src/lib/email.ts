@@ -119,21 +119,21 @@ export async function sendVerificationEmail(
 
   <p style="margin: 30px 0;">
     <a href="${verificationUrl}"
-       style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+       style="background-color: #0f766e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
       Verify email
     </a>
   </p>
 
   <p style="color: #666; font-size: 14px;">
     Or copy and paste this link into your browser:<br>
-    <a href="${verificationUrl}" style="color: #0d9488; word-break: break-all;">${verificationUrl}</a>
+    <a href="${verificationUrl}" style="color: #0f766e; word-break: break-all;">${verificationUrl}</a>
   </p>
 
   <p style="color: #666; font-size: 14px;">This link will expire in 24 hours.</p>
 
   <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
 
-  <p style="color: #999; font-size: 12px;">
+  <p style="color: #6b7280; font-size: 12px;">
     If you didn't create an account on RateMyPlace Boston, you can safely ignore this email.
   </p>
 </body>
@@ -176,21 +176,21 @@ export async function sendPasswordResetEmail(
 
   <p style="margin: 30px 0;">
     <a href="${resetUrl}"
-       style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+       style="background-color: #0f766e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
       Reset Password
     </a>
   </p>
 
   <p style="color: #666; font-size: 14px;">
     Or copy and paste this link into your browser:<br>
-    <a href="${resetUrl}" style="color: #0d9488; word-break: break-all;">${resetUrl}</a>
+    <a href="${resetUrl}" style="color: #0f766e; word-break: break-all;">${resetUrl}</a>
   </p>
 
   <p style="color: #dc2626; font-size: 14px; font-weight: 500;">This link will expire in 1 hour.</p>
 
   <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
 
-  <p style="color: #999; font-size: 12px;">
+  <p style="color: #6b7280; font-size: 12px;">
     If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.
   </p>
 </body>
@@ -257,8 +257,8 @@ export async function sendDisputeConfirmationEmail(
 
   <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
 
-  <p style="color: #999; font-size: 12px;">
-    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a> for follow-ups.
+  <p style="color: #6b7280; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0f766e;">ratemyplace.org/contact</a> for follow-ups.
   </p>
 </body>
 </html>
@@ -311,8 +311,8 @@ export async function sendContactConfirmationEmail(
 
   <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
 
-  <p style="color: #999; font-size: 12px;">
-    Sent automatically. Reply to this email or use <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>. Both reach us.
+  <p style="color: #6b7280; font-size: 12px;">
+    Sent automatically. Reply to this email or use <a href="https://ratemyplace.org/contact" style="color: #0f766e;">ratemyplace.org/contact</a>. Both reach us.
   </p>
 </body>
 </html>
@@ -355,19 +355,19 @@ export async function sendContactNotificationEmail(
 
   <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
     <p style="margin: 0 0 8px 0;"><strong>Name:</strong> ${escapeHtml(submitterName)}</p>
-    <p style="margin: 0 0 8px 0;"><strong>Email:</strong> <a href="mailto:${encodeURIComponent(submitterEmail)}" style="color: #0d9488;">${escapeHtml(submitterEmail)}</a></p>
+    <p style="margin: 0 0 8px 0;"><strong>Email:</strong> <a href="mailto:${encodeURIComponent(submitterEmail)}" style="color: #0f766e;">${escapeHtml(submitterEmail)}</a></p>
     <p style="margin: 0 0 8px 0;"><strong>Category:</strong> ${escapeHtml(category)}</p>
     <p style="margin: 16px 0 4px 0;"><strong>Message preview:</strong></p>
     <p style="margin: 0; color: #666;">${escapeHtml(messagePreview)}</p>
   </div>
 
   <p style="color: #666; font-size: 14px;">
-    View all submissions at <a href="https://ratemyplace.org/admin/contact" style="color: #0d9488;">ratemyplace.org/admin/contact</a>
+    View all submissions at <a href="https://ratemyplace.org/admin/contact" style="color: #0f766e;">ratemyplace.org/admin/contact</a>
   </p>
 
   <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
 
-  <p style="color: #999; font-size: 12px;">This is an automated admin notification from RateMyPlace Boston.</p>
+  <p style="color: #6b7280; font-size: 12px;">This is an automated admin notification from RateMyPlace Boston.</p>
 </body>
 </html>
       `,
@@ -397,12 +397,12 @@ const DISPUTE_OUTCOME_COPY: Record<DisputeResolutionOutcome, DisputeOutcomeCopy>
   uphold: {
     subject: 'We upheld your dispute',
     heading: 'We upheld your dispute',
-    lede: 'We\'ve upheld your dispute. The review has been updated according to our <a href="https://ratemyplace.org/guidelines" style="color: #0d9488;">content guidelines</a>.',
+    lede: 'We\'ve upheld your dispute. The review has been updated according to our <a href="https://ratemyplace.org/guidelines" style="color: #0f766e;">content guidelines</a>.',
   },
   dismiss: {
     subject: 'We did not uphold your dispute',
     heading: 'We did not uphold your dispute',
-    lede: 'We reviewed your dispute and decided not to act on it. The review stands. Reviews can be valid even when a landlord disagrees, so long as they meet our <a href="https://ratemyplace.org/guidelines" style="color: #0d9488;">content guidelines</a>.',
+    lede: 'We reviewed your dispute and decided not to act on it. The review stands. Reviews can be valid even when a landlord disagrees, so long as they meet our <a href="https://ratemyplace.org/guidelines" style="color: #0f766e;">content guidelines</a>.',
   },
   partially_valid: {
     subject: 'We partially upheld your dispute',
@@ -447,8 +447,8 @@ export async function sendDisputeResolutionEmail(
 
   <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
 
-  <p style="color: #999; font-size: 12px;">
-    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>.
+  <p style="color: #6b7280; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0f766e;">ratemyplace.org/contact</a>.
   </p>
 </body>
 </html>
@@ -509,14 +509,14 @@ export async function sendReviewRejectedEmail(
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <h2 style="color: #0d9488;">Your review wasn't published</h2>
 
-  <p>We didn't publish your review of <strong>${escapeHtml(buildingAddress)}</strong>. It didn't meet our <a href="${guidelinesUrl}" style="color: #0d9488;">content guidelines</a>.</p>
+  <p>We didn't publish your review of <strong>${escapeHtml(buildingAddress)}</strong>. It didn't meet our <a href="${guidelinesUrl}" style="color: #0f766e;">content guidelines</a>.</p>
 ${reasonBlock}
-  <p>You can edit and resubmit from your <a href="${profileUrl}" style="color: #0d9488;">profile</a>. Most rejections are about specific fixes (removing names, dates, or other identifying details), not the substance of what you experienced.</p>
+  <p>You can edit and resubmit from your <a href="${profileUrl}" style="color: #0f766e;">profile</a>. Most rejections are about specific fixes (removing names, dates, or other identifying details), not the substance of what you experienced.</p>
 
   <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
 
-  <p style="color: #999; font-size: 12px;">
-    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a> if you think this was a mistake.
+  <p style="color: #6b7280; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0f766e;">ratemyplace.org/contact</a> if you think this was a mistake.
   </p>
 </body>
 </html>
@@ -595,12 +595,12 @@ export async function sendRecordCorrectionOutcomeEmail(
 
   <p>${copy.lede}</p>
 
-  <p><a href="${buildingUrl}" style="color: #0d9488;">View the building page</a></p>
+  <p><a href="${buildingUrl}" style="color: #0f766e;">View the building page</a></p>
 
   <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
 
-  <p style="color: #999; font-size: 12px;">
-    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0d9488;">ratemyplace.org/contact</a>.
+  <p style="color: #6b7280; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0f766e;">ratemyplace.org/contact</a>.
   </p>
 </body>
 </html>
@@ -766,14 +766,14 @@ export async function sendOwnerNoticeEmail(
 
   <p style="margin: 30px 0;">
     <a href="${notice.adminUrl}"
-       style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+       style="background-color: #0f766e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
       ${copy.cta}
     </a>
   </p>
 
   <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
 
-  <p style="color: #999; font-size: 12px;">This is an automated admin notification from RateMyPlace Boston.</p>
+  <p style="color: #6b7280; font-size: 12px;">This is an automated admin notification from RateMyPlace Boston.</p>
 </body>
 </html>
       `,
