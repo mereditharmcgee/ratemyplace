@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, resetE2eAccountReviews } from './fixtures';
 import {
   executeLocalD1,
   resolveLocalE2EBaseURL,
@@ -91,7 +91,11 @@ async function submitReviewAsAuthedUser(
 }
 
 test.describe('Phase 20: Critical Flows', () => {
-  test.beforeEach(() => cleanupPhase20Reviews());
+  test.beforeEach(() => {
+    // A review another spec wrote moments earlier would put this account inside the pause.
+    resetE2eAccountReviews();
+    cleanupPhase20Reviews();
+  });
   test.afterEach(() => cleanupPhase20Reviews());
 
   // ─── TEST-01: Causal audit-log assertion ────────────────────────────────

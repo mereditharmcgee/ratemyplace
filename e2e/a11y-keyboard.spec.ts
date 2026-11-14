@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { test, expect } from './fixtures';
+import { test, expect, resetE2eAccountReviews } from './fixtures';
 import { executeLocalD1 } from './test-harness';
 import { prepare } from './review-helpers';
 import { FY2026_RESOURCE_ID } from '../src/lib/records/sources/boston/assessor';
@@ -308,6 +308,9 @@ test.describe('batch 2: both address searches are comboboxes with a listbox popu
 });
 
 test.describe('batch 3: rating questions are native radio groups', () => {
+  // An e2e-account review of building-30 would replace the form with a link to it.
+  test.beforeAll(() => resetE2eAccountReviews());
+
   test('Tab enters a question on its first answer, arrows choose, and Tab leaves the question', async ({
     authedPage: page,
   }) => {
@@ -367,6 +370,9 @@ test.describe('batch 3: rating questions are native radio groups', () => {
 });
 
 test.describe('batch 4: review steps move focus to their heading, and the progress row fits', () => {
+  // An e2e-account review of building-30 would replace the form with a link to it.
+  test.beforeAll(() => resetE2eAccountReviews());
+
   // building-30 is a seed building; the form opens at unit details. Nothing here is submitted.
   async function openUnitDetails(page: Page) {
     await page.goto('/review/new?building=building-30');
@@ -642,6 +648,9 @@ test.describe('batch 6: unit cards and admin rows are native disclosure buttons'
 });
 
 test.describe('batch 7: reduced motion stops transitions and spinners', () => {
+  // An e2e-account review of building-30 would replace the form with a link to it.
+  test.beforeAll(() => resetE2eAccountReviews());
+
   // The global.css rule under prefers-reduced-motion: reduce sets every duration to 0.01ms.
   // Each test also turns motion back on, to show the same element does move by default.
   const REDUCED_MS = 0.01;

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
-import { test, expect, clearRateLimits } from './fixtures';
+import { test, expect, clearRateLimits, resetE2eAccountReviews } from './fixtures';
 import { executeLocalD1 } from './test-harness';
 import { prepare, rateAllItemsInStep } from './review-helpers';
 import { FY2026_RESOURCE_ID } from '../src/lib/records/sources/boston/assessor';
@@ -487,6 +487,10 @@ test.afterAll(() => {
 
 for (const viewport of VIEWPORTS) {
   test.describe(`axe baseline at ${viewport.width}x${viewport.height}`, () => {
+    // The review form scans open building-30 as the e2e account: with a review of it left
+    // behind, the page would show that review instead of the form.
+    test.beforeAll(() => resetE2eAccountReviews());
+
     test(`home (${viewport.name})`, async ({ page }) => {
       test.setTimeout(60_000);
       await prepare(page, viewport);

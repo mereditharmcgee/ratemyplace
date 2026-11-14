@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'url';
 import path from 'path';
-import { test, expect, clearRateLimits } from './fixtures';
+import { test, expect, clearRateLimits, resetE2eAccountReviews } from './fixtures';
 import {
   executeLocalD1,
   installTurnstileStub,
@@ -10,6 +10,7 @@ import {
 } from './test-harness';
 import { rateAllItemsInStep } from './review-helpers';
 import { EMAIL_GATE_COPY } from '../src/lib/contributionCopy';
+import { REVIEW_LIMIT_COPY } from '../src/lib/reviewLimits';
 
 const BASE_URL = resolveLocalE2EBaseURL();
 
@@ -23,6 +24,10 @@ const __dirname = path.dirname(__filename);
 const USER_AUTH_FILE = path.join(__dirname, '../playwright/.auth/user.json');
 
 test.describe('Review Form', () => {
+  // One review per account and building, and a pause between submissions: start every test
+  // with none of this suite's reviews, and leave none for the specs that open building-30 later.
+  test.beforeEach(() => resetE2eAccountReviews());
+  test.afterAll(() => resetE2eAccountReviews());
 
   // E2E-03: Complete review submission happy path
   test('complete review submission happy path', async ({ authedPage }) => {
@@ -231,11 +236,50 @@ test.describe('Review Form', () => {
     await expect(radio5).toBeChecked();
   });
 
+  test('a second review of the same building shows the existing one', async ({ authedPage }) => {
+    clearRateLimits();
+    const submit = () =>
+      authedPage.request.post('/api/reviews', {
+        multipart: { building_id: 'building-30', unit_structural: '4', 'cf-turnstile-response': TURNSTILE_TEST_TOKEN },
+        // A form POST needs the Origin header, or Astro's own origin check answers first.
+        headers: { Origin: BASE_URL },
+      });
+    const first = await submit();
+    expect(first.status(), await first.text()).toBe(200);
+    const { reviewId } = (await first.json()) as { reviewId: string };
+    const editPath = `/review/edit/${encodeURIComponent(reviewId)}`;
+
+    // The route refuses a second one in the reason envelope.
+    const second = await submit();
+    expect(second.status()).toBe(409);
+    expect(await second.json()).toEqual({
+      error: REVIEW_LIMIT_COPY.alreadyReviewed,
+      details: { reason: 'already_reviewed', editPath },
+    });
+
+    // The page shows the existing review instead of the form.
+    await authedPage.goto('/review/new?building=building-30');
+    const notice = authedPage.locator('[data-existing-review]');
+    await expect(notice).toContainText(REVIEW_LIMIT_COPY.alreadyReviewed);
+    const link = notice.getByRole('link', { name: REVIEW_LIMIT_COPY.editLink });
+    await expect(link).toHaveAttribute('href', editPath);
+    await expect(authedPage.locator('#review-bedrooms')).toHaveCount(0);
+    await expect(authedPage.getByRole('button', { name: /Submit Review/ })).toHaveCount(0);
+    await expect(authedPage.locator('script[src*="challenges.cloudflare.com"]')).toHaveCount(0);
+
+    await link.click();
+    await authedPage.waitForURL((url) => url.pathname === editPath, { timeout: 15000 });
+    await expect(authedPage.getByRole('heading', { level: 1, name: REVIEW_LIMIT_COPY.editLink })).toBeVisible();
+  });
+
 });
 
-// E2E-06: Concurrent duplicate review submissions handled gracefully
+// E2E-06: Concurrent duplicate review submissions: exactly one is written.
 test.describe('Concurrent Submissions', () => {
-  test('concurrent duplicate reviews handled gracefully', async ({ browser }) => {
+  test.beforeEach(() => resetE2eAccountReviews());
+  test.afterAll(() => resetE2eAccountReviews());
+
+  test('concurrent duplicate submissions create exactly one review', async ({ browser }) => {
     // Increase timeout — this test fills the form twice (sequentially) then submits both concurrently
     test.setTimeout(120000);
 
@@ -302,16 +346,16 @@ test.describe('Concurrent Submissions', () => {
       page2.locator('button[type="button"]', { hasText: 'Submit Review' }).click(),
     ]);
 
-    // Wait for both pages to navigate AWAY from the review form.
-    // The current URL is /review/new?building=building-30.
-    // On success, both pages navigate to /building/<slug>?submitted=true.
-    // On error, both pages stay on /review/... (same URL with error shown in React state).
-    // Wait for the URL to NOT be the review form URL (i.e., navigate to building page).
-    // Use .catch(() => {}) so a timeout doesn't fail the test — we assert below.
-    await Promise.all([
-      page1.waitForURL(/\/building\//, { timeout: 30000 }).catch(() => {}),
-      page2.waitForURL(/\/building\//, { timeout: 30000 }).catch(() => {}),
-    ]);
+    // D1 runs one statement at a time and the insert carries the one-review guard, so one
+    // submission lands on the building page and the other stays on the form with the
+    // already-reviewed message, every answer kept. Each wait settles either way.
+    const settle = (page: Page) =>
+      Promise.race([
+        page.waitForURL(/\/building\//, { timeout: 30000 }).then(() => 'written', () => 'timeout'),
+        page.getByText(REVIEW_LIMIT_COPY.alreadyReviewed).waitFor({ timeout: 30000 }).then(() => 'refused', () => 'timeout'),
+      ]);
+    const outcomes = await Promise.all([settle(page1), settle(page2)]);
+    expect([...outcomes].sort()).toEqual(['refused', 'written']);
 
     // Neither page should show a 500 Internal Server Error
     const body1 = await page1.textContent('body');
@@ -319,11 +363,11 @@ test.describe('Concurrent Submissions', () => {
     expect(body1).not.toContain('Internal Server Error');
     expect(body2).not.toContain('Internal Server Error');
 
-    // At least one submission should have succeeded (redirected to building page)
-    const url1 = page1.url();
-    const url2 = page2.url();
-    const oneSucceeded = url1.includes('/building/') || url2.includes('/building/');
-    expect(oneSucceeded).toBe(true);
+    // Exactly one review of the building by this account.
+    const stored = JSON.parse(
+      executeLocalD1("SELECT COUNT(*) AS n FROM reviews WHERE user_id = 'user-test-01' AND building_id = 'building-30'")
+    )[0].results[0].n;
+    expect(stored).toBe(1);
 
     // Cleanup — do NOT sign out (would invalidate the shared session)
     await ctx1.close();
@@ -349,8 +393,11 @@ test.describe('Review form funnel', () => {
     executeLocalD1("UPDATE buildings SET google_place_id = 'e2e-place-30' WHERE id = 'building-30'");
   }
 
+  test.beforeEach(() => resetE2eAccountReviews());
+
   test.afterAll(() => {
     executeLocalD1("UPDATE buildings SET admin_notes = NULL, owner_name = NULL, google_place_id = NULL WHERE id = 'building-30'");
+    resetE2eAccountReviews();
   });
 
   async function walkToConfirm(page: Page) {
