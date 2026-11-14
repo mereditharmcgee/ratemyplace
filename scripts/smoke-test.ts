@@ -14,7 +14,8 @@ async function main(): Promise<void> {
   const results = await runSmoke(config);
   for (const item of results) {
     const outcome = item.ok ? 'PASS' : 'FAIL';
-    console.log(`${outcome} ${item.path} ${item.status} ${item.durationMs}ms${item.detail ? ` ${item.detail}` : ''}`);
+    // The name leads because a path can be probed twice (`home` and `index-home` both read /).
+    console.log(`${outcome} ${item.name} ${item.path} ${item.status} ${item.durationMs}ms${item.detail ? ` ${item.detail}` : ''}`);
   }
   if (results.some((item) => !item.ok)) process.exitCode = 1;
 }

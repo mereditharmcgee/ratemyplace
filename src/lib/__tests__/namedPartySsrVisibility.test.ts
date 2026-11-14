@@ -196,6 +196,54 @@ function headHtml(html: string): string {
   return match[1];
 }
 
+type JsonLdNode = Record<string, unknown>;
+
+/** Every structured-data block in the head, parsed. */
+function jsonLdBlocks(head: string): JsonLdNode[] {
+  const fragment = document.createElement('div');
+  fragment.innerHTML = head;
+  return Array.from(fragment.querySelectorAll('script[type="application/ld+json"]'), (script) =>
+    JSON.parse(script.textContent ?? '') as JsonLdNode,
+  );
+}
+
+function jsonLdNode(block: JsonLdNode, type: string): JsonLdNode | undefined {
+  return (block['@graph'] as JsonLdNode[]).find((node) => node['@type'] === type);
+}
+
+/** Every key at any depth, and every @type value. */
+function jsonLdKeysAndTypes(value: unknown): { keys: string[]; types: unknown[] } {
+  const keys: string[] = [];
+  const types: unknown[] = [];
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) node.forEach(walk);
+    else if (node && typeof node === 'object') {
+      for (const [key, child] of Object.entries(node)) {
+        keys.push(key);
+        if (key === '@type') types.push(child);
+        walk(child);
+      }
+    }
+  };
+  walk(value);
+  return { keys, types };
+}
+
+const RATING_KEYS = ['aggregateRating', 'review', 'reviews', 'reviewRating', 'ratingValue', 'ratingCount', 'reviewCount', 'bestRating', 'worstRating'];
+const RATING_TYPES = ['AggregateRating', 'Review', 'Rating'];
+
+/** The trail the page header shows, as { name, item } with links resolved against the page. */
+function visibleTrail(html: string, pageUrl: string): Array<{ name: string; item: string }> {
+  const nav = mainFragment(html).querySelector('nav');
+  if (!nav) throw new Error('Rendered page is missing its breadcrumb nav');
+  return Array.from(nav.children)
+    .filter((child) => child.tagName === 'A' || (child.tagName === 'SPAN' && child.textContent?.trim() !== '/'))
+    .map((child) => ({
+      name: child.textContent?.trim() ?? '',
+      item: child.tagName === 'A' ? new URL(child.getAttribute('href') ?? '', pageUrl).href : pageUrl,
+    }));
+}
+
 function headTag(head: string, selector: string, attribute: string): string | null {
   const fragment = document.createElement('div');
   fragment.innerHTML = head;
@@ -346,13 +394,88 @@ suite('named-party score visibility in rendered SSR pages', () => {
   ])('keeps the withheld $label aggregate and internal ids out of the head', async ({ Page, route, thinSlug, thinScore, thinIds }) => {
     const database = makeDatabase();
     try {
-      const head = headHtml(await renderDetail(database, Page, route, thinSlug));
+      const html = await renderDetail(database, Page, route, thinSlug);
+      const head = headHtml(html);
       const url = `https://ratemyplace.org/${route}/${thinSlug}`;
 
       expect(head).not.toContain(thinScore);
       for (const id of thinIds) expect(head).not.toContain(id);
       expect(headTag(head, 'link[rel="canonical"]', 'href')).toBe(url);
       expect(headTag(head, 'meta[property="og:url"]', 'content')).toBe(url);
+
+      // SEO-05: the structured data is the head too. One block, at the canonical, with the
+      // trail the page shows and nothing else: no score, no id, no rating markup.
+      const blocks = jsonLdBlocks(head);
+      expect(blocks).toHaveLength(1);
+      const text = JSON.stringify(blocks[0]);
+      expect(text).not.toContain(thinScore);
+      for (const id of thinIds) expect(text).not.toContain(id);
+      const { keys, types } = jsonLdKeysAndTypes(blocks[0]);
+      for (const key of RATING_KEYS) expect(keys).not.toContain(key);
+      for (const type of RATING_TYPES) expect(types).not.toContain(type);
+      expect(jsonLdNode(blocks[0], 'WebPage')?.url).toBe(url);
+      const trail = (jsonLdNode(blocks[0], 'BreadcrumbList')?.itemListElement as JsonLdNode[]).map(({ name, item }) => ({ name, item }));
+      expect(trail).toEqual(visibleTrail(html, url));
+    } finally {
+      database.close();
+    }
+  });
+
+  // Above the threshold the score is on the page, but structured data still carries no rating:
+  // AggregateRating is deferred (design spec section 9), so a published score stays out of the
+  // head and the JSON-LD as well.
+  it.each(detailCases)('keeps the published $label aggregate out of the head and structured data', async ({
+    Page,
+    route,
+    establishedSlug,
+    establishedScore,
+  }) => {
+    const database = makeDatabase();
+    try {
+      const html = await renderDetail(database, Page, route, establishedSlug);
+      const head = headHtml(html);
+
+      expect(aggregateHeaderText(html)).toContain(establishedScore);
+      expect(head).not.toContain(establishedScore);
+      const blocks = jsonLdBlocks(head);
+      expect(blocks).toHaveLength(1);
+      const { keys, types } = jsonLdKeysAndTypes(blocks[0]);
+      for (const key of RATING_KEYS) expect(keys).not.toContain(key);
+      for (const type of RATING_TYPES) expect(types).not.toContain(type);
+      expect(JSON.stringify(blocks[0])).not.toContain(establishedScore);
+    } finally {
+      database.close();
+    }
+  });
+
+  // Design spec section 9: a named-party sentinel carrying "</script><script>" must stay inert
+  // data. The name is a neutral fixture, not a real party.
+  it.each([
+    { label: 'landlord', Page: LandlordPage, route: 'landlord' as const, table: 'landlords' },
+    { label: 'property manager', Page: PropertyManagerPage, route: 'property-manager' as const, table: 'property_managers' },
+  ])('keeps a hostile $label name inert in the structured data', async ({ Page, route, table }) => {
+    const database = makeDatabase();
+    try {
+      const name = `Sentinel </script><script>window.__pwned=1</script><!-- & Co${String.fromCharCode(0x2028)}`;
+      database.prepare(`INSERT INTO ${table} (id, name, slug) VALUES (?, ?, ?)`).run('hostile-INTERNAL-1', name, 'sentinel-co');
+      const html = await renderDetail(database, Page, route, 'sentinel-co');
+      const url = `https://ratemyplace.org/${route}/sentinel-co`;
+
+      const block = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i)?.[1] ?? '';
+      expect(block).not.toMatch(/[<>&]/);
+      expect(block).not.toContain(String.fromCharCode(0x2028));
+
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      expect(Array.from(doc.head.querySelectorAll('script'), (script) => script.getAttribute('type'))).toEqual(['application/ld+json']);
+      for (const script of Array.from(doc.querySelectorAll('script'))) {
+        if (script.getAttribute('type') !== 'application/ld+json') expect(script.textContent ?? '').not.toContain('__pwned');
+      }
+
+      const [parsed] = jsonLdBlocks(headHtml(html));
+      expect(jsonLdNode(parsed, 'WebPage')?.name).toBe(name);
+      const trail = jsonLdNode(parsed, 'BreadcrumbList')?.itemListElement as JsonLdNode[];
+      expect(trail.at(-1)).toEqual({ '@type': 'ListItem', position: 3, name, item: url });
+      expect(JSON.stringify(parsed)).not.toContain('INTERNAL');
     } finally {
       database.close();
     }
@@ -367,6 +490,7 @@ suite('named-party score visibility in rendered SSR pages', () => {
       expect(head).not.toContain('rel="canonical"');
       expect(head).not.toContain('og:url');
       expect(head).not.toContain('4.8');
+      expect(jsonLdBlocks(head)).toHaveLength(0);
     } finally {
       database.close();
     }

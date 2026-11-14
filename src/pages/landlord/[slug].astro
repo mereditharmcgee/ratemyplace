@@ -9,6 +9,7 @@ import { calculateLandlordAverages, getNamedPartyScoreState, NAMED_PARTY_MIN_REV
 import { recencyWeightedOverallSql, currentReviewYear } from '../../lib/scoring-sql';
 import { getScoreTextColor } from '../../lib/scoring-colors';
 import { localityLine } from '../../lib/locality';
+import { entityBreadcrumbs } from '../../lib/jsonLd';
 
 const { slug } = Astro.params;
 
@@ -82,9 +83,11 @@ if (!landlord) {
 
 const namedPartyScoreState = getNamedPartyScoreState(approvedReviewCount, scores?.avg_overall);
 const hasNamedPartyBreakdown = scores?.avg_landlord != null;
+// The structured-data breadcrumb is the trail the header's <nav> shows (structuredDataSource.test.ts).
+const breadcrumbs = entityBreadcrumbs(landlord.name);
 ---
 
-<BaseLayout title={landlord.name} description={`Reviews for landlord ${landlord.name}`}>
+<BaseLayout title={landlord.name} description={`Reviews for landlord ${landlord.name}`} breadcrumbs={breadcrumbs}>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Header -->
     <div class="mb-8">

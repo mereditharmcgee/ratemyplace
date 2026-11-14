@@ -3,6 +3,8 @@
 import { siteUrlFrom } from './sitemap';
 
 export const SITE_NAME = 'RateMyPlace';
+/** The brand's primary message (brand.md section 1), as the footer shows it. Approved copy: never reword it here. */
+export const PRIMARY_MESSAGE = 'A public record of rental housing, from the people who know it best.';
 /** Moved verbatim from BaseLayout's default prop. */
 export const DEFAULT_DESCRIPTION = 'Tenant housing reviews - Real experiences from real renters';
 export const NOINDEX_ROBOTS = 'noindex, follow';
@@ -16,7 +18,7 @@ export const DEFAULT_OG_IMAGE = {
   width: 1200,
   height: 630,
   type: 'image/png',
-  alt: 'RateMyPlace. Know before you sign. A public record of rental housing, from the people who know it best.',
+  alt: `${SITE_NAME}. Know before you sign. ${PRIMARY_MESSAGE}`,
 } as const;
 
 export interface HeadMetaInput { title: string; description: string; pathname: string; siteOrigin: string; noindex?: boolean }
