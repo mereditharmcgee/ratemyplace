@@ -74,7 +74,7 @@ const ariaLabel =
       {series.map((entry) =>
         missing.has(entry.year) ? (
           <span class="flex max-w-8 flex-1 items-end" title={`${entry.year}: no data`} data-missing-year={entry.year}>
-            <span class="block w-full border border-dashed border-gray-400" style={`height:${BAR_AREA_PX}px`}></span>
+            <span class="block w-full border border-dashed border-gray-500" style={`height:${BAR_AREA_PX}px`}></span>
           </span>
         ) : (
           <span class="flex max-w-8 flex-1 items-end" title={`${entry.year}: ${entry.count}`}>
