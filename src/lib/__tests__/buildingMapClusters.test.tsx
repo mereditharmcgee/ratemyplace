@@ -2,22 +2,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { Renderer } from '@googlemaps/markerclusterer';
 import { CLUSTER_COLORS, CLUSTER_LEGEND_LABEL, clusterBadgeSize } from '../mapCluster';
-import { SCORE_HEX } from '../scoring-colors';
+import { SCORE_HEX, getScoreColor } from '../scoring-colors';
 
 // The map cannot run without a Maps key, so neither tests nor preview deploys see a real
 // Google map. This mounts BuildingMap against a stubbed `google.maps` and a stubbed
-// clusterer: the legend renders as on /map, and the renderer the island hands the clusterer
-// is called directly to draw a cluster badge.
+// clusterer: the legend renders as on /map, the renderer the island hands the clusterer
+// is called directly to draw a cluster badge, and the building pins the island hands the
+// clusterer are kept so their titles can be read.
 
 const clustererOptions: { renderer?: Renderer }[] = [];
+const addedMarkers: StubAdvancedMarkerElement[] = [];
 
 vi.mock('@googlemaps/markerclusterer', () => ({
   MarkerClusterer: class {
     constructor(options: { renderer?: Renderer }) {
       clustererOptions.push(options);
     }
-    clearMarkers() {}
-    addMarkers() {}
+    clearMarkers() {
+      addedMarkers.length = 0;
+    }
+    addMarkers(markers: StubAdvancedMarkerElement[]) {
+      addedMarkers.push(...markers);
+    }
   },
   SuperClusterAlgorithm: class {},
 }));
@@ -67,6 +73,7 @@ const stubGoogle = {
 
 beforeEach(() => {
   clustererOptions.length = 0;
+  addedMarkers.length = 0;
   vi.stubGlobal('google', stubGoogle);
   vi.stubGlobal(
     'fetch',
@@ -105,6 +112,37 @@ function drawCluster(renderer: Renderer, count: number) {
     {} as Parameters<Renderer['render']>[2],
   ) as unknown as StubAdvancedMarkerElement;
   return marker.options;
+}
+
+/** A building as GET /api/buildings/map returns it. */
+function mapBuilding(id: string, address: string, avgScore: number | null) {
+  return {
+    id,
+    address,
+    slug: id,
+    neighborhood: null,
+    city: 'Boston',
+    latitude: 42.31,
+    longitude: -71.1,
+    reviewCount: 3,
+    avgScore,
+  };
+}
+
+/** Mounts the map on these buildings and returns the pins the island built for them. */
+async function mountPins(buildings: ReturnType<typeof mapBuilding>[]) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify({ buildings }), { status: 200 })),
+  );
+  await mountMap();
+  await waitFor(() => expect(addedMarkers.length).toBe(buildings.length));
+  return addedMarkers.map((marker) => marker.options);
+}
+
+/** The text a marker shows, as axe reads it: whitespace collapsed, ends trimmed. */
+function visibleText(content: HTMLElement | undefined): string {
+  return (content?.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
 function legendRows(): HTMLElement[] {
@@ -159,6 +197,16 @@ describe('cluster badge on a stubbed map', () => {
     expect(drawCluster(renderer, 1).title).toBe('1 building');
   });
 
+  // WCAG 2.5.3 Label in Name: Google uses the title as the badge's accessible name, so it
+  // must start with the count the badge shows.
+  it('starts its title with the count it shows', async () => {
+    const renderer = await mountMap();
+    for (const count of [1, 6, 250]) {
+      const { title, content } = drawCluster(renderer, count);
+      expect(title!.startsWith(visibleText(content))).toBe(true);
+    }
+  });
+
   it('shows the count in a dark round badge sized for that count', async () => {
     const renderer = await mountMap();
     const { content } = drawCluster(renderer, 12);
@@ -170,5 +218,32 @@ describe('cluster badge on a stubbed map', () => {
     expect(toHex(content!.style.background || content!.style.backgroundColor)).toBe(
       CLUSTER_COLORS.fill.toLowerCase(),
     );
+  });
+});
+
+// WCAG 2.5.3 Label in Name. Google uses a marker's title as both its hover tooltip and its
+// accessible name (aria-label). A pin shows its score ("1.1"); a name of the address alone
+// left that text out, which axe flagged on /map as label-content-name-mismatch.
+describe('building pin on a stubbed map', () => {
+  it('starts its title with the score it shows, then its band label and address', async () => {
+    const [poor, good] = await mountPins([
+      mapBuilding('a', '3368 Washington Street', 1.1),
+      mapBuilding('b', '96 Conwell Avenue', 4),
+    ]);
+    expect(visibleText(poor.content)).toBe('1.1');
+    expect(poor.title).toBe('1.1 Poor, 3368 Washington Street');
+    expect(visibleText(good.content)).toBe('4.0');
+    expect(good.title).toBe('4.0 Good, 96 Conwell Avenue');
+    for (const { title, content } of [poor, good]) {
+      expect(title!.startsWith(visibleText(content))).toBe(true);
+    }
+    expect(poor.title).toContain(getScoreColor(1.1).label);
+    expect(good.title).toContain(getScoreColor(4).label);
+  });
+
+  it('names a pin with no score by its label and address, not the "?" it shows', async () => {
+    const [pin] = await mountPins([mapBuilding('c', '17 Elmira Street', null)]);
+    expect(visibleText(pin.content)).toBe('?');
+    expect(pin.title).toBe('No reviews, 17 Elmira Street');
   });
 });
