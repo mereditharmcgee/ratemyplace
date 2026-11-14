@@ -6,6 +6,7 @@ import { sendVerificationEmail } from '../../../lib/email';
 import { trackSend } from '../../../lib/trackSend';
 import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
 import { logError } from '../../../lib/logger';
+import { EMAIL_ALREADY_VERIFIED } from '../../../lib/contributionCopy';
 
 export async function POST(context: APIContext): Promise<Response> {
   const user = context.locals.user;
@@ -17,9 +18,10 @@ export async function POST(context: APIContext): Promise<Response> {
     });
   }
 
-  // Already verified
+  // Already verified. The reason tells the review pages' email verification step to reload,
+  // so the form renders; the profile reads only `error`.
   if (user.emailVerified) {
-    return new Response(JSON.stringify({ error: 'Email already verified' }), {
+    return new Response(JSON.stringify({ error: 'Email already verified', details: { reason: EMAIL_ALREADY_VERIFIED } }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' }
     });
@@ -54,7 +56,7 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   try {
-    // Create new token (deletes any existing)
+    // Create a new token (keeps the previous unexpired one live; see tokens.ts)
     const token = await createVerificationToken(db, user.id);
 
     // Phase 18 PERF-01 (companion): the email runs in the background. Always return 200.
