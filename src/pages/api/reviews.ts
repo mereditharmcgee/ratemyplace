@@ -9,6 +9,7 @@ import { moveInFromAnswer } from '../../lib/moveIn';
 import { unitTypeFromBedrooms } from '../../lib/reviewDisplay';
 import { validateReviewText } from '../../lib/validation';
 import { queueOwnerNotice } from '../../lib/ownerNotify';
+import { emailVerificationRequired, hasVerifiedEmail } from '../../lib/emailVerification';
 
 export async function POST(context: APIContext): Promise<Response> {
   // Require authentication
@@ -18,6 +19,10 @@ export async function POST(context: APIContext): Promise<Response> {
       headers: { 'Content-Type': 'application/json' }
     });
   }
+
+  // Order: authentication (401), verified email (403), then the limiter, Turnstile,
+  // validation and the write. The gate runs before any statement.
+  if (!hasVerifiedEmail(context.locals.user)) return emailVerificationRequired();
 
   try {
     const db = getDB(context);

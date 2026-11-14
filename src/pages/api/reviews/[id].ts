@@ -8,6 +8,7 @@ import { moveOutFromEdit, STORED_EDIT_COLUMNS, withStoredFields } from '../../..
 import type { StoredEditRow } from '../../../lib/reviewEdit';
 import { parseTenureMonths } from '../../../lib/tenure';
 import type { MoveInGiven } from '../../../lib/types';
+import { emailVerificationRequired, hasVerifiedEmail } from '../../../lib/emailVerification';
 
 export interface ReviewDetail {
   id: string;
@@ -156,6 +157,10 @@ export async function PATCH(context: APIContext): Promise<Response> {
       headers: { 'Content-Type': 'application/json' }
     });
   }
+
+  // Order: authentication (401), verified email (403), then ownership and the rest. The gate
+  // runs before the ownership read, so it says nothing about whether a review id exists.
+  if (!hasVerifiedEmail(context.locals.user)) return emailVerificationRequired();
 
   try {
     const db = getDB(context);

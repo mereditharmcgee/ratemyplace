@@ -6,6 +6,7 @@ import {
   type ReviewSubmitResponse,
   type SubmitOutcome,
 } from '../reviewSubmitOutcome';
+import { VERIFY_TO_POST_ERROR } from '../contributionCopy';
 
 // What the review form does after POST /api/reviews answers. A 2xx always means the review
 // exists, so it never resets Turnstile or re-enables Submit; only a usable slug and id
@@ -37,6 +38,16 @@ describe('submitOutcome', () => {
 
   it('the default copy is the one the form has always shown', () => {
     expect(SUBMIT_FAILED_COPY).toBe('Failed to submit review');
+  });
+});
+
+describe('a 403 from the verified-email gate', () => {
+  // No island change: the form shows the route's line and keeps every answer, so the writer
+  // can verify in another tab and press Submit again with a fresh Turnstile token.
+  it('is an ordinary error carrying the route line, and asks for a fresh token', () => {
+    const outcome = submitOutcome(403, false, { error: VERIFY_TO_POST_ERROR });
+    expect(outcome).toEqual({ kind: 'error', message: VERIFY_TO_POST_ERROR });
+    expect(needsFreshToken(outcome)).toBe(true);
   });
 });
 
