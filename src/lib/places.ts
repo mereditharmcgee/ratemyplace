@@ -10,7 +10,7 @@
 // SERVER ONLY. It holds the API endpoint and the key header; never import it into a React
 // island (AGENTS.md: islands import only leaf modules from src/lib).
 import { BOSTON_BOX } from './bostonBox';
-import { bostonNeighborhoodFor, isBostonLocality } from './locality';
+import { bostonNeighborhoodFor, isBostonLocality, isBostonPlace } from './locality';
 import { zip5 } from './records/seed/sam';
 import { logError } from './logger';
 
@@ -68,11 +68,15 @@ export function parsePlaceDetails(data: GooglePlaceResponse, requestedPlaceId: s
   // Google names small Boston sub-areas ("Aberdeen") where a reader expects the
   // neighborhood ("Brighton"), and sometimes areas the city does not use at all
   // ("Commonwealth"); store the city's neighborhood, from the ZIP when the name is not one
-  // (`bostonNeighborhoodFor`). Boston only: the names repeat elsewhere.
+  // (`bostonNeighborhoodFor`). Boston only, by city and state (`isBostonPlace`): the names
+  // repeat elsewhere, and so do the town names.
   const city = getComponent('locality') || getComponent('sublocality');
+  const state = getComponentShort('administrative_area_level_1');
   const zipCode = getComponent('postal_code');
   const rawNeighborhood = getComponent('neighborhood') || getComponent('sublocality_level_1');
-  const neighborhood = isBostonLocality(city) ? (bostonNeighborhoodFor(rawNeighborhood, zip5(zipCode)) ?? '') : rawNeighborhood;
+  const neighborhood = isBostonPlace(city, state)
+    ? (bostonNeighborhoodFor({ neighborhood: rawNeighborhood, city, zip: zip5(zipCode) }) ?? '')
+    : rawNeighborhood;
 
   return {
     placeId: data.id || requestedPlaceId,
@@ -80,7 +84,7 @@ export function parsePlaceDetails(data: GooglePlaceResponse, requestedPlaceId: s
     streetAddress,
     neighborhood,
     city,
-    state: getComponentShort('administrative_area_level_1'),
+    state,
     zipCode,
     latitude: data.location?.latitude,
     longitude: data.location?.longitude,

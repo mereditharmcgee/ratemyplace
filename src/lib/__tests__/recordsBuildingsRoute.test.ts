@@ -103,6 +103,22 @@ suite('POST /api/buildings with seeded dedupe', () => {
     expect(await neighborhoodOf('1 Elm St')).toBe('Commonwealth');
   });
 
+  it('a new building in a town that shares a Boston name keeps the neighborhood it was sent', async () => {
+    const res = await POST(createContext(db, { streetAddress: '2 Elm St', neighborhood: 'Twelve Corners', city: 'Brighton', state: 'NY', zipCode: '14618' }));
+    expect(res.status).toBe(201);
+    expect(await neighborhoodOf('2 Elm St')).toBe('Twelve Corners');
+  });
+
+  it.each([
+    ['Allston', '02135', 'MA'],
+    ['Roxbury', '02121', 'MA'],
+    ['Brighton', '02134', null],
+  ])('a manual entry with the city %j in ZIP %s stores no neighborhood, so the page reads the city', async (city, zipCode, state) => {
+    const res = await POST(createContext(db, { streetAddress: '12 Example Road', city, state, zipCode }));
+    expect(res.status).toBe(201);
+    expect(await neighborhoodOf('12 Example Road')).toBeNull();
+  });
+
   it('a second exact manual entry still dedupes by address and city', async () => {
     await POST(createContext(db, { streetAddress: '1 Elm St', city: 'New Haven', state: 'CT', zipCode: null }));
     const res = await POST(createContext(db, { streetAddress: '1 elm st', city: 'new haven', state: 'CT', zipCode: null }));

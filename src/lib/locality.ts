@@ -91,18 +91,45 @@ export function bostonLocalityName(value: string | null | undefined): string | n
 const ZIP_TO_NEIGHBORHOOD: ReadonlyMap<string, string> = new Map(Object.entries(BOSTON_ZIP_NEIGHBORHOODS));
 
 /**
- * The neighborhood to store for a new Boston building, from the name Google or a person
- * supplied and the building's five-digit ZIP (normalize it with `zip5` first). A sub-area
- * reads as its neighborhood ("Aberdeen" -> "Brighton"); a Boston locality name is kept in its
- * display spelling; anything else, blank or "Boston" included, gives way to the ZIP's
- * neighborhood in `BOSTON_ZIP_NEIGHBORHOODS`, or to null when the ZIP is not listed, and the
- * page then reads "Boston". The caller decides the building is in Boston (`isBostonLocality`
- * on its city): the names repeat elsewhere.
+ * True when a city and state name a place in Boston: a Boston locality name, in
+ * Massachusetts or with no state given (manual entry may leave it out). The city alone is not
+ * enough here, because Brighton, Hyde Park, Charlestown and Roxbury are also towns in other
+ * states, and a Brighton, NY neighborhood must not be read against Boston's vocabulary.
  */
-export function bostonNeighborhoodFor(value: string | null | undefined, zip: string | null | undefined): string | null {
+export function isBostonPlace(city: string | null | undefined, state: string | null | undefined): boolean {
+  if (!isBostonLocality(city)) return false;
+  const code = state?.trim().toUpperCase() ?? '';
+  return code === '' || code === 'MA' || code === 'MASSACHUSETTS';
+}
+
+/** The display spelling of a value as a Boston neighborhood: sub-areas resolved, plain "Boston" and unknown names null. */
+function neighborhoodName(value: string | null | undefined): string | null {
   const name = value?.trim() ? bostonLocalityName(resolveBostonSubArea(value)) : null;
-  if (name && name !== 'Boston') return name;
-  return (zip ? ZIP_TO_NEIGHBORHOOD.get(zip.trim()) : undefined) ?? null;
+  return name && name !== 'Boston' ? name : null;
+}
+
+/**
+ * The neighborhood to store for a new Boston building (`isBostonPlace` decides that), from
+ * the name Google or a person supplied, the city, and the five-digit ZIP (normalize it with
+ * `zip5` first). In order:
+ *
+ * 1. A sub-area reads as its neighborhood ("Aberdeen" -> "Brighton"), and a Boston locality
+ *    name is kept in its display spelling.
+ * 2. Otherwise, blank and plain "Boston" included, a city that is itself a neighborhood
+ *    ("Allston") already places the building, so nothing is stored and display reads the
+ *    city. The ZIP's name could contradict it ("Brighton, Allston").
+ * 3. Otherwise the ZIP's neighborhood in `BOSTON_ZIP_NEIGHBORHOODS`, or null when the ZIP is
+ *    not listed, and the page reads "Boston".
+ */
+export function bostonNeighborhoodFor(place: {
+  neighborhood: string | null | undefined;
+  city: string | null | undefined;
+  zip: string | null | undefined;
+}): string | null {
+  const name = neighborhoodName(place.neighborhood);
+  if (name) return name;
+  if (neighborhoodName(place.city)) return null;
+  return (place.zip ? ZIP_TO_NEIGHBORHOOD.get(place.zip.trim()) : undefined) ?? null;
 }
 
 function addressWords(address?: string | null): Set<string> {
