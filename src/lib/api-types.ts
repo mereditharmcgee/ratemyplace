@@ -546,4 +546,9 @@ export interface RecordsQueueFixtureResult {
   sourceErrors: Array<{ label: string; message: string }>;
   /** Row count per source label, for the sources that ran. One that threw is absent, not zero. */
   rowsBySource: Record<string, number>;
+  /**
+   * Report-only findings (`FixtureNotice` in lib/records/fixture.ts), never counted in
+   * `failures`. A row an older scheduler wrote has none, and reads as an empty list.
+   */
+  notices: Array<{ label: string; detail: string }>;
 }

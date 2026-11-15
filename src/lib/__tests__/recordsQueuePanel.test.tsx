@@ -484,6 +484,32 @@ describe('RecordsQueuePanel', () => {
     );
   });
 
+  it('lists report-only notices under a clean headline, saying they never pause the fill', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          queuePayload({
+            lastFixture: {
+              at: 1_757_000_000,
+              failures: 0,
+              checksFailed: 0,
+              checksTotal: 17,
+              failed: [],
+              sourceErrors: [],
+              rowsBySource: {},
+              notices: [{ label: '311 2011 file has no rows', detail: 'resource 94b499d9 answered with no rows' }],
+            },
+          }),
+        ),
+      ),
+    );
+    const { container } = render(<RecordsQueuePanel />);
+    await waitFor(() => expect(container.textContent).toContain('Fixture: all 17 checks passed at'));
+    expect(container.textContent).toContain('never pause the fill');
+    expect(container.textContent).toContain('311 2011 file has no rows: resource 94b499d9 answered with no rows');
+  });
+
   it('reports failed checks and thrown sources, then lists the failed labels', async () => {
     vi.stubGlobal(
       'fetch',

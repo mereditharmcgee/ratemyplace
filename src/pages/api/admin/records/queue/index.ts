@@ -38,6 +38,19 @@ function isSourceErrors(value: unknown): value is RecordsQueueFixtureResult['sou
   );
 }
 
+function isNotices(value: unknown): value is RecordsQueueFixtureResult['notices'] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (entry) =>
+        !!entry &&
+        typeof entry === 'object' &&
+        typeof (entry as Record<string, unknown>).label === 'string' &&
+        typeof (entry as Record<string, unknown>).detail === 'string',
+    )
+  );
+}
+
 function isNumberRecord(value: unknown): value is Record<string, number> {
   return (
     !!value &&
@@ -56,6 +69,10 @@ function isNumberRecord(value: unknown): value is Record<string, number> {
  * than no row, because the panel would render a confident "all checks passed" headline off
  * numbers whose supporting lists it cannot read. Cast-after-check is only honest when the
  * check covers the whole type.
+ *
+ * The one exception is `notices`, added in November 2026: absent means a scheduler older than
+ * the field wrote the row (the Worker deploys separately from the site), and reads as none.
+ * Present, it is checked like every other list.
  */
 function parseFixture(value: string): RecordsQueueFixtureResult | null {
   let parsed: unknown;
@@ -71,7 +88,9 @@ function parseFixture(value: string): RecordsQueueFixtureResult | null {
   if (!isStringArray(raw.failed)) return null;
   if (!isSourceErrors(raw.sourceErrors)) return null;
   if (!isNumberRecord(raw.rowsBySource)) return null;
-  return parsed as RecordsQueueFixtureResult;
+  const notices = raw.notices === undefined ? [] : raw.notices;
+  if (!isNotices(notices)) return null;
+  return { ...(parsed as Omit<RecordsQueueFixtureResult, 'notices'>), notices };
 }
 
 /**

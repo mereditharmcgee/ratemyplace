@@ -32,11 +32,18 @@ function fixtureResult(overrides: Partial<FixtureResult> = {}): FixtureResult {
     failures: 0,
     sourceErrors: [],
     rowsBySource: {},
+    notices: [],
     parcelId: '2102098000',
     condominium: false,
     ...overrides,
   };
 }
+
+/** What the fixture reported on 2026-11-15 about the two legacy 311 files the city's reload left empty. */
+const EMPTY_FILE_NOTICES: FixtureResult['notices'] = [
+  { label: '311 2014 file has no rows', detail: 'resource bdae89c8 answered with no rows' },
+  { label: '311 2011 file has no rows', detail: 'resource 94b499d9 answered with no rows' },
+];
 
 /** A day the Lanark fixture passed: one check ran and came back ok, and no source threw. */
 function passingFixture(): FixtureResult {
@@ -386,8 +393,43 @@ describe('plan', () => {
       failed: [],
       sourceErrors: [],
       rowsBySource: { 'Approved Building Permits': 0, RentSmart: 4 },
+      notices: [],
     });
     expect(await settingOf(db, SCHEDULER_SETTING_KEYS.lastAlert)).toBeNull();
+  });
+
+  it('stores the fixture notices with the day’s result, and neither pauses nor alerts for them', async () => {
+    const db = createRecordsTestDb();
+    const d = deps(db, { fixture: async () => ({ ...passingFixture(), notices: EMPTY_FILE_NOTICES }) });
+
+    expect(await plan(d)).toMatchObject({ paused: false, alerted: false, fixtureFailures: 0 });
+    expect(JSON.parse((await settingOf(db, SCHEDULER_SETTING_KEYS.lastFixture))!).notices).toEqual(EMPTY_FILE_NOTICES);
+    expect(await getFillPaused(db)).toBe(false);
+    expect(d.alerts).toHaveLength(0);
+  });
+
+  it('resumes a fixture-caused pause on a passing morning that still has notices', async () => {
+    const db = createRecordsTestDb();
+    let today = failingFixture();
+    const d = deps(db, { fixture: async () => today });
+    expect(await plan(d)).toMatchObject({ paused: true });
+
+    today = { ...passingFixture(), notices: EMPTY_FILE_NOTICES };
+    expect(await plan(d)).toMatchObject({ paused: false, resumed: true });
+    expect(await getFillPaused(db)).toBe(false);
+  });
+
+  it('lists the notices in the fixture report an alert carries, apart from the failures', async () => {
+    const db = createRecordsTestDb();
+    const d = deps(db, { fixture: async () => ({ ...failingFixture(), notices: EMPTY_FILE_NOTICES }) });
+    await plan(d);
+
+    expect(d.alerts).toHaveLength(1);
+    expect(d.alerts[0]).toContain('Notices (these never pause the fill):');
+    expect(d.alerts[0]).toContain('311 2014 file has no rows: resource bdae89c8 answered with no rows');
+    expect(d.alerts[0]).toContain('311 2011 file has no rows: resource 94b499d9 answered with no rows');
+    // The headline still counts only the check that failed and the source that threw.
+    expect(d.alerts[0]).toContain('1 check failed, 1 source threw');
   });
 
   it('pauses the fill and alerts once when the fixture fails, and does not alert again while paused', async () => {

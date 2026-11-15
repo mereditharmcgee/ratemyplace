@@ -171,7 +171,12 @@ If the 06:00 planner pauses the fill and emails, read the email before resuming 
   `app_settings.records_fixture_last`. The healthy state is a line reading "Fixture: all N
   checks passed at <date>" — the panel names the number of checks out loud, because "nothing
   failed" is also true of a run where nothing ran — with a timestamp from this morning. A
-  timestamp more than a day old means the planner did not run.
+  timestamp more than a day old means the planner did not run. Under it, a "Notices (report
+  only, these never pause the fill)" list names city data worth knowing about, such as a 311
+  file that answers with no rows (2011 and 2014 since the city's 2026-09-18 reload). A notice
+  is not a failure and needs no action here; it clears by itself once the city reloads the
+  file. "311 empty-file check incomplete" means the probe itself could not reach some files
+  that morning.
 
 ## The breaker email, and unpausing
 
