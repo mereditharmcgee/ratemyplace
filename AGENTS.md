@@ -361,7 +361,9 @@ Things that have already cost time. Read before debugging.
 - **311 is sixteen yearly resources plus a new-system resource with a different schema.**
   The legacy files keep the address as free text in `location`; the new one splits it into
   `street_number` / `street_name` / `zip_code`. A retired legacy resource id fails every
-  pull until someone updates `LEGACY_311_RESOURCES`; it does not clear on its own.
+  pull until someone updates `LEGACY_311_RESOURCES`; it does not clear on its own. An emptied
+  one fails nothing: 2011 and 2014 have answered with zero rows since the city's 2026-09-18
+  reload (see `src/lib/AGENTS.md`).
 - **CKAN rejects `ESCAPE '\'`** with `HTTP 409 Query is not a single statement`. LIKE
   clauses against `data.boston.gov` use `ESCAPE '!'` instead. See `src/lib/records/ckan.ts`.
 - **Seeded buildings** (`buildings.source = 'seed'`, ids `seed-<parcel>`) come from
