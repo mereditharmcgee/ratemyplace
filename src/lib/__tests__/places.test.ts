@@ -69,6 +69,69 @@ describe('parsePlaceDetails', () => {
     expect(parsePlaceDetails(body, 'x')?.neighborhood).toBe('Aberdeen');
   });
 
+  // Google's own micro-areas are not names the city uses; "Commonwealth" covers addresses in
+  // both Allston and Brighton, so the ZIP decides.
+  function bostonWith(neighborhood: string | null, zip: string, locality = 'Boston', state = 'MA'): GooglePlaceResponse {
+    return bostonBody({
+      addressComponents: [
+        component('street_number', '10'),
+        component('route', 'Example Road', 'Example Rd'),
+        ...(neighborhood ? [component('neighborhood', neighborhood)] : []),
+        component('locality', locality),
+        component('administrative_area_level_1', state, state),
+        component('postal_code', zip),
+      ],
+    });
+  }
+
+  it('stores nothing for an unknown name when Google gives a neighborhood as the city', () => {
+    // The page then reads "Allston, MA", not "Brighton, Allston, MA".
+    expect(parsePlaceDetails(bostonWith('Commonwealth', '02135', 'Allston'), 'x')?.neighborhood).toBe('');
+    expect(parsePlaceDetails(bostonWith(null, '02124', 'Dorchester Center'), 'x')?.neighborhood).toBe('');
+  });
+
+  it.each([
+    ['Twelve Corners', '14618', 'Brighton', 'NY'],
+    ['Old Town', '12538', 'Hyde Park', 'NY'],
+    ['Aberdeen', '14618', 'Brighton', 'NY'],
+  ])('leaves %j alone in a town that shares a Boston name (%s %s, %s)', (neighborhood, zip, locality, state) => {
+    expect(parsePlaceDetails(bostonWith(neighborhood, zip, locality, state), 'x')?.neighborhood).toBe(neighborhood);
+  });
+
+  it.each([
+    ['Commonwealth', '02135', 'Brighton'],
+    ['Commonwealth', '02134', 'Allston'],
+    ["St. Elizabeth's", '02135', 'Brighton'],
+    [null, '02128', 'East Boston'],
+  ])('stores the Boston name %j in ZIP %s as %j', (neighborhood, zip, expected) => {
+    expect(parsePlaceDetails(bostonWith(neighborhood, zip), 'x')?.neighborhood).toBe(expected);
+  });
+
+  it('stores no neighborhood when the ZIP is not one neighborhood, and keeps the ZIP as Google gave it', () => {
+    const place = parsePlaceDetails(bostonWith('Commonwealth', '02116'), 'x');
+    expect(place?.neighborhood).toBe('');
+    expect(place?.zipCode).toBe('02116');
+  });
+
+  it('keeps a Boston neighborhood Google names directly, whatever the ZIP', () => {
+    expect(parsePlaceDetails(bostonWith('Back Bay', '02116'), 'x')?.neighborhood).toBe('Back Bay');
+    expect(parsePlaceDetails(bostonWith('Allston', '02135'), 'x')?.neighborhood).toBe('Allston');
+  });
+
+  it('leaves a non-Boston name it does not know alone', () => {
+    const body = bostonBody({
+      addressComponents: [
+        component('street_number', '1'),
+        component('route', 'Main Street'),
+        component('neighborhood', 'Commonwealth'),
+        component('locality', 'Cambridge'),
+        component('administrative_area_level_1', 'Massachusetts', 'MA'),
+        component('postal_code', '02139'),
+      ],
+    });
+    expect(parsePlaceDetails(body, 'x')?.neighborhood).toBe('Commonwealth');
+  });
+
   it('returns null for an error body', () => {
     expect(parsePlaceDetails({ error: { status: 'NOT_FOUND', message: 'nope' } }, 'x')).toBeNull();
   });

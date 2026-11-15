@@ -4,6 +4,8 @@ import { generateIdFromEntropySize } from 'lucia';
 import { checkRateLimit, buildRateLimitHeaders, getClientIP } from '../../lib/rateLimit';
 import { escapeLikePattern, sanitizeText } from '../../lib/validation';
 import { addressKey } from '../../lib/records/identity';
+import { zip5 } from '../../lib/records/seed/sam';
+import { bostonNeighborhoodFor, isBostonPlace } from '../../lib/locality';
 import { findExistingBuilding, resolveInputFrom } from '../../lib/buildingResolve';
 import { emailVerificationRequired, hasVerifiedEmail } from '../../lib/emailVerification';
 
@@ -172,12 +174,19 @@ export async function POST(context: APIContext): Promise<Response> {
         headers: { 'Content-Type': 'application/json' }
       });
     }
-    const cleanNeighborhood = typeof neighborhood === 'string' && neighborhood.trim()
+    const suppliedNeighborhood = typeof neighborhood === 'string' && neighborhood.trim()
       ? sanitizeText(neighborhood).slice(0, 120)
       : null;
     const cleanState = typeof state === 'string' && state.trim()
       ? state.trim().slice(0, 2).toUpperCase()
       : null;
+    // A Boston building stores the city's neighborhood, never a Google micro-area such as
+    // "Commonwealth" (`bostonNeighborhoodFor`). Applied here too, not only in the Places
+    // parser, because the body is the client's. Gated on the state as well as the city:
+    // Brighton and Hyde Park are also towns elsewhere.
+    const cleanNeighborhood = isBostonPlace(input.city, cleanState)
+      ? bostonNeighborhoodFor({ neighborhood: suppliedNeighborhood, city: input.city, zip: zip5(input.zip) })
+      : suppliedNeighborhood;
 
     // Coordinates: accept only finite numbers within valid lat/lng ranges; a bad
     // coordinate becomes null (building simply won't appear on the map) rather

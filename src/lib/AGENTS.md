@@ -647,6 +647,18 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   `records/seed/format.ts` and `api/places/details.ts` apply it, gated on
   `isBostonLocality(city)` so a non-Boston "Aberdeen" is left alone. Do not add sub-areas
   to `BOSTON_LOCALITY_NAMES`; that list is the dedupe and search vocabulary.
+  `BOSTON_ZIP_NEIGHBORHOODS`, also there, names the neighborhood of each Boston ZIP that SAM
+  labels at least 95% one way (measured 2026-11-14; the comment lists the ZIPs left out and
+  why). `bostonNeighborhoodFor` in `locality.ts` is what a new Boston building stores: a
+  sub-area as its neighborhood, a Boston locality name in its display spelling, null when
+  the city is itself a neighborhood (so the page never reads "Brighton, Allston"), and
+  otherwise the ZIP's neighborhood, or null, which reads as "Boston". It fixes Google's
+  "Commonwealth", which covers addresses in both Allston and Brighton. `places.ts` and
+  `POST /api/buildings` both apply it, the route because the body is the client's, and both
+  gate it on `isBostonPlace(city, state)`, not the city alone: Brighton, Hyde Park,
+  Charlestown and Roxbury are also towns in other states. Display does not apply it:
+  `displayLocality` has no ZIP, so a stored name it does not know is fixed in the data, not
+  at render time.
 - **`bostonBox.ts` and `mapView.ts` are the map's only geography.** `BOSTON_BOX` /
   `inBostonBox` (shared with `records/seed/sam.ts`) say what counts as inside Boston;
   `initialMapView` fits the first non-empty marker load to the Boston markers only (a New
