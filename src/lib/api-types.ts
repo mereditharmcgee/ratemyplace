@@ -8,6 +8,7 @@
 // Type-only: the import is erased at build time, so this file pulls no lib/records/ code
 // into a browser bundle. A runtime import from here would.
 import type { QueueReason } from './records/types';
+import type { ReviewFlagCode } from './reviewFlags';
 
 // =============================================================================
 // Common Types
@@ -84,6 +85,8 @@ export interface AdminReview {
   move_in_season: string;
   unit_type: string;
   rent_amount: number | null;
+  /** Advisory signals, computed when the list is read (src/lib/reviewFlags.ts). */
+  integrity_flags?: ReviewFlagCode[];
 }
 
 export interface AdminReviewsResponse {

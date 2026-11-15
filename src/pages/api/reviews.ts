@@ -10,6 +10,14 @@ import { unitTypeFromBedrooms } from '../../lib/reviewDisplay';
 import { validateReviewText } from '../../lib/validation';
 import { queueOwnerNotice } from '../../lib/ownerNotify';
 import { emailVerificationRequired, hasVerifiedEmail } from '../../lib/emailVerification';
+import { logError } from '../../lib/logger';
+import {
+  classifyReviewRefusal,
+  REVIEW_GUARD_SQL,
+  reviewGuardBinds,
+  reviewInserted,
+  reviewRefusalResponse,
+} from '../../lib/reviewLimits';
 
 export async function POST(context: APIContext): Promise<Response> {
   // Require authentication
@@ -175,8 +183,12 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const reviewId = generateIdFromEntropySize(10);
 
-    // Insert review with all 27 score fields
-    await db.prepare(`
+    // Insert review with all 27 score fields. Checks run in this order: authentication,
+    // verified email, the hourly attempt limiter, Turnstile, validation, the building lookup,
+    // and last the guard in this statement's WHERE (src/lib/reviewLimits.ts): one review per
+    // account and building, the daily limit, the pause. The guard is a code constant and every
+    // value in it is bound; D1 runs one statement at a time, so two submissions cannot both pass.
+    const result = await db.prepare(`
       INSERT INTO reviews (
         id, user_id, building_id,
         tenure_months, move_out_year_new, is_current_tenant,
@@ -199,7 +211,7 @@ export async function POST(context: APIContext): Promise<Response> {
         status,
         move_in_year, move_in_season, move_in_given,
         accepts_housing_vouchers, safely_lit_at_night
-      ) VALUES (
+      ) SELECT
         ?, ?, ?,
         ?, ?, ?,
         ?, ?, ?, ?, ?, ?,
@@ -221,7 +233,7 @@ export async function POST(context: APIContext): Promise<Response> {
         ?,
         ?, ?, ?,
         ?, ?
-      )
+      WHERE ${REVIEW_GUARD_SQL}
     `).bind(
       reviewId,
       context.locals.user.id,
@@ -292,8 +304,18 @@ export async function POST(context: APIContext): Promise<Response> {
       moveIn.given,
       // New survey fields
       acceptsHousingVouchers,
-      safelyLitAtNight
+      safelyLitAtNight,
+      // The guard's values, after the review's own
+      ...reviewGuardBinds(context.locals.user.id, buildingId)
     ).run();
+
+    if (!reviewInserted(result)) {
+      // Nothing was written: say why. `unknown` (the state changed between the two
+      // statements) is answered as a failed submission; the log carries no ids.
+      const refusal = await classifyReviewRefusal(db, context.locals.user.id, buildingId);
+      if (refusal.reason === 'unknown') logError('review_create_unclassified', {});
+      return reviewRefusalResponse(refusal);
+    }
 
     // The review is saved and hidden until moderated: tell the owner it is waiting.
     queueOwnerNotice(context, { kind: 'review_submitted', buildingId: building.id });
