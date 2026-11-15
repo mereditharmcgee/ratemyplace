@@ -23,6 +23,22 @@ export function zipEqualsClause(column: string, zips: readonly string[]): string
 }
 
 /**
+ * `"<column>"::text IN ('Ward 18','18')`: every spelling 311 uses for one ward. The legacy files
+ * write `Ward 18`, `18`, and for a one-digit ward both `5` and `05`, often in the same year
+ * (checked 2026-11-15); the new system stores the ward as a number. The `::text` cast lets one
+ * list serve both, where a numeric column compared with `'Ward 18'` would fail the whole query.
+ * Interpolation invariant: `column` is a code constant checked against a conservative shape, and
+ * `ward` must be a whole number from 1 to 99 (anything else throws) before its spellings go
+ * through `sqlLiteral`.
+ */
+export function wardEqualsClause(column: string, ward: number): string {
+  if (!/^[a-z_]+$/.test(column)) throw new Error(`Unsafe column name for ward clause: ${column}`);
+  if (!Number.isInteger(ward) || ward < 1 || ward > 99) throw new Error(`Ward clause needs a ward from 1 to 99, got ${ward}`);
+  const spellings = [`Ward ${ward}`, String(ward), ...(ward < 10 ? [`0${ward}`] : [])];
+  return `"${column}"::text IN (${spellings.map(sqlLiteral).join(',')})`;
+}
+
+/**
  * Escape `!`, `%`, and `_` for a LIKE pattern using `!` as the escape character
  * (escaping `!` itself first, so a literal `!` in the input round-trips correctly).
  *
