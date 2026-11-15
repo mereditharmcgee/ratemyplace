@@ -212,15 +212,19 @@ function fixtureHeadline(fixture: FixtureResult): string {
 
 /**
  * What the fixture saw, for a human reading the alert at 3am: the headline numbers, then
- * every failed check with its detail and every source that threw, then the per-source row
- * counts. The row counts are the fastest way to tell "the city is down" from "our query
- * broke" — a source that returns zero rows where it returned four hundred yesterday is a
- * different problem from one that threw.
+ * every failed check with its detail and every source that threw, then any report-only
+ * notices, then the per-source row counts. The row counts are the fastest way to tell "the
+ * city is down" from "our query broke" — a source that returns zero rows where it returned
+ * four hundred yesterday is a different problem from one that threw.
  */
 function fixtureReport(fixture: FixtureResult): string {
   const lines = [`${fixtureHeadline(fixture)}.`];
   for (const check of fixture.checks) if (!check.ok) lines.push(`  - ${check.label}: ${check.detail}`);
   for (const failure of fixture.sourceErrors) lines.push(`  - ${failure.label} threw: ${failure.message}`);
+  if (fixture.notices.length > 0) {
+    lines.push('Notices (these never pause the fill):');
+    for (const notice of fixture.notices) lines.push(`  - ${notice.label}: ${notice.detail}`);
+  }
   const labels = Object.keys(fixture.rowsBySource).sort();
   if (labels.length > 0) {
     lines.push('Rows by source:');
@@ -264,6 +268,8 @@ export async function plan(deps: SchedulerDeps): Promise<PlanResult> {
       failed: fixture.checks.filter((check) => !check.ok).map((check) => check.label),
       sourceErrors: fixture.sourceErrors,
       rowsBySource: fixture.rowsBySource,
+      // Stored for the panel only. The breaker below reads `failures`, never these.
+      notices: fixture.notices,
     }),
     now,
   );

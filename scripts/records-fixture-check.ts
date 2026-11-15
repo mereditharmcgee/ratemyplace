@@ -47,6 +47,12 @@ async function main(): Promise<void> {
     console.log(c.ok ? `PASS ${c.label}` : `FAIL ${c.label} — ${c.detail}`);
   }
 
+  // Report-only: a notice never changes the exit code, as it never pauses the fill.
+  if (result.notices.length > 0) {
+    console.log('');
+    for (const n of result.notices) console.log(`NOTE ${n.label} — ${n.detail}`);
+  }
+
   console.log('');
   console.log(
     result.failures === 0

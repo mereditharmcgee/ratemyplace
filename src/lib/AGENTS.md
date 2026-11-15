@@ -305,6 +305,16 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   answer) and that a city-wide query on the same resource finds a row from the last 60 days
   with a ten-digit parcel. Before a new check pins one parcel's value, ask whether a reload of
   that dataset could take the value away.
+  **Notices are the fixture's report-only channel** (`FixtureResult.notices`). They are never
+  counted in `checksFailed` or `failures`, so the breaker cannot pause the fill on one or hold
+  a fixture pause because of one. The one notice so far asks each of the seventeen 311 files
+  for one row, one file at a time, and names any that answers with none: the city's 2026-09-18
+  reload left 2011 and 2014 empty, which fails no query, and a file only the city can reload
+  must not stop the fill. `plan` stores notices in `records_fixture_last`, the breaker email
+  lists them under their own heading, `/admin/records` shows them under the fixture line, and
+  `npm run records:check` prints them as `NOTE` lines without changing its exit code. Something
+  the fill should wait for belongs in a check; something only a human or the city can act on
+  belongs here.
 - **`queue.ts` is the pull queue, and `attempts` counts CLAIMS, not failures.** One pending
   row per building (0031's partial unique index). `claimBatch` takes a lease by conditional
   `UPDATE`, incrementing `attempts` as it goes; `completeRow` resets it to 0; `failRow`

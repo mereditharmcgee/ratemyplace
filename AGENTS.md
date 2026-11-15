@@ -297,7 +297,9 @@ Things that have already cost time. Read before debugging.
   went with it; the RentSmart checks now ask that the source answers and has recent rows
   city-wide (see `src/lib/AGENTS.md`). Read what `npm run records:check` prints before you
   change a check. `fixture.ts` runs inside the records-scheduler Worker, so a change to it
-  reaches the 06:00 planner only after `npm run records:worker:deploy`.
+  reaches the 06:00 planner only after `npm run records:worker:deploy`. City data that a human
+  should hear about but the fill should not wait on goes in a fixture **notice**, not a
+  check: notices never pause the fill (see `src/lib/AGENTS.md`).
 - **"Delete orphan buildings" in `/admin/buildings` deletes exactly what the "Outside
   Boston / New Haven, no reviews" toggle shows.** Both use `orphanBuildingsWhere()` in
   `src/lib/admin/orphanBuildings.ts`: `source = 'user'`, no review of any status, not

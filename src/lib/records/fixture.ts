@@ -5,6 +5,7 @@ import { SAM_FIELDS, SAM_RESOURCE_ID, indexSamByParcel } from './seed/sam';
 import type { SamRow } from './seed/types';
 import { resolveParcel } from './sources/boston/assessor';
 import { RENTSMART_RESOURCE_ID } from './sources/boston/rentsmart';
+import { LEGACY_311_RESOURCES, NEW_311_RESOURCE_ID } from './sources/boston/serviceRequests';
 import type {
   AssessmentPayload,
   BuildingIdentity,
@@ -17,6 +18,16 @@ import type {
 export interface FixtureCheck {
   label: string;
   ok: boolean;
+  detail: string;
+}
+
+/**
+ * Something the fixture saw that a human should know about but that must never pause the fill.
+ * Notices are not checks: they are never counted in `checksFailed` or `failures`, which is the
+ * only number the breaker reads.
+ */
+export interface FixtureNotice {
+  label: string;
   detail: string;
 }
 
@@ -39,6 +50,8 @@ export interface FixtureResult {
   sourceErrors: Array<{ label: string; message: string }>;
   /** Row count per source label, for the sources that ran. A source that threw is absent, not zero. */
   rowsBySource: Record<string, number>;
+  /** Report-only findings, such as a 311 file the city left empty. Never part of `failures`. */
+  notices: FixtureNotice[];
   parcelId: string | null;
   condominium: boolean;
 }
@@ -96,6 +109,48 @@ async function newestRentSmartRow(since: string, fetchImpl: FetchLike): Promise<
   }
 }
 
+/** Every 311 file the adapter queries: the legacy years newest first, then the new system. */
+const SERVICE_REQUEST_FILES: ReadonlyArray<{ name: string; lacks: string; resourceId: string }> = [
+  ...LEGACY_311_RESOURCES.map((r) => ({ name: String(r.year), lacks: String(r.year), resourceId: r.resourceId })),
+  { name: 'new-system', lacks: 'every new-system request', resourceId: NEW_311_RESOURCE_ID },
+];
+
+/**
+ * Report-only: asks each 311 file for one row and returns a notice for each that has none. The
+ * city's 2026-09-18 reload left the 2011 and 2014 files empty (same ids, schema intact), which
+ * fails nothing: every query answers, with zero rows. Lanark's own 311 checks cannot see it
+ * either, because one address's year can be empty for honest reasons. A notice is not a failure,
+ * so a file only the city can reload never pauses the fill.
+ *
+ * One file at a time, so the city sees seventeen one-row queries in a row rather than a burst on
+ * top of the eleven sources. Interpolation invariant: the resource ids are code constants from
+ * `serviceRequests.ts` and nothing else is interpolated. Never rejects; a probe that fails is
+ * reported once, with the files it could not check.
+ */
+async function emptyServiceRequestFiles(fetchImpl: FetchLike): Promise<FixtureNotice[]> {
+  const notices: FixtureNotice[] = [];
+  const unchecked: string[] = [];
+  let firstError: string | null = null;
+  for (const file of SERVICE_REQUEST_FILES) {
+    try {
+      const rows = await ckanSql<CkanRow>(`SELECT "_id" FROM "${file.resourceId}" LIMIT 1`, fetchImpl);
+      if (rows.length === 0) {
+        notices.push({
+          label: `311 ${file.name} file has no rows`,
+          detail: `resource ${file.resourceId} answered with no rows, so every building's 311 history lacks ${file.lacks} until the city reloads it`,
+        });
+      }
+    } catch (err) {
+      unchecked.push(file.name);
+      firstError ??= messageOf(err);
+    }
+  }
+  if (unchecked.length > 0) {
+    notices.push({ label: '311 empty-file check incomplete', detail: `could not check ${unchecked.join(', ')}: ${firstError}` });
+  }
+  return notices;
+}
+
 /**
  * Runs every Boston source for the Lanark fixture and compares the results to values
  * recorded in September 2026. Never throws: a source that fails becomes a failed check.
@@ -147,12 +202,13 @@ export async function runLanarkFixture(fetchImpl: FetchLike, options: FixtureOpt
   // `allRows` and the insertion order of `rowsBySource` read the same on every run whatever
   // order the responses arrived in. Two fixture runs have to compare label for label.
   //
-  // The city-wide RentSmart query starts with them for the same reason. It catches its own
-  // failure, so nothing rejects while it waits to be awaited at the RentSmart checks.
+  // The city-wide RentSmart query and the 311 empty-file probe start with them for the same
+  // reason. Each catches its own failures, so nothing rejects while it waits to be awaited.
   const rentsmartSince = new Date((options.clockMs ?? Date.now)() - RENTSMART_RECENT_DAYS * DAY_MS)
     .toISOString()
     .slice(0, 10);
   const newestRentSmart = newestRentSmartRow(rentsmartSince, fetchImpl);
+  const emptyFiles = emptyServiceRequestFiles(fetchImpl);
   const sources = sourcesForCity('Boston');
   const settled = await Promise.all(
     sources.map(async (source): Promise<{ rows: RecordRow[] } | { error: string }> => {
@@ -366,6 +422,7 @@ export async function runLanarkFixture(fetchImpl: FetchLike, options: FixtureOpt
     failures,
     sourceErrors,
     rowsBySource,
+    notices: await emptyFiles,
     parcelId: identity.parcelId,
     condominium: identity.condominium,
   };

@@ -90,7 +90,7 @@ const REASON_LABELS: Array<[keyof RecordsQueueStats['pendingByReason'], string]>
  * a settings row written by a newer scheduler must degrade to "not run yet" rather than
  * throw the panel away.
  */
-type LastFixture = Pick<RecordsQueueFixtureResult, 'at' | 'failures' | 'checksTotal' | 'failed' | 'sourceErrors'>;
+type LastFixture = Pick<RecordsQueueFixtureResult, 'at' | 'failures' | 'checksTotal' | 'failed' | 'sourceErrors' | 'notices'>;
 
 function parseFixture(value: unknown): LastFixture | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -112,7 +112,18 @@ function parseFixture(value: unknown): LastFixture | null {
     }
   }
 
-  return { at: raw.at, failures: raw.failures, checksTotal: raw.checksTotal, failed, sourceErrors };
+  // Report-only, and absent from rows an older scheduler wrote.
+  const notices: LastFixture['notices'] = [];
+  if (Array.isArray(raw.notices)) {
+    for (const entry of raw.notices) {
+      if (!entry || typeof entry !== 'object') continue;
+      const item = entry as Record<string, unknown>;
+      if (typeof item.label !== 'string') continue;
+      notices.push({ label: item.label, detail: typeof item.detail === 'string' ? item.detail : '' });
+    }
+  }
+
+  return { at: raw.at, failures: raw.failures, checksTotal: raw.checksTotal, failed, sourceErrors, notices };
 }
 
 function formatDate(timestamp: number): string {
@@ -421,6 +432,19 @@ export default function RecordsQueuePanel() {
                 </li>
               ))}
             </ul>
+          )}
+          {lastFixture && lastFixture.notices.length > 0 && (
+            <div className="mt-3">
+              <p className="text-sm text-gray-700">Notices (report only, these never pause the fill):</p>
+              <ul className="mt-1 space-y-1 text-sm text-gray-600 list-disc list-inside">
+                {lastFixture.notices.map((notice) => (
+                  <li key={`notice-${notice.label}`}>
+                    {notice.label}
+                    {notice.detail ? `: ${notice.detail}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
 

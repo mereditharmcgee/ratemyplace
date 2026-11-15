@@ -197,6 +197,7 @@ suite('admin records queue routes', () => {
         failed: ['assessor parcel'],
         sourceErrors: [{ label: '311 requests', message: 'HTTP 500' }],
         rowsBySource: { 'Assessor FY2026': 3 },
+        notices: [{ label: '311 2011 file has no rows', detail: 'resource 94b499d9 answered with no rows' }],
       };
       await db
         .prepare('INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)')
@@ -208,6 +209,22 @@ suite('admin records queue routes', () => {
 
       expect(response.status).toBe(200);
       expect(payload.lastFixture).toEqual(fixture);
+    });
+
+    // The site deploys on merge and the Worker only when someone runs records:worker:deploy, so
+    // the panel reads rows an older scheduler wrote, with no notices, until then.
+    it('reads a fixture row an older scheduler wrote, with no notices, as having none', async () => {
+      const db = createRecordsTestDb();
+      const older = { at: NOW, failures: 0, checksFailed: 0, checksTotal: 17, failed: [], sourceErrors: [], rowsBySource: {} };
+      await db
+        .prepare('INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)')
+        .bind(SETTING_KEYS.fixtureLast, JSON.stringify(older), NOW)
+        .run();
+
+      const response = await GET(createContext(db, { method: 'GET' }));
+
+      expect(response.status).toBe(200);
+      expect((await data<QueuePayload>(response)).lastFixture).toEqual({ ...older, notices: [] });
     });
 
     it('reports an unparseable fixture setting as null rather than failing the panel', async () => {
@@ -264,6 +281,19 @@ suite('admin records queue routes', () => {
           failed: [],
           sourceErrors: [{ label: 'RentSmart' }],
           rowsBySource: {},
+        },
+      ],
+      [
+        'a notices entry without a detail',
+        {
+          at: 1,
+          failures: 0,
+          checksFailed: 0,
+          checksTotal: 1,
+          failed: [],
+          sourceErrors: [],
+          rowsBySource: {},
+          notices: [{ label: '311 2011 file has no rows' }],
         },
       ],
       [

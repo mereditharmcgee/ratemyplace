@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { LANARK_FIXTURE, runLanarkFixture, type FixtureCheck, type FixtureResult } from '../records/fixture';
 import { sourcesForCity } from '../records/jurisdictions';
 import { RENTSMART_RESOURCE_ID } from '../records/sources/boston/rentsmart';
+import { LEGACY_311_RESOURCES, NEW_311_RESOURCE_ID } from '../records/sources/boston/serviceRequests';
 import type { FetchLike } from '../records/types';
 
 /** A fetch that answers every CKAN call with an empty result set. */
@@ -257,5 +258,96 @@ describe('runLanarkFixture RentSmart checks', () => {
     // the one place this failure is counted, as with the SAM check.
     expect(result.sourceErrors.find((e) => e.label === 'RentSmart')).toBeUndefined();
     expect(result.rowsBySource.RentSmart).toBe(0);
+  });
+});
+
+/**
+ * The city's 2026-09-18 reload left the 2011 and 2014 legacy 311 files empty: same ids, schema
+ * intact, zero rows. An empty file fails nothing, and Lanark's 311 floor sits below its total, so
+ * no check noticed. The fixture now asks each 311 file for one row and reports an empty one as a
+ * notice. A notice is never a failure: a failed check pauses the fill every morning, and the fill
+ * should not wait on a reload only the city can do.
+ */
+describe('runLanarkFixture 311 empty-file notices', () => {
+  const PROBE = 'SELECT "_id" FROM ';
+
+  function legacyId(year: number): string {
+    const resource = LEGACY_311_RESOURCES.find((r) => r.year === year);
+    if (!resource) throw new Error(`no legacy 311 resource for ${year}`);
+    return resource.resourceId;
+  }
+
+  /** Resolves the parcel and answers each 311 probe with one row, except the `empty` ids (none) and `failing` ids (HTTP 500). */
+  function probeFetch(options: { empty?: string[]; failing?: string[] } = {}, probes: string[] = []): FetchLike {
+    return async (input) => {
+      const sql = new URL(String(input)).searchParams.get('sql') ?? '';
+      if (sql.startsWith('SELECT "PID"')) return ckanAnswer([{ PID: LANARK_FIXTURE.parcelId }]);
+      if (sql.startsWith(PROBE)) {
+        probes.push(sql);
+        if (options.failing?.some((id) => sql.includes(id))) return ckanFailure(500, 'upstream unavailable');
+        return ckanAnswer(options.empty?.some((id) => sql.includes(id)) ? [] : [{ _id: 1 }]);
+      }
+      return ckanAnswer([]);
+    };
+  }
+
+  it('has no notices when every 311 file answers with a row', async () => {
+    const result = await runLanarkFixture(probeFetch(), runOptions);
+    expect(result.notices).toEqual([]);
+  });
+
+  it('notes each legacy 311 file that answers with no rows, newest first', async () => {
+    const result = await runLanarkFixture(probeFetch({ empty: [legacyId(2011), legacyId(2014)] }), runOptions);
+    expect(result.notices.map((n) => n.label)).toEqual(['311 2014 file has no rows', '311 2011 file has no rows']);
+    expect(result.notices[0].detail).toContain(legacyId(2014));
+    expect(result.notices[0].detail).toContain('lacks 2014');
+  });
+
+  it('notes an empty new-system file the same way', async () => {
+    const result = await runLanarkFixture(probeFetch({ empty: [NEW_311_RESOURCE_ID] }), runOptions);
+    expect(result.notices.map((n) => n.label)).toEqual(['311 new-system file has no rows']);
+    expect(result.notices[0].detail).toContain(NEW_311_RESOURCE_ID);
+  });
+
+  it('never counts a notice as a failure', async () => {
+    const clean = await runLanarkFixture(probeFetch(), runOptions);
+    const empty = await runLanarkFixture(probeFetch({ empty: [legacyId(2011), legacyId(2014)] }), runOptions);
+    expect(empty.failures).toBe(clean.failures);
+    expect(empty.checksFailed).toBe(clean.checksFailed);
+    expect(empty.checks.map((c) => c.label)).toEqual(clean.checks.map((c) => c.label));
+    expect(empty.sourceErrors).toEqual(clean.sourceErrors);
+  });
+
+  it('says in one notice which files it could not check, and still fails nothing', async () => {
+    const clean = await runLanarkFixture(probeFetch(), runOptions);
+    const result = await runLanarkFixture(probeFetch({ failing: [legacyId(2011), legacyId(2014)] }), runOptions);
+    expect(result.notices).toHaveLength(1);
+    expect(result.notices[0].label).toBe('311 empty-file check incomplete');
+    expect(result.notices[0].detail).toContain('2014, 2011');
+    expect(result.notices[0].detail).toContain('HTTP 500');
+    expect(result.failures).toBe(clean.failures);
+  });
+
+  it('asks each of the seventeen 311 files for one row, one file at a time', async () => {
+    const probes: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const answer = probeFetch({}, probes);
+    const fetchImpl: FetchLike = async (input, init) => {
+      const probing = (new URL(String(input)).searchParams.get('sql') ?? '').startsWith(PROBE);
+      if (!probing) return answer(input, init);
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        return await answer(input, init);
+      } finally {
+        inFlight -= 1;
+      }
+    };
+    await runLanarkFixture(fetchImpl, runOptions);
+    const ids = [...LEGACY_311_RESOURCES.map((r) => r.resourceId), NEW_311_RESOURCE_ID];
+    expect(probes).toEqual(ids.map((id) => `SELECT "_id" FROM "${id}" LIMIT 1`));
+    expect(maxInFlight).toBe(1);
   });
 });
