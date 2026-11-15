@@ -102,9 +102,11 @@ export const BOSTON_SUB_AREAS: Readonly<Record<string, string>> = {
 // `BOSTON_LOCALITY_NAMES` or `BOSTON_SUB_AREAS`. Google Places sometimes hands back a
 // micro-area of its own that the city does not use ("Commonwealth", "St. Elizabeth's"), and
 // "Commonwealth" alone covers addresses in both Allston (02134) and Brighton (02135), so no
-// fixed alias can place it. The ZIP places nearly all of them. The exception is a stretch of
-// Commonwealth Avenue itself (about 1387-1462, ZIP 02135) that SAM files under Allston; those
-// parcels are seeded, so a new entry there lands on its seeded row and this table is not used.
+// fixed alias can place it. The ZIP places nearly all of them. The exception is a pocket of
+// 02135 that SAM files under Allston (about 4% of its addresses): Commonwealth Avenue about
+// 1387-1462 and nearby streets such as Gordon Street, Camelot Court, Dustin Street and
+// Cambridge Street 615-677. Those parcels are seeded, so a new entry there usually lands on its
+// seeded row and this table is not used.
 //
 // Measured 2026-11-14 on the seeded buildings, whose neighborhood is SAM's
 // MAILING_NEIGHBORHOOD, and checked against the live SAM file: a ZIP is listed when at least
