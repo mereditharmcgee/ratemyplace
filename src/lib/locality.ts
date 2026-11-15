@@ -6,7 +6,7 @@
 // agrees: if the stored neighborhood is blank, or is itself one of the words
 // in the street address, fall back to the city instead.
 
-import { BOSTON_LOCALITY_NAMES, BOSTON_SUB_AREAS } from './bostonLocalities';
+import { BOSTON_LOCALITY_NAMES, BOSTON_SUB_AREAS, BOSTON_ZIP_NEIGHBORHOODS } from './bostonLocalities';
 
 interface LocalityBuilding {
   address?: string | null;
@@ -84,6 +84,25 @@ const BOSTON_LOCALITY_BY_KEY: ReadonlyMap<string, string> = new Map(
 export function bostonLocalityName(value: string | null | undefined): string | null {
   if (!value) return null;
   return BOSTON_LOCALITY_BY_KEY.get(normalize(value.replace(/,\s*[A-Za-z]{2}\s*$/, ''))) ?? null;
+}
+
+// `BOSTON_ZIP_NEIGHBORHOODS` as a Map, so a key such as "constructor" finds nothing rather
+// than an Object method.
+const ZIP_TO_NEIGHBORHOOD: ReadonlyMap<string, string> = new Map(Object.entries(BOSTON_ZIP_NEIGHBORHOODS));
+
+/**
+ * The neighborhood to store for a new Boston building, from the name Google or a person
+ * supplied and the building's five-digit ZIP (normalize it with `zip5` first). A sub-area
+ * reads as its neighborhood ("Aberdeen" -> "Brighton"); a Boston locality name is kept in its
+ * display spelling; anything else, blank or "Boston" included, gives way to the ZIP's
+ * neighborhood in `BOSTON_ZIP_NEIGHBORHOODS`, or to null when the ZIP is not listed, and the
+ * page then reads "Boston". The caller decides the building is in Boston (`isBostonLocality`
+ * on its city): the names repeat elsewhere.
+ */
+export function bostonNeighborhoodFor(value: string | null | undefined, zip: string | null | undefined): string | null {
+  const name = value?.trim() ? bostonLocalityName(resolveBostonSubArea(value)) : null;
+  if (name && name !== 'Boston') return name;
+  return (zip ? ZIP_TO_NEIGHBORHOOD.get(zip.trim()) : undefined) ?? null;
 }
 
 function addressWords(address?: string | null): Set<string> {

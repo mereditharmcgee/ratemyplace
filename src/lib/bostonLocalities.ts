@@ -96,3 +96,35 @@ export const BOSTON_SUB_AREAS: Readonly<Record<string, string>> = {
   Readville: 'Hyde Park',
   'Bellevue Hill': 'West Roxbury',
 };
+
+// The neighborhood of each Boston ZIP that the city's own address file names almost
+// uniformly, for a Boston building whose supplied neighborhood is not a name in
+// `BOSTON_LOCALITY_NAMES` or `BOSTON_SUB_AREAS`. Google Places sometimes hands back a
+// micro-area of its own that the city does not use ("Commonwealth", "St. Elizabeth's"), and
+// "Commonwealth" alone covers addresses in both Allston (02134) and Brighton (02135), so no
+// fixed alias can place it. The ZIP can.
+//
+// Measured 2026-11-14 on the seeded buildings, whose neighborhood is SAM's
+// MAILING_NEIGHBORHOOD: a ZIP is listed when at least 95% of its parcels share one name.
+// Left out on purpose: the central ZIPs (SAM names them plain "Boston"), 02118 (87%
+// "Roxbury", though readers call it the South End), 02120 (94% Mission Hill), 02136 (86%
+// Hyde Park, 14% Mattapan) and 02467 (Chestnut Hill, shared with Newton and Brookline). A
+// building there keeps no neighborhood and reads as "Boston", which is never wrong.
+//
+// Keys are five-digit ZIPs. Every value is a name in `BOSTON_LOCALITY_NAMES`.
+export const BOSTON_ZIP_NEIGHBORHOODS: Readonly<Record<string, string>> = {
+  '02119': 'Roxbury',
+  '02121': 'Dorchester',
+  '02122': 'Dorchester',
+  '02124': 'Dorchester',
+  '02125': 'Dorchester',
+  '02126': 'Mattapan',
+  '02127': 'South Boston',
+  '02128': 'East Boston',
+  '02129': 'Charlestown',
+  '02130': 'Jamaica Plain',
+  '02131': 'Roslindale',
+  '02132': 'West Roxbury',
+  '02134': 'Allston',
+  '02135': 'Brighton',
+};

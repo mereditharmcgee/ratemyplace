@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BOSTON_LOCALITY_NAMES, BOSTON_SUB_AREAS } from '../bostonLocalities';
-import { bostonLocalityName, displayLocality, isBostonLocality, localityLine, resolveBostonSubArea } from '../locality';
+import { BOSTON_LOCALITY_NAMES, BOSTON_SUB_AREAS, BOSTON_ZIP_NEIGHBORHOODS } from '../bostonLocalities';
+import { bostonLocalityName, bostonNeighborhoodFor, displayLocality, isBostonLocality, localityLine, resolveBostonSubArea } from '../locality';
 
 describe('resolveBostonSubArea', () => {
   it('maps a sub-area to its neighborhood, ignoring case and spacing', () => {
@@ -187,4 +187,59 @@ describe('bostonLocalityName', () => {
       expect(bostonLocalityName(value) !== null).toBe(isBostonLocality(value));
     },
   );
+});
+
+describe('bostonNeighborhoodFor', () => {
+  // The city's own neighborhood for a new Boston building. Google's "Commonwealth" covers
+  // addresses in two neighborhoods, so it is the ZIP that places it.
+  it.each([
+    ['Commonwealth', '02135', 'Brighton'],
+    ['Commonwealth', '02134', 'Allston'],
+    ["St. Elizabeth's", '02135', 'Brighton'],
+    ['Chestnut Hill', '02135', 'Brighton'],
+  ])('reads the name %j it does not know in ZIP %s as %j', (value, zip, expected) => {
+    expect(bostonNeighborhoodFor(value, zip)).toBe(expected);
+  });
+
+  it('keeps a Boston locality name in its display spelling, whatever the ZIP says', () => {
+    expect(bostonNeighborhoodFor('jamaica plain', '02135')).toBe('Jamaica Plain');
+    expect(bostonNeighborhoodFor(' Back Bay ', '02116')).toBe('Back Bay');
+    expect(bostonNeighborhoodFor('Mission Hill', null)).toBe('Mission Hill');
+  });
+
+  it('reads a sub-area as its neighborhood before the ZIP is consulted', () => {
+    expect(bostonNeighborhoodFor('Aberdeen', '02134')).toBe('Brighton');
+    expect(bostonNeighborhoodFor('Savin Hill', null)).toBe('Dorchester');
+  });
+
+  it('takes the ZIP for a blank name or plain Boston', () => {
+    expect(bostonNeighborhoodFor(null, '02128')).toBe('East Boston');
+    expect(bostonNeighborhoodFor('', '02127')).toBe('South Boston');
+    expect(bostonNeighborhoodFor('  ', '02129')).toBe('Charlestown');
+    expect(bostonNeighborhoodFor('Boston', '02130')).toBe('Jamaica Plain');
+  });
+
+  it('gives null, which reads as Boston, when the ZIP is not one neighborhood', () => {
+    expect(bostonNeighborhoodFor('Commonwealth', '02116')).toBeNull();
+    expect(bostonNeighborhoodFor('Commonwealth', '02118')).toBeNull();
+    expect(bostonNeighborhoodFor('Commonwealth', '02136')).toBeNull();
+    expect(bostonNeighborhoodFor('Commonwealth', null)).toBeNull();
+    expect(bostonNeighborhoodFor('Boston', undefined)).toBeNull();
+    expect(bostonNeighborhoodFor(undefined, '')).toBeNull();
+  });
+
+  it('finds nothing for a key that is an Object method name', () => {
+    expect(bostonNeighborhoodFor('Commonwealth', 'constructor')).toBeNull();
+    expect(bostonNeighborhoodFor('Commonwealth', '__proto__')).toBeNull();
+  });
+
+  it('lists only five-digit ZIPs, each mapped to a Boston neighborhood display trusts', () => {
+    expect(Object.keys(BOSTON_ZIP_NEIGHBORHOODS).length).toBeGreaterThan(0);
+    for (const [zip, neighborhood] of Object.entries(BOSTON_ZIP_NEIGHBORHOODS)) {
+      expect(zip).toMatch(/^\d{5}$/);
+      expect(BOSTON_LOCALITY_NAMES).toContain(neighborhood);
+      expect(neighborhood).not.toBe('Boston');
+      expect(displayLocality({ address: '1 Example Road', neighborhood, city: 'Boston' })).toBe(neighborhood);
+    }
+  });
 });
