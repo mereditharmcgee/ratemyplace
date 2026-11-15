@@ -26,7 +26,8 @@ export interface ComboboxStatusOptions {
   message?: string | null;
   /**
    * Any value whose identity changes when a results update lands, and only then (memoize it).
-   * It restarts the settle timer.
+   * It restarts the settle timer and, in the same render, drops the active option. A new value
+   * on every render would re-render without end.
    */
   version: unknown;
 }
@@ -113,9 +114,15 @@ export function useComboboxListbox(options: UseComboboxListboxOptions): Combobox
   // beside our own buildings), so the index the reader arrowed to may now be another option.
   // None stays active: Enter cannot take a row the reader never heard, and the next arrow
   // starts again from the top or bottom.
-  useEffect(() => {
+  // The reset happens while rendering the new rows, not in an effect. An effect runs after those
+  // rows are on screen: for that moment aria-activedescendant named whatever row now sat at the
+  // old index, and an arrow pressed in that moment was undone when the effect ran.
+  // The updater forms keep a function-valued version from being read as an updater.
+  const [seenVersion, setSeenVersion] = useState(() => version);
+  if (seenVersion !== version) {
+    setSeenVersion(() => version);
     setActiveIndex(-1);
-  }, [version]);
+  }
 
   useEffect(() => {
     if (!scrollPending.current) return;

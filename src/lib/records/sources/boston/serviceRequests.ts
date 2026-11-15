@@ -1,8 +1,9 @@
 // CKAN's SQL endpoint has no parameter binding, so this module is the repo's documented
 // exception to "parameterized queries always" (see AGENTS.md). The invariant that keeps
 // it safe: every interpolated value passes through `sqlLiteral`/`addressLikeClauses` (ZIPs
-// through `zipEqualsClause`, a five-digit guard in front of `sqlLiteral`), and every identifier
-// (table/column name) is a code constant, never user input.
+// through `zipEqualsClause`, a five-digit guard in front of `sqlLiteral`; the ward through
+// `wardEqualsClause`, a whole-number guard in front of it), and every identifier (table/column
+// name) is a code constant, never user input.
 //
 // Boston's 311 data ships as two incompatible systems glued together on the dataset page:
 // sixteen year-sliced "legacy" resources (2011-2026, one schema, address stored as free
@@ -15,9 +16,10 @@
 // replacing them with a partial 311 history. A retired resource id surfaces as an error on
 // every pull until someone fixes it by updating LEGACY_311_RESOURCES; it will not clear on
 // its own.
-import { addressLikeClauses, ckanSql, rangeAddressClause, rangeNumberClause, ROW_CAP, sqlLiteral, textOrNull, zipEqualsClause } from '../../ckan';
+import { addressLikeClauses, ckanSql, rangeAddressClause, rangeNumberClause, ROW_CAP, sqlLiteral, textOrNull, wardEqualsClause, zipEqualsClause } from '../../ckan';
 import { houseNumberTokenMatches, leadingToken, recordZips } from '../../identity';
-import type { RecordRow, RecordSource, ServiceRequestClassification, ServiceRequestPayload, SourceResult } from '../../types';
+import { wardZipArm } from '../../wards';
+import type { BuildingIdentity, RecordRow, RecordSource, ServiceRequestClassification, ServiceRequestPayload, SourceResult } from '../../types';
 
 export const NEW_311_RESOURCE_ID = '254adca6-64ab-4c5c-9fc0-a6da622be185';
 export const SERVICE_REQUESTS_PAGE_URL = 'https://data.boston.gov/dataset/311-service-requests';
@@ -135,39 +137,60 @@ function mapNewRow(row: Row): ServiceRequestPayload | null {
   };
 }
 
+/** Both 311 systems name the ward in a column called `ward`: text in the legacy files, a number in the new one. */
+const WARD_COLUMN = 'ward';
+
+/**
+ * One system's ZIP qualifier: a request with no ZIP, one filed under the page's or the parcel's
+ * ZIP (`recordZips`), or one filed under another ZIP of the parcel's ward that also names that
+ * ward (`wardZipArm`). The city's 311 ZIP and the assessor's disagree on about one housing request
+ * in 25; the ward settles most of those without letting in a same-named street elsewhere, because
+ * a street name repeats across wards but, as far as the FY2026 assessor shows, not at the same
+ * number inside one. Null when the page has no usable ZIP, which leaves the query unnarrowed as
+ * before.
+ */
+function zipQualifier(zipColumn: string, identity: BuildingIdentity): string | null {
+  const zips = recordZips(identity);
+  if (zips.length === 0) return null;
+  const arms = [`"${zipColumn}" IS NULL`, zipEqualsClause(zipColumn, zips)];
+  const wardArm = wardZipArm(identity);
+  if (wardArm) arms.push(`(${wardEqualsClause(WARD_COLUMN, wardArm.ward)} AND ${zipEqualsClause(zipColumn, wardArm.zips)})`);
+  return `(${arms.join(' OR ')})`;
+}
+
 export const serviceRequestsSource: RecordSource = {
   id: NEW_311_RESOURCE_ID,
   label: '311 Service Requests',
   pageUrl: SERVICE_REQUESTS_PAGE_URL,
   kinds: ['service_request'],
   async run(identity, fetchImpl): Promise<SourceResult> {
-    // The page's ZIP, plus the current-year parcel's when the two differ (`recordZips`): the city
-    // files 311 requests under the parcel's ZIP even where the page carries another one.
-    const zips = recordZips(identity);
-    const zipOk = zips.length > 0;
     // The as-written LIKE clauses, plus one regex clause for every number inside a range address
     // and every city record filed under a range that reaches it ('501-507 Example Ave' for
     // 503). The regex arm can find a range that starts below the address and ends below it too,
     // so every row is checked with `houseNumberTokenMatches` before it is kept.
     const rangeClause = rangeAddressClause('location', identity, { enclosing: true });
     const addressClauses = [...addressLikeClauses('location', identity), ...(rangeClause ? [rangeClause] : [])];
-    // Qualifying by zip is why a same-named street in one neighborhood does not attach
-    // 311 cases filed against a same-named street elsewhere in the city (see permits.ts).
-    const legacyWhere = zipOk
-      ? `(("location_zipcode" IS NULL OR ${zipEqualsClause('location_zipcode', zips)}) AND (${addressClauses.join(' OR ')}))`
-      : `(${addressClauses.join(' OR ')})`;
+    // Qualifying by ZIP, and by ward where the ZIPs disagree (`zipQualifier`), is why a same-named
+    // street in one neighborhood does not attach 311 cases filed against a same-named street
+    // elsewhere in the city (see permits.ts). The ZIPs are the page's plus the current-year
+    // parcel's when the two differ: the city files 311 requests under the parcel's ZIP even where
+    // the page carries another one.
+    const legacyZip = zipQualifier('location_zipcode', identity);
+    const legacyWhere = legacyZip ? `(${legacyZip} AND (${addressClauses.join(' OR ')}))` : `(${addressClauses.join(' OR ')})`;
 
     const numberForms = Array.from(
       new Set([...identity.matchNumbers, ...identity.numbers, ...(identity.rangeForm ? [identity.rangeForm] : [])]),
     );
     const newRangeClause = rangeNumberClause('street_number', identity, { enclosing: true });
     const numberMatch = `upper("street_number") IN (${numberForms.map(sqlLiteral).join(',')})`;
-    // upper() on street_number matches the upper() on street_name above; the new-system
-    // street_number and zip_code columns are both text (verified live 2026-09-06/07).
+    // upper() on street_number matches the upper() on street_name above. street_number is text;
+    // zip_code and ward are numbers (zip_code was text when first checked on 2026-09-06/07 and
+    // numeric by 2026-11-15), and quoted ZIP literals compare against either.
+    const newZip = zipQualifier('zip_code', identity);
     const newWhere =
       `upper("street_name") IN (${identity.streetForms.map(sqlLiteral).join(',')}) ` +
       `AND ${newRangeClause ? `(${numberMatch} OR ${newRangeClause})` : numberMatch}` +
-      (zipOk ? ` AND ("zip_code" IS NULL OR ${zipEqualsClause('zip_code', zips)})` : '');
+      (newZip ? ` AND ${newZip}` : '');
 
     const queries: string[] = [];
     const seen = new Set<string>();

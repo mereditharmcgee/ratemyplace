@@ -22,6 +22,11 @@ import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 const PAGE_ZIP = '02199';
 const PARCEL_ZIP = '02101';
 
+/**
+ * The parcel id starts `00`, a ward Boston does not have, so the 311 ward arm (records311Ward.test.ts)
+ * stays out of these ZIP-arm assertions. The pull suite below keeps a ward-1 parcel; its assertions
+ * only look for the ZIP list.
+ */
 function identity(overrides: { zip?: string | null; parcelZip?: string | null } = {}): BuildingIdentity {
   const built = buildIdentity({
     id: 'b-zip',
@@ -29,7 +34,7 @@ function identity(overrides: { zip?: string | null; parcelZip?: string | null } 
     city: 'Boston',
     state: 'MA',
     zip_code: overrides.zip === undefined ? PAGE_ZIP : overrides.zip,
-    parcel_id: '0100000012',
+    parcel_id: '0000000012',
     sam_id: null,
   });
   return { ...built, parcelZip: overrides.parcelZip ?? null };

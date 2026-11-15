@@ -290,7 +290,13 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
 - **`npm run records:check`** hits the live datasets and reports which resource ids and
   columns still exist. Boston retires 311 resource ids without notice, and a retired id
   fails that whole source on every pull until someone updates `LEGACY_311_RESOURCES` —
-  it does not heal on its own. Run it before trusting a source failure.
+  it does not heal on its own. Run it before trusting a source failure. A resource the city
+  empties fails nothing, and the fixture's floor does not notice it either: since the
+  2026-09-18 reload, the 2011 and 2014 resources answer every query with zero rows (same ids,
+  schema intact, CSV downloads still full size). Only those two years' data dictionaries retype
+  `precinct` as numeric, and legacy precincts such as `0502A` are not numbers, which is the
+  likely reason the load failed. Until the city reloads them, every building's 311 history
+  lacks 2011 and 2014.
 - **`fixture.ts` runs inside a Worker**, not just under that script: the scheduler's daily
   circuit breaker calls `runLanarkFixture`, which pulls in `seed/sam.ts` for the SAM check.
   Both files — and anything either imports — must stay runtime-agnostic: no `node:` imports,
@@ -400,6 +406,16 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   It only widens: a page with no usable ZIP stays unnarrowed rather than narrowed to the
   parcel's, and the building row is never changed. Permits keep the page ZIP (their parcel arm
   covers the rest). The fixture runs its sources concurrently and never sets `parcelZip`.
+- **311 also accepts another ZIP of the parcel's own ward.** About one housing request in 25
+  carries a ZIP that is neither the page's nor the parcel's (measured 2026-11-15: 3.8% of legacy
+  2024 housing rows, 4.3% in the new system), and three in four of those name the parcel's ward.
+  A Boston parcel id starts with its ward (`parcelWard` in `records/wards.ts`), so `wardZipArm`
+  adds one arm to both 311 ZIP qualifiers: the row's `ward` is the parcel's **and** its ZIP is
+  one that ward's parcels carry (`WARD_ZIPS`, derived from the FY2026 assessor). The second half
+  is what keeps twin streets out: a 2024 row filed under Brighton's ZIP but Charlestown's ward
+  would otherwise attach to the Charlestown twin. `wardEqualsClause` compares `ward` as text
+  because the legacy files write `Ward 18`, `18` or `05` and the new system stores a number. It
+  only widens, and only when the page has a usable ZIP. The violation feeds do not use it.
 - **`matchConfidence.ts` decides when an address-keyed zero is not a finding.** A range too
   wide to expand, a mixed-parity range, or a current-year parcel (`parcelStreetNumber` /
   `parcelStreetNumberHigh`, FY2026 only) that covers numbers the page's address does not:
