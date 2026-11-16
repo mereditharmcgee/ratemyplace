@@ -15,7 +15,7 @@ package against the `node:sqlite` D1 double.
 | Cron | Runs | What it does |
 |---|---|---|
 | `* * * * *` | every minute | `drain` — claims up to 3 people-facing rows plus 1 city-wide fill row, pulls each building's records for real, logs `records_drain`. Skips the fill row entirely while the fill is paused. |
-| `0 6 * * *` | 06:00 UTC daily | `plan` — in this order: purges finished rows, enqueues refreshes, tops the fill queue back up, runs the Lanark fixture and the source error-rate check, then trips the circuit breaker (pausing the fill and emailing once) if either fails — or, when the pause it set earlier was caused by the fixture, lifts it on the first morning the fixture passes again and emails that too. The order is the point: the breaker is judged on the day's pulls and stops the fill before the next drain. Logs `records_plan`. |
+| `0 6 * * *` | 06:00 UTC daily | `plan`, in this order: purges finished rows, enqueues refreshes, tops the fill queue back up, runs the records fixture and the source error-rate check, then trips the circuit breaker (pausing the fill and emailing once) if either fails. Or, when the pause it set earlier was caused by the fixture, lifts it on the first morning the fixture passes again and emails that too. The order is the point: the breaker is judged on the day's pulls and stops the fill before the next drain. Logs `records_plan`. |
 
 A seeded building's pull is about 27 requests to `data.boston.gov` — 17 of them 311 (sixteen
 yearly files plus the new-system resource), one per assessor year, one each for permits,
@@ -147,7 +147,7 @@ this deploy.
   ```
   The queue tables live in D1 and survive; nothing drains them until a scheduler is back.
 
-The circuit breaker does the first of these on its own if the Lanark fixture fails or a
+The circuit breaker does the first of these on its own if the records fixture fails or a
 source's error rate crosses the threshold, and emails `RECORDS_ALERT_EMAIL` once. That
 email is plain text and ends with `$SITE_URL/admin/records`, so unpausing is one tap from
 the alert on a phone.

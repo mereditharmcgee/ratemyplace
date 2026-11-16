@@ -1,5 +1,7 @@
 # Boston Coverage C1: Migration, Address Keys, Seed Pipeline — Implementation Plan
 
+> **Note (2026-11-15):** the practice building in this plan is now fictional: 52-68 Tarnwick Pl, with made-up records throughout. It replaced a real building. Lines that recorded what the live city data showed for that building are worded generically. The live records check (`npm run records:check` and the scheduler's daily breaker) now runs against a different, real building set in `src/lib/records/fixture.ts`, so the live-check code and values here do not match what it checks today.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship migration 0031, the address-key and search-term helpers, and an idempotent seed script that turns the FY2026 assessor plus SAM address points into about 38,400 Boston building rows with an assessor provenance row and assessment record each, matching the Boston buildings already in production onto their parcels first.
@@ -14,7 +16,7 @@
 - Assessor FY2026 resource `ee73430d-96c0-423e-ad21-c4cfb54c8961`. `ST_NAME` is mixed case with an abbreviated suffix (`Chelsea ST`, `PRINCETON ST`), `ST_NUM`/`ST_NUM2` are strings, `RES_UNITS` is often null on R2/R3, `CITY` is a postal district in caps (`EAST BOSTON`), `BLDG_SEQ` is a string.
 - SAM CSV resource `6d6cfc99-6f26-4974-bbb3-17b5dbad49a9`, 399,457 rows. Columns used: `SAM_ADDRESS_ID`, `RELATIONSHIP_TYPE` (`'1'` = the building's primary address, `'2'` = a unit), `PARCEL_ID` (10 digits with leading zero), `MAILING_NEIGHBORHOOD`, `ZIP_CODE`, `POINT_X` (longitude), `POINT_Y` (latitude), `UNIT`.
 - `datastore_search` returns at most 32,000 rows per request; `fields` and `filters` (JSON, array value = IN) are honored.
-- Lanark fixture: parcel `2102098000`, SAM id `83763`, `23-27 Lanark Rd`, Brighton, 02135, lon `-71.1458`, lat `42.33909`.
+- Practice building: the tests below use a fictional one, parcel `2109417000`, SAM id `58344`, `52-68 Tarnwick Pl`, Brighton, 02135, lon `-71.15748`, lat `42.33318`. The live values of the original building are left out.
 
 **Conventions for every task:** TDD (failing test, run it, implement, run it, commit). Commit messages end with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`. Run `npm test` before every commit. No `any`. Every CKAN identifier is a code constant. Run commands from the worktree root `C:\Users\mmcge\ratemyplace-boston\.worktrees\building-records` on branch `feat/boston-coverage-c1` (create it from `origin/main` after merging the spec branch, or from `feat/boston-coverage-spec`).
 
@@ -38,7 +40,7 @@
 | `src/lib/records/seed/match.ts` | Create: `matchExistingBuildings` |
 | `src/lib/records/seed/sql.ts` | Create: `seedStatements` emitting SQL strings |
 | `scripts/records-seed-boston.ts` | Create: download, cache, orchestrate, write batches, apply |
-| `scripts/records-fixture-check.ts` | Modify: SAM check for the Lanark parcel |
+| `scripts/records-fixture-check.ts` | Modify: SAM check for the records fixture parcel |
 | `package.json` | Modify: `records:seed` script |
 | `.gitignore` | Modify: `.cache/` |
 | `migrations/AGENTS.md`, `src/lib/AGENTS.md`, spec | Modify: document 0031, the seed module, the two amendments |
@@ -132,7 +134,7 @@ Expected: FAIL with "no such column: source" (the migration does not exist yet).
 
 -- Which pipeline created the row. Seeded rows come from the assessor bulk download.
 ALTER TABLE buildings ADD COLUMN source TEXT NOT NULL DEFAULT 'user' CHECK (source IN ('user','seed'));
--- Normalized street name plus abbreviated suffix, e.g. 'LANARK RD', and the house-number
+-- Normalized street name plus abbreviated suffix, e.g. 'TARNWICK PL', and the house-number
 -- range (equal for a single number). Populated by the seed for Boston rows and by the
 -- building-creation endpoint for anything created afterwards. Reviewer dedupe and the
 -- seed's existing-row matching both look up on (city, street_key) then range-contain.
@@ -233,9 +235,9 @@ describe('splitSuffix', () => {
 
 describe('streetKey', () => {
   it('uses the assessor spelling of the suffix', () => {
-    expect(streetKey('Lanark Road')).toBe('LANARK RD');
-    expect(streetKey('Lanark Rd')).toBe('LANARK RD');
-    expect(streetKey('LANARK RD')).toBe('LANARK RD');
+    expect(streetKey('Tarnwick Place')).toBe('TARNWICK PL');
+    expect(streetKey('Tarnwick Pl')).toBe('TARNWICK PL');
+    expect(streetKey('TARNWICK PL')).toBe('TARNWICK PL');
   });
   it('drops units and punctuation', () => {
     expect(streetKey('Beacon St., Apt 3')).toBe('BEACON ST');
@@ -247,16 +249,16 @@ describe('addressKey', () => {
     expect(addressKey('1027 Commonwealth Avenue')).toEqual({ streetKey: 'COMMONWEALTH AV', numLo: 1027, numHi: 1027 });
   });
   it('parses a range', () => {
-    expect(addressKey('23-27 Lanark Rd')).toEqual({ streetKey: 'LANARK RD', numLo: 23, numHi: 27 });
+    expect(addressKey('52-68 Tarnwick Pl')).toEqual({ streetKey: 'TARNWICK PL', numLo: 52, numHi: 68 });
   });
   it('drops a letter suffix on the number', () => {
     expect(addressKey('12A Beacon St')).toEqual({ streetKey: 'BEACON ST', numLo: 12, numHi: 12 });
   });
   it('orders a reversed range', () => {
-    expect(addressKey('27-23 Lanark Rd')).toEqual({ streetKey: 'LANARK RD', numLo: 23, numHi: 27 });
+    expect(addressKey('68-52 Tarnwick Pl')).toEqual({ streetKey: 'TARNWICK PL', numLo: 52, numHi: 68 });
   });
   it('returns null when there is no number or the street is degenerate', () => {
-    expect(addressKey('Lanark Rd')).toBeNull();
+    expect(addressKey('Tarnwick Pl')).toBeNull();
     expect(addressKey('5 Ave')).toBeNull();
   });
 });
@@ -281,7 +283,7 @@ export function splitSuffix(street: string): { base: string; spellings: readonly
 
 /**
  * The lookup key shared by seeded rows and reviewer dedupe: base name plus the assessor's
- * spelling of the suffix ('LANARK RD'), or the bare base when there is no suffix.
+ * spelling of the suffix ('TARNWICK PL'), or the bare base when there is no suffix.
  */
 export function streetKey(street: string): string {
   const { base, spellings } = splitSuffix(street);
@@ -352,13 +354,13 @@ import { normalizeSearchQuery } from '../searchQuery';
 describe('normalizeSearchQuery', () => {
   it('splits on whitespace and expands suffix abbreviations to the long spelling', () => {
     expect(normalizeSearchQuery('1027 comm ave')).toEqual(['1027', 'comm', 'avenue']);
-    expect(normalizeSearchQuery('Lanark Rd')).toEqual(['lanark', 'road']);
+    expect(normalizeSearchQuery('Tarnwick Pl')).toEqual(['tarnwick', 'place']);
   });
   it('strips punctuation and collapses spaces', () => {
     expect(normalizeSearchQuery('  Beacon St., #3 ')).toEqual(['beacon', 'street', '3']);
   });
   it('keeps a hyphenated range as one term', () => {
-    expect(normalizeSearchQuery('23-27 Lanark')).toEqual(['23-27', 'lanark']);
+    expect(normalizeSearchQuery('52-68 Tarnwick')).toEqual(['52-68', 'tarnwick']);
   });
   it('returns an empty list for an empty or punctuation-only query', () => {
     expect(normalizeSearchQuery('')).toEqual([]);
@@ -562,15 +564,15 @@ describe('assessmentFromRow', () => {
   it('maps a modern assessor row to the assessment payload', () => {
     const payload = assessmentFromRow(
       {
-        PID: '2102098000', OWNER: 'LANARK ROAD LLC', LU: 'A', LU_DESC: 'APT 7-30 UNITS', YR_BUILT: '1925', YR_REMODEL: null,
+        PID: '2109417000', OWNER: 'WRENFIELD REALTY LLC', LU: 'A', LU_DESC: 'APT 7-30 UNITS', YR_BUILT: '1948', YR_REMODEL: null,
         GROSS_AREA: '12000', LIVING_AREA: '10000', RES_UNITS: '12', COM_UNITS: '0', TOTAL_VALUE: '3500000.00', LAND_VALUE: '1000000', BLDG_VALUE: '2500000',
         MAIL_ADDRESSEE: null, MAIL_STREET_ADDRESS: '1 Main St', MAIL_CITY: 'Boston', MAIL_STATE: 'MA', MAIL_ZIP_CODE: '02135',
       },
       ASSESSOR_YEARS[0],
     );
     expect(payload.fiscalYear).toBe('FY2026');
-    expect(payload.parcelId).toBe('2102098000');
-    expect(payload.owner).toBe('LANARK ROAD LLC');
+    expect(payload.parcelId).toBe('2109417000');
+    expect(payload.owner).toBe('WRENFIELD REALTY LLC');
     expect(payload.residentialUnits).toBe(12);
     expect(payload.totalValue).toBe(3500000);
     expect(payload.mailStreet).toBe('1 Main St');
@@ -790,7 +792,7 @@ import { buildingTypeFor, formatSeedAddress, seedSlug, titleCaseNeighborhood } f
 
 describe('formatSeedAddress', () => {
   it('spells the suffix out and title-cases the street', () => {
-    expect(formatSeedAddress('23', '27', 'Lanark RD')).toBe('23-27 Lanark Road');
+    expect(formatSeedAddress('52', '68', 'Tarnwick PL')).toBe('52-68 Tarnwick Place');
     expect(formatSeedAddress('1027', null, 'COMMONWEALTH AV')).toBe('1027 Commonwealth Avenue');
     expect(formatSeedAddress('432', null, 'Chelsea ST')).toBe('432 Chelsea Street');
   });
@@ -810,7 +812,7 @@ describe('formatSeedAddress', () => {
 
 describe('seedSlug', () => {
   it('follows the existing address-city convention', () => {
-    expect(seedSlug('23-27 Lanark Road', new Set())).toBe('23-27-lanark-road-boston');
+    expect(seedSlug('52-68 Tarnwick Place', new Set())).toBe('52-68-tarnwick-place-boston');
   });
   it('suffixes on collision and records the slug it took', () => {
     const taken = new Set(['5-park-street-boston']);
@@ -858,7 +860,7 @@ function titleWord(word: string): string {
 }
 
 /**
- * The assessor stores '23' + '27' + 'Lanark RD'; pages read '23-27 Lanark Road'. The
+ * The assessor stores '52' + '68' + 'Tarnwick PL'; pages read '52-68 Tarnwick Place'. The
  * suffix is spelled out from the identity table so the seed and the normalizer agree.
  * A leading directional stays as the assessor wrote it ('W Broadway').
  */
@@ -933,30 +935,30 @@ import { SAM_FIELDS, SAM_RESOURCE_ID, indexSamByParcel } from '../records/seed/s
 import type { SamRow } from '../records/seed/types';
 
 const row = (o: Partial<SamRow>): SamRow => ({
-  SAM_ADDRESS_ID: '1', RELATIONSHIP_TYPE: '1', PARCEL_ID: '2102098000', MAILING_NEIGHBORHOOD: 'Brighton', ZIP_CODE: '02135',
-  POINT_X: '-71.1458', POINT_Y: '42.33909', UNIT: null, ...o,
+  SAM_ADDRESS_ID: '1', RELATIONSHIP_TYPE: '1', PARCEL_ID: '2109417000', MAILING_NEIGHBORHOOD: 'Brighton', ZIP_CODE: '02135',
+  POINT_X: '-71.15748', POINT_Y: '42.33318', UNIT: null, ...o,
 });
 
 describe('indexSamByParcel', () => {
   it('keeps the primary address point with the lowest SAM id per parcel', () => {
     const index = indexSamByParcel([
-      row({ SAM_ADDRESS_ID: '262632', RELATIONSHIP_TYPE: '2', UNIT: '1' }),
-      row({ SAM_ADDRESS_ID: '83763' }),
-      row({ SAM_ADDRESS_ID: '90000', MAILING_NEIGHBORHOOD: 'Allston' }),
+      row({ SAM_ADDRESS_ID: '352109', RELATIONSHIP_TYPE: '2', UNIT: '1' }),
+      row({ SAM_ADDRESS_ID: '58344' }),
+      row({ SAM_ADDRESS_ID: '90049', MAILING_NEIGHBORHOOD: 'Allston' }),
     ]);
-    expect(index.get('2102098000')).toEqual({ samId: '83763', latitude: 42.33909, longitude: -71.1458, neighborhood: 'Brighton', zip: '02135' });
+    expect(index.get('2109417000')).toEqual({ samId: '58344', latitude: 42.33318, longitude: -71.15748, neighborhood: 'Brighton', zip: '02135' });
   });
   it('falls back to a unit row when a parcel has no primary point', () => {
     const index = indexSamByParcel([row({ SAM_ADDRESS_ID: '5', RELATIONSHIP_TYPE: '2', UNIT: '3' })]);
-    expect(index.get('2102098000')?.samId).toBe('5');
+    expect(index.get('2109417000')?.samId).toBe('5');
   });
   it('canonicalizes numeric parcel ids and skips rows without one or without coordinates', () => {
     const index = indexSamByParcel([
-      row({ PARCEL_ID: 2102098000 }),
+      row({ PARCEL_ID: 2109417000 }),
       row({ SAM_ADDRESS_ID: '2', PARCEL_ID: null }),
       row({ SAM_ADDRESS_ID: '3', PARCEL_ID: '0100037000', POINT_X: null }),
     ]);
-    expect([...index.keys()]).toEqual(['2102098000']);
+    expect([...index.keys()]).toEqual(['2109417000']);
   });
   it('names the resource and the fields it downloads', () => {
     expect(SAM_RESOURCE_ID).toBe('6d6cfc99-6f26-4974-bbb3-17b5dbad49a9');
@@ -1045,12 +1047,12 @@ import { ASSESSOR_SEED_FIELDS, collapseAssessorRows } from '../records/seed/coll
 import type { AssessorRow, SamPoint } from '../records/seed/types';
 
 const base: AssessorRow = {
-  PID: '2102098000', BLDG_SEQ: '1', ST_NUM: '23', ST_NUM2: '27', ST_NAME: 'Lanark RD', CITY: 'BRIGHTON', ZIP_CODE: '02135',
-  LU: 'A', LU_DESC: 'APT 7-30 UNITS', OWNER: 'LANARK ROAD LLC', YR_BUILT: '1925', YR_REMODEL: null, GROSS_AREA: '12000', LIVING_AREA: '10000',
+  PID: '2109417000', BLDG_SEQ: '1', ST_NUM: '52', ST_NUM2: '68', ST_NAME: 'Tarnwick PL', CITY: 'BRIGHTON', ZIP_CODE: '02135',
+  LU: 'A', LU_DESC: 'APT 7-30 UNITS', OWNER: 'WRENFIELD REALTY LLC', YR_BUILT: '1948', YR_REMODEL: null, GROSS_AREA: '12000', LIVING_AREA: '10000',
   RES_UNITS: '12', COM_UNITS: '0', TOTAL_VALUE: '3500000', LAND_VALUE: '1000000', BLDG_VALUE: '2500000',
   MAIL_ADDRESSEE: null, MAIL_STREET_ADDRESS: '1 Main St', MAIL_CITY: 'Boston', MAIL_STATE: 'MA', MAIL_ZIP_CODE: '02135',
 };
-const sam = new Map<string, SamPoint>([['2102098000', { samId: '83763', latitude: 42.33909, longitude: -71.1458, neighborhood: 'Brighton', zip: '02135' }]]);
+const sam = new Map<string, SamPoint>([['2109417000', { samId: '58344', latitude: 42.33318, longitude: -71.15748, neighborhood: 'Brighton', zip: '02135' }]]);
 
 describe('collapseAssessorRows', () => {
   it('builds one SeedBuilding with SAM coordinates and neighborhood', () => {
@@ -1058,20 +1060,20 @@ describe('collapseAssessorRows', () => {
     expect(skipped).toEqual([]);
     expect(buildings).toHaveLength(1);
     const b = buildings[0];
-    expect(b.parcelId).toBe('2102098000');
-    expect(b.address).toBe('23-27 Lanark Road');
-    expect(b.streetKey).toBe('LANARK RD');
-    expect(b.numLo).toBe(23);
-    expect(b.numHi).toBe(27);
+    expect(b.parcelId).toBe('2109417000');
+    expect(b.address).toBe('52-68 Tarnwick Place');
+    expect(b.streetKey).toBe('TARNWICK PL');
+    expect(b.numLo).toBe(52);
+    expect(b.numHi).toBe(68);
     expect(b.neighborhood).toBe('Brighton');
     expect(b.zip).toBe('02135');
     expect(b.unitCount).toBe(12);
-    expect(b.yearBuilt).toBe(1925);
+    expect(b.yearBuilt).toBe(1948);
     expect(b.buildingType).toBe('apartment');
-    expect(b.latitude).toBe(42.33909);
-    expect(b.samId).toBe('83763');
+    expect(b.latitude).toBe(42.33318);
+    expect(b.samId).toBe('58344');
     expect(b.assessment.fiscalYear).toBe('FY2026');
-    expect(b.assessment.owner).toBe('LANARK ROAD LLC');
+    expect(b.assessment.owner).toBe('WRENFIELD REALTY LLC');
   });
 
   it('collapses BLDG_SEQ rows of one parcel, summing units and keeping the first row', () => {
@@ -1084,7 +1086,7 @@ describe('collapseAssessorRows', () => {
     );
     expect(buildings).toHaveLength(1);
     expect(buildings[0].unitCount).toBe(12);
-    expect(buildings[0].yearBuilt).toBe(1925);
+    expect(buildings[0].yearBuilt).toBe(1948);
   });
 
   it('infers units for R2 and R3 when the assessor leaves them blank', () => {
@@ -1249,11 +1251,11 @@ import { matchExistingBuildings } from '../records/seed/match';
 import type { ExistingBuilding, SeedBuilding } from '../records/seed/types';
 
 const seed = (o: Partial<SeedBuilding>): SeedBuilding => ({
-  parcelId: '2102098000', address: '23-27 Lanark Road', streetKey: 'LANARK RD', numLo: 23, numHi: 27, neighborhood: 'Brighton', zip: '02135',
-  unitCount: 12, yearBuilt: 1925, buildingType: 'apartment', latitude: 42.3, longitude: -71.1, samId: '83763',
+  parcelId: '2109417000', address: '52-68 Tarnwick Place', streetKey: 'TARNWICK PL', numLo: 52, numHi: 68, neighborhood: 'Brighton', zip: '02135',
+  unitCount: 12, yearBuilt: 1948, buildingType: 'apartment', latitude: 42.3, longitude: -71.1, samId: '58344',
   assessment: { fiscalYear: 'FY2026' } as SeedBuilding['assessment'], ...o,
 });
-const existing = (o: Partial<ExistingBuilding>): ExistingBuilding => ({ id: 'b1', address: '23 Lanark Rd', slug: '23-lanark-rd-boston', parcel_id: null, latitude: null, longitude: null, ...o });
+const existing = (o: Partial<ExistingBuilding>): ExistingBuilding => ({ id: 'b1', address: '52 Tarnwick Pl', slug: '52-tarnwick-pl-boston', parcel_id: null, latitude: null, longitude: null, ...o });
 
 describe('matchExistingBuildings', () => {
   it('matches a number inside a seeded range on the same street key', () => {
@@ -1262,11 +1264,11 @@ describe('matchExistingBuildings', () => {
     expect(result.unmatched).toEqual([]);
   });
   it('matches a range that the parcel range contains', () => {
-    const result = matchExistingBuildings([existing({ address: '23-25 Lanark Rd' })], [seed({})]);
+    const result = matchExistingBuildings([existing({ address: '52-56 Tarnwick Pl' })], [seed({})]);
     expect(result.matched).toHaveLength(1);
   });
   it('keeps an existing parcel id that agrees and reports one that disagrees', () => {
-    const agree = matchExistingBuildings([existing({ parcel_id: '2102098000' })], [seed({})]);
+    const agree = matchExistingBuildings([existing({ parcel_id: '2109417000' })], [seed({})]);
     expect(agree.matched).toHaveLength(1);
     const disagree = matchExistingBuildings([existing({ parcel_id: '0100037000' })], [seed({})]);
     expect(disagree.matched).toEqual([]);
@@ -1274,14 +1276,14 @@ describe('matchExistingBuildings', () => {
   });
   it('reports an address with no parcel, an unparseable address, and an overlapping-but-not-contained range', () => {
     const result = matchExistingBuildings(
-      [existing({ id: 'x', address: '99 Lanark Rd' }), existing({ id: 'y', address: 'Lanark Rd' }), existing({ id: 'z', address: '21-25 Lanark Rd' })],
+      [existing({ id: 'x', address: '99 Tarnwick Pl' }), existing({ id: 'y', address: 'Tarnwick Pl' }), existing({ id: 'z', address: '48-56 Tarnwick Pl' })],
       [seed({})],
     );
     expect(result.matched).toEqual([]);
     expect(result.unmatched.map((u) => [u.building.id, u.reason])).toEqual([['x', 'no_parcel_for_address'], ['y', 'unparseable_address'], ['z', 'range_overlaps_parcel_boundary']]);
   });
   it('reports two parcels claiming one address as ambiguous', () => {
-    const result = matchExistingBuildings([existing({ address: '25 Lanark Rd' })], [seed({}), seed({ parcelId: '2102099000', numLo: 25, numHi: 25 })]);
+    const result = matchExistingBuildings([existing({ address: '56 Tarnwick Pl' })], [seed({}), seed({ parcelId: '2109418000', numLo: 56, numHi: 56 })]);
     expect(result.matched).toEqual([]);
     expect(result.unmatched[0].reason).toBe('ambiguous');
   });
@@ -1381,11 +1383,11 @@ import type { ExistingBuilding, SeedBuilding } from '../records/seed/types';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 
 const parcel: SeedBuilding = {
-  parcelId: '2102098000', address: "23-27 O'Lanark Road", streetKey: 'LANARK RD', numLo: 23, numHi: 27, neighborhood: 'Brighton', zip: '02135',
-  unitCount: 12, yearBuilt: 1925, buildingType: 'apartment', latitude: 42.33909, longitude: -71.1458, samId: '83763',
+  parcelId: '2109417000', address: "52-68 O'Tarnwick Place", streetKey: 'TARNWICK PL', numLo: 52, numHi: 68, neighborhood: 'Brighton', zip: '02135',
+  unitCount: 12, yearBuilt: 1948, buildingType: 'apartment', latitude: 42.33318, longitude: -71.15748, samId: '58344',
   assessment: {
-    fiscalYear: 'FY2026', parcelId: '2102098000', owner: "O'BRIEN LLC", mailAddressee: null, mailStreet: '1 Main St', mailCity: 'Boston', mailState: 'MA', mailZip: '02135',
-    landUse: 'A', landUseDescription: 'APT 7-30 UNITS', yearBuilt: 1925, yearRemodel: null, grossArea: 12000, livingArea: 10000,
+    fiscalYear: 'FY2026', parcelId: '2109417000', owner: "O'BRIEN LLC", mailAddressee: null, mailStreet: '1 Main St', mailCity: 'Boston', mailState: 'MA', mailZip: '02135',
+    landUse: 'A', landUseDescription: 'APT 7-30 UNITS', yearBuilt: 1948, yearRemodel: null, grossArea: 12000, livingArea: 10000,
     residentialUnits: 12, commercialUnits: 0, totalValue: 3500000, landValue: 1000000, buildingValue: 2500000, condominium: false,
   },
 };
@@ -1406,14 +1408,14 @@ describe('lit', () => {
 describe('seedStatements', () => {
   it('creates a seeded building, its assessor pull, and its assessment record', async () => {
     const db = createRecordsTestDb();
-    const statements = seedStatements({ created: [{ parcel, slug: '23-27-olanark-road-boston' }], matched: [] });
+    const statements = seedStatements({ created: [{ parcel, slug: '52-68-otarnwick-place-boston' }], matched: [] });
     expect(statements).toHaveLength(3);
     await apply(db, statements);
-    const b = await db.prepare("SELECT id, address, slug, city, neighborhood, zip_code, source, parcel_id, sam_id, street_key, st_num_lo, st_num_hi, unit_count, year_built, building_type, latitude FROM buildings WHERE parcel_id = '2102098000'").first<Record<string, unknown>>();
-    expect(b).toMatchObject({ id: 'seed-2102098000', address: "23-27 O'Lanark Road", slug: '23-27-olanark-road-boston', city: 'Boston', neighborhood: 'Brighton', zip_code: '02135', source: 'seed', sam_id: '83763', street_key: 'LANARK RD', st_num_lo: 23, st_num_hi: 27, unit_count: 12, year_built: 1925, building_type: 'apartment', latitude: 42.33909 });
-    const pull = await db.prepare("SELECT id, source_id, source_label, status, row_count, triggered_by, trigger_reason FROM record_pulls WHERE building_id = 'seed-2102098000'").first<Record<string, unknown>>();
-    expect(pull).toMatchObject({ id: 'seed-FY2026-2102098000', source_id: FY2026_RESOURCE_ID, source_label: 'Property Assessment FY2026', status: 'ok', row_count: 1, triggered_by: null, trigger_reason: SEED_TRIGGER_REASON });
-    const record = await db.prepare("SELECT kind, source_key, payload FROM building_records WHERE building_id = 'seed-2102098000'").first<{ kind: string; source_key: string; payload: string }>();
+    const b = await db.prepare("SELECT id, address, slug, city, neighborhood, zip_code, source, parcel_id, sam_id, street_key, st_num_lo, st_num_hi, unit_count, year_built, building_type, latitude FROM buildings WHERE parcel_id = '2109417000'").first<Record<string, unknown>>();
+    expect(b).toMatchObject({ id: 'seed-2109417000', address: "52-68 O'Tarnwick Place", slug: '52-68-otarnwick-place-boston', city: 'Boston', neighborhood: 'Brighton', zip_code: '02135', source: 'seed', sam_id: '58344', street_key: 'TARNWICK PL', st_num_lo: 52, st_num_hi: 68, unit_count: 12, year_built: 1948, building_type: 'apartment', latitude: 42.33318 });
+    const pull = await db.prepare("SELECT id, source_id, source_label, status, row_count, triggered_by, trigger_reason FROM record_pulls WHERE building_id = 'seed-2109417000'").first<Record<string, unknown>>();
+    expect(pull).toMatchObject({ id: 'seed-FY2026-2109417000', source_id: FY2026_RESOURCE_ID, source_label: 'Property Assessment FY2026', status: 'ok', row_count: 1, triggered_by: null, trigger_reason: SEED_TRIGGER_REASON });
+    const record = await db.prepare("SELECT kind, source_key, payload FROM building_records WHERE building_id = 'seed-2109417000'").first<{ kind: string; source_key: string; payload: string }>();
     expect(record?.kind).toBe('assessment');
     expect(record?.source_key).toBe('FY2026');
     expect(JSON.parse(record!.payload).owner).toBe("O'BRIEN LLC");
@@ -1424,22 +1426,22 @@ describe('seedStatements', () => {
     await apply(db, seedStatements({ created: [{ parcel, slug: 'first-slug' }], matched: [] }));
     const again = { ...parcel, address: 'renamed', unitCount: 13, assessment: { ...parcel.assessment, totalValue: 1 } };
     await apply(db, seedStatements({ created: [{ parcel: again, slug: 'second-slug' }], matched: [] }));
-    const b = await db.prepare("SELECT address, slug, unit_count FROM buildings WHERE id = 'seed-2102098000'").first<Record<string, unknown>>();
-    expect(b).toEqual({ address: "23-27 O'Lanark Road", slug: 'first-slug', unit_count: 13 });
-    const pulls = await db.prepare("SELECT COUNT(*) AS n FROM record_pulls WHERE building_id = 'seed-2102098000'").first<{ n: number }>();
+    const b = await db.prepare("SELECT address, slug, unit_count FROM buildings WHERE id = 'seed-2109417000'").first<Record<string, unknown>>();
+    expect(b).toEqual({ address: "52-68 O'Tarnwick Place", slug: 'first-slug', unit_count: 13 });
+    const pulls = await db.prepare("SELECT COUNT(*) AS n FROM record_pulls WHERE building_id = 'seed-2109417000'").first<{ n: number }>();
     expect(pulls?.n).toBe(1);
-    const record = await db.prepare("SELECT payload FROM building_records WHERE building_id = 'seed-2102098000'").first<{ payload: string }>();
+    const record = await db.prepare("SELECT payload FROM building_records WHERE building_id = 'seed-2109417000'").first<{ payload: string }>();
     expect(JSON.parse(record!.payload).totalValue).toBe(1);
   });
 
   it('updates a matched existing building in place and gives it provenance', async () => {
     const db = createRecordsTestDb();
-    const id = await insertBuilding(db, { id: 'b1', address: '23 Lanark Rd' });
-    const building: ExistingBuilding = { id, address: '23 Lanark Rd', slug: 'b1', parcel_id: null, latitude: 1, longitude: 2 };
+    const id = await insertBuilding(db, { id: 'b1', address: '52 Tarnwick Pl' });
+    const building: ExistingBuilding = { id, address: '52 Tarnwick Pl', slug: 'b1', parcel_id: null, latitude: 1, longitude: 2 };
     const statements = seedStatements({ created: [], matched: [{ building, parcel }] });
     await apply(db, statements);
     const b = await db.prepare("SELECT address, parcel_id, sam_id, street_key, st_num_lo, st_num_hi, latitude, longitude, source FROM buildings WHERE id = 'b1'").first<Record<string, unknown>>();
-    expect(b).toEqual({ address: '23 Lanark Rd', parcel_id: '2102098000', sam_id: '83763', street_key: 'LANARK RD', st_num_lo: 23, st_num_hi: 23, latitude: 42.33909, longitude: -71.1458, source: 'user' });
+    expect(b).toEqual({ address: '52 Tarnwick Pl', parcel_id: '2109417000', sam_id: '58344', street_key: 'TARNWICK PL', st_num_lo: 52, st_num_hi: 52, latitude: 42.33318, longitude: -71.15748, source: 'user' });
     const pull = await db.prepare("SELECT id FROM record_pulls WHERE building_id = 'b1'").first<{ id: string }>();
     expect(pull?.id).toBe('seed-FY2026-b1');
   });
@@ -1711,8 +1713,8 @@ Expected: the two downloads (a few minutes the first time; SAM is 13 pages), the
 - [ ] **Step 4: Apply locally and spot-check**
 
 Run: `npm run records:seed -- --apply --local`
-Then: `npx wrangler d1 execute ratemyplace-db --local --command "SELECT COUNT(*) FROM buildings WHERE source='seed'; SELECT address, slug, neighborhood, unit_count FROM buildings WHERE parcel_id='2102098000'; SELECT COUNT(*) FROM building_records WHERE kind='assessment';"`
-Expected: about 38,400 seeded rows; the Lanark parcel present as `23-27 Lanark Road`, Brighton; one assessment record per seeded building. Re-run `--apply --local` once more and confirm the count does not change.
+Then: `npx wrangler d1 execute ratemyplace-db --local --command "SELECT COUNT(*) FROM buildings WHERE source='seed'; SELECT address, slug, neighborhood, unit_count FROM buildings WHERE parcel_id='<a parcel you know>'; SELECT COUNT(*) FROM building_records WHERE kind='assessment';"`
+Expected: about 38,400 seeded rows; that parcel present with its formatted seed address and neighborhood; one assessment record per seeded building. Re-run `--apply --local` once more and confirm the count does not change.
 
 - [ ] **Step 5: Commit**
 
@@ -1738,16 +1740,16 @@ import { indexSamByParcel, SAM_FIELDS, SAM_RESOURCE_ID } from '../src/lib/record
 import type { SamRow } from '../src/lib/records/seed/types';
 ```
 
-and, where the other checks run for the Lanark fixture, add:
+and, where the other checks run for the records fixture, add:
 
 ```ts
   // SAM: the seed's coordinate and neighborhood source. Filtered to the fixture parcel so
   // the check is one request, not the 400,000-row download.
-  const samRows = await fetchAllRows<SamRow>(SAM_RESOURCE_ID, { fields: [...SAM_FIELDS], filters: { PARCEL_ID: '2102098000' } }, fetchImpl);
-  const samPoint = indexSamByParcel(samRows).get('2102098000');
+  const samRows = await fetchAllRows<SamRow>(SAM_RESOURCE_ID, { fields: [...SAM_FIELDS], filters: { PARCEL_ID: '2109417000' } }, fetchImpl);
+  const samPoint = indexSamByParcel(samRows).get('2109417000');
   check(
-    'SAM primary point for Lanark: id 83763, Brighton, inside Boston',
-    samPoint?.samId === '83763' && samPoint.neighborhood === 'Brighton' && samPoint.latitude > 42.2 && samPoint.latitude < 42.4 && samPoint.longitude > -71.2 && samPoint.longitude < -70.9,
+    'SAM primary point for the fixture: id 58344, Brighton, inside Boston',
+    samPoint?.samId === '58344' && samPoint.neighborhood === 'Brighton' && samPoint.latitude > 42.2 && samPoint.latitude < 42.4 && samPoint.longitude > -71.2 && samPoint.longitude < -70.9,
     JSON.stringify(samPoint ?? null),
   );
 ```
@@ -1755,7 +1757,7 @@ and, where the other checks run for the Lanark fixture, add:
 - [ ] **Step 2: Run it**
 
 Run: `npm run records:check`
-Expected: every existing line still PASS plus `PASS SAM primary point for Lanark: id 83763, Brighton, inside Boston`.
+Expected: every existing line still PASS plus `PASS SAM primary point for the fixture: id 58344, Brighton, inside Boston`.
 
 - [ ] **Step 3: Commit**
 

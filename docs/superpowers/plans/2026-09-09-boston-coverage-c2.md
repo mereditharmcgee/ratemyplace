@@ -1,5 +1,7 @@
 # Boston Coverage C2: Queue, Companion Worker, Planner, Circuit Breaker, Admin Controls — Implementation Plan
 
+> **Note (2026-11-15):** the practice building in this plan is now fictional: 52-68 Tarnwick Pl, with made-up records throughout. It replaced a real building. Lines that recorded what the live city data showed for that building are worded generically. The live records check (`npm run records:check` and the scheduler's daily breaker) now runs against a different, real building set in `src/lib/records/fixture.ts`, so the live-check code and values here do not match what it checks today.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship the scheduled half of sub-project C: a `records_queue` module, a companion Cron Worker that drains it at a polite rate and runs a daily planner, a circuit breaker that pauses the city-wide fill on fixture failure or a source error spike and emails once, and an admin panel to watch and control it. Deployed with the fill paused; C3 unpauses.
@@ -15,7 +17,7 @@
 - `pullBuildingRecords(db, building, { triggeredBy, correctionId?, fetchImpl? })` in `src/lib/records/pull.ts` writes one `record_pulls` row per source; `PULL_INSERT_SQL` there lists the columns explicitly.
 - `sourcesForCity('Boston')` in `jurisdictions.ts` returns every Boston `RecordSource` (id, label, kinds, run). The assessor sources have `kinds: ['assessment']`; every other source is "deeper".
 - `ASSESSOR_YEARS` in the assessor adapter lists the six assessor resource ids.
-- `scripts/records-fixture-check.ts` runs the Lanark fixture with a `check(label, ok, detail)` collector; it is a script, not a module.
+- `scripts/records-fixture-check.ts` runs the records fixture with a `check(label, ok, detail)` collector; it is a script, not a module.
 - Test helpers: `createRecordsTestDb()`, `insertBuilding()` in `src/lib/__tests__/helpers/recordsDb.ts` (stub `buildings`, `users`, `rate_limits`, `audit_logs`; applies 0029–0031). Tests live in `src/lib/__tests__/` and must be named `records*.test.ts` so `npx vitest run records` finds them. The stub has no `reviews` or `saved_buildings` table; Task 3 adds minimal ones to the stub.
 - `email.ts` senders take `(apiKey, ...)` and return `EmailResult`; `logError(event, context)` in `logger.ts`.
 - Admin routes check `context.locals.user?.isAdmin` and return JSON via a local `json()` helper; see `src/pages/api/admin/records/corrections/index.ts`.
@@ -32,8 +34,8 @@
 |---|---|
 | `src/lib/records/pull.ts` | Modify: `PullOptions.triggerReason`, written to `record_pulls.trigger_reason` |
 | `src/pages/api/admin/buildings/[id]/records/pull.ts`, `src/pages/api/admin/records/corrections/[id]/repull.ts` | Modify: pass `triggerReason: 'admin'` / `'correction'` |
-| `src/lib/records/fixture.ts` | Create: `runLanarkFixture(fetchImpl)` returning structured checks |
-| `scripts/records-fixture-check.ts` | Modify: thin printer over `runLanarkFixture` |
+| `src/lib/records/fixture.ts` | Create: `runRecordsFixture(fetchImpl)` returning structured checks |
+| `scripts/records-fixture-check.ts` | Modify: thin printer over `runRecordsFixture` |
 | `src/lib/records/queue.ts` | Create: enqueue, claim, complete, fail, planner selectors, breaker inputs, settings, stats |
 | `src/lib/records/scheduler.ts` | Create: `drain(deps)`, `plan(deps)`, `DEEPER_SOURCE_IDS`, rate constants |
 | `src/lib/email.ts` | Modify: `sendRecordsBreakerEmail` |
@@ -62,7 +64,7 @@ Find the existing pull test that inserts a building and runs `pullBuildingRecord
 ```ts
 it('writes the trigger reason on every pull row and leaves triggered_by null for a non-admin pull', async () => {
   const db = createRecordsTestDb();
-  const id = await insertBuilding(db, { parcel_id: '2102098000' });
+  const id = await insertBuilding(db, { parcel_id: '2109417000' });
   await pullBuildingRecords(db, await loadBuilding(db, id), { triggeredBy: null, triggerReason: 'queue:fill', fetchImpl: okFetch });
   const rows = await db.prepare('SELECT DISTINCT trigger_reason, triggered_by FROM record_pulls WHERE building_id = ?').bind(id).all<{ trigger_reason: string | null; triggered_by: string | null }>();
   expect(rows.results).toEqual([{ trigger_reason: 'queue:fill', triggered_by: null }]);
@@ -71,7 +73,7 @@ it('writes the trigger reason on every pull row and leaves triggered_by null for
 it('defaults trigger_reason to admin when an admin id is given and no reason is', async () => {
   const db = createRecordsTestDb();
   await db.prepare("INSERT INTO users (id, email, is_admin) VALUES ('admin1', 'a@x', 1)").run();
-  const id = await insertBuilding(db, { parcel_id: '2102098000' });
+  const id = await insertBuilding(db, { parcel_id: '2109417000' });
   await pullBuildingRecords(db, await loadBuilding(db, id), { triggeredBy: 'admin1', fetchImpl: okFetch });
   const row = await db.prepare('SELECT trigger_reason FROM record_pulls WHERE building_id = ? LIMIT 1').bind(id).first<{ trigger_reason: string }>();
   expect(row?.trigger_reason).toBe('admin');
@@ -120,7 +122,7 @@ git commit -m "feat(records): record why a pull ran in record_pulls.trigger_reas
 
 ---
 
-### Task 2: The Lanark fixture as a library
+### Task 2: The records fixture as a library
 
 **Files:**
 - Create: `src/lib/records/fixture.ts`
@@ -134,33 +136,33 @@ The circuit breaker runs the same checks the script runs. Move the checks into a
 ```ts
 // src/lib/__tests__/recordsFixture.test.ts
 import { describe, expect, it } from 'vitest';
-import { LANARK_FIXTURE, runLanarkFixture } from '../records/fixture';
+import { RECORDS_FIXTURE, runRecordsFixture } from '../records/fixture';
 import type { FetchLike } from '../records/types';
 
 /** A fetch that answers every CKAN call with an empty result set. */
 const emptyFetch: FetchLike = async () =>
   new Response(JSON.stringify({ success: true, result: { records: [] } }), { status: 200 });
 
-describe('runLanarkFixture', () => {
+describe('runRecordsFixture', () => {
   it('names the fixture parcel and address', () => {
-    expect(LANARK_FIXTURE.parcelId).toBe('2102098000');
-    expect(LANARK_FIXTURE.address).toBe('23-27 Lanark Rd, Boston, MA 02135');
+    expect(RECORDS_FIXTURE.parcelId).toBe('2109417000');
+    expect(RECORDS_FIXTURE.address).toBe('52-68 Tarnwick Pl, Boston, MA 02135');
   });
 
   it('returns one check per assertion and counts failures without throwing', async () => {
-    const result = await runLanarkFixture(emptyFetch);
+    const result = await runRecordsFixture(emptyFetch);
     expect(result.checks.length).toBeGreaterThanOrEqual(12);
     expect(result.checks.every((c) => typeof c.label === 'string' && typeof c.ok === 'boolean' && typeof c.detail === 'string')).toBe(true);
     // Empty responses fail the parcel resolution and every value check.
     expect(result.failures).toBeGreaterThan(0);
-    expect(result.checks.find((c) => c.label === 'parcel resolves to 2102098000')?.ok).toBe(false);
+    expect(result.checks.find((c) => c.label === 'parcel resolves to 2109417000')?.ok).toBe(false);
   });
 
   it('reports a source that throws as a failed check, not an exception', async () => {
     const throwingFetch: FetchLike = async () => {
       throw new Error('boom');
     };
-    const result = await runLanarkFixture(throwingFetch);
+    const result = await runRecordsFixture(throwingFetch);
     expect(result.failures).toBeGreaterThan(0);
     expect(result.sourceErrors.length).toBeGreaterThan(0);
   });
@@ -196,18 +198,18 @@ export interface FixtureResult {
   parcelId: string | null;
 }
 
-/** 23-27 Lanark Rd, Brighton: the one address every Boston adapter is verified against. */
-export const LANARK_FIXTURE = {
-  address: '23-27 Lanark Rd, Boston, MA 02135',
-  parcelId: '2102098000',
+/** The practice address every Boston adapter example in this plan uses. */
+export const RECORDS_FIXTURE = {
+  address: '52-68 Tarnwick Pl, Boston, MA 02135',
+  parcelId: '2109417000',
 } as const;
 
 /**
- * Runs every Boston source for the Lanark fixture and compares the results to values
+ * Runs every Boston source for the records fixture and compares the results to values
  * recorded in September 2026. Never throws: a source that fails becomes a failed check.
  * Used by `npm run records:check` (prints) and by the scheduler's daily circuit breaker.
  */
-export async function runLanarkFixture(fetchImpl: FetchLike): Promise<FixtureResult> {
+export async function runRecordsFixture(fetchImpl: FetchLike): Promise<FixtureResult> {
   const checks: FixtureCheck[] = [];
   const sourceErrors: FixtureResult['sourceErrors'] = [];
   const check = (label: string, ok: boolean, detail: string): void => {
@@ -222,18 +224,18 @@ export async function runLanarkFixture(fetchImpl: FetchLike): Promise<FixtureRes
 }
 ```
 
-Keep the same check labels and expected values (owner `/LANARK ROAD LLC/`, mailStreet `PO BOX 35006`, landUse `A`, yearRemodel `1980`, totalValue `6720200`, six assessment years, zero permits, no violations, enforcement two cases / 2008 / 1505 Commonwealth, 311 total ≥ 90 and housing 3–8, RentSmart rows present, SAM primary point). Wrap `resolveParcel` in try/catch: a thrown resolution becomes a failed "parcel resolves" check with the message as detail, and every later check runs against an identity with `parcelId: null`.
+Keep the same check labels and expected values (the owner pattern, mail street, land use, remodel year, total value, six assessment years, the recorded permit, violation, enforcement and 311 counts, RentSmart rows present, and the SAM primary point). Wrap `resolveParcel` in try/catch: a thrown resolution becomes a failed "parcel resolves" check with the message as detail, and every later check runs against an identity with `parcelId: null`.
 
 Rewrite `scripts/records-fixture-check.ts` to:
 
 ```ts
-import { runLanarkFixture } from '../src/lib/records/fixture';
+import { runRecordsFixture } from '../src/lib/records/fixture';
 import type { FetchLike } from '../src/lib/records/types';
 
 const fetchImpl: FetchLike = (input, init) => fetch(input, init);
 
 async function main(): Promise<void> {
-  const result = await runLanarkFixture(fetchImpl);
+  const result = await runRecordsFixture(fetchImpl);
   for (const err of result.sourceErrors) console.log(`${err.label}: FAILED — ${err.message}`);
   for (const c of result.checks) console.log(c.ok ? `PASS ${c.label}` : `FAIL ${c.label} — ${c.detail}`);
   console.log('');
@@ -256,7 +258,7 @@ Expected: unit PASS; live check prints the same 16 PASS lines as before plus `AL
 
 ```bash
 git add src/lib/records/fixture.ts scripts/records-fixture-check.ts src/lib/__tests__/recordsFixture.test.ts
-git commit -m "refactor(records): the Lanark fixture check is a library the breaker can call"
+git commit -m "refactor(records): the records fixture check is a library the breaker can call"
 ```
 
 ---
@@ -859,7 +861,7 @@ function deps(db: ReturnType<typeof createRecordsTestDb>, overrides: Partial<Sch
       const summary: PullSummary = { buildingId: building.id, jurisdiction: 'boston', parcelId: null, condominium: false, sources: [] };
       return summary;
     },
-    fixture: async () => ({ checks: [], failures: 0, sourceErrors: [], parcelId: '2102098000' }),
+    fixture: async () => ({ checks: [], failures: 0, sourceErrors: [], parcelId: '2109417000' }),
     alert: async (subject, body) => {
       alerts.push(`${subject}\n${body}`);
     },
@@ -923,12 +925,12 @@ describe('plan', () => {
 
   it('pauses the fill and alerts once when the fixture fails, and does not alert again while paused', async () => {
     const db = createRecordsTestDb();
-    const d = deps(db, { fixture: async () => ({ checks: [{ label: 'parcel resolves to 2102098000', ok: false, detail: 'got null' }], failures: 1, sourceErrors: [], parcelId: null }) });
+    const d = deps(db, { fixture: async () => ({ checks: [{ label: 'parcel resolves to 2109417000', ok: false, detail: 'got null' }], failures: 1, sourceErrors: [], parcelId: null }) });
     const first = await plan(d);
     expect(first).toMatchObject({ paused: true, alerted: true, fixtureFailures: 1 });
     expect(await getFillPaused(db)).toBe(true);
     expect(d.alerts).toHaveLength(1);
-    expect(d.alerts[0]).toContain('parcel resolves to 2102098000');
+    expect(d.alerts[0]).toContain('parcel resolves to 2109417000');
     const second = await plan(d);
     expect(second).toMatchObject({ paused: true, alerted: false });
     expect(d.alerts).toHaveLength(1);
@@ -1084,7 +1086,7 @@ export async function plan(deps: SchedulerDeps): Promise<PlanResult> {
 
   const reasons: string[] = [];
   if (fixture.failures > 0) {
-    reasons.push(`Lanark fixture: ${fixture.failures} failure(s): ${fixture.checks.filter((c) => !c.ok).map((c) => `${c.label} (${c.detail})`).join('; ')}${fixture.sourceErrors.map((e) => `; ${e.label} threw: ${e.message}`).join('')}`);
+    reasons.push(`Records fixture: ${fixture.failures} failure(s): ${fixture.checks.filter((c) => !c.ok).map((c) => `${c.label} (${c.detail})`).join('; ')}${fixture.sourceErrors.map((e) => `; ${e.label} threw: ${e.message}`).join('')}`);
   }
   for (const r of tripped) reasons.push(`Source ${r.sourceId}: ${r.errors} of ${r.attempts} pulls failed in the last 24 hours`);
 
@@ -1173,7 +1175,7 @@ git commit -m "feat(records): scheduler drain, daily planner, and the fill circu
 // workers/records-scheduler/src/index.ts
 import type { D1Database, ExecutionContext, ScheduledEvent } from '@cloudflare/workers-types';
 import { sendRecordsBreakerEmail } from '../../../src/lib/email';
-import { runLanarkFixture } from '../../../src/lib/records/fixture';
+import { runRecordsFixture } from '../../../src/lib/records/fixture';
 import { drain, liveDeps, plan, type SchedulerDeps } from '../../../src/lib/records/scheduler';
 import type { FetchLike, RecordsDb } from '../../../src/lib/records/types';
 
@@ -1196,7 +1198,7 @@ function depsFor(env: Env): SchedulerDeps {
   // types and the site's types from having to agree on the D1 package version.
   const db = env.DB as unknown as RecordsDb;
   return liveDeps(db, {
-    fixture: () => runLanarkFixture(fetchImpl),
+    fixture: () => runRecordsFixture(fetchImpl),
     alert: async (subject, body) => {
       const result = await sendRecordsBreakerEmail(env.RESEND_API_KEY, env.RECORDS_ALERT_EMAIL, subject, body);
       if (!result.success) log('records_breaker_email_failed', { error: result.error });

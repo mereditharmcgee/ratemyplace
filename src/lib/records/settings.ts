@@ -15,7 +15,7 @@ export const SETTING_KEYS = {
   fillPaused: 'records_fill_paused',
   /** Unix seconds of the last breaker alert, so a paused fill does not alert again. */
   breakerLastAlert: 'records_breaker_last_alert',
-  /** JSON: what the daily Lanark fixture saw. Rendered by the admin queue panel. */
+  /** JSON: what the daily records fixture saw. Rendered by the admin queue panel. */
   fixtureLast: 'records_fixture_last',
   /**
    * A `BreakerPauseCause`, present only while the breaker owns the current pause. Written in
@@ -29,7 +29,7 @@ export const SETTING_KEYS = {
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];
 
 /**
- * Why the breaker paused the fill. `fixture`: the Lanark fixture failed (this wins when the
+ * Why the breaker paused the fill. `fixture`: the records fixture failed (this wins when the
  * error rate tripped too) — the planner resumes it the first morning the fixture passes and no
  * source is over the error threshold. `errors`: only a source's error rate tripped — that needs
  * a human, because the fill is the main thing feeding the rate, and a paused fill would let it

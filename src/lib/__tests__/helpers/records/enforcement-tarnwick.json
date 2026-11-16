@@ -1,0 +1,205 @@
+[
+  {
+    "case_no": "CE0916", "code": "1", "value": "25", "description": "Improper storage trash: res",
+    "status": "Open", "status_dttm": "2025-01-23 08:31:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T16"
+  },
+  {
+    "case_no": "CE0916", "code": "3", "value": "100", "description": "Overfilling of barrel/dumpster",
+    "status": "Open", "status_dttm": "2025-01-23 08:31:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T16"
+  },
+  {
+    "case_no": "CE0915", "code": "1", "value": "25", "description": "Improper storage trash: res",
+    "status": "Closed", "status_dttm": "2024-09-11 13:13:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T15"
+  },
+  {
+    "case_no": "CE0914", "code": "1", "value": "25", "description": "Improper storage trash: res",
+    "status": "Closed", "status_dttm": "2023-07-19 15:37:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T14"
+  },
+  {
+    "case_no": "CE0914", "code": "21a", "value": "150", "description": "illegal parking prop owner 1",
+    "status": "Closed", "status_dttm": "2023-07-19 15:37:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T14"
+  },
+  {
+    "case_no": "CE0913", "code": "17a", "value": "50", "description": "Failure clear sidewalk - snow",
+    "status": "Closed", "status_dttm": "2022-03-10 12:43:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T13"
+  },
+  {
+    "case_no": "CE0913", "code": "17c", "value": "200", "description": "Failure clear sidewalk - snow",
+    "status": "Closed", "status_dttm": "2022-03-10 12:43:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T13"
+  },
+  {
+    "case_no": "CE0912", "code": "24", "value": "15", "description": "Overgrown Weeds On Property",
+    "status": "Closed", "status_dttm": "2021-09-08 07:21:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T12"
+  },
+  {
+    "case_no": "CE0912", "code": "1", "value": "25", "description": "Improper storage trash: res",
+    "status": "Closed", "status_dttm": "2021-09-08 07:21:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T12"
+  },
+  {
+    "case_no": "CE0911", "code": "3", "value": "100", "description": "Overfilling of barrel/dumpster",
+    "status": "Closed", "status_dttm": "2020-11-20 14:37:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T11"
+  },
+  {
+    "case_no": "CE0911", "code": "25", "value": "50", "description": "No Number On A Building",
+    "status": "Closed", "status_dttm": "2020-11-20 14:37:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T11"
+  },
+  {
+    "case_no": "CE0910", "code": "1", "value": "25", "description": "Improper storage trash: res",
+    "status": "Closed", "status_dttm": "2019-03-13 09:18:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T10"
+  },
+  {
+    "case_no": "CE0910", "code": "3", "value": "100", "description": "Overfilling of barrel/dumpster",
+    "status": "Closed", "status_dttm": "2019-03-13 09:18:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T10"
+  },
+  {
+    "case_no": "CE0909", "code": "1", "value": "25", "description": "Improper storage trash: res",
+    "status": "Closed", "status_dttm": "2018-10-25 10:49:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T9"
+  },
+  {
+    "case_no": "CE0909", "code": "25", "value": "50", "description": "No Number On A Building",
+    "status": "Closed", "status_dttm": "2018-10-25 10:49:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T9"
+  },
+  {
+    "case_no": "CE0908", "code": "17a", "value": "50", "description": "Failure clear sidewalk - snow",
+    "status": "Closed", "status_dttm": "2017-02-22 13:17:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T8"
+  },
+  {
+    "case_no": "CE0907", "code": "1", "value": "25", "description": "Improper storage trash: res",
+    "status": "Closed", "status_dttm": "2016-08-03 14:10:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T7"
+  },
+  {
+    "case_no": "CE0907", "code": "24", "value": "15", "description": "Overgrown Weeds On Property",
+    "status": "Closed", "status_dttm": "2016-08-03 14:10:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T7"
+  },
+  {
+    "case_no": "CE0906", "code": "1", "value": "25", "description": "Improper storage trash: res",
+    "status": "Closed", "status_dttm": "2015-06-16 13:30:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T6"
+  },
+  {
+    "case_no": "CE0906", "code": "3", "value": "100", "description": "Overfilling of barrel/dumpster",
+    "status": "Closed", "status_dttm": "2015-06-16 13:30:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T6"
+  },
+  {
+    "case_no": "CE0905", "code": "21a", "value": "150", "description": "illegal parking prop owner 1",
+    "status": "Closed", "status_dttm": "2014-06-11 15:23:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T5"
+  },
+  {
+    "case_no": "CE0905", "code": "1", "value": "25", "description": "Improper storage trash: res",
+    "status": "Closed", "status_dttm": "2014-06-11 15:23:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T5"
+  },
+  {
+    "case_no": "CE0904", "code": "24", "value": "15", "description": "Overgrown Weeds On Property",
+    "status": "Closed", "status_dttm": "2013-06-20 08:27:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T4"
+  },
+  {
+    "case_no": "CE0904", "code": "25", "value": "50", "description": "No Number On A Building",
+    "status": "Closed", "status_dttm": "2013-06-20 08:27:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T4"
+  },
+  {
+    "case_no": "CE0903", "code": "1", "value": "25", "description": "Improper storage trash: res",
+    "status": "Closed", "status_dttm": "2012-10-08 10:51:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T3"
+  },
+  {
+    "case_no": "CE0902", "code": "1", "value": "25", "description": "Improper storage trash: res",
+    "status": "Closed", "status_dttm": "2011-10-03 11:13:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T2"
+  },
+  {
+    "case_no": "CE0902", "code": "3", "value": "100", "description": "Overfilling of barrel/dumpster",
+    "status": "Closed", "status_dttm": "2011-10-03 11:13:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T2"
+  },
+  {
+    "case_no": "CE0901", "code": "1", "value": "25", "description": "Improper storage trash: res",
+    "status": "Closed", "status_dttm": "2011-03-28 13:52:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T1"
+  },
+  {
+    "case_no": "CE0901", "code": "3", "value": "100", "description": "Overfilling of barrel/dumpster",
+    "status": "Closed", "status_dttm": "2011-03-28 13:52:00",
+    "violation_stno": "52", "violation_sthigh": null, "violation_street": "Tarnwick", "violation_suffix": "PL",
+    "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV",
+    "sam_id": "58344", "ticket_no": "T1"
+  }
+]

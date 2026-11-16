@@ -506,10 +506,10 @@ suite('admin records queue routes', () => {
     it('queues a follower pull for each reviewed Boston building never pulled, and skips the rest', async () => {
       const db = createRecordsTestDb();
       // Reviewed, Boston, has a parcel, never pulled: the one this endpoint exists for.
-      await insertBuilding(db, { id: 'never', parcel_id: '2102098000' });
+      await insertBuilding(db, { id: 'never', parcel_id: '2109417000' });
       await reviewed(db, 'never');
       // Reviewed but already has a deeper pull.
-      await insertBuilding(db, { id: 'pulled', parcel_id: '2102098001' });
+      await insertBuilding(db, { id: 'pulled', parcel_id: '2109417001' });
       await reviewed(db, 'pulled');
       await insertPull(db, 'pulled', DEEPER_SOURCE_IDS[0]);
       // Reviewed but not Boston.
@@ -522,7 +522,7 @@ suite('admin records queue routes', () => {
       });
       await reviewed(db, 'new-haven');
       // Boston and never pulled, but no approved review: not this endpoint's business.
-      await insertBuilding(db, { id: 'pending-only', parcel_id: '2102098002' });
+      await insertBuilding(db, { id: 'pending-only', parcel_id: '2109417002' });
       await reviewed(db, 'pending-only', 'pending');
       // Two approved reviews on one building still examine it once.
       await reviewed(db, 'never', 'approved', 2);
@@ -544,7 +544,7 @@ suite('admin records queue routes', () => {
 
     it('is safe to press twice: the second press finds the row already queued', async () => {
       const db = createRecordsTestDb();
-      await insertBuilding(db, { id: 'never', parcel_id: '2102098000' });
+      await insertBuilding(db, { id: 'never', parcel_id: '2109417000' });
       await reviewed(db, 'never');
 
       await BACKFILL(createContext(db, { body: {} }));
@@ -562,11 +562,11 @@ suite('admin records queue routes', () => {
       const db = createRecordsTestDb();
       const old = Math.floor(Date.now() / 1000) - 45 * 86_400;
       // Records in, more than 30 days old: `stale` to the panel, still "already pulled" here.
-      await insertBuilding(db, { id: 'old', parcel_id: '2102098010' });
+      await insertBuilding(db, { id: 'old', parcel_id: '2109417010' });
       await reviewed(db, 'old');
       await insertPull(db, 'old', DEEPER_SOURCE_IDS[0], 'ok', old);
       // Records in, with a refresh row pending: `refresh_requested` to the panel.
-      await insertBuilding(db, { id: 'refreshing', parcel_id: '2102098011' });
+      await insertBuilding(db, { id: 'refreshing', parcel_id: '2109417011' });
       await reviewed(db, 'refreshing');
       await insertPull(db, 'refreshing', DEEPER_SOURCE_IDS[0], 'ok', old);
       await db

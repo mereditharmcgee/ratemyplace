@@ -55,7 +55,7 @@ Per building a deep pull is about 20 requests to data.boston.gov (311 alone span
 
 | Column | Value |
 |---|---|
-| `address` | formatted the way existing pages read: `ST_NUM`[`-ST_NUM2`] plus street name with the suffix spelled out ("23-27 Lanark Road"), using the suffix table in `src/lib/records/identity.ts` |
+| `address` | formatted the way existing pages read: `ST_NUM`[`-ST_NUM2`] plus street name with the suffix spelled out ("52-68 Tarnwick Place"), using the suffix table in `src/lib/records/identity.ts` |
 | `city` | `Boston` |
 | `neighborhood` | assessor `CITY` title-cased (Allston, Dorchester, Roxbury, …); `BOSTON` becomes null |
 | `state`, `zip_code` | `MA`, assessor `ZIP_CODE` zero-padded |
@@ -82,8 +82,8 @@ Per building a deep pull is about 20 requests to data.boston.gov (311 alone span
 >   does carry `RES_UNITS` is used as given, and the parcel's rows are summed.
 > - **A parcel whose `ST_NUM` is 0** (the assessor's placeholder for an unnumbered lot) is
 >   skipped, not seeded as "0 Something Street".
-> - **A comma tail in `ST_NAME` renders in parentheses**: `LANARK RD, REAR` becomes
->   `23-27 Lanark Road (Rear)`. The suffix table keys off the street alone, so the tail
+> - **A comma tail in `ST_NAME` renders in parentheses**: `TARNWICK PL, REAR` becomes
+>   `52-68 Tarnwick Place (Rear)`. The suffix table keys off the street alone, so the tail
 >   never confuses the street key.
 > - **Real count: 38,221 buildings**, not the ~38,400 estimated from the land-use table
 >   above. The difference is the skipped rows — no parcel id, no usable address, `ST_NUM` 0.
@@ -130,7 +130,7 @@ Additive only. Applied by hand like 0029; `ALTER TABLE ... ADD COLUMN` has no `I
 | Column | Purpose |
 |---|---|
 | `source TEXT NOT NULL DEFAULT 'user' CHECK (source IN ('user','seed'))` | which pipeline created the row |
-| `street_key TEXT` | normalized street name plus suffix, e.g. `LANARK RD` |
+| `street_key TEXT` | normalized street name plus suffix, e.g. `TARNWICK PL` |
 | `st_num_lo INTEGER`, `st_num_hi INTEGER` | house-number range (equal for a single number) |
 
 Indexes: `idx_buildings_parcel (parcel_id)`, `idx_buildings_street (city, street_key)`.
@@ -406,7 +406,7 @@ ORDER BY (source = 'user') DESC, created_at LIMIT 1
 
 On a match: set `google_place_id`, and `latitude`/`longitude` if null, and return the existing slug. On no match: create a `user` row as today, now also populating the three key columns. Addresses outside Boston keep today's behavior exactly.
 
-**Range addresses.** A parcel addressed "23-27 Lanark Road" is one page; a reviewer choosing "25 Lanark Rd" lands on it. The page title keeps the assessor's range.
+**Range addresses.** A parcel addressed "52-68 Tarnwick Place" is one page; a reviewer choosing "56 Tarnwick Pl" lands on it. The page title keeps the assessor's range.
 
 > **Amended 2026-09-09, as built (C1):** `normalizeSearchQuery` returns `string[][]`, not
 > `string[]`: one array of alternative spellings per term. Expanding an abbreviation to a
@@ -415,8 +415,8 @@ On a match: set `google_place_id`, and `latitude`/`longitude` if null, and retur
 > stored either way, and still requires both terms.
 >
 > Two things the C3 dedupe has to do that this section did not call out. Manual-entry
-> addresses (and Google Places results) carry a trailing city/state token — "23-27 Lanark Rd,
-> Boston, MA" — which must be stripped before `addressKey` runs, or the street key comes out
+> addresses (and Google Places results) carry a trailing city/state token, as in "52-68 Tarnwick Pl,
+> Boston, MA", which must be stripped before `addressKey` runs, or the street key comes out
 > wrong. And the dedupe query needs the same ZIP tiebreaker `seed/match.ts` uses: street keys
 > repeat across neighborhoods, so `(city, street_key)` plus range containment can return two
 > genuinely different buildings.
@@ -472,7 +472,7 @@ On a match: set `google_place_id`, and `latitude`/`longitude` if null, and retur
 
 **Sitemap.** `/sitemap.xml` is an index pointing at `/sitemaps/static.xml` and `/sitemaps/buildings-<n>.xml` in chunks of 10,000, generated from D1 and served with `Cache-Control: public, max-age=3600`. Included: allowlisted static pages; every building with `city = 'Boston'` and `parcel_id` not null; any other building or landlord page with at least one approved review. Excluded: auth, profile, admin, review forms. `lastmod` is the latest of the building's `updated_at`, its most recent `record_pulls.retrieved_at`, and its most recent approved review. `/robots.txt` allows crawling and names the index. Structured data remains a v1.6 item.
 
-**Metadata for seeded pages.** Title "23-27 Lanark Road, Boston | RateMyPlace"; description "City of Boston records for 23-27 Lanark Road: assessment, permits, violations, code enforcement, and 311 requests. No tenant reviews yet." Review-based metadata takes over once a review exists. No noindex.
+**Metadata for seeded pages.** Title "52-68 Tarnwick Place, Boston | RateMyPlace"; description "City of Boston records for 52-68 Tarnwick Place: assessment, permits, violations, code enforcement, and 311 requests. No tenant reviews yet." Review-based metadata takes over once a review exists. No noindex.
 
 **Docs and policy text in the same release:**
 - `ops/growth/STRATEGY.md`: dated decision-log entry lifting the reader-first deferral for Boston.
@@ -589,7 +589,7 @@ On a match: set `google_place_id`, and `latitude`/`longitude` if null, and retur
 >   id, finished row).
 > - `recordsQueuePanel.test.tsx` — the panel's states, the pause toggle, the disabled Retry
 >   button on a live lease.
-> - `recordsFixture.test.ts` — `runLanarkFixture` as a library: every check recorded, a source
+> - `recordsFixture.test.ts` covers `runRecordsFixture` as a library: every check recorded, a source
 >   that throws becoming a `sourceErrors` entry rather than an exception.
 >
 > `recordsPull.test.ts` gained the `trigger_reason` cases, and the test-db helper gained stub

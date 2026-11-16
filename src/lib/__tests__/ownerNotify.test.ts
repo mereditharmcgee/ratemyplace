@@ -27,8 +27,8 @@ import {
   queueOwnerNotice,
 } from '../ownerNotify';
 
-const AT = 1784338200;
-const SUBJECT_SUFFIX = ' (Jul 17, 2026, 9:30 PM ET)';
+const AT = 1779586200;
+const SUBJECT_SUFFIX = ' (May 23, 2026, 9:30 PM ET)';
 
 let errorSpy: MockInstance;
 
@@ -88,7 +88,7 @@ describe.skipIf(!sqliteAvailable)('notifyOwner', () => {
   }
 
   it.each(OWNER_NOTICE_KINDS)('%s: sends one notice to the owner with the queue link, address and time', async (kind) => {
-    await notifyOwner(deps(db), { kind, buildingId: 'bldg-lanark' });
+    await notifyOwner(deps(db), { kind, buildingId: 'bldg-tarnwick' });
 
     expect(mockSend).toHaveBeenCalledOnce();
     const args = mockSend.mock.calls[0][0];
@@ -96,17 +96,17 @@ describe.skipIf(!sqliteAvailable)('notifyOwner', () => {
     expect(args.subject.endsWith(SUBJECT_SUFFIX)).toBe(true);
     expect(args.html).toContain(`https://ratemyplace.org${OWNER_NOTICE_ADMIN_PATH[kind]}`);
     expect(args.html).not.toContain('https://ratemyplace.org//admin');
-    expect(args.html).toContain('23-27 Lanark Rd');
-    expect(args.html).toContain('Jul 17, 2026, 9:30 PM ET');
+    expect(args.html).toContain('52-68 Tarnwick Pl');
+    expect(args.html).toContain('May 23, 2026, 9:30 PM ET');
   });
 
   it('carries no tenant data: every address in the payload is ours, and nothing names the tenant', async () => {
     await db.prepare("INSERT INTO users (id, email) VALUES ('tenant-1', 'tenant@example.com')").run();
     await db
-      .prepare("INSERT INTO reviews (id, user_id, building_id, status) VALUES ('rev-1', 'tenant-1', 'bldg-lanark', 'pending')")
+      .prepare("INSERT INTO reviews (id, user_id, building_id, status) VALUES ('rev-1', 'tenant-1', 'bldg-tarnwick', 'pending')")
       .run();
 
-    await notifyOwner(deps(db), { kind: 'review_submitted', buildingId: 'bldg-lanark' });
+    await notifyOwner(deps(db), { kind: 'review_submitted', buildingId: 'bldg-tarnwick' });
 
     const payload = JSON.stringify(mockSend.mock.calls[0][0]);
     const addresses = payload.match(/[\w.+-]+@[\w-]+\.[\w.]+/g) ?? [];
@@ -155,7 +155,7 @@ describe.skipIf(!sqliteAvailable)('notifyOwner', () => {
     expect(await setting('email_failure_count')).toBeNull();
     expect(loggedEvents()).toContain('owner_notice_capped');
 
-    await notifyOwner(deps(db), { kind: 'review_submitted', buildingId: 'bldg-lanark' });
+    await notifyOwner(deps(db), { kind: 'review_submitted', buildingId: 'bldg-tarnwick' });
     expect(mockSend).toHaveBeenCalledTimes(7);
   });
 
@@ -171,7 +171,7 @@ describe.skipIf(!sqliteAvailable)('notifyOwner', () => {
   it('holds back any kind past the site-wide daily cap', async () => {
     await seedRateRows('owner-notice-day:site', 40);
 
-    await notifyOwner(deps(db), { kind: 'dispute', buildingId: 'bldg-lanark' });
+    await notifyOwner(deps(db), { kind: 'dispute', buildingId: 'bldg-tarnwick' });
 
     expect(mockSend).not.toHaveBeenCalled();
     expect(parseEmailFailure(await setting('email_last_failure_owner'))).toMatchObject({ kind: 'owner_dispute', reason: 'capped' });
@@ -180,7 +180,7 @@ describe.skipIf(!sqliteAvailable)('notifyOwner', () => {
   it('still sends when the cap cannot be checked, and says so', async () => {
     db.exec('DROP TABLE rate_limits');
 
-    await notifyOwner(deps(db), { kind: 'review_edited', buildingId: 'bldg-lanark' });
+    await notifyOwner(deps(db), { kind: 'review_edited', buildingId: 'bldg-tarnwick' });
 
     expect(mockSend).toHaveBeenCalledOnce();
     expect(loggedEvents()).toContain('owner_notice_cap_unavailable');
@@ -195,7 +195,7 @@ describe.skipIf(!sqliteAvailable)('notifyOwner', () => {
         throw new Error('D1 down');
       },
     };
-    await expect(notifyOwner(deps(broken), { kind: 'bug_report', buildingId: 'bldg-lanark' })).resolves.toBeUndefined();
+    await expect(notifyOwner(deps(broken), { kind: 'bug_report', buildingId: 'bldg-tarnwick' })).resolves.toBeUndefined();
   });
 
   describe('queueOwnerNotice', () => {

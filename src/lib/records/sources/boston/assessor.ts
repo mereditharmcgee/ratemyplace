@@ -149,7 +149,7 @@ export function assessmentFromRow(row: Record<string, unknown>, year: AssessorYe
   let mailState = pick(c.mailState);
   let mailZip = pick(c.mailZip);
   if (c.mailCombined) {
-    // "PO BOX 35006 C/O ATT DENNIS CLAIR, BOSTON, MA 02135" -> street, city, state, zip.
+    // "1 MAIN ST C/O SOMEONE, BOSTON, MA 02135" -> street, city, state, zip.
     // Parsed from the end: the street half can itself contain commas, the tail cannot.
     const combined = pick(c.mailCombined) ?? '';
     const parts = combined.split(',').map((p) => p.trim()).filter(Boolean);

@@ -17,7 +17,7 @@ const EASTERN_DATE_TIME = new Intl.DateTimeFormat('en-US', {
 });
 
 /**
- * A Unix-seconds timestamp as Boston wall-clock time, e.g. "Jul 17, 2026, 9:30 PM ET".
+ * A Unix-seconds timestamp as Boston wall-clock time, e.g. "May 23, 2026, 9:30 PM ET".
  *
  * For admin surfaces and owner notices only — never a public page, where exact times go
  * through `privacy.ts`. Newer ICU puts a narrow no-break space (U+202F) before AM/PM and

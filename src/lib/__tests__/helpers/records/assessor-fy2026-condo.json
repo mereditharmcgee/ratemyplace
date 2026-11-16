@@ -1,5 +1,5 @@
 [
-  { "PID": "2102110000", "ST_NUM": "55", "ST_NUM2": "65", "ST_NAME": "Lanark RD", "LU": "CM", "OWNER": "GRAND LANARK CONDO TR" },
-  { "PID": "2102110002", "ST_NUM": "55", "ST_NUM2": null, "ST_NAME": "Lanark RD", "LU": "CD", "OWNER": "SRIVATSA SRINI" },
-  { "PID": "2102110004", "ST_NUM": "55", "ST_NUM2": null, "ST_NAME": "Lanark RD", "LU": "CD", "OWNER": "MATTCAM LLC" }
+  { "PID": "2108871000", "ST_NUM": "127", "ST_NUM2": "129", "ST_NAME": "Tarnwick PL", "LU": "CM", "OWNER": "WYNSTABLE CONDO TR" },
+  { "PID": "2108871002", "ST_NUM": "127", "ST_NUM2": null, "ST_NAME": "Tarnwick PL", "LU": "CD", "OWNER": "ELLERBY MORGAN" },
+  { "PID": "2108871004", "ST_NUM": "129", "ST_NUM2": null, "ST_NAME": "Tarnwick PL", "LU": "CD", "OWNER": "PELLOWAY CORA" }
 ]

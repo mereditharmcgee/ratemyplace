@@ -9,8 +9,8 @@ import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
-import lanark2026 from './helpers/records/assessor-fy2026-lanark.json';
-import enforcementLanark from './helpers/records/enforcement-lanark.json';
+import tarnwick2026 from './helpers/records/assessor-fy2026-tarnwick.json';
+import enforcementTarnwick from './helpers/records/enforcement-tarnwick.json';
 
 const suite = sqliteAvailable ? describe : describe.skip;
 
@@ -118,14 +118,14 @@ suite('getBuildingRecords', () => {
     expect(await getBuildingRecords(db, buildingId)).toBeNull();
   });
 
-  it('reads back a real pull with an assessment and enforcement rows', async () => {
+  it('reads back a recorded-shape pull with an assessment and enforcement rows', async () => {
     const db = await createDbWithAdmin();
     const buildingId = await insertBuilding(db);
     const building = await loadBuilding(db, buildingId);
     const fetchImpl = fixtureFetch([
-      { resourceId: FY2026_RESOURCE_ID, sqlIncludes: 'NOT IN', records: lanark2026 },
-      { resourceId: FY2026_RESOURCE_ID, sqlIncludes: '"PID" IN', records: lanark2026 },
-      { resourceId: ENFORCEMENT_RESOURCE_ID, records: enforcementLanark },
+      { resourceId: FY2026_RESOURCE_ID, sqlIncludes: 'NOT IN', records: tarnwick2026 },
+      { resourceId: FY2026_RESOURCE_ID, sqlIncludes: '"PID" IN', records: tarnwick2026 },
+      { resourceId: ENFORCEMENT_RESOURCE_ID, records: enforcementTarnwick },
     ]);
     await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl });
 
@@ -134,7 +134,7 @@ suite('getBuildingRecords', () => {
     expect(view).not.toBeNull();
     expect(view!.assessments).toHaveLength(1);
     expect(view!.assessments[0].fiscalYear).toBe('FY2026');
-    expect(view!.enforcement).toHaveLength(3);
+    expect(view!.enforcement).toHaveLength(29);
     expect(view!.permits).toEqual([]);
     expect(view!.serviceRequests).toEqual([]);
     expect(view!.pulledAt).toBeGreaterThan(0);

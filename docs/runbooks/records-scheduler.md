@@ -16,7 +16,7 @@ routes but not in the cron until someone runs `npm run records:worker:deploy`.
 | Cron | Runs | What it does |
 |---|---|---|
 | `* * * * *` | every minute | `drain`. Up to three people-facing rows (priority 0 and 1: button, follower, refresh), then one city-wide `fill` row unless the fill is paused. Logs one `records_drain` line. |
-| `0 6 * * *` | 06:00 UTC daily | `plan`. In order: purge finished `refresh`/`fill` rows older than 90 days, enqueue refreshes, top the fill queue back up in batches of 100 inserts, run the Lanark fixture, compute per-source error rates, then decide the circuit breaker. Logs `records_plan_enqueued` and `records_plan`. |
+| `0 6 * * *` | 06:00 UTC daily | `plan`. In order: purge finished `refresh`/`fill` rows older than 90 days, enqueue refreshes, top the fill queue back up in batches of 100 inserts, run the records fixture, compute per-source error rates, then decide the circuit breaker. Logs `records_plan_enqueued` and `records_plan`. |
 
 Rows are claimed **one at a time, immediately before the pull that uses them**, so a lease
 covers a request that is actually in flight. The two crons overlap at 06:00 UTC. That is
@@ -167,23 +167,42 @@ If the 06:00 planner pauses the fill and emails, read the email before resuming 
 - **Oldest pending** — the age of the oldest claimable row. A number that climbs past a few
   hours with the fill running means the drain has stopped; check the Worker's Cron Events
   tab for red rows.
-- **Fixture** — the last daily Lanark fixture result, from
+- **Fixture**: the last daily records fixture result, from
   `app_settings.records_fixture_last`. The healthy state is a line reading "Fixture: all N
   checks passed at <date>" — the panel names the number of checks out loud, because "nothing
   failed" is also true of a run where nothing ran — with a timestamp from this morning. A
   timestamp more than a day old means the planner did not run. Under it, a "Notices (report
   only, these never pause the fill)" list names city data worth knowing about, such as a 311
   file that answers with no rows (2011 and 2014 since the city's 2026-09-18 reload). A notice
-  is not a failure and needs no action here; it clears by itself once the city reloads the
-  file. "311 empty-file check incomplete" means the probe itself could not reach some files
-  that morning.
+  is not a failure and needs no action here; it clears by itself once the file has rows again.
+  One or two emptied files pause nothing: the every-year and new-system checks skip them, and
+  the 311 total and housing floors are lowered by what they held for the fixture building when
+  the counts were recorded. This panel lists a failed check by its label only. The email adds
+  the failed check's detail, and `npm run records:check` prints it on the `FAIL` line. Neither
+  the panel nor the email shows what a passing check excused, so to see that on a passing
+  morning run `npm run records:check`: each 311 check that excused something prints it on its
+  `PASS` line, for example "PASS 311 total >= 200 (floor lowered by 18 to 182 for 2019, whose
+  file has no rows)". Three or more files that held the building's rows answering empty at once
+  fail "311 files emptied since the counts were recorded: at most 2", which pauses the fill and
+  sends the email. That many is a wipe, or the city moving 311 to new resource ids and leaving
+  the old ones empty. A move does not heal on its own: point `LEGACY_311_RESOURCES` (or
+  `NEW_311_RESOURCE_ID`) at the new ids and redeploy the site and the Worker. Every pull
+  meanwhile replaces a building's stored 311 rows with none, so check this first. "311
+  empty-file check incomplete" means the probe could not reach some files that morning, even
+  after asking a failed file a second time (once two files in a row fail both tries, later
+  files get one try each until one answers, so a city that is down does not double the wait). A
+  file it could not reach excuses nothing, so a failed every-year or new-system check whose
+  detail says "the empty-file check could not reach" a file may be that morning's outage. That
+  detail is in the email and on the check's `FAIL` line in `npm run records:check`, not on this
+  panel, which shows the label alone. Run `npm run records:check` before treating it as a
+  broken query.
 
 ## The breaker email, and unpausing
 
 The subject is "RateMyPlace records fill paused". It arrives once. It means the daily
 planner found one of two things:
 
-- **The Lanark fixture failed** — any failed check, or any source that threw. The email
+- **The records fixture failed**: any failed check, or any source that threw. The email
   lists each failure and then the per-source row counts, which are the fastest way to tell
   "the city is down" from "our query broke": a source returning zero rows where it returned
   four hundred yesterday is a different problem from one that threw.
@@ -227,20 +246,28 @@ npx wrangler d1 execute ratemyplace-db --remote --command \
 ```
 
 Before unpausing, find out whether the cause is fixed. `npm run records:check` runs the same
-fixture by hand against the live datasets and prints every check, which is the quickest
-answer. Boston retiring a 311 resource id is a common cause and does not heal on its own —
-`LEGACY_311_RESOURCES` in the 311 source has to be updated, and both the site and the Worker
-redeployed.
+fixture by hand against the live datasets and prints every check, with the detail of each one
+that failed and what each 311 check excused, which is the quickest answer. The fixture is one
+building, 2262-2266 Dorchester Ave, a Boston Housing Authority building, chosen because its
+owner is a public body, so nothing the checks compare or print names a private person or
+company. Its address and every expected value are in `RECORDS_FIXTURE` in
+`src/lib/records/fixture.ts`. Boston retiring a 311 resource id is a
+common cause and does not heal on its own: `LEGACY_311_RESOURCES` in the 311 source has to be
+updated, and both the site and the Worker redeployed.
 
-A failed check can also mean the city's data moved while nothing broke. On 2026-11-13 the
-city reloaded RentSmart and the fixture parcel's rows went with it, so the old check,
-"RentSmart rows present", failed every morning and paused the fill again each time. The
-RentSmart checks now ask two things: that the adapter's parcel query answers (zero rows is an
-answer), and that a city-wide query on the same resource finds a row from the last 60 days
-with a ten-digit parcel. When a check fails this way, fix the check in
-`src/lib/records/fixture.ts`, then deploy the Worker with `npm run records:worker:deploy`. The
-fixture runs inside the Worker, so a site deploy alone does not change what the 06:00 planner
-checks.
+A failed check can also mean the city's data moved while nothing broke. A RentSmart reload can
+drop any parcel's rows, so a check that one parcel has rows, like the old "RentSmart rows
+present", can fail every morning and pause the fill again each time while the source works.
+The RentSmart checks ask two things instead: that the adapter's parcel query answers (zero
+rows is an answer), and that a city-wide query on the same resource finds a row from the last
+60 days with a ten-digit parcel. The check most exposed to this now is
+`311 new-system rows >= 1`: on 2026-11-15 it rested on a single case at the building, opened
+2026-10-13, so the city merging, moving or dropping that one case would fail it with nothing
+broken. Read a failure there as possible data movement first. (A new-system file the city
+leaves empty does not fail it: the check is skipped that morning, as above.) When a check fails
+this way, fix the check in `src/lib/records/fixture.ts`, then deploy the Worker with
+`npm run records:worker:deploy`. The fixture runs inside the Worker, so a site deploy alone
+does not change what the 06:00 planner checks.
 
 Then unpause from `/admin/records` with the Resume fill button, or, if the site is not
 reachable:

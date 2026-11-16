@@ -48,7 +48,7 @@ export const BOSTON_LOCALITY_NAMES: readonly string[] = [
 
 // Smaller places inside a Boston neighborhood, as Google Places names them in the
 // `neighborhood` address component, mapped to the neighborhood a reader knows. Production
-// had "27 Lanark Road" stored as "Aberdeen" while every seeded row on the same street says
+// had a Brighton building stored as "Aberdeen" while every seeded row on its street says
 // "Brighton". Every value here is a name in `BOSTON_LOCALITY_NAMES`.
 //
 // This is a display and storage alias only. It is deliberately NOT part of

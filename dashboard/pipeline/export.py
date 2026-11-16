@@ -71,7 +71,7 @@ def clean(v):
 
 
 def nice_address(a):
-    """'195 Lexington ST' -> '195 Lexington St'. The assessor writes the suffix in capitals."""
+    """'14 Wrenlow ST' -> '14 Wrenlow St'. The assessor writes the suffix in capitals."""
     return " ".join(t.capitalize() if (t.isupper() and t.isalpha() and len(t) > 1) else t for t in clean(a).split()) or "(no street address)"
 
 

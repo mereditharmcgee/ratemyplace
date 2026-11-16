@@ -86,10 +86,10 @@ describe('displayLocality', () => {
   });
 
   it('reads a Google sub-area as the Boston neighborhood it sits in', () => {
-    // Production: 27 Lanark Road came back from Google Places as "Aberdeen"; every seeded
-    // Lanark Road row says "Brighton".
-    expect(displayLocality({ address: '27 Lanark Road', neighborhood: 'Aberdeen', city: 'Boston' })).toBe('Brighton');
-    expect(displayLocality({ address: '27 Lanark Road', neighborhood: '  aberdeen ', city: 'Boston' })).toBe('Brighton');
+    // Production: a Brighton building came back from Google Places as "Aberdeen"; every
+    // seeded row on the same street says "Brighton".
+    expect(displayLocality({ address: '68 Tarnwick Place', neighborhood: 'Aberdeen', city: 'Boston' })).toBe('Brighton');
+    expect(displayLocality({ address: '68 Tarnwick Place', neighborhood: '  aberdeen ', city: 'Boston' })).toBe('Brighton');
     expect(displayLocality({ address: '1 Main St', neighborhood: 'Fort Point', city: 'Boston' })).toBe('Seaport');
     expect(displayLocality({ address: '1 Main St', neighborhood: 'Savin Hill', city: 'Dorchester' })).toBe('Dorchester');
   });
@@ -127,7 +127,7 @@ describe('localityLine', () => {
   });
 
   it('names the Boston neighborhood for a Google sub-area', () => {
-    expect(localityLine({ address: '27 Lanark Road', neighborhood: 'Aberdeen', city: 'Boston' }, 'MA')).toBe(
+    expect(localityLine({ address: '68 Tarnwick Place', neighborhood: 'Aberdeen', city: 'Boston' }, 'MA')).toBe(
       'Brighton, Boston, MA'
     );
   });

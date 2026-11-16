@@ -21,8 +21,8 @@
 //
 // Matching on `violation_sthigh` against `identity.numbers` also means a stored range row
 // can attach to a building whose own address is a different (overlapping) range: a
-// `21-23` row matches a `23-27` building because `23` is shared, and that row genuinely
-// does cover number 23 — it is not a false match. The correction workflow is the escape
+// `50-52` row matches a `52-68` building because `52` is shared, and that row genuinely
+// does cover number 52. It is not a false match. The correction workflow is the escape
 // hatch for the cases where that overlap is unwanted.
 //
 // The suffix and zip predicates below tolerate a NULL or empty-string value in the feed
@@ -71,10 +71,10 @@ export function suffixSpellings(identity: Pick<BuildingIdentity, 'streetBase' | 
 }
 
 /**
- * `violation_sthigh` is either half of a stored range ("21-23" -> stno "21", sthigh "23")
+ * `violation_sthigh` is either half of a stored range ("50-52" -> stno "50", sthigh "52")
  * or the letter of a lettered number ("120A" -> stno "120", sthigh "A") — see the header
  * note. A purely alphabetic `sthigh` is the latter and is appended with no separator
- * ("120A"); anything else is the former and keeps the hyphen ("21-23").
+ * ("120A"); anything else is the former and keeps the hyphen ("50-52").
  */
 function buildAddress(row: Row): string | null {
   const stno = textOrNull(row.violation_stno);

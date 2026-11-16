@@ -91,7 +91,7 @@ describe('isSearchVariant', () => {
   });
 
   it('treats any query parameter as a variant', () => {
-    expect(isSearchVariant(new URL('https://ratemyplace.org/search?q=lanark'))).toBe(true);
+    expect(isSearchVariant(new URL('https://ratemyplace.org/search?q=tarnwick'))).toBe(true);
     expect(isSearchVariant(new URL('https://ratemyplace.org/search?q='))).toBe(true);
     expect(isSearchVariant(new URL('https://ratemyplace.org/search?type=landlords'))).toBe(true);
   });

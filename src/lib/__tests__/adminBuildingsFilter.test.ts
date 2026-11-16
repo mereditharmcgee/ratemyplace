@@ -33,8 +33,8 @@ describe('adminBuildingsUrl', () => {
 
 const building: AdminBuilding = {
   id: 'b-1',
-  address: '12 Lanark Rd',
-  slug: '12-lanark-rd',
+  address: '12 Tarnwick Pl',
+  slug: '12-tarnwick-pl',
   neighborhood: null,
   city: 'Boston',
   state: 'MA',
@@ -50,7 +50,7 @@ const building: AdminBuilding = {
   property_manager_name: null,
   created_at: 1,
   admin_notes: 'Owner disputes the unit count',
-  owner_name: 'Lanark LLC',
+  owner_name: 'Tarnwick LLC',
   owner_entity: 'llc',
   owner_website: null,
   review_count: 0,
@@ -61,7 +61,7 @@ describe('building edit round-trip', () => {
   it('starts the form from the stored notes and owner fields', () => {
     const form = buildingEditForm(building);
     expect(form.admin_notes).toBe('Owner disputes the unit count');
-    expect(form.owner_name).toBe('Lanark LLC');
+    expect(form.owner_name).toBe('Tarnwick LLC');
     expect(form.owner_website).toBe('');
     expect(form.unit_count).toBeNull();
   });
@@ -84,7 +84,7 @@ describe('building edit round-trip', () => {
     const updated = applyBuildingPatch(building, { admin_notes: '', year_built: 1912 });
     expect(updated.admin_notes).toBeNull();
     expect(updated.year_built).toBe(1912);
-    expect(updated.owner_name).toBe('Lanark LLC');
+    expect(updated.owner_name).toBe('Tarnwick LLC');
     expect(building.admin_notes).toBe('Owner disputes the unit count');
   });
 

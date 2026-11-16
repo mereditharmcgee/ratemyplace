@@ -40,7 +40,7 @@ suite('POST /api/buildings with seeded dedupe', () => {
   beforeEach(async () => {
     db = createRecordsTestDb();
     await db.prepare("INSERT INTO users (id, email) VALUES ('user-1', 'u@example.com')").run();
-    await insertBuilding(db, { id: 'seed-1', address: '23-27 Lanark Rd', slug: '23-27-lanark-rd-boston', source: 'seed', street_key: 'LANARK RD', st_num_lo: 23, st_num_hi: 27, parcel_id: '1', latitude: null, longitude: null });
+    await insertBuilding(db, { id: 'seed-1', address: '52-68 Tarnwick Pl', slug: '52-68-tarnwick-pl-boston', source: 'seed', street_key: 'TARNWICK PL', st_num_lo: 52, st_num_hi: 68, parcel_id: '1', latitude: null, longitude: null });
   });
 
   it('415 on a non-JSON body and 400 on a non-object body', async () => {
@@ -49,9 +49,9 @@ suite('POST /api/buildings with seeded dedupe', () => {
   });
 
   it('a Google place inside a seeded range lands on the seeded row and stamps place id and coordinates', async () => {
-    const res = await POST(createContext(db, { placeId: 'gp-1', streetAddress: '25 Lanark Rd', neighborhood: 'Brighton', city: 'Boston', state: 'MA', zipCode: '02135', latitude: 42.34, longitude: -71.15 }));
+    const res = await POST(createContext(db, { placeId: 'gp-1', streetAddress: '56 Tarnwick Pl', neighborhood: 'Brighton', city: 'Boston', state: 'MA', zipCode: '02135', latitude: 42.34, longitude: -71.15 }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ building: { id: 'seed-1', slug: '23-27-lanark-rd-boston' }, created: false });
+    expect(await res.json()).toEqual({ building: { id: 'seed-1', slug: '52-68-tarnwick-pl-boston' }, created: false });
     const [seed] = await rows(db);
     expect(seed.google_place_id).toBe('gp-1');
     expect(seed.latitude).toBe(42.34);
@@ -59,7 +59,7 @@ suite('POST /api/buildings with seeded dedupe', () => {
   });
 
   it('a manual entry with a comma-less city tail lands on the seeded row', async () => {
-    const res = await POST(createContext(db, { streetAddress: '27 Lanark Road Boston', city: 'Boston', state: 'MA', zipCode: null }));
+    const res = await POST(createContext(db, { streetAddress: '68 Tarnwick Place Boston', city: 'Boston', state: 'MA', zipCode: null }));
     expect(res.status).toBe(200);
     expect((await res.json()).building.id).toBe('seed-1');
     expect((await rows(db)).length).toBe(1);
@@ -128,7 +128,7 @@ suite('POST /api/buildings with seeded dedupe', () => {
 
   it('an exact place id wins over the address tier and leaves the seeded row alone', async () => {
     await insertBuilding(db, { id: 'other', address: '1 Pine St', slug: '1-pine-st-cambridge', city: 'Cambridge', zip_code: '02139', google_place_id: 'gp-x' });
-    const res = await POST(createContext(db, { placeId: 'gp-x', streetAddress: '25 Lanark Rd', city: 'Boston', state: 'MA', zipCode: '02135' }));
+    const res = await POST(createContext(db, { placeId: 'gp-x', streetAddress: '56 Tarnwick Pl', city: 'Boston', state: 'MA', zipCode: '02135' }));
     expect(res.status).toBe(200);
     expect((await res.json()).building).toEqual({ id: 'other', slug: '1-pine-st-cambridge' });
     const seed = (await rows(db)).find((r) => r.id === 'seed-1');
@@ -138,7 +138,7 @@ suite('POST /api/buildings with seeded dedupe', () => {
   it('never overwrites an already-stamped seeded row, and does not touch its updated_at', async () => {
     await stampSeed(db, { placeId: 'gp-old', lat: 42.1, lng: -71.1, updatedAt: 1_700_000_000 });
     const before = await updatedAt(db, 'seed-1');
-    const res = await POST(createContext(db, { placeId: 'gp-new', streetAddress: '25 Lanark Rd', city: 'Boston', state: 'MA', zipCode: '02135', latitude: 42.34, longitude: -71.15 }));
+    const res = await POST(createContext(db, { placeId: 'gp-new', streetAddress: '56 Tarnwick Pl', city: 'Boston', state: 'MA', zipCode: '02135', latitude: 42.34, longitude: -71.15 }));
     expect(res.status).toBe(200);
     expect((await res.json()).building.id).toBe('seed-1');
     const seed = (await rows(db)).find((r) => r.id === 'seed-1');
@@ -151,7 +151,7 @@ suite('POST /api/buildings with seeded dedupe', () => {
     // coordinates and keeps its own place id — the later place id lands on this same row
     // through the address tier anyway, so the outcome stays idempotent.
     await stampSeed(db, { placeId: 'gp-old', lat: null, lng: null, updatedAt: 1_700_000_000 });
-    const res = await POST(createContext(db, { placeId: 'gp-new', streetAddress: '25 Lanark Rd', city: 'Boston', state: 'MA', zipCode: '02135', latitude: 42.34, longitude: -71.15 }));
+    const res = await POST(createContext(db, { placeId: 'gp-new', streetAddress: '56 Tarnwick Pl', city: 'Boston', state: 'MA', zipCode: '02135', latitude: 42.34, longitude: -71.15 }));
     expect(res.status).toBe(200);
     expect((await res.json()).building.id).toBe('seed-1');
     const seed = (await rows(db)).find((r) => r.id === 'seed-1');
@@ -162,7 +162,7 @@ suite('POST /api/buildings with seeded dedupe', () => {
   it('a manual entry with no place id and no coordinates does not bump updated_at', async () => {
     await stampSeed(db, { placeId: null, lat: null, lng: null, updatedAt: 1_700_000_000 });
     const before = await updatedAt(db, 'seed-1');
-    const res = await POST(createContext(db, { streetAddress: '25 Lanark Rd', city: 'Boston', state: 'MA', zipCode: '02135' }));
+    const res = await POST(createContext(db, { streetAddress: '56 Tarnwick Pl', city: 'Boston', state: 'MA', zipCode: '02135' }));
     expect(res.status).toBe(200);
     expect((await res.json()).building.id).toBe('seed-1');
     expect(await updatedAt(db, 'seed-1')).toBe(before);
@@ -202,12 +202,12 @@ suite('findExistingBuilding agrees with POST /api/buildings', () => {
   beforeEach(async () => {
     db = createRecordsTestDb();
     await db.prepare("INSERT INTO users (id, email) VALUES ('user-1', 'u@example.com')").run();
-    await insertBuilding(db, { id: 'seed-1', address: '23-27 Lanark Rd', slug: '23-27-lanark-rd-boston', source: 'seed', street_key: 'LANARK RD', st_num_lo: 23, st_num_hi: 27, parcel_id: '1' });
+    await insertBuilding(db, { id: 'seed-1', address: '52-68 Tarnwick Pl', slug: '52-68-tarnwick-pl-boston', source: 'seed', street_key: 'TARNWICK PL', st_num_lo: 52, st_num_hi: 68, parcel_id: '1' });
     await insertBuilding(db, { id: 'nh-elm', address: '1 Elm St', slug: '1-elm-st-new-haven', city: 'New Haven', state: 'CT', zip_code: '06511' });
   });
 
   it.each([
-    ['a seeded-range hit', { placeId: 'gp-1', streetAddress: '25 Lanark Rd', city: 'Boston', state: 'MA', zipCode: '02135' }],
+    ['a seeded-range hit', { placeId: 'gp-1', streetAddress: '56 Tarnwick Pl', city: 'Boston', state: 'MA', zipCode: '02135' }],
     ['an exact manual entry', { streetAddress: '1 elm st', city: 'new haven', state: 'CT', zipCode: null }],
     ['a new address', { placeId: 'gp-2', streetAddress: '5 Oak St', city: 'Dorchester', state: 'MA', zipCode: '02122' }],
   ])('%s', async (_label, body) => {
@@ -254,7 +254,7 @@ suite('GET /api/buildings guards the typeahead', () => {
 
   beforeEach(async () => {
     db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'seed-1', address: '23-27 Lanark Rd', slug: '23-27-lanark-rd-boston', source: 'seed' });
+    await insertBuilding(db, { id: 'seed-1', address: '52-68 Tarnwick Pl', slug: '52-68-tarnwick-pl-boston', source: 'seed' });
   });
 
   it('answers a one-character query with no rows rather than ten arbitrary ones', async () => {
@@ -264,22 +264,22 @@ suite('GET /api/buildings guards the typeahead', () => {
   });
 
   it('a two-character query searches, and finds the seeded row', async () => {
-    const res = await GET(getContext(db, '?q=Lan'));
+    const res = await GET(getContext(db, '?q=Tar'));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.buildings).toHaveLength(1);
-    expect(body.buildings[0]).toMatchObject({ id: 'seed-1', address: '23-27 Lanark Rd' });
+    expect(body.buildings[0]).toMatchObject({ id: 'seed-1', address: '52-68 Tarnwick Pl' });
   });
 
   it('429s one IP past 120 lookups a minute', async () => {
     for (let i = 0; i < 120; i += 1) {
-      expect((await GET(getContext(db, '?q=Lan'))).status).toBe(200);
+      expect((await GET(getContext(db, '?q=Tar'))).status).toBe(200);
     }
-    const refused = await GET(getContext(db, '?q=Lan'));
+    const refused = await GET(getContext(db, '?q=Tar'));
     expect(refused.status).toBe(429);
     expect(await refused.json()).toEqual({ error: 'Too many requests. Please try again later.' });
     expect(refused.headers.get('X-RateLimit-Limit')).toBe('120');
     // A different caller is unaffected: the budget is per IP.
-    expect((await GET(getContext(db, '?q=Lan', '203.0.113.21'))).status).toBe(200);
+    expect((await GET(getContext(db, '?q=Tar', '203.0.113.21'))).status).toBe(200);
   });
 });

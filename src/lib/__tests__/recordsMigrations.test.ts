@@ -13,9 +13,9 @@ const suite = sqliteAvailable ? describe : describe.skip;
 suite('migrations 0029 and 0030', () => {
   it('adds parcel_id to buildings and creates the three records tables', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { parcel_id: '2102098000' });
+    await insertBuilding(db, { parcel_id: '2109417000' });
     const row = await db.prepare('SELECT parcel_id, sam_id FROM buildings').first<{ parcel_id: string; sam_id: string | null }>();
-    expect(row).toEqual({ parcel_id: '2102098000', sam_id: null });
+    expect(row).toEqual({ parcel_id: '2109417000', sam_id: null });
 
     const tables = await db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('record_pulls','building_records','record_corrections') ORDER BY name")

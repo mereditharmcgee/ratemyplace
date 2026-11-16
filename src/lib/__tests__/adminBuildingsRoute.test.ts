@@ -41,7 +41,7 @@ suite('GET /api/admin/buildings filters', () => {
     db = createAdminTestDb();
     await insertLandlord(db, 'll-aa', 'AA Management');
     await insertLandlord(db, 'll-other', 'Other Co');
-    await insertBuilding(db, { id: 'b-aa-1', address: '12 Lanark Rd', city: 'Boston' });
+    await insertBuilding(db, { id: 'b-aa-1', address: '12 Tarnwick Pl', city: 'Boston' });
     await insertBuilding(db, { id: 'b-aa-2', address: '333 Humphrey St', city: 'New Haven', state: 'CT', zip_code: '06511' });
     await insertBuilding(db, { id: 'b-other', address: '9 Oak St', city: 'Boston' });
     await db.prepare("UPDATE buildings SET landlord_id = 'll-aa' WHERE id IN ('b-aa-1', 'b-aa-2')").run();
@@ -78,7 +78,7 @@ suite('GET /api/admin/buildings filters', () => {
     expect(ids(await list(db, '?q=humphrey'))).toEqual(['b-aa-2']);
     expect(ids(await list(db, '?q=new%20haven'))).toEqual(['b-aa-2']);
     expect(ids(await list(db, '?q=06511'))).toEqual(['b-aa-2']);
-    expect((await list(db, '?q=lanark')).total).toBe(1);
+    expect((await list(db, '?q=tarnwick')).total).toBe(1);
   });
 
   it('q treats % and _ literally', async () => {
@@ -95,8 +95,8 @@ suite('GET /api/admin/buildings filters', () => {
   });
 
   it('landlord and q combine', async () => {
-    expect(ids(await list(db, '?landlord=ll-aa&q=lanark'))).toEqual(['b-aa-1']);
-    expect(ids(await list(db, '?landlord=ll-other&q=lanark'))).toEqual([]);
+    expect(ids(await list(db, '?landlord=ll-aa&q=tarnwick'))).toEqual(['b-aa-1']);
+    expect(ids(await list(db, '?landlord=ll-other&q=tarnwick'))).toEqual([]);
   });
 
   it('the row SELECT carries admin notes and owner fields so an edit can round-trip them', async () => {

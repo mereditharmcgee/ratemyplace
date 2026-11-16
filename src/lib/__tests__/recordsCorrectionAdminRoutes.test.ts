@@ -8,7 +8,7 @@ import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
-import lanark2026 from './helpers/records/assessor-fy2026-lanark.json';
+import tarnwick2026 from './helpers/records/assessor-fy2026-tarnwick.json';
 import permits from './helpers/records/permits-positive.json';
 import { sendRecordCorrectionOutcomeEmail } from '../email';
 import { parseEmailFailure } from '../emailHealth';
@@ -25,8 +25,8 @@ const sendOutcomeEmail = vi.mocked(sendRecordCorrectionOutcomeEmail);
 const suite = sqliteAvailable ? describe : describe.skip;
 
 const ADMIN_ID = 'admin';
-const BUILDING_ID = 'bldg-lanark';
-const BUILDING_ADDRESS = '23-27 Lanark Rd, Boston, MA 02135';
+const BUILDING_ID = 'bldg-tarnwick';
+const BUILDING_ADDRESS = '52-68 Tarnwick Pl, Boston, MA 02135';
 const CORRECTION_ID = 'corr-1';
 
 /** Every Boston source: six assessor years, permits, violations, enforcement, 311, RentSmart. */
@@ -109,7 +109,7 @@ function createContext(db: TestD1Database, options: ContextOptions = {}): APICon
 /** Boston fixture routing: FY2026 assessment plus the permits feed; every other source returns empty. */
 function bostonFixtures(): ReturnType<typeof fixtureFetch> {
   return fixtureFetch([
-    { resourceId: FY2026_RESOURCE_ID, records: lanark2026 },
+    { resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 },
     { resourceId: PERMITS_RESOURCE_ID, records: permits },
   ]);
 }
@@ -200,7 +200,7 @@ suite('admin record correction routes', () => {
 
     it('re-pulls every source, tags the pulls with the correction, and diffs the result', async () => {
       const db = await createDbWithAdmin();
-      await insertBuilding(db, { parcel_id: '2102098000' });
+      await insertBuilding(db, { parcel_id: '2109417000' });
       await insertCorrection(db);
       vi.stubGlobal('fetch', bostonFixtures());
 
@@ -248,7 +248,7 @@ suite('admin record correction routes', () => {
 
     it('audits the re-pull against the building with the correction id in the notes', async () => {
       const db = await createDbWithAdmin();
-      await insertBuilding(db, { parcel_id: '2102098000' });
+      await insertBuilding(db, { parcel_id: '2109417000' });
       await insertCorrection(db);
       vi.stubGlobal('fetch', bostonFixtures());
 
@@ -280,7 +280,7 @@ suite('admin record correction routes', () => {
         sources: Array<{ label: string; status: string; rowCount: number }>;
       };
       expect(newValue.correctionId).toBe(CORRECTION_ID);
-      expect(newValue.parcelId).toBe('2102098000');
+      expect(newValue.parcelId).toBe('2109417000');
       expect(newValue.condominium).toBe(false);
       expect(newValue.sources).toHaveLength(BOSTON_SOURCE_COUNT);
       expect(newValue.sources.every((source) => typeof source.label === 'string')).toBe(true);
@@ -364,7 +364,7 @@ suite('admin record correction routes', () => {
 
     it('resolves after a re-pull: stores the outcome, audits it, and emails the filer', async () => {
       const db = await createDbWithAdmin();
-      await insertBuilding(db, { parcel_id: '2102098000' });
+      await insertBuilding(db, { parcel_id: '2109417000' });
       await insertCorrection(db);
       vi.stubGlobal('fetch', bostonFixtures());
 
@@ -461,7 +461,7 @@ suite('admin record correction routes', () => {
         httpStatus: 422,
       });
       const db = await createDbWithAdmin();
-      await insertBuilding(db, { parcel_id: '2102098000' });
+      await insertBuilding(db, { parcel_id: '2109417000' });
       await insertCorrection(db);
       vi.stubGlobal('fetch', fixtureFetch([]));
 
@@ -492,7 +492,7 @@ suite('admin record correction routes', () => {
       const db = await createDbWithAdmin();
       // A parcel id, so the pull resolves and every source lands 'empty' rather than
       // 'error' — an all-error group no longer satisfies the resolve gate.
-      await insertBuilding(db, { parcel_id: '2102098000' });
+      await insertBuilding(db, { parcel_id: '2109417000' });
       await insertCorrection(db, { contactEmail: null });
       vi.stubGlobal('fetch', fixtureFetch([]));
 
@@ -571,7 +571,7 @@ suite('admin record correction routes', () => {
 
       // First re-pull: FY2026 answers (which also resolves and stores the parcel),
       // every other source returns empty. A partially successful group — evidence.
-      vi.stubGlobal('fetch', fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]));
+      vi.stubGlobal('fetch', fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }]));
       expect((await REPULL(createContext(db))).status).toBe(200);
 
       const firstGroup = await db
@@ -624,7 +624,7 @@ suite('admin record correction routes', () => {
 
     it('resolves once when two admins resolve the same correction at the same time', async () => {
       const db = await createDbWithAdmin();
-      await insertBuilding(db, { parcel_id: '2102098000' });
+      await insertBuilding(db, { parcel_id: '2109417000' });
       await insertCorrection(db);
       vi.stubGlobal('fetch', bostonFixtures());
 

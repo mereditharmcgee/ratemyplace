@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
 
 -- Which pipeline created the row. Seeded rows come from the assessor bulk download.
 ALTER TABLE buildings ADD COLUMN source TEXT NOT NULL DEFAULT 'user' CHECK (source IN ('user','seed'));
--- Normalized street name plus abbreviated suffix, e.g. 'LANARK RD', and the house-number
+-- Normalized street name plus abbreviated suffix, e.g. 'TARNWICK PL', and the house-number
 -- range (equal for a single number). Populated by the seed for Boston rows and by the
 -- building-creation endpoint for anything created afterwards. Reviewer dedupe and the
 -- seed's existing-row matching both look up on (city, street_key) then range-contain.

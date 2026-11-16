@@ -10,13 +10,13 @@ import {
   shouldPanToUser,
 } from '../mapView';
 
-const LANARK = { lat: 42.3398, lng: -71.1543 }; // Brighton
+const BRIGHTON = { lat: 42.3398, lng: -71.1543 }; // Brighton
 const SOUTHIE = { lat: 42.3334, lng: -71.0495 }; // South Boston
 const NEW_HAVEN = { lat: 41.3083, lng: -72.9279 };
 
 describe('inBostonBox', () => {
   it('holds Boston and drops New Haven and null island', () => {
-    expect(inBostonBox(LANARK.lat, LANARK.lng)).toBe(true);
+    expect(inBostonBox(BRIGHTON.lat, BRIGHTON.lng)).toBe(true);
     expect(inBostonBox(NEW_HAVEN.lat, NEW_HAVEN.lng)).toBe(false);
     expect(inBostonBox(0, 0)).toBe(false);
   });
@@ -28,7 +28,7 @@ describe('inBostonBox', () => {
 
 describe('pointsToFit', () => {
   it('keeps only the Boston markers when there are any', () => {
-    expect(pointsToFit([LANARK, NEW_HAVEN, SOUTHIE])).toEqual([LANARK, SOUTHIE]);
+    expect(pointsToFit([BRIGHTON, NEW_HAVEN, SOUTHIE])).toEqual([BRIGHTON, SOUTHIE]);
   });
 
   it('falls back to every marker when none is in Boston', () => {
@@ -37,7 +37,7 @@ describe('pointsToFit', () => {
   });
 
   it('ignores a marker without a usable coordinate', () => {
-    expect(pointsToFit([LANARK, { lat: Number.NaN, lng: -71 }])).toEqual([LANARK]);
+    expect(pointsToFit([BRIGHTON, { lat: Number.NaN, lng: -71 }])).toEqual([BRIGHTON]);
   });
 
   it('returns nothing for no markers', () => {
@@ -47,11 +47,11 @@ describe('pointsToFit', () => {
 
 describe('boxAround', () => {
   it('spans the extremes', () => {
-    expect(boxAround([LANARK, SOUTHIE])).toEqual({
-      north: LANARK.lat,
+    expect(boxAround([BRIGHTON, SOUTHIE])).toEqual({
+      north: BRIGHTON.lat,
       south: SOUTHIE.lat,
       east: SOUTHIE.lng,
-      west: LANARK.lng,
+      west: BRIGHTON.lng,
     });
   });
 
@@ -62,30 +62,30 @@ describe('boxAround', () => {
 
 describe('initialMapView', () => {
   it('centers on a lone marker at street zoom', () => {
-    expect(initialMapView([LANARK])).toEqual({
+    expect(initialMapView([BRIGHTON])).toEqual({
       kind: 'center',
-      center: LANARK,
+      center: BRIGHTON,
       zoom: SINGLE_MARKER_ZOOM,
-      box: { north: LANARK.lat, south: LANARK.lat, east: LANARK.lng, west: LANARK.lng },
+      box: { north: BRIGHTON.lat, south: BRIGHTON.lat, east: BRIGHTON.lng, west: BRIGHTON.lng },
     });
   });
 
   it('centers when every marker sits on the same spot', () => {
-    expect(initialMapView([LANARK, { ...LANARK }])?.kind).toBe('center');
+    expect(initialMapView([BRIGHTON, { ...BRIGHTON }])?.kind).toBe('center');
   });
 
   it('fits the Boston markers and leaves an out-of-town one out of the view', () => {
-    const view = initialMapView([LANARK, SOUTHIE, NEW_HAVEN]);
+    const view = initialMapView([BRIGHTON, SOUTHIE, NEW_HAVEN]);
     expect(view).toEqual({
       kind: 'fit',
-      box: { north: LANARK.lat, south: SOUTHIE.lat, east: SOUTHIE.lng, west: LANARK.lng },
+      box: { north: BRIGHTON.lat, south: SOUTHIE.lat, east: SOUTHIE.lng, west: BRIGHTON.lng },
       padding: FIT_PADDING_PX,
       maxZoom: MAX_FIT_ZOOM,
     });
   });
 
   it('centers on the one Boston marker even with others out of town', () => {
-    expect(initialMapView([NEW_HAVEN, LANARK])).toMatchObject({ kind: 'center', center: LANARK });
+    expect(initialMapView([NEW_HAVEN, BRIGHTON])).toMatchObject({ kind: 'center', center: BRIGHTON });
   });
 
   it('has no view without markers', () => {

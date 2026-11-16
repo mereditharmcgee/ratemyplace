@@ -11,7 +11,7 @@ import {
 import { sanitizeMultilineText } from '../validation';
 
 const goodBody = {
-  buildingId: 'bldg-lanark',
+  buildingId: 'bldg-tarnwick',
   recordKind: 'permit',
   claim: 'This permit lists the wrong applicant name for the 2023 renovation.',
   contactEmail: 'tenant@example.com',
@@ -44,7 +44,7 @@ describe('validateCorrectionBody', () => {
 
   it('accepts a panel kind with no email', () => {
     const errors = validateCorrectionBody({
-      buildingId: 'bldg-lanark',
+      buildingId: 'bldg-tarnwick',
       recordKind: 'panel',
       claim: 'The whole records panel is missing for this building entirely.',
     });

@@ -8,12 +8,13 @@
  *   - whenever Boston changes a schema on one of the eleven sources in jurisdictions.ts
  *     (a renamed/dropped column, a retired CKAN resource id, a reclassified 311 reason)
  *
- * It pulls every Boston source for one fixed fixture — 23-27 Lanark Rd, Brighton,
- * parcel 2102098000 — and checks the results against known-good values recorded
- * September 2026. A failure does not necessarily mean the adapter is broken: the city's
- * data moves (new assessment year, new enforcement case, more 311 volume). Read the
- * printed actual values and decide whether the fixture's expectations are stale or the
- * adapter regressed — do not just bump the expected numbers to make it pass.
+ * It pulls every Boston source for the records fixture, one fixed building (`RECORDS_FIXTURE`:
+ * 2262-2266 Dorchester Ave, a Boston Housing Authority building), and checks the results
+ * against the known-good values recorded there in November 2026. A failure does not
+ * necessarily mean the adapter is broken: the city's data moves (new assessment year, new
+ * enforcement case, more 311 volume). Read the printed actual values and decide whether the
+ * fixture's expectations are stale or the adapter regressed. Do not just bump the expected
+ * numbers to make it pass.
  *
  * The checks themselves live in `src/lib/records/fixture.ts`, because the scheduler's
  * daily circuit breaker runs the same ones inside a Worker. This script only prints them.
@@ -21,13 +22,13 @@
  * Usage: npm run records:check
  */
 
-import { runLanarkFixture } from '../src/lib/records/fixture';
+import { runRecordsFixture } from '../src/lib/records/fixture';
 import type { FetchLike } from '../src/lib/records/types';
 
 const fetchImpl: FetchLike = (input, init) => fetch(input, init);
 
 async function main(): Promise<void> {
-  const result = await runLanarkFixture(fetchImpl);
+  const result = await runRecordsFixture(fetchImpl);
 
   console.log(`Resolved parcelId=${result.parcelId} condominium=${result.condominium}`);
   console.log('');
@@ -43,8 +44,12 @@ async function main(): Promise<void> {
   }
   console.log('');
 
+  // A passing line prints only its note, never its whole detail: the note is what the 311 empty-file
+  // probe excused (a lowered floor, a skipped file), and the other details can carry values a
+  // passing morning has no reason to print, such as the RentSmart check's city-wide sample parcel.
   for (const c of result.checks) {
-    console.log(c.ok ? `PASS ${c.label}` : `FAIL ${c.label} — ${c.detail}`);
+    if (!c.ok) console.log(`FAIL ${c.label} — ${c.detail}`);
+    else console.log(c.note ? `PASS ${c.label} (${c.note})` : `PASS ${c.label}`);
   }
 
   // Report-only: a notice never changes the exit code, as it never pauses the fill.

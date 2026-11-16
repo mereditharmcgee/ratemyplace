@@ -180,11 +180,11 @@ export async function insertBuilding(db: TestD1Database, overrides: Partial<Buil
   // undefined into the statement, so drop those keys before the defaults are applied.
   const given = Object.fromEntries(Object.entries(overrides).filter(([, v]) => v !== undefined)) as Partial<BuildingRow>;
   const row: BuildingRow = {
-    id: 'bldg-lanark',
-    address: '23-27 Lanark Rd, Boston, MA 02135',
+    id: 'bldg-tarnwick',
+    address: '52-68 Tarnwick Pl, Boston, MA 02135',
     // Mirrors the old helper's `overrides.slug ?? id`: an override id becomes the slug too, so
     // a second building in one test does not collide on the UNIQUE column.
-    slug: given.id ?? 'bldg-lanark',
+    slug: given.id ?? 'bldg-tarnwick',
     neighborhood: null,
     city: 'Boston',
     state: 'MA',

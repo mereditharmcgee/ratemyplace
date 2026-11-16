@@ -40,32 +40,32 @@ suite('building search SQL', () => {
 
   it('puts reviewed buildings first (by review count, then score), then the rest by address', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'z', address: '9 Lanark Rd', parcel_id: '1', source: 'seed' });
-    await insertBuilding(db, { id: 'y', address: '5 Lanark Rd', parcel_id: '2', source: 'seed' });
-    await insertBuilding(db, { id: 'x', address: '7 Lanark Rd', parcel_id: '3' });
-    await insertBuilding(db, { id: 'w', address: '3 Lanark Rd', parcel_id: '4' });
+    await insertBuilding(db, { id: 'z', address: '9 Tarnwick Pl', parcel_id: '1', source: 'seed' });
+    await insertBuilding(db, { id: 'y', address: '5 Tarnwick Pl', parcel_id: '2', source: 'seed' });
+    await insertBuilding(db, { id: 'x', address: '7 Tarnwick Pl', parcel_id: '3' });
+    await insertBuilding(db, { id: 'w', address: '3 Tarnwick Pl', parcel_id: '4' });
     await review(db, 'x', 4);
     await review(db, 'w', 3, 'w-1');
     await review(db, 'w', 5, 'w-2');
-    expect((await search(db, 'lanark')).map((r) => r.slug)).toEqual(['w', 'x', 'y', 'z']);
+    expect((await search(db, 'tarnwick')).map((r) => r.slug)).toEqual(['w', 'x', 'y', 'z']);
   });
 
   it('flags city records only for Boston buildings with a parcel', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'p', address: '1 Lanark Rd', parcel_id: '1' });
-    await insertBuilding(db, { id: 'q', address: '2 Lanark Rd', parcel_id: null });
+    await insertBuilding(db, { id: 'p', address: '1 Tarnwick Pl', parcel_id: '1' });
+    await insertBuilding(db, { id: 'q', address: '2 Tarnwick Pl', parcel_id: null });
     // The city half of the flag has to agree with `jurisdictionForCity`: case-insensitive,
     // tolerant of a trailing ", MA" at any spacing, and never NULL for a row whose city is NULL.
-    await insertBuilding(db, { id: 'lower', address: '3 Lanark Rd', parcel_id: '2', city: 'boston' });
-    await insertBuilding(db, { id: 'stated', address: '4 Lanark Rd', parcel_id: '3', city: 'Boston, MA' });
-    await insertBuilding(db, { id: 'nospace', address: '7 Lanark Rd', parcel_id: '6', city: 'Boston,MA' });
-    await insertBuilding(db, { id: 'twospace', address: '8 Lanark Rd', parcel_id: '7', city: 'Boston,  MA' });
-    await insertBuilding(db, { id: 'other', address: '5 Lanark Rd', parcel_id: '4', city: 'Cambridge' });
+    await insertBuilding(db, { id: 'lower', address: '3 Tarnwick Pl', parcel_id: '2', city: 'boston' });
+    await insertBuilding(db, { id: 'stated', address: '4 Tarnwick Pl', parcel_id: '3', city: 'Boston, MA' });
+    await insertBuilding(db, { id: 'nospace', address: '7 Tarnwick Pl', parcel_id: '6', city: 'Boston,MA' });
+    await insertBuilding(db, { id: 'twospace', address: '8 Tarnwick Pl', parcel_id: '7', city: 'Boston,  MA' });
+    await insertBuilding(db, { id: 'other', address: '5 Tarnwick Pl', parcel_id: '4', city: 'Cambridge' });
     // `insertBuilding` types `city` as a string, so null it after the fact.
-    await insertBuilding(db, { id: 'nocity', address: '6 Lanark Rd', parcel_id: '5' });
+    await insertBuilding(db, { id: 'nocity', address: '6 Tarnwick Pl', parcel_id: '5' });
     await db.prepare("UPDATE buildings SET city = NULL WHERE id = 'nocity'").run();
 
-    const byslug = new Map((await search(db, 'lanark')).map((r) => [r.slug, r.has_records]));
+    const byslug = new Map((await search(db, 'tarnwick')).map((r) => [r.slug, r.has_records]));
     expect(byslug.get('p')).toBe(1);
     expect(byslug.get('q')).toBe(0);
     expect(byslug.get('lower')).toBe(1);

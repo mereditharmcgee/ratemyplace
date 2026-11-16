@@ -194,7 +194,7 @@ Approval to update §11 (asset rows and OG rules), tick the §12 OG item, and ad
 
 `isSearchVariant(new URL(...))`:
 - `/search` and `/search?` give false.
-- `/search?q=lanark`, `/search?q=` and `/search?type=landlords` give true.
+- `/search?q=tarnwick`, `/search?q=` and `/search?type=landlords` give true.
 
 **Implement:**
 
@@ -360,16 +360,16 @@ export function bostonLocalityName(value: string | null | undefined): string | n
 
 ### Step 4: distinct records-page titles (`src/lib/buildingMeta.ts`)
 
-**Edit the tests first** in `src/lib/__tests__/recordsBuildingMeta.test.ts`. The fixture `seeded` is unchanged: `23-27 Lanark Road`, Boston, `Aberdeen`, `2102396000`.
+**Edit the tests first** in `src/lib/__tests__/recordsBuildingMeta.test.ts`. The fixture `seeded` is unchanged: `52-68 Tarnwick Place`, Boston, `Aberdeen`, `2109452000`.
 
 Change these existing cases:
 - `'describes a seeded page by its city records when no review exists'` now expects:
-  - title `'23-27 Lanark Road, Brighton, Boston'`
-  - description `'City of Boston records for 23-27 Lanark Road, Brighton: assessment, permits, violations, code enforcement, and 311 requests. No tenant reviews yet.'`
-- `'reads the city the way the rest of the records code does'` now expects `'23-27 Lanark Road, Brighton, Boston'` for both `city:'boston'` and `city:'Boston, MA'`.
+  - title `'52-68 Tarnwick Place, Brighton, Boston'`
+  - description `'City of Boston records for 52-68 Tarnwick Place, Brighton: assessment, permits, violations, code enforcement, and 311 requests. No tenant reviews yet.'`
+- `'reads the city the way the rest of the records code does'` now expects `'52-68 Tarnwick Place, Brighton, Boston'` for both `city:'boston'` and `city:'Boston, MA'`.
 
 Keep these unchanged:
-- review metadata once a review exists (`'Reviews for 23-27 Lanark Road in Brighton'`)
+- review metadata once a review exists (`'Reviews for 52-68 Tarnwick Place in Brighton'`)
 - no parcel, and New Haven
 - `'12 Elm St, Boston'` with `neighborhood:null`
 
@@ -932,7 +932,7 @@ Do not tick SEO-06, which also covers the sitemap.
    - Expected on main: titles `{groups:292, urls:711, differentAddressOrZip:177}`.
    - Expected after this branch: titles `{groups:≈120, urls:≈358, differentAddressOrZip:0}`, max length 70; descriptions the same counts (or 0 groups with Step 4b), max length 168; `place named twice 0`.
    - Small drift is fine as the city-wide fill adds rows. **`differentAddressOrZip` must be 0.**
-4. Run `/qa`. Pay particular attention to building pages: seeded with no review, reviewed (`/building/27-lanark-road-boston`), New Haven, and an unknown slug that rewrites to the 404.
+4. Run `/qa`. Pay particular attention to building pages: seeded with no review, a reviewed Boston building page (pick one from /search), New Haven, and an unknown slug that rewrites to the 404.
 
 ## 6. Preview and production checks
 
@@ -965,7 +965,7 @@ Do not tick SEO-06, which also covers the sitemap.
    | `/` | title `Know before you sign. \| RateMyPlace`; canonical and `og:url` `https://ratemyplace.org/`; absolute `og:image`; `twitter:card` `summary_large_image` |
    | `/about/` | canonical `https://ratemyplace.org/about` |
    | `/search` | canonical; no robots |
-   | `/search?q=lanark` | robots `noindex, follow`; no canonical; no `og:url` |
+   | `/search?q=tarnwick` | robots `noindex, follow`; no canonical; no `og:url` |
    | `/auth/signin` | noindex; no canonical |
    | `/no-such-page` | status 404, with noindex |
    | `/building/6-prescott-street-boston` | `6 Prescott Street, East Boston \| RateMyPlace` |
@@ -973,7 +973,7 @@ Do not tick SEO-06, which also covers the sitemap.
    | `/building/14-16-derne-street-boston` | `14-16 Derne Street, Boston \| RateMyPlace` |
    | `/building/850-dorchester-avenue-boston` | `850 Dorchester Avenue, Dorchester, Boston \| RateMyPlace` |
    | `/building/1715-commonwealth-avenue-boston` | `1715 Commonwealth Avenue, Boston \| RateMyPlace` |
-   | `/building/27-lanark-road-boston` | **unchanged**: `27 Lanark Road \| RateMyPlace` |
+   | a reviewed Boston building page (pick one from /search) | **unchanged**: its review title, `<address> \| RateMyPlace` |
    | `/building/282-lexington-street-boston` and `-2` | the same title, by design |
 
 5. `curl -s https://ratemyplace-64y.pages.dev/about | grep canonical` gives `https://ratemyplace.org/about`. This is informational only: that host serves `Disallow: /`, so SAFE-10 is still the real fix.

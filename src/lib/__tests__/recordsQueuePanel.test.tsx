@@ -35,8 +35,8 @@ const PARKED_ROW: RecordsQueueParkedRow = {
   last_error: LONG_ERROR,
   requested_at: NOW - 3 * 3600 - 60,
   locked_at: null,
-  address: '23-27 Lanark Rd, Boston, MA 02135',
-  slug: '23-27-lanark-rd',
+  address: '52-68 Tarnwick Pl, Boston, MA 02135',
+  slug: '52-68-tarnwick-pl',
 };
 
 /** Parked at its third claim, with that pull still holding the lease. */
@@ -79,7 +79,7 @@ function cellOf(container: HTMLElement, address: string, column: string): HTMLEl
   return rowFor(container, address).querySelectorAll('td')[index] as HTMLElement;
 }
 
-const LANARK = '23-27 Lanark Rd, Boston, MA 02135';
+const ADDRESS = '52-68 Tarnwick Pl, Boston, MA 02135';
 const RUNNING = '1 Running St, Boston, MA 02135';
 
 describe('RecordsQueuePanel', () => {
@@ -271,18 +271,18 @@ describe('RecordsQueuePanel', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const { container, getByText } = render(<RecordsQueuePanel />);
-    await waitFor(() => expect(container.textContent).toContain('23-27 Lanark Rd, Boston, MA 02135'));
+    await waitFor(() => expect(container.textContent).toContain('52-68 Tarnwick Pl, Boston, MA 02135'));
 
-    expect(container.querySelector('a[href="/building/23-27-lanark-rd"]')).toBeTruthy();
+    expect(container.querySelector('a[href="/building/52-68-tarnwick-pl"]')).toBeTruthy();
 
-    const errorCell = cellOf(container, LANARK, 'Last error').querySelector('[title]') as HTMLElement | null;
+    const errorCell = cellOf(container, ADDRESS, 'Last error').querySelector('[title]') as HTMLElement | null;
     expect(errorCell?.getAttribute('title')).toBe(LONG_ERROR);
     expect((errorCell?.textContent ?? '').length).toBeLessThanOrEqual(120);
     expect(errorCell?.textContent).not.toBe(LONG_ERROR);
 
     // "3 h" answers the question an admin actually has — how far behind is this row? — where
     // a bare date only answers it for rows parked days ago.
-    expect(cellOf(container, LANARK, 'Requested').textContent?.trim()).toBe('3 h');
+    expect(cellOf(container, ADDRESS, 'Requested').textContent?.trim()).toBe('3 h');
 
     const callsBefore = fetchMock.mock.calls.length;
     fireEvent.click(getByText('Retry'));
@@ -310,9 +310,9 @@ describe('RecordsQueuePanel', () => {
     );
 
     const { container } = render(<RecordsQueuePanel />);
-    await waitFor(() => expect(container.textContent).toContain(LANARK));
+    await waitFor(() => expect(container.textContent).toContain(ADDRESS));
 
-    const cell = cellOf(container, LANARK, 'Last error').querySelector('[title]') as HTMLElement;
+    const cell = cellOf(container, ADDRESS, 'Last error').querySelector('[title]') as HTMLElement;
     expect(cell.textContent).toBe(`${'x'.repeat(118)}…`);
     expect(cell.textContent).not.toMatch(/[\uD800-\uDBFF]/);
     // The full text is still one `title` away, surrogate pair intact.
@@ -347,10 +347,10 @@ describe('RecordsQueuePanel', () => {
     expect(fetchMock.mock.calls.length).toBe(callsBefore);
 
     // A row with no lease at all is retryable, and so the button stays live.
-    const parked = retryButton(container, LANARK);
+    const parked = retryButton(container, ADDRESS);
     expect(parked.disabled).toBe(false);
     expect(parked.getAttribute('aria-disabled')).toBe('false');
-    expect(rowFor(container, LANARK).textContent).not.toContain('running');
+    expect(rowFor(container, ADDRESS).textContent).not.toContain('running');
   });
 
   it('names the row being retried in the button label while the POST is in flight', async () => {
@@ -365,17 +365,17 @@ describe('RecordsQueuePanel', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const { container } = render(<RecordsQueuePanel />);
-    await waitFor(() => expect(container.textContent).toContain(LANARK));
-    expect(retryButton(container, LANARK).getAttribute('aria-label')).toBe('Retry ' + LANARK);
+    await waitFor(() => expect(container.textContent).toContain(ADDRESS));
+    expect(retryButton(container, ADDRESS).getAttribute('aria-label')).toBe('Retry ' + ADDRESS);
 
-    fireEvent.click(retryButton(container, LANARK));
+    fireEvent.click(retryButton(container, ADDRESS));
 
     // A screen reader told "Retry" while that row is already retrying has been told the
     // wrong thing; the visible label changes, so the accessible one has to change with it.
-    await waitFor(() => expect(retryButton(container, LANARK).getAttribute('aria-label')).toBe('Retrying ' + LANARK));
+    await waitFor(() => expect(retryButton(container, ADDRESS).getAttribute('aria-label')).toBe('Retrying ' + ADDRESS));
 
     release(jsonResponse({ data: { stats: RUNNING_STATS } }));
-    await waitFor(() => expect(retryButton(container, LANARK).getAttribute('aria-label')).toBe('Retry ' + LANARK));
+    await waitFor(() => expect(retryButton(container, ADDRESS).getAttribute('aria-label')).toBe('Retry ' + ADDRESS));
   });
 
   it('offers Retry again once the lease has expired', async () => {
@@ -401,7 +401,7 @@ describe('RecordsQueuePanel', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const { container, getByText } = render(<RecordsQueuePanel />);
-    await waitFor(() => expect(container.textContent).toContain('23-27 Lanark Rd, Boston, MA 02135'));
+    await waitFor(() => expect(container.textContent).toContain('52-68 Tarnwick Pl, Boston, MA 02135'));
 
     fireEvent.click(getByText('Retry'));
 
@@ -421,7 +421,7 @@ describe('RecordsQueuePanel', () => {
     vi.stubGlobal('fetch', gone);
 
     const first = render(<RecordsQueuePanel />);
-    await waitFor(() => expect(first.container.textContent).toContain('23-27 Lanark Rd, Boston, MA 02135'));
+    await waitFor(() => expect(first.container.textContent).toContain('52-68 Tarnwick Pl, Boston, MA 02135'));
     fireEvent.click(first.getByText('Retry'));
     await waitFor(() => expect(first.container.textContent).toContain('That row is no longer in the queue'));
 
@@ -439,7 +439,7 @@ describe('RecordsQueuePanel', () => {
     vi.stubGlobal('fetch', unsupported);
 
     const second = render(<RecordsQueuePanel />);
-    await waitFor(() => expect(second.container.textContent).toContain('23-27 Lanark Rd, Boston, MA 02135'));
+    await waitFor(() => expect(second.container.textContent).toContain('52-68 Tarnwick Pl, Boston, MA 02135'));
     fireEvent.click(second.getByText('Retry'));
     await waitFor(() => expect(second.container.textContent).toContain('Could not retry that row'));
   });
@@ -571,7 +571,7 @@ describe('RecordsQueuePanel', () => {
     // truth: the numbers stay, and the banner says they are the last good ones.
     expect(statValue(container, 'Button')).toBe('2');
     expect(statValue(container, 'Parked')).toBe('1');
-    expect(container.textContent).toContain(LANARK);
+    expect(container.textContent).toContain(ADDRESS);
     expect(container.textContent).toContain("Couldn't refresh the queue; showing the last good numbers");
     expect(container.textContent).not.toContain('Could not load the queue');
 

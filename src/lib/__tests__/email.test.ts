@@ -370,7 +370,7 @@ describe('cross-template guarantees', () => {
       () => sendReviewRejectedEmail('k', 'https://r.org', 'r@e.com', 'A', null),
       () => sendContactConfirmationEmail('k', 'u@e.com', 'X', 'general'),
       () => sendOwnerNoticeEmail('k', 'o@e.com', {
-        kind: 'dispute', buildingAddress: 'Y', receivedAt: 1784338200, adminUrl: 'https://r.org/admin/disputes',
+        kind: 'dispute', buildingAddress: 'Y', receivedAt: 1779586200, adminUrl: 'https://r.org/admin/disputes',
       }),
     ];
 
@@ -393,7 +393,7 @@ describe('cross-template guarantees', () => {
       () => sendReviewRejectedEmail('k', 'https://r.org', 'r@e.com', 'A', null),
       () => sendContactConfirmationEmail('k', 'u@e.com', 'X', 'general'),
       () => sendOwnerNoticeEmail('k', 'o@e.com', {
-        kind: 'bug_report', buildingAddress: null, receivedAt: 1784338200, adminUrl: 'https://r.org/admin/bug-reports',
+        kind: 'bug_report', buildingAddress: null, receivedAt: 1779586200, adminUrl: 'https://r.org/admin/bug-reports',
       }),
     ];
 
@@ -484,27 +484,27 @@ describe('sendOwnerNoticeEmail', () => {
     const adminUrl = `https://ratemyplace.org/admin/${kind}?status=pending`;
     const result = await sendOwnerNoticeEmail('k', 'owner@example.org', {
       kind,
-      buildingAddress: '23-27 Lanark Rd, Boston, MA 02135',
-      receivedAt: 1784338200,
+      buildingAddress: '52-68 Tarnwick Pl, Boston, MA 02135',
+      receivedAt: 1779586200,
       adminUrl,
     });
     expect(result.success).toBe(true);
     const args = mockSend.mock.calls[0][0];
     expect(args.from).toBe('RateMyPlace Boston <noreply@ratemyplace.org>');
     expect(args.to).toBe('owner@example.org');
-    expect(args.subject).toBe(`${SUBJECTS[kind]} (Jul 17, 2026, 9:30 PM ET)`);
+    expect(args.subject).toBe(`${SUBJECTS[kind]} (May 23, 2026, 9:30 PM ET)`);
     expect(args.subject).not.toContain('@');
     // A system URL: interpolated raw, so its query string is not &amp;-mangled.
     expect(args.html).toContain(`href="${adminUrl}"`);
-    expect(args.html).toContain('Received: Jul 17, 2026, 9:30 PM ET');
+    expect(args.html).toContain('Received: May 23, 2026, 9:30 PM ET');
     expect(args.html).toContain('Building:');
-    expect(args.html).toContain('23-27 Lanark Rd, Boston, MA 02135');
+    expect(args.html).toContain('52-68 Tarnwick Pl, Boston, MA 02135');
     expect(args.html).toContain('This is an automated admin notification from RateMyPlace Boston.');
   });
 
   it('a missing key reports not_configured without touching Resend', async () => {
     const result = await sendOwnerNoticeEmail('', 'owner@example.org', {
-      kind: 'bug_report', buildingAddress: null, receivedAt: 1784338200, adminUrl: 'https://ratemyplace.org/admin/bug-reports',
+      kind: 'bug_report', buildingAddress: null, receivedAt: 1779586200, adminUrl: 'https://ratemyplace.org/admin/bug-reports',
     });
     expect(result).toEqual({ success: false, error: 'Email service not configured', reason: 'not_configured' });
     expect(mockSend).not.toHaveBeenCalled();
@@ -514,7 +514,7 @@ describe('sendOwnerNoticeEmail', () => {
     await sendOwnerNoticeEmail('k', 'owner@example.org', {
       kind: 'review_submitted',
       buildingAddress: '<img src=x onerror=alert(1)> 1 Main St',
-      receivedAt: 1784338200,
+      receivedAt: 1779586200,
       adminUrl: 'https://ratemyplace.org/admin/reviews?status=pending',
     });
     const html: string = mockSend.mock.calls[0][0].html;
@@ -524,14 +524,14 @@ describe('sendOwnerNoticeEmail', () => {
 
   it('omits the Building line when there is no address', async () => {
     await sendOwnerNoticeEmail('k', 'owner@example.org', {
-      kind: 'bug_report', buildingAddress: null, receivedAt: 1784338200, adminUrl: 'https://ratemyplace.org/admin/bug-reports',
+      kind: 'bug_report', buildingAddress: null, receivedAt: 1779586200, adminUrl: 'https://ratemyplace.org/admin/bug-reports',
     });
     expect(mockSend.mock.calls[0][0].html).not.toContain('Building:');
   });
 
   it('cuts a long address to the maximum plus an ellipsis', async () => {
     await sendOwnerNoticeEmail('k', 'owner@example.org', {
-      kind: 'dispute', buildingAddress: 'A'.repeat(300), receivedAt: 1784338200, adminUrl: 'https://ratemyplace.org/admin/disputes',
+      kind: 'dispute', buildingAddress: 'A'.repeat(300), receivedAt: 1779586200, adminUrl: 'https://ratemyplace.org/admin/disputes',
     });
     const html: string = mockSend.mock.calls[0][0].html;
     expect(OWNER_NOTICE_MAX_ADDRESS).toBe(200);

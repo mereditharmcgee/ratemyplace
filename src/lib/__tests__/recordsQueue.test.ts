@@ -163,7 +163,7 @@ describe('claimBatch', () => {
     await insertBuilding(db, {
       id: 'b2',
       slug: 'b2',
-      address: '23-27 Lanark Rd, Boston, MA 02135',
+      address: '52-68 Tarnwick Pl, Boston, MA 02135',
       city: 'Boston',
       state: 'MA',
       zip_code: '02135',
@@ -180,14 +180,14 @@ describe('claimBatch', () => {
     expect(claimed.map((r) => r.reason)).toEqual(['follower', 'button', 'refresh']);
     expect(claimed[1].building).toEqual({
       id: 'b2',
-      address: '23-27 Lanark Rd, Boston, MA 02135',
+      address: '52-68 Tarnwick Pl, Boston, MA 02135',
       city: 'Boston',
       state: 'MA',
       zip_code: '02135',
       parcel_id: '2201234000',
       sam_id: '123456',
     });
-    expect(buildIdentity(claimed[1].building).streetShort).toBe('LANARK RD');
+    expect(buildIdentity(claimed[1].building).streetShort).toBe('TARNWICK PL');
     const rows = await queueRows(db);
     expect(rows.filter((r) => r.locked_at !== null)).toHaveLength(3);
   });
