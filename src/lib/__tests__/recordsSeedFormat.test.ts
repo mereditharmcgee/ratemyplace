@@ -4,7 +4,7 @@ import { buildingTypeFor, formatSeedAddress, seedSlug, titleCaseNeighborhood } f
 
 describe('formatSeedAddress', () => {
   it('spells the suffix out and title-cases the street', () => {
-    expect(formatSeedAddress('23', '27', 'Lanark RD')).toBe('23-27 Lanark Road');
+    expect(formatSeedAddress('52', '68', 'Tarnwick PL')).toBe('52-68 Tarnwick Place');
     expect(formatSeedAddress('1027', null, 'COMMONWEALTH AV')).toBe('1027 Commonwealth Avenue');
     expect(formatSeedAddress('432', null, 'Chelsea ST')).toBe('432 Chelsea Street');
   });
@@ -31,13 +31,13 @@ describe('formatSeedAddress', () => {
   });
 
   it('returns null for the assessor 0, which marks an unnumbered rear lot', () => {
-    expect(formatSeedAddress('0', null, 'Lanark RD')).toBeNull();
-    expect(formatSeedAddress('00', null, 'Lanark RD')).toBeNull();
-    expect(formatSeedAddress(0, null, 'Lanark RD')).toBeNull();
+    expect(formatSeedAddress('0', null, 'Tarnwick PL')).toBeNull();
+    expect(formatSeedAddress('00', null, 'Tarnwick PL')).toBeNull();
+    expect(formatSeedAddress(0, null, 'Tarnwick PL')).toBeNull();
   });
 
   it('renders a reversed or zero-padded range low to high, numerically', () => {
-    expect(formatSeedAddress('27', '23', 'Lanark RD')).toBe('23-27 Lanark Road');
+    expect(formatSeedAddress('68', '52', 'Tarnwick PL')).toBe('52-68 Tarnwick Place');
     expect(formatSeedAddress('5', '05', 'Park ST')).toBe('5 Park Street');
     expect(formatSeedAddress('05', null, 'Park ST')).toBe('5 Park Street');
   });
@@ -52,8 +52,8 @@ describe('formatSeedAddress', () => {
   });
 
   it('renders a comma tail as a parenthesized suffix so a rear lot is not a visible twin', () => {
-    expect(formatSeedAddress('23', null, 'LANARK RD, REAR')).toBe('23 Lanark Road (Rear)');
-    expect(formatSeedAddress('23', '27', 'Lanark RD, rear')).toBe('23-27 Lanark Road (Rear)');
+    expect(formatSeedAddress('52', null, 'TARNWICK PL, REAR')).toBe('52 Tarnwick Place (Rear)');
+    expect(formatSeedAddress('52', '68', 'Tarnwick PL, rear')).toBe('52-68 Tarnwick Place (Rear)');
   });
 });
 
@@ -83,7 +83,7 @@ describe('formatSeedAddress on the assessor suffixes added in October 2026', () 
 
 describe('seedSlug', () => {
   it('follows the existing address-city convention', () => {
-    expect(seedSlug('23-27 Lanark Road', new Set())).toBe('23-27-lanark-road-boston');
+    expect(seedSlug('52-68 Tarnwick Place', new Set())).toBe('52-68-tarnwick-place-boston');
   });
   it('suffixes on collision and records the slug it took', () => {
     const taken = new Set(['5-park-street-boston']);

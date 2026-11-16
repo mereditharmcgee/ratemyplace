@@ -32,8 +32,8 @@ describe('humanize', () => {
 
 describe('formatEasternDateTime', () => {
   it('renders an EDT evening in Boston time with an ET suffix', () => {
-    // 2026-07-18T01:30Z is the evening before in Boston.
-    expect(formatEasternDateTime(1784338200)).toBe('Jul 17, 2026, 9:30 PM ET');
+    // 2026-05-24T01:30Z is the evening before in Boston.
+    expect(formatEasternDateTime(1779586200)).toBe('May 23, 2026, 9:30 PM ET');
   });
 
   it('renders an EST afternoon', () => {
@@ -47,7 +47,7 @@ describe('formatEasternDateTime', () => {
   });
 
   it('is plain printable ASCII, so it is safe in a subject line (no U+202F or U+00A0)', () => {
-    for (const t of [1784338200, 1768496700]) {
+    for (const t of [1779586200, 1768496700]) {
       expect(formatEasternDateTime(t)).toMatch(/^[ -~]+$/);
     }
   });

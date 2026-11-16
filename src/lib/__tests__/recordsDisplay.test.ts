@@ -101,29 +101,29 @@ describe('showMailingAddress', () => {
   });
 
   it('returns true for an LLC owner', () => {
-    expect(showMailingAddress('LANARK ROAD LLC MASS LLC')).toBe(true);
+    expect(showMailingAddress('WRENFIELD REALTY LLC')).toBe(true);
   });
 
   it('returns true for a limited partnership owner', () => {
-    expect(showMailingAddress('KELLEHER FAMILY LP MASS LP')).toBe(true);
+    expect(showMailingAddress('QUARROW FAMILY LP MASS LP')).toBe(true);
   });
 
   it('returns true for a condo trust owner spelled with a bare TR suffix', () => {
-    expect(showMailingAddress('GRAND LANARK CONDO TR')).toBe(true);
+    expect(showMailingAddress('WYNSTABLE CONDO TR')).toBe(true);
   });
 
   it('returns true for a realty trust owner', () => {
-    expect(showMailingAddress('LANARK ROAD REALTY TRUST')).toBe(true);
+    expect(showMailingAddress('TARNWICK PLACE REALTY TRUST')).toBe(true);
   });
 
   it('returns false for an individual owner', () => {
-    expect(showMailingAddress('PASCUCCI CARLO')).toBe(false);
+    expect(showMailingAddress('BRAMMOCK ELLIS')).toBe(false);
   });
 
   // Periods are replaced with spaces before matching, so the punctuated corporate forms have
   // to be listed in their spaced shape. The escaped `L\.L\.C` they replaced never matched.
   it('returns true for a punctuated LLC', () => {
-    expect(showMailingAddress('LANARK L.L.C.')).toBe(true);
+    expect(showMailingAddress('TARNWICK L.L.C.')).toBe(true);
   });
 
   it('returns true for a punctuated limited partnership', () => {
@@ -140,7 +140,7 @@ describe('showMailingAddress', () => {
   );
 
   // The same suffix alongside something that names a trust does clear the gate.
-  it.each(['SMITH FAMILY TR', 'GRAND LANARK CONDO TR', 'LANARK NOMINEE TRSTEE', '17 LANARK REALTY TR'])(
+  it.each(['SMITH FAMILY TR', 'WYNSTABLE CONDO TR', 'TARNWICK NOMINEE TRSTEE', '17 TARNWICK REALTY TR'])(
     'returns true for %s, where the trustee suffix accompanies a named trust',
     (owner) => {
       expect(showMailingAddress(owner)).toBe(true);
@@ -157,8 +157,8 @@ describe('showMailingAddress', () => {
   );
 
   it('still returns true for the company and corporation spellings', () => {
-    expect(showMailingAddress('CLAIR MANAGEMENT COMPANY INC')).toBe(true);
-    expect(showMailingAddress('LANARK CORP')).toBe(true);
+    expect(showMailingAddress('QUILLBY MANAGEMENT COMPANY INC')).toBe(true);
+    expect(showMailingAddress('TARNWICK CORP')).toBe(true);
   });
 
   // The privacy failure this gate exists to prevent: a substring test for entity tokens
@@ -174,7 +174,7 @@ describe('showMailingAddress', () => {
 
 describe('formatDollars', () => {
   it('formats a dollar amount with thousands separators', () => {
-    expect(formatDollars(6720200)).toBe('$6,720,200');
+    expect(formatDollars(4520600)).toBe('$4,520,600');
   });
 
   it('returns "Not recorded" for null', () => {
@@ -189,15 +189,15 @@ describe('formatDollars', () => {
 
 describe('formatRecordDate', () => {
   it('formats a "YYYY-MM-DD HH:MM:SS" timestamp', () => {
-    expect(formatRecordDate('2008-08-30 09:42:00')).toBe('Aug 30, 2008');
+    expect(formatRecordDate('2015-07-23 10:27:00')).toBe('Jul 23, 2015');
   });
 
   it('formats an ISO "T"-separated timestamp', () => {
-    expect(formatRecordDate('2021-01-28T16:29:26')).toBe('Jan 28, 2021');
+    expect(formatRecordDate('2022-12-05T11:24:37')).toBe('Dec 5, 2022');
   });
 
   it('formats a timestamp with a UTC offset suffix', () => {
-    expect(formatRecordDate('2026-07-17 13:56:00+00')).toBe('Jul 17, 2026');
+    expect(formatRecordDate('2025-06-30 13:52:00+00')).toBe('Jun 30, 2025');
   });
 
   it('returns "Date not recorded" for null', () => {
@@ -211,15 +211,15 @@ describe('formatRecordDate', () => {
 
 describe('formatPullDate', () => {
   it('formats a unix timestamp the same way record dates read', () => {
-    // 2026-07-17T12:00:00Z, mid-morning in Boston: same calendar day either way.
-    expect(formatPullDate(1784289600)).toBe('Jul 17, 2026');
+    // 2026-05-23T12:00:00Z, mid-morning in Boston: same calendar day either way.
+    expect(formatPullDate(1779537600)).toBe('May 23, 2026');
   });
 
   // The reason this does not reuse formatRecordDate's UTC-free path: a pull is a real instant,
   // and an evening pull in Boston is already the next day in UTC.
   it('reports a late-evening Boston pull as that Boston day, not the UTC day', () => {
-    // 2026-07-18T01:30:00Z is 2026-07-17 21:30 in America/New_York.
-    expect(formatPullDate(1784338200)).toBe('Jul 17, 2026');
+    // 2026-05-24T01:30:00Z is 2026-05-23 21:30 in America/New_York.
+    expect(formatPullDate(1779586200)).toBe('May 23, 2026');
   });
 
   it('returns "Date not recorded" for a non-finite timestamp', () => {
@@ -231,7 +231,7 @@ describe('mailingAddressLine', () => {
   it('drops an individual addressee under an entity owner, keeping the address itself', () => {
     const line = mailingAddressLine(
       assessment({
-        owner: '17 LANARK RD REALTY TRUST',
+        owner: '17 TARNWICK PL REALTY TRUST',
         mailAddressee: 'SMITH JOHN',
         mailStreet: 'PO BOX 1',
         mailCity: 'BRIGHTON',
@@ -247,8 +247,8 @@ describe('mailingAddressLine', () => {
   it('drops a C/O line that names a person', () => {
     const line = mailingAddressLine(
       assessment({
-        owner: '17 LANARK RD REALTY TRUST',
-        mailAddressee: 'C/O ATT DENNIS CLAIR',
+        owner: '17 TARNWICK PL REALTY TRUST',
+        mailAddressee: 'C/O JORDAN QUILLBY',
         mailStreet: 'PO BOX 1',
       }),
     );
@@ -259,13 +259,13 @@ describe('mailingAddressLine', () => {
   it('keeps an addressee that is itself an entity', () => {
     const line = mailingAddressLine(
       assessment({
-        owner: '17 LANARK RD REALTY TRUST',
-        mailAddressee: 'CLAIR MANAGEMENT COMPANY INC',
+        owner: '17 TARNWICK PL REALTY TRUST',
+        mailAddressee: 'QUILLBY MANAGEMENT COMPANY INC',
         mailStreet: 'PO BOX 1',
       }),
     );
 
-    expect(line).toBe('CLAIR MANAGEMENT COMPANY INC, PO BOX 1');
+    expect(line).toBe('QUILLBY MANAGEMENT COMPANY INC, PO BOX 1');
   });
 
   it('returns "Not recorded" when the assessor recorded no mailing address at all', () => {
@@ -582,14 +582,14 @@ describe('still-open wording', () => {
 
   it('labels an open case with the year it was filed, in each date shape the feeds use', () => {
     expect(stillOpenLabel('2013-04-02 09:30:00')).toBe('Still open in city records, filed 2013');
-    expect(stillOpenLabel('2021-01-28T16:29:26')).toBe('Still open in city records, filed 2021');
-    expect(stillOpenLabel('2026-08-01 10:00:00+00')).toBe('Still open in city records, filed 2026');
+    expect(stillOpenLabel('2022-12-05T11:24:37')).toBe('Still open in city records, filed 2022');
+    expect(stillOpenLabel('2026-03-31 14:25:00+00')).toBe('Still open in city records, filed 2026');
   });
 
   it('never prints anything more precise than the year', () => {
-    const label = stillOpenLabel('2016-09-14 07:12:00');
+    const label = stillOpenLabel('2016-03-08 07:12:00');
     expect(label).toBe('Still open in city records, filed 2016');
-    expect(label).not.toMatch(/Sep|14|07:12/);
+    expect(label).not.toMatch(/Mar|08|07:12/);
   });
 
   it('leaves the year off rather than guessing one when the filing date is missing or unreadable', () => {

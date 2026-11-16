@@ -1,18 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { buildIdentity, toCanonicalParcel, toNumericParcel } from '../records/identity';
 
-const base = { id: 'b1', address: '23-27 Lanark Rd, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: null, sam_id: null };
+const base = { id: 'b1', address: '52-68 Tarnwick Pl, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: null, sam_id: null };
 
 describe('buildIdentity', () => {
   it('splits a ranged address into numbers, keeps the range, and normalizes the suffix', () => {
     const id = buildIdentity(base);
-    expect(id.numbers).toEqual(['23', '27']);
-    expect(id.rangeForm).toBe('23-27');
-    expect(id.streetShort).toBe('LANARK RD');
-    expect(id.streetLong).toBe('LANARK ROAD');
-    expect(id.streetBase).toBe('LANARK');
-    expect(id.addressFormsShort).toEqual(['23 LANARK RD', '27 LANARK RD', '23-27 LANARK RD']);
-    expect(id.addressFormsLong).toEqual(['23 LANARK ROAD', '27 LANARK ROAD', '23-27 LANARK ROAD']);
+    expect(id.numbers).toEqual(['52', '68']);
+    expect(id.rangeForm).toBe('52-68');
+    expect(id.streetShort).toBe('TARNWICK PL');
+    expect(id.streetLong).toBe('TARNWICK PLACE');
+    expect(id.streetBase).toBe('TARNWICK');
+    expect(id.addressFormsShort).toEqual(['52 TARNWICK PL', '68 TARNWICK PL', '52-68 TARNWICK PL']);
+    expect(id.addressFormsLong).toEqual(['52 TARNWICK PLACE', '68 TARNWICK PLACE', '52-68 TARNWICK PLACE']);
     expect(id.zip).toBe('02135');
     expect(id.parcelId).toBeNull();
     expect(id.condominium).toBe(false);
@@ -44,14 +44,14 @@ describe('buildIdentity', () => {
   });
 
   it('throws on an address it cannot parse', () => {
-    expect(() => buildIdentity({ ...base, address: 'Lanark Road' })).toThrow(/parse/i);
+    expect(() => buildIdentity({ ...base, address: 'Tarnwick Place' })).toThrow(/parse/i);
   });
 
   it('keeps the unit letter in lettered ranges and does not duplicate numbers', () => {
-    const id = buildIdentity({ ...base, address: '100-100A Lanark Rd, Boston, MA' });
+    const id = buildIdentity({ ...base, address: '100-100A Tarnwick Pl, Boston, MA' });
     expect(id.numbers).toEqual(['100', '100A']);
     expect(id.rangeForm).toBe('100-100A');
-    expect(id.addressFormsShort).toEqual(['100 LANARK RD', '100A LANARK RD', '100-100A LANARK RD']);
+    expect(id.addressFormsShort).toEqual(['100 TARNWICK PL', '100A TARNWICK PL', '100-100A TARNWICK PL']);
     const single = buildIdentity({ ...base, address: '12A Main St, Boston, MA' });
     expect(single.numbers).toEqual(['12A', '12']);
     expect(single.rangeForm).toBeNull();
@@ -112,8 +112,8 @@ describe('buildIdentity', () => {
   });
 
   it('throws on a spaced range the number parser cannot take whole', () => {
-    // parseStreetAddress keeps only "23", leaving "- 27 Lanark" as the street base.
-    expect(() => buildIdentity({ ...base, address: '23 - 27 Lanark Rd' })).toThrow(/degenerate/i);
+    // parseStreetAddress keeps only "52", leaving "- 68 Tarnwick" as the street base.
+    expect(() => buildIdentity({ ...base, address: '52 - 68 Tarnwick Pl' })).toThrow(/degenerate/i);
   });
 
   it('strips a comma-less trailing locality, so both forms of one address agree', () => {
@@ -174,7 +174,7 @@ describe('buildIdentity on the assessor suffixes added in October 2026', () => {
 describe('parcel helpers', () => {
   it('canonical form keeps ten digits with a leading zero; numeric strips it', () => {
     expect(toCanonicalParcel('100001000')).toBe('0100001000');
-    expect(toCanonicalParcel('2102098000')).toBe('2102098000');
+    expect(toCanonicalParcel('2109417000')).toBe('2109417000');
     expect(toNumericParcel('0100001000')).toBe('100001000');
     expect(toCanonicalParcel('12ab')).toBeNull();
   });

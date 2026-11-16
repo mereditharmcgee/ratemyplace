@@ -5,17 +5,17 @@ import { enforcementSource, ENFORCEMENT_RESOURCE_ID } from '../records/sources/b
 import { violationsSource, VIOLATIONS_RESOURCE_ID } from '../records/sources/boston/violations';
 import type { EnforcementTicketPayload, ViolationPayload } from '../records/types';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
-import lanarkRows from './helpers/records/enforcement-lanark.json';
+import tarnwickRows from './helpers/records/enforcement-tarnwick.json';
 
-const lanark = buildIdentity({
-  id: 'b1', address: '23-27 Lanark Rd, Boston, MA', city: 'Boston', state: 'MA',
-  zip_code: '02135', parcel_id: null, sam_id: '83763',
+const tarnwick = buildIdentity({
+  id: 'b1', address: '52-68 Tarnwick Pl, Boston, MA', city: 'Boston', state: 'MA',
+  zip_code: '02135', parcel_id: null, sam_id: '58344',
 });
 
 describe('violationFeeds helpers', () => {
   it('bareStreetName strips a leading directional when a word follows', () => {
     expect(bareStreetName({ streetBase: 'W NEWTON' })).toBe('NEWTON');
-    expect(bareStreetName({ streetBase: 'LANARK' })).toBe('LANARK');
+    expect(bareStreetName({ streetBase: 'TARNWICK' })).toBe('TARNWICK');
     expect(bareStreetName({ streetBase: 'NORTH' })).toBe('NORTH');
   });
 
@@ -36,45 +36,51 @@ describe('violationFeeds helpers', () => {
 });
 
 describe('enforcementSource', () => {
-  it('builds the exact query shape for the Lanark identity', async () => {
-    const fetchImpl = fixtureFetch([{ resourceId: ENFORCEMENT_RESOURCE_ID, records: lanarkRows }]);
-    const result = await enforcementSource.run(lanark, fetchImpl);
-    expect(result.query).toContain(`upper("violation_street") = 'LANARK'`);
-    expect(result.query).toContain(`"violation_stno" IN ('23','25','27')`);
-    expect(result.query).toContain(`"violation_sthigh" IN ('23','25','27')`);
-    expect(result.query).toContain(`upper("violation_suffix") IN ('RD','ROAD')`);
+  it('builds the exact query shape for the practice identity', async () => {
+    const fetchImpl = fixtureFetch([{ resourceId: ENFORCEMENT_RESOURCE_ID, records: tarnwickRows }]);
+    const result = await enforcementSource.run(tarnwick, fetchImpl);
+    expect(result.query).toContain(`upper("violation_street") = 'TARNWICK'`);
+    expect(result.query).toContain(`"violation_stno" IN ('52','54','56','58','60','62','64','66','68')`);
+    expect(result.query).toContain(`"violation_sthigh" IN ('52','54','56','58','60','62','64','66','68')`);
+    expect(result.query).toContain(`upper("violation_suffix") IN ('PL','PLACE')`);
     expect(result.query).toContain(`("violation_zip" IS NULL OR "violation_zip" = '' OR "violation_zip" = '02135')`);
     expect(result.query).toContain(`ORDER BY "status_dttm" DESC NULLS LAST, "case_no", "code", "_id" LIMIT 500`);
-    expect(result.query).not.toContain('23-27');
+    expect(result.query).not.toContain('52-68');
   });
 
   it('maps rows and keys, dedupes on case_no:code', async () => {
-    const fetchImpl = fixtureFetch([{ resourceId: ENFORCEMENT_RESOURCE_ID, records: lanarkRows }]);
-    const result = await enforcementSource.run(lanark, fetchImpl);
-    expect(result.rows.map((r) => r.sourceKey)).toEqual(['CE7067:1', 'CE7067:9a', 'CE5252:9b']);
+    const fetchImpl = fixtureFetch([{ resourceId: ENFORCEMENT_RESOURCE_ID, records: tarnwickRows }]);
+    const result = await enforcementSource.run(tarnwick, fetchImpl);
+    expect(result.rows.map((r) => r.sourceKey)).toEqual([
+      'CE0916:1', 'CE0916:3', 'CE0915:1', 'CE0914:1', 'CE0914:21a', 'CE0913:17a',
+      'CE0913:17c', 'CE0912:24', 'CE0912:1', 'CE0911:3', 'CE0911:25', 'CE0910:1',
+      'CE0910:3', 'CE0909:1', 'CE0909:25', 'CE0908:17a', 'CE0907:1', 'CE0907:24',
+      'CE0906:1', 'CE0906:3', 'CE0905:21a', 'CE0905:1', 'CE0904:24', 'CE0904:25',
+      'CE0903:1', 'CE0902:1', 'CE0902:3', 'CE0901:1', 'CE0901:3',
+    ]);
     const first = result.rows[0];
     expect(first.kind).toBe('enforcement_ticket');
     expect(first.payload as EnforcementTicketPayload).toMatchObject({
-      caseNumber: 'CE7067', ticketNumber: 'T1', code: '1', description: 'Improper storage trash: res',
-      status: 'Closed', statusDate: '2008-08-30 09:42:00', address: '23 Lanark RD',
-      contactAddress: '1505 COMMONWEALTH  AV', samId: '83763',
+      caseNumber: 'CE0916', ticketNumber: 'T16', code: '1', description: 'Improper storage trash: res',
+      status: 'Open', statusDate: '2025-01-23 08:31:00', address: '52 Tarnwick PL',
+      contactAddress: '88 FELLWICK  AV', samId: '58344',
     });
   });
 
   it('reconstructs a ranged address from stno/sthigh', async () => {
-    const ranged = [{ ...lanarkRows[0], case_no: 'CE9999', code: '1', violation_stno: '55', violation_sthigh: '65' }];
+    const ranged = [{ ...tarnwickRows[0], case_no: 'CE9999', code: '1', violation_stno: '127', violation_sthigh: '129' }];
     const fetchImpl = fixtureFetch([{ resourceId: ENFORCEMENT_RESOURCE_ID, records: ranged }]);
-    const result = await enforcementSource.run(lanark, fetchImpl);
-    expect((result.rows[0].payload as EnforcementTicketPayload).address).toBe('55-65 Lanark RD');
+    const result = await enforcementSource.run(tarnwick, fetchImpl);
+    expect((result.rows[0].payload as EnforcementTicketPayload).address).toBe('127-129 Tarnwick PL');
   });
 
   it('dedupes, keeping the first of two rows sharing case_no and code', async () => {
     const dup = [
-      { ...lanarkRows[0], description: 'first' },
-      { ...lanarkRows[0], description: 'second' },
+      { ...tarnwickRows[0], description: 'first' },
+      { ...tarnwickRows[0], description: 'second' },
     ];
     const fetchImpl = fixtureFetch([{ resourceId: ENFORCEMENT_RESOURCE_ID, records: dup }]);
-    const result = await enforcementSource.run(lanark, fetchImpl);
+    const result = await enforcementSource.run(tarnwick, fetchImpl);
     expect(result.rows).toHaveLength(1);
     expect((result.rows[0].payload as EnforcementTicketPayload).description).toBe('first');
   });
@@ -104,49 +110,49 @@ describe('enforcementSource', () => {
 
   it('matches a lettered number and reconstructs the lettered address with no hyphen', async () => {
     const lettered = buildIdentity({
-      id: 'b6', address: '120A Lanark Rd, Boston, MA', city: 'Boston', state: 'MA',
+      id: 'b6', address: '120A Tarnwick Pl, Boston, MA', city: 'Boston', state: 'MA',
       zip_code: '02135', parcel_id: null, sam_id: null,
     });
-    const row = { ...lanarkRows[0], case_no: 'CE8888', code: '1', violation_stno: '120', violation_sthigh: 'A' };
+    const row = { ...tarnwickRows[0], case_no: 'CE8888', code: '1', violation_stno: '120', violation_sthigh: 'A' };
     const fetchImpl = fixtureFetch([{ resourceId: ENFORCEMENT_RESOURCE_ID, records: [row] }]);
     const result = await enforcementSource.run(lettered, fetchImpl);
     expect(result.query).toContain(`"violation_stno" IN ('120A','120')`);
     expect(result.query).toContain(`'120A'`);
     expect(result.query).toContain(`'120'`);
-    expect((result.rows[0].payload as EnforcementTicketPayload).address).toBe('120A Lanark RD');
+    expect((result.rows[0].payload as EnforcementTicketPayload).address).toBe('120A Tarnwick PL');
   });
 
   it('still maps a row with a null violation_suffix and tolerates it in the SQL', async () => {
-    const row = { ...lanarkRows[0], case_no: 'CE4444', code: '1', violation_suffix: null };
+    const row = { ...tarnwickRows[0], case_no: 'CE4444', code: '1', violation_suffix: null };
     const fetchImpl = fixtureFetch([{ resourceId: ENFORCEMENT_RESOURCE_ID, records: [row] }]);
-    const result = await enforcementSource.run(lanark, fetchImpl);
+    const result = await enforcementSource.run(tarnwick, fetchImpl);
     expect(result.query).toContain(`"violation_suffix" IS NULL OR "violation_suffix" = ''`);
-    expect((result.rows[0].payload as EnforcementTicketPayload).address).toBe('23 Lanark');
+    expect((result.rows[0].payload as EnforcementTicketPayload).address).toBe('52 Tarnwick');
   });
 });
 
 describe('violationsSource', () => {
   it('queries the violations resource and maps rows without a ticketNumber field', async () => {
-    const row = { ...lanarkRows[0] };
+    const row = { ...tarnwickRows[0] };
     delete (row as Record<string, unknown>).ticket_no;
     const fetchImpl = fixtureFetch([{ resourceId: VIOLATIONS_RESOURCE_ID, records: [row] }]);
-    const result = await violationsSource.run(lanark, fetchImpl);
+    const result = await violationsSource.run(tarnwick, fetchImpl);
     expect(result.query).toContain(VIOLATIONS_RESOURCE_ID);
     expect(result.rows[0].kind).toBe('violation');
     const payload = result.rows[0].payload as ViolationPayload;
     expect(payload).not.toHaveProperty('ticketNumber');
-    expect(payload.caseNumber).toBe('CE7067');
+    expect(payload.caseNumber).toBe('CE0916');
   });
 
   it('returns an empty row list for an empty feed', async () => {
     const fetchImpl = fixtureFetch([{ resourceId: VIOLATIONS_RESOURCE_ID, records: [] }]);
-    const result = await violationsSource.run(lanark, fetchImpl);
+    const result = await violationsSource.run(tarnwick, fetchImpl);
     expect(result.rows).toEqual([]);
   });
 
   it('does not select ticket_no', async () => {
     const fetchImpl = fixtureFetch([{ resourceId: VIOLATIONS_RESOURCE_ID, records: [] }]);
-    const result = await violationsSource.run(lanark, fetchImpl);
+    const result = await violationsSource.run(tarnwick, fetchImpl);
     expect(result.query).not.toContain('"ticket_no"');
   });
 });

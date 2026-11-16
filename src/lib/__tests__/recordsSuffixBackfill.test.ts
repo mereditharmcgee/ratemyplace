@@ -45,10 +45,10 @@ describe('respelledSeedAddress', () => {
   });
 
   it('leaves an address already in its longest spelling, or with no suffix, alone', () => {
-    expect(respelledSeedAddress('23-27 Lanark Road')).toBeNull();
+    expect(respelledSeedAddress('52-68 Tarnwick Place')).toBeNull();
     expect(respelledSeedAddress('29 Neponset Field Lane')).toBeNull();
     expect(respelledSeedAddress('10 W Broadway')).toBeNull();
-    expect(respelledSeedAddress('12 Lanark Road (Rear)')).toBeNull();
+    expect(respelledSeedAddress('12 Tarnwick Place (Rear)')).toBeNull();
     expect(respelledSeedAddress('5 Park Street')).toBeNull();
     expect(respelledSeedAddress('5 Wy')).toBeNull();
   });
@@ -70,12 +70,12 @@ describe('respelledSeedAddress', () => {
 describe('planSuffixBackfill', () => {
   const grampian = row({ id: 'seed-g', address: '120 Grampian Wy', street_key: 'GRAMPIAN WY', st_num_lo: 120, st_num_hi: 120 });
   const neponset = row({ id: 'seed-n', address: '29 Neponset Field Lane', street_key: 'NEPONSET FIELD LN', st_num_lo: 29, st_num_hi: 29 });
-  const lanark = row({ id: 'seed-l', address: '23-27 Lanark Road', street_key: 'LANARK RD', st_num_lo: 23, st_num_hi: 27 });
+  const tarnwick = row({ id: 'seed-l', address: '52-68 Tarnwick Place', street_key: 'TARNWICK PL', st_num_lo: 52, st_num_hi: 68 });
   const userWy = row({ id: 'u-wy', source: 'user', address: '9 Appian Wy', street_key: 'APPIAN WY', st_num_lo: 9, st_num_hi: 9 });
   const userWay = row({ id: 'u-way', source: 'user', address: '9 Appian Way', street_key: 'APPIAN WAY', st_num_lo: 9, st_num_hi: 9 });
 
   it('respells a seeded Wy row without re-keying it, and re-keys the stored LN key without respelling it', () => {
-    const plan = planSuffixBackfill([grampian, neponset, lanark]);
+    const plan = planSuffixBackfill([grampian, neponset, tarnwick]);
     expect(plan.respells).toEqual([{ id: 'seed-g', source: 'seed', from: '120 Grampian Wy', to: '120 Grampian Way' }]);
     expect(plan.rekeys).toEqual([{ id: 'seed-n', source: 'seed', from: 'NEPONSET FIELD LN', to: 'NEPONSET FIELD LA' }]);
     expect(plan.refused).toEqual([]);
@@ -117,7 +117,7 @@ describe('planSuffixBackfill', () => {
 
   it('snapshots exactly the rows it touches or refuses', () => {
     const bare = row({ id: 'seed-bare', address: '5 Wy', street_key: 'WY', st_num_lo: 5, st_num_hi: 5 });
-    const plan = planSuffixBackfill([grampian, neponset, lanark, userWy, userWay, bare]);
+    const plan = planSuffixBackfill([grampian, neponset, tarnwick, userWy, userWay, bare]);
     expect(plan.before.map((r) => r.id)).toEqual(['seed-g', 'seed-n', 'u-way', 'seed-bare']);
     expect(plan.before[0]).toEqual(grampian);
   });
@@ -244,7 +244,7 @@ describe('backfillFiles and writeBackfillRun', () => {
   });
 
   it('writes nothing at all for a plan with no changes', () => {
-    const none = planSuffixBackfill([row({ id: 'seed-l', address: '23-27 Lanark Road', street_key: 'LANARK RD', st_num_lo: 23, st_num_hi: 27 })]);
+    const none = planSuffixBackfill([row({ id: 'seed-l', address: '52-68 Tarnwick Place', street_key: 'TARNWICK PL', st_num_lo: 52, st_num_hi: 68 })]);
     const files = backfillFiles(none, OPTIONS);
     expect(files.size).toBe(0);
     const fs = fakeFs();

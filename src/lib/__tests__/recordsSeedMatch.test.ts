@@ -3,11 +3,11 @@ import { matchExistingBuildings } from '../records/seed/match';
 import type { ExistingBuilding, SeedBuilding } from '../records/seed/types';
 
 const seed = (o: Partial<SeedBuilding>): SeedBuilding => ({
-  parcelId: '2102098000', address: '23-27 Lanark Road', streetKey: 'LANARK RD', numLo: 23, numHi: 27, neighborhood: 'Brighton', zip: '02135',
-  unitCount: 12, yearBuilt: 1925, buildingType: 'apartment', latitude: 42.3, longitude: -71.1, samId: '83763',
+  parcelId: '2109417000', address: '52-68 Tarnwick Place', streetKey: 'TARNWICK PL', numLo: 52, numHi: 68, neighborhood: 'Brighton', zip: '02135',
+  unitCount: 12, yearBuilt: 1948, buildingType: 'apartment', latitude: 42.3, longitude: -71.1, samId: '58344',
   assessment: { fiscalYear: 'FY2026' } as SeedBuilding['assessment'], ...o,
 });
-const existing = (o: Partial<ExistingBuilding>): ExistingBuilding => ({ id: 'b1', address: '23 Lanark Rd', slug: '23-lanark-rd-boston', parcel_id: null, latitude: null, longitude: null, zip_code: '02135', ...o });
+const existing = (o: Partial<ExistingBuilding>): ExistingBuilding => ({ id: 'b1', address: '52 Tarnwick Pl', slug: '52-tarnwick-pl-boston', parcel_id: null, latitude: null, longitude: null, zip_code: '02135', ...o });
 
 /** Two Jamaica Plain / Allston parcels that both contain number 15, distinguished only by ZIP. */
 const gordonJP = seed({ parcelId: '1400001000', address: '15-17 Gordon Street', streetKey: 'GORDON ST', numLo: 15, numHi: 17, zip: '02130' });
@@ -21,11 +21,11 @@ describe('matchExistingBuildings', () => {
     expect(result.unmatched).toEqual([]);
   });
   it('matches a range that the parcel range contains', () => {
-    const result = matchExistingBuildings([existing({ address: '23-25 Lanark Rd' })], [seed({})]);
+    const result = matchExistingBuildings([existing({ address: '52-56 Tarnwick Pl' })], [seed({})]);
     expect(result.matched).toHaveLength(1);
   });
   it('keeps an existing parcel id that agrees and reports one that disagrees', () => {
-    const agree = matchExistingBuildings([existing({ parcel_id: '2102098000' })], [seed({})]);
+    const agree = matchExistingBuildings([existing({ parcel_id: '2109417000' })], [seed({})]);
     expect(agree.matched).toHaveLength(1);
     const disagree = matchExistingBuildings([existing({ parcel_id: '0100037000' })], [seed({})]);
     expect(disagree.matched).toEqual([]);
@@ -61,19 +61,19 @@ describe('matchExistingBuildings', () => {
 
   it('reports an address with no parcel and an unparseable address', () => {
     const result = matchExistingBuildings(
-      [existing({ id: 'x', address: '99 Lanark Rd' }), existing({ id: 'y', address: 'Lanark Rd' })],
+      [existing({ id: 'x', address: '99 Tarnwick Pl' }), existing({ id: 'y', address: 'Tarnwick Pl' })],
       [seed({})],
     );
     expect(result.matched).toEqual([]);
     expect(result.unmatched.map((u) => [u.building.id, u.reason])).toEqual([['x', 'no_parcel_for_address'], ['y', 'unparseable_address']]);
   });
   it('separates a range that crosses a parcel edge from one that swallows a whole parcel', () => {
-    const crosses = matchExistingBuildings([existing({ address: '21-25 Lanark Rd' })], [seed({})]);
+    const crosses = matchExistingBuildings([existing({ address: '48-56 Tarnwick Pl' })], [seed({})]);
     expect(crosses.unmatched.map((u) => u.reason)).toEqual(['range_overlaps_parcel_boundary']);
-    expect(crosses.unmatched[0].candidates.map((p) => p.parcelId)).toEqual(['2102098000']);
-    const swallows = matchExistingBuildings([existing({ address: '21-31 Lanark Rd' })], [seed({})]);
+    expect(crosses.unmatched[0].candidates.map((p) => p.parcelId)).toEqual(['2109417000']);
+    const swallows = matchExistingBuildings([existing({ address: '48-68 Tarnwick Pl' })], [seed({})]);
     expect(swallows.unmatched.map((u) => u.reason)).toEqual(['existing_spans_multiple_parcels']);
-    expect(swallows.unmatched[0].candidates.map((p) => p.parcelId)).toEqual(['2102098000']);
+    expect(swallows.unmatched[0].candidates.map((p) => p.parcelId)).toEqual(['2109417000']);
   });
   it('respects street-side parity: an even number is not inside an odd-only parcel range', () => {
     // The production dry run of 2026-09-09: 66 Chiswick Road saw two candidates, the odd
@@ -92,7 +92,7 @@ describe('matchExistingBuildings', () => {
   });
 
   it('reports two parcels claiming one address as ambiguous', () => {
-    const result = matchExistingBuildings([existing({ address: '25 Lanark Rd' })], [seed({}), seed({ parcelId: '2102099000', numLo: 25, numHi: 25 })]);
+    const result = matchExistingBuildings([existing({ address: '56 Tarnwick Pl' })], [seed({}), seed({ parcelId: '2109418000', numLo: 56, numHi: 56 })]);
     expect(result.matched).toEqual([]);
     expect(result.unmatched[0].reason).toBe('ambiguous');
   });
@@ -100,7 +100,7 @@ describe('matchExistingBuildings', () => {
   it('claims every parcel a human still has to look at, so the seed never creates a twin for one', () => {
     const result = matchExistingBuildings(
       [
-        existing({ id: 'm', address: '23 Lanark Rd' }),
+        existing({ id: 'm', address: '52 Tarnwick Pl' }),
         existing({ id: 'c', address: '25 Fenwood Rd', parcel_id: '0100037000' }),
         onGordon({ zip_code: null }),
         existing({ id: 's', address: '10-40 Wilcock St' }),
@@ -115,6 +115,6 @@ describe('matchExistingBuildings', () => {
     );
     expect(result.matched.map((m) => m.building.id)).toEqual(['m']);
     expect(result.conflicts.map((c) => c.building.id)).toEqual(['c']);
-    expect([...result.claimedParcels].sort()).toEqual(['1400001000', '1400002000', '2102098000', '3300123000', '4400001000']);
+    expect([...result.claimedParcels].sort()).toEqual(['1400001000', '1400002000', '2109417000', '3300123000', '4400001000']);
   });
 });

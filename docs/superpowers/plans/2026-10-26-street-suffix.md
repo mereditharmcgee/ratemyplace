@@ -272,7 +272,7 @@ After D4, the respelled rows ("9-11 Appian Way", "120 Grampian Way") have the sa
 | `serviceRequests.ts`, new system | `upper("street_name") IN streetForms` | Gains the USPS forms (WAY, HWY, PKWY, CIR, LN, ROW, ALY) |
 | `serviceRequests.ts`, 16 legacy years | `addressLikeClauses('location')` | Before, prefixes rescued only HW→HWY, CI→CIR, RO→ROW and CR→CRES. After, all forms are matched. |
 
-The Lanark fixture (RD) is unchanged, so `records:check` cannot exercise the new shapes; the pilot does. All interpolation still goes through `escapeLikeForCkan` and `sqlLiteral`.
+The records fixture of the time was unchanged, so `records:check` could not exercise the new shapes; the pilot does. All interpolation still goes through `escapeLikeForCkan` and `sqlLiteral`.
 
 ## 5. Change set
 
@@ -315,7 +315,7 @@ const LIKE = "LIKE ? ESCAPE '\\'";
 /**
  * The address as space-delimited words, with a leading and trailing space and commas and
  * periods read as spaces. An alternative spelling is matched against this as `% <spelling> %`,
- * so it only ever hits a whole word: 'lane' finds "Radford La" but not the `la` in "Lanark"
+ * so it only ever hits a whole word: 'lane' finds "Radford La" but not the `la` in "Lawrence"
  * or the `ln` in "Lincoln".
  */
 const ADDRESS_WORDS = "(' ' || REPLACE(REPLACE(b.address, ',', ' '), '.', ' ') || ' ')";
@@ -528,7 +528,7 @@ Expected output against production today, with `--pulled-since`:
    - [new] `530 VFW Pw` → exactly `530 VFW PW%`, `530 VFW PARKWAY%`, `530 VFW PKWY%`.
    - [new] `11 Radford La` → LA, LANE, LN.
    - [new] `10 Battery Wharf` → WHARF, WH.
-   - [guard] `1027 Commonwealth Ave` → exactly 2 clauses (AV, AVENUE); `12 Main Ter` → TE, TERRACE; `23-27 Lanark Rd` → the same 6 as today.
+   - [guard] `1027 Commonwealth Ave` → exactly 2 clauses (AV, AVENUE); `12 Main Ter` → TE, TERRACE; `52-68 Tarnwick Pl` → the same 6 as today.
    - [new] Property test: for every row and spelling in `SUFFIX_SPELLINGS`, `buildIdentity('5-7 Test <spelling>')` must have a clause literal prefixing every `{5, 7, 5-7} × streetForms` form. Today it fails on WHARF/WH.
 5. **`src/lib/__tests__/recordsPermits.test.ts`**
    - '9 Grampian Wy' (zip 02125, parcel 1302537000): `result.query` contains `LIKE '9 GRAMPIAN WY%'` [guard] and `LIKE '9 GRAMPIAN WAY%'` [new].
@@ -568,7 +568,7 @@ Expected output against production today, with `--pulled-since`:
       - '120 Grampian Wy' → '120 Grampian Way'.
       - '9-11 Appian Wy' → '…Way'; '12 American Legion Hw' → '…Highway'; '16 Cedar Lane Wy' → '16 Cedar Lane Way'; '566 W Roxbury Pw' → '…Parkway'; '10-12 Conry Cr' → '…Crescent'.
       - '120A Grampian Wy' → '120A Grampian Way'; '5 Grampian Wy (Rear)' → '5 Grampian Way (Rear)'.
-      - null for '23-27 Lanark Road', '29 Neponset Field Lane', '10 W Broadway', '12 Lanark Road (Rear)' and '5 Park Street'.
+      - null for '52-68 Tarnwick Place', '29 Neponset Field Lane', '10 W Broadway', '12 Tarnwick Place (Rear)' and '5 Park Street'.
       - It agrees with `formatSeedAddress(lo, hi, ST_NAME)` for all eight spellings.
     - b. **`planSuffixBackfill`:**
       - A seed Grampian row is respelled, not re-keyed.

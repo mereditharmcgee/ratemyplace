@@ -522,7 +522,7 @@ export interface RecordsQueueParkedRow {
 
 /**
  * What the daily scheduler stamps into `app_settings.records_fixture_last` — the
- * last circuit-breaker fixture run against the Lanark address. Written by `plan`
+ * last circuit-breaker run of the records fixture (lib/records/fixture.ts). Written by `plan`
  * in lib/records/scheduler.ts and read back by GET /api/admin/records/queue; the
  * shape lives here so the writer and the panel cannot drift apart.
  *

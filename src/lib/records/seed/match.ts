@@ -5,7 +5,7 @@ import type { ExistingBuilding, SeedBuilding } from './types';
 export type UnmatchedReason =
   | 'unparseable_address'
   | 'no_parcel_for_address'
-  /** The existing range crosses a parcel edge without swallowing one: 21-25 against a 23-27 parcel. */
+  /** The existing range crosses a parcel edge without swallowing one: 48-56 against a 52-68 parcel. */
   | 'range_overlaps_parcel_boundary'
   /** The existing range contains a whole parcel, so it is probably several parcels' worth of building. */
   | 'existing_spans_multiple_parcels'

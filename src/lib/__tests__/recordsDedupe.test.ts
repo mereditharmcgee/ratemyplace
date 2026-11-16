@@ -11,9 +11,9 @@ const suite = sqliteAvailable ? describe : describe.skip;
 suite('findBuildingByAddress', () => {
   it('matches a single number inside a seeded range, under any suffix spelling', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'seed-1', address: '23-27 Lanark Rd', slug: '23-27-lanark-rd-boston', source: 'seed', street_key: 'LANARK RD', st_num_lo: 23, st_num_hi: 27, parcel_id: '1' });
-    const hit = await findBuildingByAddress(db, { address: '25 Lanark Road', city: 'Boston', zip: null });
-    expect(hit).toEqual({ id: 'seed-1', slug: '23-27-lanark-rd-boston' });
+    await insertBuilding(db, { id: 'seed-1', address: '52-68 Tarnwick Pl', slug: '52-68-tarnwick-pl-boston', source: 'seed', street_key: 'TARNWICK PL', st_num_lo: 52, st_num_hi: 68, parcel_id: '1' });
+    const hit = await findBuildingByAddress(db, { address: '56 Tarnwick Place', city: 'Boston', zip: null });
+    expect(hit).toEqual({ id: 'seed-1', slug: '52-68-tarnwick-pl-boston' });
   });
 
   it('respects street-side parity', async () => {
@@ -159,10 +159,10 @@ suite('findBuildingByAddress', () => {
 
   it('returns null outside Boston, for an unparseable address, or with no candidate', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'c', address: '1 Lanark Rd', source: 'seed', street_key: 'LANARK RD', st_num_lo: 1, st_num_hi: 1 });
-    expect(await findBuildingByAddress(db, { address: '1 Lanark Rd', city: 'New Haven', zip: null })).toBeNull();
-    expect(await findBuildingByAddress(db, { address: 'Lanark Rd', city: 'Boston', zip: null })).toBeNull();
-    expect(await findBuildingByAddress(db, { address: '3 Lanark Rd', city: 'Boston', zip: null })).toBeNull();
+    await insertBuilding(db, { id: 'c', address: '1 Tarnwick Pl', source: 'seed', street_key: 'TARNWICK PL', st_num_lo: 1, st_num_hi: 1 });
+    expect(await findBuildingByAddress(db, { address: '1 Tarnwick Pl', city: 'New Haven', zip: null })).toBeNull();
+    expect(await findBuildingByAddress(db, { address: 'Tarnwick Pl', city: 'Boston', zip: null })).toBeNull();
+    expect(await findBuildingByAddress(db, { address: '3 Tarnwick Pl', city: 'Boston', zip: null })).toBeNull();
   });
 
   it('lands a typed Way on the assessor Wy parcel', async () => {

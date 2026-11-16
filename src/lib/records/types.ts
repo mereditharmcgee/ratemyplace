@@ -141,7 +141,7 @@ export type AddressMatchUncertainty = 'wide_range' | 'mixed_parity';
 export interface BuildingIdentity {
   buildingId: string;
   /**
-   * Individual street numbers as written, e.g. ['23','27'] for '23-27'. Parcel resolution keys
+   * Individual street numbers as written, e.g. ['52','68'] for '52-68'. Parcel resolution keys
    * on these, so an expanded middle number can never pull a neighbouring parcel into it.
    */
   numbers: string[];
@@ -163,13 +163,13 @@ export interface BuildingIdentity {
   enclosingHighs: string[];
   /** Why the address's house numbers could not all be listed for matching, or null when they were. */
   matchUncertainty: AddressMatchUncertainty | null;
-  /** The hyphenated range as written, e.g. '23-27', or null. */
+  /** The hyphenated range as written, e.g. '52-68', or null. */
   rangeForm: string | null;
-  /** Uppercase street with short suffix, e.g. 'LANARK RD'. */
+  /** Uppercase street with short suffix, e.g. 'TARNWICK PL'. */
   streetShort: string;
-  /** Uppercase street with long suffix, e.g. 'LANARK ROAD'. Equal to streetShort when no suffix. */
+  /** Uppercase street with long suffix, e.g. 'TARNWICK PLACE'. Equal to streetShort when no suffix. */
   streetLong: string;
-  /** Uppercase street name without suffix, e.g. 'LANARK'. */
+  /** Uppercase street name without suffix, e.g. 'TARNWICK'. */
   streetBase: string;
   /** Every known uppercase spelling of the street across Boston datasets, unique, assessor form first (e.g. ['COMMONWEALTH AV','COMMONWEALTH AVE','COMMONWEALTH AVENUE']). Use for exact matches outside the assessor. */
   streetForms: string[];

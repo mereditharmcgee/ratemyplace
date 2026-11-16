@@ -32,13 +32,13 @@ import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding, insertPull } from './helpers/recordsDb';
 import { MAX_ATTEMPTS, enqueue } from '../records/queue';
 import { fixtureFetch, type FixtureRoute } from './helpers/records/fixtureFetch';
-import lanark2026 from './helpers/records/assessor-fy2026-lanark.json';
-import lanark2025 from './helpers/records/assessor-fy2025-lanark.json';
+import tarnwick2026 from './helpers/records/assessor-fy2026-tarnwick.json';
+import tarnwick2025 from './helpers/records/assessor-fy2025-tarnwick.json';
 import condo2026 from './helpers/records/assessor-fy2026-condo.json';
 import permitsPositive from './helpers/records/permits-positive.json';
-import legacy311 from './helpers/records/311-2024-lanark.json';
-import new311 from './helpers/records/311-new-lanark.json';
-import enforcementRows from './helpers/records/enforcement-lanark.json';
+import legacy311 from './helpers/records/311-2024-tarnwick.json';
+import new311 from './helpers/records/311-new-tarnwick.json';
+import enforcementRows from './helpers/records/enforcement-tarnwick.json';
 
 /** The assessor's previous fiscal year, so the value series has two points to draw between. */
 const FY2025_RESOURCE_ID = ASSESSOR_YEARS[1].resourceId;
@@ -60,7 +60,7 @@ const LEGACY_2023_RESOURCE_ID = LEGACY_311_RESOURCES.find((resource) => resource
 const suite = sqliteAvailable ? describe : describe.skip;
 
 const ADMIN_ID = 'admin-render';
-const BUILDING_ID = 'bldg-lanark';
+const BUILDING_ID = 'bldg-tarnwick';
 
 /** A string no source or copy constant contains, so finding it in the HTML can only mean one thing. */
 const UPSTREAM_ERROR_TEXT = 'ZZZ-INTERNAL-ZZZ';
@@ -91,7 +91,7 @@ async function seedPulledBuilding(
   assessorRows: AssessorRow[],
   routes: FixtureRoute[] = [],
 ): Promise<void> {
-  await insertBuilding(db, { id: BUILDING_ID, parcel_id: '2102098000' });
+  await insertBuilding(db, { id: BUILDING_ID, parcel_id: '2109417000' });
   const building = await loadBuilding(db, BUILDING_ID);
   await pullBuildingRecords(db, building, {
     triggeredBy: ADMIN_ID,
@@ -144,36 +144,47 @@ function sectionText(html: string, heading: string): string {
 suite('BuildingRecords.astro rendered output', () => {
   it('renders an entity owner with its tax mailing address', async () => {
     const db = await createDbWithAdmin();
-    await seedPulledBuilding(db, lanark2026 as AssessorRow[]);
+    await seedPulledBuilding(db, tarnwick2026 as AssessorRow[]);
 
     const html = await renderPanel(db);
 
     expect(html).toContain('id="public-records"');
-    expect(html).toContain('LANARK ROAD LLC MASS LLC');
-    expect(html).toContain('PO BOX 35006');
+    expect(html).toContain('WRENFIELD REALTY LLC');
+    expect(html).toContain('88 FELLWICK AV');
     // The correction form's Turnstile script rides with the panel, not with the page.
     expect(html).toContain('challenges.cloudflare.com/turnstile');
   });
 
   it('never prints the person an entity lists as its addressee', async () => {
     const db = await createDbWithAdmin();
-    await seedPulledBuilding(db, lanark2026 as AssessorRow[]);
+    // The practice building lists no addressee. This owner is another entity, one that names
+    // a person on its tax mailing address.
+    await seedPulledBuilding(db, [
+      {
+        ...(tarnwick2026[0] as AssessorRow),
+        OWNER: 'TARNCREST LLC',
+        MAIL_ADDRESSEE: 'C/O JORDAN QUILLBY',
+        MAIL_STREET_ADDRESS: 'PO BOX 1',
+      },
+    ]);
 
     const html = await renderPanel(db);
 
-    // The entity's own address is published (above); the human being named on it is not.
-    expect(html).not.toContain('DENNIS CLAIR');
-    expect(html).not.toContain('C/O ATT');
+    // The entity's own address is published. The person named on it is not.
+    expect(html).toContain('TARNCREST LLC');
+    expect(html).toContain('PO BOX 1');
+    expect(html).not.toContain('JORDAN QUILLBY');
+    expect(html).not.toContain('C/O JORDAN');
   });
 
   it('withholds the mailing address of an individual owner', async () => {
     const db = await createDbWithAdmin();
     await seedPulledBuilding(db, [
       {
-        ...(lanark2026[0] as AssessorRow),
-        OWNER: 'PASCUCCI CARLO',
+        ...(tarnwick2026[0] as AssessorRow),
+        OWNER: 'BRAMMOCK ELLIS',
         MAIL_ADDRESSEE: null,
-        MAIL_STREET_ADDRESS: '195 LEXINGTON ST',
+        MAIL_STREET_ADDRESS: '14 WRENLOW ST',
       },
     ]);
 
@@ -181,14 +192,14 @@ suite('BuildingRecords.astro rendered output', () => {
 
     // The owner of record is public information. Where that person receives mail is a
     // home address, and no amount of it may reach the page — not the street, not the label.
-    expect(html).toContain('PASCUCCI CARLO');
-    expect(html).not.toContain('195 LEXINGTON ST');
+    expect(html).toContain('BRAMMOCK ELLIS');
+    expect(html).not.toContain('14 WRENLOW ST');
     expect(html).not.toContain('Tax mailing address');
   });
 
   it("never renders an errored source's upstream error text", async () => {
     const db = await createDbWithAdmin();
-    await seedPulledBuilding(db, lanark2026 as AssessorRow[], [
+    await seedPulledBuilding(db, tarnwick2026 as AssessorRow[], [
       { resourceId: PERMITS_RESOURCE_ID, errorStatus: 503, errorMessage: UPSTREAM_ERROR_TEXT },
     ]);
 
@@ -209,7 +220,7 @@ suite('BuildingRecords.astro rendered output', () => {
 
   it('distinguishes a source that was never pulled from one that came back empty', async () => {
     const db = await createDbWithAdmin();
-    await seedPulledBuilding(db, lanark2026 as AssessorRow[]);
+    await seedPulledBuilding(db, tarnwick2026 as AssessorRow[]);
     // Drop the violations provenance row, leaving the source in the state a build that
     // predates it would produce: never queried for this building. It stored no rows, so
     // nothing references the pull row being deleted.
@@ -248,8 +259,8 @@ suite('BuildingRecords.astro rendered output', () => {
 suite('BuildingRecords.astro ledger', () => {
   /** Two assessor years plus permits, 311 (legacy and new), and code enforcement. */
   async function seedFullBuilding(db: TestD1Database, extraRoutes: FixtureRoute[] = []): Promise<void> {
-    await seedPulledBuilding(db, lanark2026 as AssessorRow[], [
-      { resourceId: FY2025_RESOURCE_ID, records: lanark2025 as AssessorRow[] },
+    await seedPulledBuilding(db, tarnwick2026 as AssessorRow[], [
+      { resourceId: FY2025_RESOURCE_ID, records: tarnwick2025 as AssessorRow[] },
       { resourceId: PERMITS_RESOURCE_ID, records: permitsPositive as AssessorRow[] },
       { resourceId: LEGACY_2024_RESOURCE_ID, records: legacy311 as AssessorRow[] },
       { resourceId: NEW_311_RESOURCE_ID, records: new311 as AssessorRow[] },
@@ -390,17 +401,17 @@ suite('BuildingRecords.astro ledger', () => {
     ]);
     expect(strip!.querySelectorAll('dd')).toHaveLength(4);
 
-    expect(html).toContain('LANARK ROAD LLC MASS LLC');
-    expect(html).toContain('Assessor FY2026 · parcel 2102098000');
+    expect(html).toContain('WRENFIELD REALTY LLC');
+    expect(html).toContain('Assessor FY2026 · parcel 2109417000');
     expect(html).toContain('Built');
-    expect(html).toContain('1920');
+    expect(html).toContain('1948');
     // The assessor left the unit count blank, so the sub-line says nothing about units.
-    expect(html).toContain('Last remodel 1980</span>');
+    expect(html).toContain('Last remodel 1996</span>');
     expect(html).not.toContain('units not recorded');
     expect(html).toContain('Land use');
     expect(html).toContain('APT 7-30 UNITS');
     // Compact, not the long form, so the four cells fit across a phone.
-    expect(html).toContain('$6.72M');
+    expect(html).toContain('$4.52M');
   });
 
   it('adds the unit count to the built sub-line when the assessor recorded one', async () => {
@@ -412,7 +423,7 @@ suite('BuildingRecords.astro ledger', () => {
 
     const html = await renderPanel(db);
 
-    expect(html).toContain('Last remodel 1980 · units 12');
+    expect(html).toContain('Last remodel 1996 · units 12');
   });
 
   it('draws a sparkline across the fiscal years and states the range under it', async () => {
@@ -422,7 +433,7 @@ suite('BuildingRecords.astro ledger', () => {
     const html = await renderPanel(db);
 
     expect(html).toContain('<polyline');
-    expect(html).toContain('FY2025–FY2026, range $6.53M–$6.72M');
+    expect(html).toContain('FY2025–FY2026, range $4.32M–$4.52M');
   });
 
   it('counts each source on its closed ledger row', async () => {
@@ -431,30 +442,31 @@ suite('BuildingRecords.astro ledger', () => {
 
     const html = await renderPanel(db);
 
-    // Two living-conditions requests, one still open. The two trash-storage requests are
-    // property upkeep, and the four requests in no group are counted once, under the groups.
+    // Two living-conditions requests, one still open. The two upkeep requests are
+    // property upkeep, one still open, and the 22 requests in no group are counted once,
+    // under the groups.
     const living = summaryText(html, '311 living conditions requests');
     expect(living).toContain('1 still open');
     expect(living).toContain('2024–2026');
     expect(living).not.toContain('not shown');
     const upkeep = summaryText(html, '311 property upkeep requests');
-    expect(upkeep).toContain('2 still open');
+    expect(upkeep).toContain('1 still open');
     expect(upkeep).toContain('2024');
     expect(summaryText(html, '311 building and code requests')).toContain('none on record');
-    expect(parse(html).textContent).toContain('4 other 311 requests at or near this address');
+    expect(parse(html).textContent).toContain('22 other 311 requests at or near this address');
 
-    // Two Public Works tickets, though the feed holds three violation lines.
+    // Sixteen Public Works tickets, though the feed holds 29 violation lines.
     const tickets = summaryText(html, 'Public Works code enforcement tickets');
-    expect(tickets).toContain('3 violation lines on 2 tickets');
+    expect(tickets).toContain('29 violation lines on 16 tickets');
 
-    // Two permits after the duplicate row is deduped, one open, $36,500 + $1,200 declared.
+    // Two permits after the duplicate row is deduped, one open, $23,600 + $4,700 declared.
     const permits = summaryText(html, 'Building permits');
     // An open permit is an active permit, so permits keep "open" rather than "still open".
-    expect(permits).toContain('1 open · $37.7K declared');
+    expect(permits).toContain('1 open · $28.3K declared');
     expect(permits).not.toContain('still open');
-    // The coverage label is the years the permits actually fall in (2019 and 2021) — not the
+    // The coverage label is the years the permits actually fall in (2019 and 2022), not the
     // feed's documented coverage window the bars are drawn across, which runs 2006 to 2026.
-    expect(permits).toContain('2019–2021');
+    expect(permits).toContain('2019–2022');
     // The body names the feed's start as the feed's, so it does not read as a second span for
     // this building's permits.
     const permitsBody = sectionText(html, 'Building permits');
@@ -573,7 +585,7 @@ suite('BuildingRecords.astro ledger', () => {
     for (const label of openLabels) expect(label).toMatch(/^Still open in city records, filed \d{4}$/);
     expect(requests.textContent).toContain('Show all 2 requests');
     // The full list keeps the closed dates the summary rows leave out.
-    expect(requests.textContent).toContain('closed Dec 20, 2024');
+    expect(requests.textContent).toContain('closed Dec 17, 2024');
   });
 
   it('words open ISD violations the same way and keeps closed ones as recorded', async () => {
@@ -594,12 +606,13 @@ suite('BuildingRecords.astro ledger', () => {
 
   it('leaves the explanation off a section with no open case', async () => {
     const db = await createDbWithAdmin();
-    await seedFullBuilding(db);
+    // Only the closed one of the two synthetic ISD lines, so the violations row has no open case.
+    const closedOnly = (OPEN_VIOLATION_ROUTE.records ?? []).filter((row) => (row as { status: string }).status === 'Closed');
+    await seedFullBuilding(db, [{ ...OPEN_VIOLATION_ROUTE, records: closedOnly }]);
 
     const html = await renderPanel(db);
 
-    // The fixture's code enforcement tickets are all closed.
-    expect(sectionText(html, 'Public Works code enforcement tickets')).not.toContain(STILL_OPEN_NOTE);
+    expect(sectionText(html, 'ISD violation cases')).not.toContain(STILL_OPEN_NOTE);
   });
 
   it("keeps an open permit's status as the city recorded it", async () => {
@@ -674,7 +687,7 @@ suite('BuildingRecords.astro ledger', () => {
   it('keeps a space between every count and its noun, and the noun in the right number', async () => {
     const db = await createDbWithAdmin();
     // Eight property upkeep types, so the category chart has a leftover line to print.
-    const trash = (legacy311 as AssessorRow[]).find((row) => String(row.type).startsWith('Improper Storage'))!;
+    const trash = (legacy311 as AssessorRow[]).find((row) => row.reason === 'Code Enforcement')!;
     const upkeepTypes = [
       'Improper Storage of Trash (Barrels)', 'Poor Conditions of Property', 'Unshoveled Sidewalk', 'Snow Removal',
       'Illegal Dumping', 'Construction Debris', 'Illegal Posting of Signs', 'Illegal Vending',
@@ -786,7 +799,7 @@ suite('BuildingRecords.astro ledger', () => {
     const tickets = sectionText(html, 'Public Works code enforcement tickets');
     expect(tickets).toContain('Ticket T1');
     expect(tickets).toContain('Ticket T2');
-    expect(tickets).toContain('Show all 2 tickets');
+    expect(tickets).toContain('Show all 16 tickets');
   });
 
   it('says an empty violations list is a fact about the feed, not a clearance', async () => {
@@ -870,7 +883,7 @@ suite('BuildingRecords.astro ledger', () => {
       ...(permitsPositive[0] as AssessorRow),
       permitnumber: 'CAP' + index,
     }));
-    await seedPulledBuilding(db, lanark2026 as AssessorRow[], [
+    await seedPulledBuilding(db, tarnwick2026 as AssessorRow[], [
       { resourceId: PERMITS_RESOURCE_ID, records: capacityPermits },
     ]);
 
@@ -879,7 +892,7 @@ suite('BuildingRecords.astro ledger', () => {
     await pullBuildingRecords(db, building, {
       triggeredBy: ADMIN_ID,
       fetchImpl: fixtureFetch([
-        { resourceId: FY2026_RESOURCE_ID, records: lanark2026 as AssessorRow[] },
+        { resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 as AssessorRow[] },
         { resourceId: PERMITS_RESOURCE_ID, errorStatus: 503, errorMessage: UPSTREAM_ERROR_TEXT },
       ]),
     });
@@ -909,7 +922,7 @@ suite('BuildingRecords.astro ledger', () => {
 
   it('replaces the facts strip with the condominium note for a condo parcel', async () => {
     const db = await createDbWithAdmin();
-    await insertBuilding(db, { id: 'bldg-condo', address: '55 Lanark Rd, Boston, MA 02135' });
+    await insertBuilding(db, { id: 'bldg-condo', address: '127-129 Tarnwick Pl, Boston, MA 02135' });
     const building = await loadBuilding(db, 'bldg-condo');
     // No whole-building parcel, three condo rows behind the address: the same two-query
     // resolution the live assessor source runs, answered the way a condo answers it.

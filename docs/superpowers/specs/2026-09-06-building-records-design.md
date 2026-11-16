@@ -3,8 +3,9 @@
 **Date:** 2026-09-06
 **Milestone:** v1.7.0 "Public Record" (proposed; not yet in `.planning/`)
 **Status:** Design approved in conversation 2026-09-06; spec pending owner review
-**Source brief:** "Building records as a RateMyPlace feature" (owner handoff, 2026-09-06, from the Lanark Road investigation)
+**Source brief:** "Building records as a RateMyPlace feature" (owner handoff, 2026-09-06, from the owner's investigation of one building)
 **Companion method:** `investigate-a-landlord` skill (human method; this spec covers the data)
+**Note (2026-11-15):** the practice building in this spec is now fictional: 52-68 Tarnwick Pl, with made-up records throughout. It replaced a real building. Lines that recorded what the live city data showed for that building are worded generically. The live records check (`npm run records:check` and the scheduler's daily breaker) now runs against a different, real building set in `src/lib/records/fixture.ts`.
 
 ## Purpose
 
@@ -195,7 +196,7 @@ Input: `BuildingIdentity`. Output: `{ sourceId, sourceLabel, query, rows: { kind
 
 ### Identity handling
 
-- **Parcel resolution:** assessor by exact `ST_NUM` and normalized `ST_NAME` using the existing helpers. Ranged addresses (`23-27`) try each number and the hyphenated form. Street names are matched exactly, never prefix-matched.
+- **Parcel resolution:** assessor by exact `ST_NUM` and normalized `ST_NAME` using the existing helpers. Ranged addresses (`52-68`) try each number and the hyphenated form. Street names are matched exactly, never prefix-matched.
 - **Condo detection:** multiple assessor rows with different parcel ids for one address means a condominium building. A stores no `parcel_id`, stores an `assessment` row with `condominium: true` and no owner fields, and the admin summary says why.
 
   > **Amended 2026-09-07, as built:** condominium detection is **by land-use code, not by counting parcel ids**. The whole-building query excludes `LU IN ('CD','CM')`; an address that returns no whole-building row and at least one `CD`/`CM` row is a condominium. Counting distinct parcel ids could not tell a condominium apart from an address that genuinely spans two whole-building parcels.
@@ -223,8 +224,8 @@ Pages Functions allow 50 subrequests per invocation. A full Boston pull is 28 to
 
 ### Fixture
 
-- **Offline:** recorded Boston responses for 23-27 Lanark Road in `src/lib/__tests__/helpers/records/`. `npm test` never touches the network.
-- **Live, by hand:** `scripts/records-fixture-check.ts` hits Boston and diffs against the brief's expected values (parcel `2102098000`; owner Lanark Road LLC; mailing PO Box 35006; land use A; remodel 1980; FY2026 total value $6,720,200; zero permits under every query form; no ISD violations; two 2008 trash tickets with contact address 1505 Commonwealth Ave; 98 311 cases 2011 to 2026, four housing-related). Run before the first production pull and whenever Boston changes a schema. It is not part of CI.
+- **Offline:** Boston responses in their recorded column shapes, with fictional values for the practice building 52-68 Tarnwick Place, in `src/lib/__tests__/helpers/records/`. `npm test` never touches the network.
+- **Live, by hand:** `scripts/records-fixture-check.ts` hits Boston and diffs against expected values for one real building: its parcel, owner, mailing street, land use, remodel year, FY2026 total value, permits under every query form, ISD violations, enforcement tickets and their contact address, and 311 case counts. Run before the first production pull and whenever Boston changes a schema. It is not part of CI.
 
 ## Section 3: Public records panel
 
@@ -264,7 +265,7 @@ A section whose latest pull is `error` and which has no prior rows renders "reco
 
 - **Owner mailing address is shown only when the owner of record is an entity**, decided by `inferOwnerEntity`. An individual's mailing address is never rendered, even though the assessor publishes it, because it is usually their home.
 
-  > **Amended 2026-09-07, as built:** the gate is `showMailingAddress` in `records/display.ts`, not `inferOwnerEntity`. It is a **word-boundary entity-token rule**: a bare substring test would match `INC` inside `PRINCE` and publish a person's home address. A trustee suffix alone is **not** an entity, so `SMITH JOHN TR` is treated as an individual and its address stays hidden; a trustee suffix clears the gate only alongside a trust or entity token (`SMITH FAMILY TR` does). The rule errs toward hiding: a withheld business address costs a reader one lookup, a published home address cannot be taken back. The same gate is applied to the mailing **addressee** line, because an entity can name a person there (`C/O ATT ...`), while the street and city lines are kept either way.
+  > **Amended 2026-09-07, as built:** the gate is `showMailingAddress` in `records/display.ts`, not `inferOwnerEntity`. It is a **word-boundary entity-token rule**: a bare substring test would match `INC` inside `PRINCE` and publish a person's home address. A trustee suffix alone is **not** an entity, so `SMITH JOHN TR` is treated as an individual and its address stays hidden; a trustee suffix clears the gate only alongside a trust or entity token (`SMITH FAMILY TR` does). The rule errs toward hiding: a withheld business address costs a reader one lookup, a published home address cannot be taken back. The same gate is applied to the mailing **addressee** line, because an entity can name a person there (`C/O ...`), while the street and city lines are kept either way.
 
 - **Condominium buildings show no owner.** The Property section states that the building is divided into individually owned condominium units.
 - **Banned words cannot appear in panel copy:** cash-out, extracted, cross-collateralized, deferred maintenance, pattern, evasive, delay. A test scans the component's static strings.
@@ -306,7 +307,7 @@ No "edit this value" anywhere. No way to hide a section on request. No owner ver
 
 ### Tests (offline)
 
-- Per-source adapter tests on recorded responses, including the Lanark fixture end to end.
+- Per-source adapter tests on stored responses, including the fictional practice building end to end.
 - Identity: ranged and hyphenated numbers, both parcel forms, exact street matching, condo detection.
 - Pull semantics: one failing source leaves the other five written; re-pull replaces without duplicating on `source_key`; `record_pulls` is insert-only; `error` status preserves prior rows.
 - Read validation: malformed payload renders "record unavailable"; the page still renders.
@@ -331,9 +332,9 @@ No "edit this value" anywhere. No way to hide a section on request. No owner ver
    > **Amended 2026-09-07, as built:** `0030_audit_records_actions.sql` follows it. Apply both with `wrangler d1 execute --remote --file`, one file at a time, never `migrations apply --remote`; back up `audit_logs` before `0030` and verify the row count after.
 
 3. Deploy. Production shows no panel until a building is pulled.
-4. Pull Lanark first; compare to the brief by eye and with the live fixture script.
+4. Pull the brief's building first; compare it to the brief by eye and with the live fixture script.
 5. Pull the remaining Boston buildings from the admin table.
-6. Run `/qa` on three buildings: Lanark, one condominium, one with an individual owner.
+6. Run `/qa` on three buildings: the brief's building, one condominium, one with an individual owner.
 7. `npm run check`, `npm test`, `npm run build` clean before merge.
 
 ## Open questions

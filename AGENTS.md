@@ -84,7 +84,7 @@ npm run build      # production build
 npm run e2e        # fresh local D1 + seed + build + Playwright
 npm run db:setup   # db:fresh then db:seed (local D1 only)
 npm run ops:metrics   # regenerate ops/METRICS.md from production (read-only)
-npm run records:check   # live Lanark fixture check (hits data.boston.gov), run by hand
+npm run records:check   # live records fixture check (hits data.boston.gov), run by hand
 npm run records:seed -- --dry-run   # Boston bulk seed; --write / --apply --local / --apply --remote
 npm run records:suffix-backfill -- --remote   # after a SUFFIX_SPELLINGS change: generates re-key/respell/refresh SQL, applies nothing
 npm run records:owners-backfill -- --remote   # one-time fill of building_owners from stored assessor rows: writes SQL, applies nothing
@@ -144,7 +144,7 @@ in this repo that builds SQL by interpolation. It is scoped to that directory an
 queries sent to `data.boston.gov`, never to D1. The invariant that keeps it safe: every
 interpolated value passes through `sqlLiteral` or `addressLikeClauses` or a digits-only
 guard, and every identifier (resource id, column name) is a code constant, never user
-input. After touching an adapter, run `npm run records:check` against the Lanark fixture.
+input. After touching an adapter, run `npm run records:check` against the records fixture.
 This exception does not extend to any other module or any other data source.
 
 ### Getting the database
@@ -293,13 +293,13 @@ Things that have already cost time. Read before debugging.
 - **A fixture check can fail because the city's data moved, not because a pull broke.** Any
   failed check pauses the fill, and a fixture pause clears only when the check passes, so a
   check that depends on one parcel's city data re-pauses the fill every morning once the city
-  drops that data. The city reloaded RentSmart on 2026-11-13 and the fixture parcel's rows
-  went with it; the RentSmart checks now ask that the source answers and has recent rows
-  city-wide (see `src/lib/AGENTS.md`). Read what `npm run records:check` prints before you
-  change a check. `fixture.ts` runs inside the records-scheduler Worker, so a change to it
-  reaches the 06:00 planner only after `npm run records:worker:deploy`. City data that a human
-  should hear about but the fill should not wait on goes in a fixture **notice**, not a
-  check: notices never pause the fill (see `src/lib/AGENTS.md`).
+  drops that data. A RentSmart reload can drop any parcel's rows, so the RentSmart checks ask
+  that the source answers and has recent rows city-wide (see `src/lib/AGENTS.md`). Read what
+  `npm run records:check` prints before you change a check. `fixture.ts` runs inside the
+  records-scheduler Worker, so a change to it reaches the 06:00 planner only after
+  `npm run records:worker:deploy`. City data that a human should hear about but the fill
+  should not wait on goes in a fixture **notice**, not a check: notices never pause the fill
+  (see `src/lib/AGENTS.md`).
 - **"Delete orphan buildings" in `/admin/buildings` deletes exactly what the "Outside
   Boston / New Haven, no reviews" toggle shows.** Both use `orphanBuildingsWhere()` in
   `src/lib/admin/orphanBuildings.ts`: `source = 'user'`, no review of any status, not
@@ -352,8 +352,8 @@ Things that have already cost time. Read before debugging.
   the permits adapter uses the numeric form only because its column is numeric; the
   violation feeds have no parcel column and key on street, number, and SAM id.
 - **The FY2026 assessor stores ranged addresses as `ST_NUM` plus `ST_NUM2`**, and street
-  names arrive mixed-case. An exact `datastore_search` filter therefore misses `23-27
-  Lanark Rd` entirely, which is why `src/lib/records/` uses the CKAN SQL endpoint with
+  names arrive mixed-case. An exact `datastore_search` filter therefore misses a ranged
+  Brighton address entirely, which is why `src/lib/records/` uses the CKAN SQL endpoint with
   `upper()` and checks both number columns.
 - **The violation and code-enforcement feeds drop street directionals** and store ranges
   split across a low and a high column (`violation_stno` / `violation_sthigh`), where the
@@ -364,8 +364,9 @@ Things that have already cost time. Read before debugging.
   The legacy files keep the address as free text in `location`; the new one splits it into
   `street_number` / `street_name` / `zip_code`. A retired legacy resource id fails every
   pull until someone updates `LEGACY_311_RESOURCES`; it does not clear on its own. An emptied
-  one fails nothing: 2011 and 2014 have answered with zero rows since the city's 2026-09-18
-  reload (see `src/lib/AGENTS.md`).
+  one fails no pull: 2011 and 2014 have answered with zero rows since the city's 2026-09-18
+  reload. The fixture excuses a file or two emptied like that and fails once three or more
+  that held its building's rows are empty at once (see `src/lib/AGENTS.md`).
 - **CKAN rejects `ESCAPE '\'`** with `HTTP 409 Query is not a single statement`. LIKE
   clauses against `data.boston.gov` use `ESCAPE '!'` instead. See `src/lib/records/ckan.ts`.
 - **Seeded buildings** (`buildings.source = 'seed'`, ids `seed-<parcel>`) come from

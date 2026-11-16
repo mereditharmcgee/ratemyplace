@@ -30,17 +30,17 @@ describe('addressLikeClauses', () => {
   });
 
   it('throws on a column name that is not a safe lowercase identifier', () => {
-    expect(() => addressLikeClauses('address; DROP TABLE x', identityWithForms(['55 LANARK RD']))).toThrow();
-    expect(() => addressLikeClauses('Address', identityWithForms(['55 LANARK RD']))).toThrow();
+    expect(() => addressLikeClauses('address; DROP TABLE x', identityWithForms(['127 TARNWICK PL']))).toThrow();
+    expect(() => addressLikeClauses('Address', identityWithForms(['127 TARNWICK PL']))).toThrow();
   });
 
   it('the emitted pattern is a true prefix match: matches an address extension, not a longer number sharing the prefix', () => {
-    const [clause] = addressLikeClauses('address', identityWithForms(['55 LANARK RD']));
+    const [clause] = addressLikeClauses('address', identityWithForms(['127 TARNWICK PL']));
     const inner = clause.match(/LIKE '(.*)%' ESCAPE '!'/)![1];
     const literal = inner.replace(/!(.)/g, '$1'); // undo '!'-escaping to recover the literal prefix
     const regex = new RegExp('^' + literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '.*$');
-    expect(regex.test('55 LANARK RD REAR')).toBe(true);
-    expect(regex.test('551 LANARK RD')).toBe(false);
+    expect(regex.test('127 TARNWICK PL REAR')).toBe(true);
+    expect(regex.test('1271 TARNWICK PL')).toBe(false);
   });
 });
 
@@ -65,8 +65,8 @@ describe('addressLikeClauses tries every street spelling', () => {
   it('leaves a street whose short form prefixes its other spellings exactly as it was', () => {
     expect(prefixes('1027 Commonwealth Ave')).toEqual(['1027 COMMONWEALTH AV', '1027 COMMONWEALTH AVENUE']);
     expect(prefixes('12 Main Ter')).toEqual(['12 MAIN TE', '12 MAIN TERRACE']);
-    expect(prefixes('23-27 Lanark Rd')).toEqual([
-      '23 LANARK RD', '27 LANARK RD', '23-27 LANARK RD', '23 LANARK ROAD', '27 LANARK ROAD', '23-27 LANARK ROAD',
+    expect(prefixes('52-68 Tarnwick Pl')).toEqual([
+      '52 TARNWICK PL', '68 TARNWICK PL', '52-68 TARNWICK PL', '52 TARNWICK PLACE', '68 TARNWICK PLACE', '52-68 TARNWICK PLACE',
     ]);
   });
 
@@ -89,10 +89,10 @@ describe('addressLikeClauses tries every street spelling', () => {
 
 describe('parseMoney', () => {
   it.each([
-    ['6,720,200', 6720200],
-    ['6780500', 6780500],
-    ['$6,649,200.00 ', 6649200],
-    ['$36,500.00', 36500],
+    ['4,520,600', 4520600],
+    ['4326800', 4326800],
+    ['$4,134,900.00 ', 4134900],
+    ['$23,600.00', 23600],
     [6551400, 6551400],
     [null, null],
     ['', null],
@@ -103,9 +103,9 @@ describe('parseMoney', () => {
 
 describe('parseIntOrNull', () => {
   it.each([
-    ['1920', 1920],
-    ['34650.00000', 34650],
-    ['27720.0', 27720],
+    ['1948', 1948],
+    ['21648.00000', 21648],
+    ['12716.0', 12716],
     ['1,150', 1150],
     [1234.5, 1234],
     ['-5', -5],

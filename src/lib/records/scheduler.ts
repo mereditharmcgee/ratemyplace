@@ -207,7 +207,7 @@ function plural(n: number, word: string): string {
 
 /** The one line that says how the fixture went: the breaker trip reason, and the report's first line. */
 function fixtureHeadline(fixture: FixtureResult): string {
-  return `Lanark fixture: ${plural(fixture.checksFailed, 'check')} failed, ${plural(fixture.sourceErrors.length, 'source')} threw`;
+  return `Records fixture: ${plural(fixture.checksFailed, 'check')} failed, ${plural(fixture.sourceErrors.length, 'source')} threw`;
 }
 
 /**
@@ -265,6 +265,7 @@ export async function plan(deps: SchedulerDeps): Promise<PlanResult> {
       failures: fixture.failures,
       checksFailed: fixture.checksFailed,
       checksTotal: fixture.checks.length,
+      // Labels only. A failed check's detail goes to the email, so the panel shows just the label.
       failed: fixture.checks.filter((check) => !check.ok).map((check) => check.label),
       sourceErrors: fixture.sourceErrors,
       rowsBySource: fixture.rowsBySource,
@@ -333,7 +334,7 @@ export async function plan(deps: SchedulerDeps): Promise<PlanResult> {
         [
           'The city-wide records fill was resumed automatically.',
           '',
-          `The breaker paused it because the Lanark fixture failed. This morning all ${plural(fixture.checks.length, 'check')} passed and no source is over the error threshold, so the fill starts again on the next minute tick.`,
+          `The breaker paused it because the records fixture failed. This morning all ${plural(fixture.checks.length, 'check')} passed and no source is over the error threshold, so the fill starts again on the next minute tick.`,
           '',
           fixtureReport(fixture),
           '',

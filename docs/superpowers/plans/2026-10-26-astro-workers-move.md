@@ -209,7 +209,7 @@ Commits are renumbered in execution order. Mapping from v1: old C2→C1, C3→C2
 
 #### C1 `chore(deps): tailwindcss and @tailwindcss/vite 4.3.3`
 - Run `npm install -D tailwindcss@^4.3.3 @tailwindcss/vite@^4.3.3`. It is still on Vite 6, and 4.3.3 is the first line that accepts Vite 8.
-- Verify: build, then a visual check of `/`, `/search?q=lanark`, a building page and `/methodology` at 375, 768 and 1280 against production.
+- Verify: build, then a visual check of `/`, a search results page, a building page and `/methodology` at 375, 768 and 1280 against production.
 
 #### C2 `refactor(runtime): every Cloudflare env read goes through getEnv/getDB via locals.cfEnv`
 
@@ -598,7 +598,7 @@ Contract tests:
     - In `wt-main`, run `npm run db:setup`, then copy its `.wrangler/state` into `wt-b`, so both serve identical data.
     - Serve `wt-main` with `npx wrangler pages dev dist --port 8790 --persist-to .wrangler/state --binding=TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA`.
     - Serve `wt-b` with `npx wrangler dev --config dist/server/wrangler.json --port 8791 --persist-to .wrangler/state --local-upstream localhost:8791 --var TURNSTILE_SECRET_KEY:1x0000000000000000000000000000000AA`.
-    - Fetch the public pages: `/`, `/search?q=lanark`, one seeded building, one landlord, one property manager, `/methodology`, `/about`, `/privacy`, `/terms`, `/guidelines`, `/contact`, `/dispute`, `/bug-report`, `/map`, `/auth/signin`, `/auth/signup`, `/auth/forgot-password`, `/nope-404`, `/robots.txt`, `/sitemap.xml`.
+    - Fetch the public pages: `/`, one search with results, one seeded building, one landlord, one property manager, `/methodology`, `/about`, `/privacy`, `/terms`, `/guidelines`, `/contact`, `/dispute`, `/bug-report`, `/map`, `/auth/signin`, `/auth/signup`, `/auth/forgot-password`, `/nope-404`, `/robots.txt`, `/sitemap.xml`.
     - Fetch the signed-in pages: `/profile`, `/review/new` and `/admin`, using a session cookie from the seeded e2e admin's sign-in POST with the dummy Turnstile token.
     - Normalise hashed `/_astro/*` names, `astro-island uid`, `data-astro-cid-*` and whitespace runs, then run `git diff --no-index`.
     - Every structural difference (element nesting, missing spaces between inline elements) is explained or fixed.

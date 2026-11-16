@@ -17,7 +17,7 @@ export function titleWord(word: string): string {
 
 /**
  * Whether the assessor already wrote this word in mixed case ('McBride', 'DeWolfe'). The
- * capital has to be internal: a plainly capitalized 'Lanark' title-cases to itself, but
+ * capital has to be internal: a plainly capitalized 'Tarnwick' title-cases to itself, but
  * 'Martin-luther' should be corrected rather than preserved.
  */
 function hasInternalCapital(word: string): boolean {
@@ -61,11 +61,11 @@ function houseNumber(value: unknown): HouseNumber | null {
 }
 
 /**
- * The assessor stores '23' + '27' + 'Lanark RD'; pages read '23-27 Lanark Road'. The
- * suffix is spelled out from the identity table so the seed and the normalizer agree, and
- * a spelled-out leading directional is abbreviated the way `splitSuffix` abbreviates it
- * ('WEST BROADWAY' -> 'W Broadway'). A range renders low to high numerically, whichever
- * order the two columns arrived in.
+ * An assessor row such as '52' + '68' + 'Tarnwick PL' reads '52-68 Tarnwick Place' on a
+ * page. The suffix is spelled out from the identity table so the seed and the normalizer
+ * agree, and a spelled-out leading directional is abbreviated the way `splitSuffix`
+ * abbreviates it ('WEST BROADWAY' -> 'W Broadway'). A range renders low to high
+ * numerically, whichever order the two columns arrived in.
  *
  * Null for the same degenerate streets `buildIdentity` throws on ('AVE', '& ST'), so a
  * bare suffix never becomes a seeded building.
@@ -76,7 +76,7 @@ export function formatSeedAddress(stNum: unknown, stNum2: unknown, stName: unkno
   const full = textOrNull(stName);
   if (!lo || !full) return null;
 
-  // 'LANARK RD, REAR': the suffix keys off the street alone, the tail is shown in parentheses.
+  // 'TARNWICK PL, REAR': the suffix keys off the street alone, the tail is shown in parentheses.
   const comma = full.indexOf(',');
   const street = comma >= 0 ? full.slice(0, comma).trim() : full;
   const tail = comma >= 0 ? full.slice(comma + 1).trim() : '';

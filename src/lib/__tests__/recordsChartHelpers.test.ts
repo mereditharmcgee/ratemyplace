@@ -106,11 +106,11 @@ describe('countByYear', () => {
   });
 
   it('reads the year off each of the timestamp shapes the feeds use', () => {
-    const rows = [row('2008-08-30 09:42:00'), row('2021-01-28T16:29:26'), row('2026-07-17 13:56:00+00')];
+    const rows = [row('2015-07-23 10:27:00'), row('2022-12-05T11:24:37'), row('2025-06-30 13:52:00+00')];
     const series = countByYear(rows, (r) => r.date);
-    expect(series[0]).toEqual({ year: 2008, count: 1 });
-    expect(series[series.length - 1]).toEqual({ year: 2026, count: 1 });
-    expect(series).toHaveLength(19);
+    expect(series[0]).toEqual({ year: 2015, count: 1 });
+    expect(series[series.length - 1]).toEqual({ year: 2025, count: 1 });
+    expect(series).toHaveLength(11);
   });
 });
 

@@ -12,8 +12,8 @@ describe('normalizeSearchQuery', () => {
     expect(normalizeSearchQuery('  Beacon St., #3 ')).toEqual([['beacon'], ['st', 'street'], ['3']]);
   });
   it('keeps a hyphenated range as one term and strips stray hyphens', () => {
-    expect(normalizeSearchQuery('23-27 Lanark')).toEqual([['23-27'], ['lanark']]);
-    expect(normalizeSearchQuery('-23-27-')).toEqual([['23-27']]);
+    expect(normalizeSearchQuery('52-68 Tarnwick')).toEqual([['52-68'], ['tarnwick']]);
+    expect(normalizeSearchQuery('-52-68-')).toEqual([['52-68']]);
   });
   it('returns an empty list for an empty or punctuation-only query', () => {
     expect(normalizeSearchQuery('')).toEqual([]);

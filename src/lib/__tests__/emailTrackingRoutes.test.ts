@@ -213,7 +213,7 @@ describe.skipIf(!sqliteAvailable)('route email sends record their failures', () 
     await db.prepare("INSERT INTO users (id, email) VALUES ('tenant-1', 'tenant@example.com')").run();
     await insertBuilding(db);
     await db
-      .prepare("INSERT INTO reviews (id, user_id, building_id, status) VALUES ('rev-1', 'tenant-1', 'bldg-lanark', 'approved')")
+      .prepare("INSERT INTO reviews (id, user_id, building_id, status) VALUES ('rev-1', 'tenant-1', 'bldg-tarnwick', 'approved')")
       .run();
     await db
       .prepare(

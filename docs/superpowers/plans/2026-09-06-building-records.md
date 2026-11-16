@@ -1,5 +1,7 @@
 # Building Records (Sub-project A) Implementation Plan
 
+> **Note (2026-11-15):** the practice building in this plan is now fictional: 52-68 Tarnwick Pl, with made-up records throughout. It replaced a real building. Lines that recorded what the live city data showed for that building are worded generically. The live records check (`npm run records:check` and the scheduler's daily breaker) now runs against a different, real building set in `src/lib/records/fixture.ts`, so the live-check code and values here do not match what it checks today.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a cited, dated public-records panel to Boston building pages, fed by admin-triggered pulls from City of Boston open data, with a correction path whose only resolution is a re-pull.
@@ -20,15 +22,15 @@ These override the brief where they differ. The adapters are written to them.
 
 | Fact | Consequence |
 |---|---|
-| FY2026 assessor stores ranged addresses as `ST_NUM` = `23`, `ST_NUM2` = `27`, `ST_NAME` = `Lanark RD` (mixed case). Exact `filters` on `datastore_search` return nothing for Lanark. | All sources use `datastore_search_sql` with `upper()` comparisons. Parcel resolution matches `ST_NUM` or `ST_NUM2`. |
-| Street suffixes are short and uppercase in assessor, permits, and enforcement (`AV`, `RD`, `ST`). 311 `location` uses `Rd`/`Ave` free text: `23 Lanark Rd  Brighton  MA  02135` (double spaces). | Identity builds short-suffix forms for exact matches and both short and long forms for `LIKE` matches. |
-| Permits `parcel_id` is numeric (leading zero dropped). Lanark has 0 permits by parcel and by address. `55-65 Lanark RD` has 14 by address. | Permits query by numeric parcel OR address forms. |
-| Violations and enforcement key on `violation_street` = `Lanark` (bare name) and `violation_stno` = `23`. Enforcement for Lanark returns 3 rows across 2 case numbers (one case has two codes), contact `1505 COMMONWEALTH  AV`, 2008. Violations: none. | Source key for both is `case_no:code`. |
-| RentSmart has a `parcel` column. Lanark returns 4 rows (3 Housing Complaints 2025 to 2026, 1 Sanitation). | RentSmart queries by parcel. |
+| FY2026 assessor stores ranged addresses as `ST_NUM` = `52`, `ST_NUM2` = `68`, `ST_NAME` = street plus suffix in mixed case (the fixture's fictional `Tarnwick PL`). Exact `filters` on `datastore_search` return nothing for the practice building's ranged address. | All sources use `datastore_search_sql` with `upper()` comparisons. Parcel resolution matches `ST_NUM` or `ST_NUM2`. |
+| Street suffixes are short and uppercase in assessor, permits, and enforcement (`AV`, `RD`, `ST`). 311 `location` uses short suffixes such as `Pl` and `Ave` in free text with double spaces, as in the fixture's `52 Tarnwick Pl  Brighton  MA  02135`. | Identity builds short-suffix forms for exact matches and both short and long forms for `LIKE` matches. |
+| Permits `parcel_id` is numeric (leading zero dropped). The permit tests use a condominium on the same street (`127-129`) as the positive control, with fictional permit rows that match it by address. | Permits query by numeric parcel OR address forms. |
+| Violations and enforcement key on `violation_street` = the bare street name and `violation_stno` = `52`. One enforcement case can carry several codes, and a contact address can hold two spaces before `AV`. | Source key for both is `case_no:code`. |
+| RentSmart has a `parcel` column, and each row carries a `violation_type` such as Housing Complaints or Sanitation Requests. | RentSmart queries by parcel. |
 | 311 legacy yearly resources 2011 to 2026 share one schema. The new-system resource has a different schema (`case_id`, `street_number`, `street_name`, `case_topic`, `assigned_department`). No Inspectional Services cases exist in the new system yet. | One 311 source runs 17 queries; classification rules differ per system. |
-| Assessment history columns drift: FY2024 has no `ST_NUM2`; FY2023 has `OWNER MAIL ADDRESS` combined; FY2022 and FY2021 use `MAIL_ADDRESS`, `MAIL_ZIPCODE`, `ZIPCODE`. Values are formatted `6,720,200`, `6780500`, or `$6,649,200.00 `. `PID` is stable across years for Lanark. | Per-year column map and a money parser that strips everything but digits and dot. |
+| Assessment history columns drift: FY2024 has no `ST_NUM2`; FY2023 has `OWNER MAIL ADDRESS` combined; FY2022 and FY2021 use `MAIL_ADDRESS`, `MAIL_ZIPCODE`, `ZIPCODE`. Values are formatted like `4,520,600`, `4326800`, or `$4,134,900.00 ` (fictional values in the real formats). `PID` is stable across years for the practice building. | Per-year column map and a money parser that strips everything but digits and dot. |
 | Dataset page slugs: `property-assessment`, `approved-building-permits`, `building-and-property-violations1`, `public-works-violations`, `311-service-requests`, `rentsmart`. | `pageUrl` on each source. |
-| Lanark FY2026: `TOTAL_VALUE` 6,720,200; `LAND_VALUE` 1,620,500; `BLDG_VALUE` 5,099,700; mail `PO BOX 35006`, addressee `C/O ATT <person>`; `LU` `A`; `YR_BUILT` 1920; `YR_REMODEL` 1980; `GROSS_AREA` 34650; `LIVING_AREA` 27720. | Fixture values. |
+| Practice building FY2026, as written into the fixture: `TOTAL_VALUE` 4,520,600; `LAND_VALUE` 1,302,900; `BLDG_VALUE` 3,217,700; mail `88 FELLWICK AV, WELLESLEY, MA 02481`, no addressee; `LU` `A`; `YR_BUILT` 1948; `YR_REMODEL` 1996; `GROSS_AREA` 21648; `LIVING_AREA` 12716. | Fixture values. |
 | `audit_logs` has a `CHECK` on `action_type`. New action types require a table rebuild (the 0028 pattern). | Migration 0030 rebuilds `audit_logs` adding `records_pulled` and `record_correction_resolved`. |
 
 ## File structure
@@ -63,7 +65,7 @@ These override the brief where they differ. The adapters are written to them.
 | `src/pages/admin/records.astro` | Admin page |
 | `src/lib/__tests__/helpers/sqliteD1.ts` | Add `batch` and `exec` |
 | `src/lib/__tests__/helpers/records/*.json`, `fixtureFetch.ts`, `recordsDb.ts` | Recorded responses, fake fetch, schema bootstrap |
-| `scripts/records-fixture-check.ts` | Live Lanark check, run by hand |
+| `scripts/records-fixture-check.ts` | Live records fixture check, run by hand |
 
 ---
 
@@ -230,12 +232,12 @@ export async function insertBuilding(
   db: TestD1Database,
   overrides: Partial<{ id: string; address: string; slug: string; city: string; zip_code: string; parcel_id: string | null }> = {},
 ): Promise<string> {
-  const id = overrides.id ?? 'bldg-lanark';
+  const id = overrides.id ?? 'bldg-tarnwick';
   await db
     .prepare('INSERT INTO buildings (id, address, slug, city, state, zip_code, parcel_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .bind(
       id,
-      overrides.address ?? '23-27 Lanark Rd, Boston, MA 02135',
+      overrides.address ?? '52-68 Tarnwick Pl, Boston, MA 02135',
       overrides.slug ?? id,
       overrides.city ?? 'Boston',
       'MA',
@@ -260,9 +262,9 @@ const suite = sqliteAvailable ? describe : describe.skip;
 suite('migrations 0029 and 0030', () => {
   it('adds parcel_id to buildings and creates the three records tables', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { parcel_id: '2102098000' });
+    await insertBuilding(db, { parcel_id: '2109417000' });
     const row = await db.prepare('SELECT parcel_id, sam_id FROM buildings').first<{ parcel_id: string; sam_id: string | null }>();
-    expect(row).toEqual({ parcel_id: '2102098000', sam_id: null });
+    expect(row).toEqual({ parcel_id: '2109417000', sam_id: null });
 
     const tables = await db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('record_pulls','building_records','record_corrections') ORDER BY name")
@@ -572,15 +574,15 @@ export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
 export interface BuildingIdentity {
   buildingId: string;
-  /** Individual street numbers, e.g. ['23','27'] for '23-27'. */
+  /** Individual street numbers, e.g. ['52','68'] for '52-68'. */
   numbers: string[];
-  /** The hyphenated range as written, e.g. '23-27', or null. */
+  /** The hyphenated range as written, e.g. '52-68', or null. */
   rangeForm: string | null;
-  /** Uppercase street with short suffix, e.g. 'LANARK RD'. */
+  /** Uppercase street with short suffix, e.g. 'TARNWICK PL'. */
   streetShort: string;
-  /** Uppercase street with long suffix, e.g. 'LANARK ROAD'. Equal to streetShort when no suffix. */
+  /** Uppercase street with long suffix, e.g. 'TARNWICK PLACE'. Equal to streetShort when no suffix. */
   streetLong: string;
-  /** Uppercase street name without suffix, e.g. 'LANARK'. */
+  /** Uppercase street name without suffix, e.g. 'TARNWICK'. */
   streetBase: string;
   /** Every '<number> <streetShort>' form, uppercase. */
   addressFormsShort: string[];
@@ -665,13 +667,13 @@ describe('sqlLiteral', () => {
 
 describe('parseMoney / parseIntOrNull', () => {
   it('handles every assessor value format seen in the wild', () => {
-    expect(parseMoney('6,720,200')).toBe(6720200);
-    expect(parseMoney('6780500')).toBe(6780500);
-    expect(parseMoney('$6,649,200.00 ')).toBe(6649200);
-    expect(parseMoney('$36,500.00')).toBe(36500);
+    expect(parseMoney('4,520,600')).toBe(4520600);
+    expect(parseMoney('4326800')).toBe(4326800);
+    expect(parseMoney('$4,134,900.00 ')).toBe(4134900);
+    expect(parseMoney('$23,600.00')).toBe(23600);
     expect(parseMoney(null)).toBeNull();
     expect(parseMoney('')).toBeNull();
-    expect(parseIntOrNull('1920')).toBe(1920);
+    expect(parseIntOrNull('1948')).toBe(1948);
     expect(parseIntOrNull(null)).toBeNull();
     expect(parseIntOrNull('abc')).toBeNull();
   });
@@ -732,7 +734,7 @@ export function sqlLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-/** '6,720,200' | '6780500' | '$6,649,200.00 ' -> integer dollars; null when absent. */
+/** '4,520,600' | '4326800' | '$4,134,900.00 ' -> integer dollars; null when absent. */
 export function parseMoney(value: string | null | undefined): number | null {
   if (value == null) return null;
   const cleaned = String(value).replace(/[^0-9.]/g, '');
@@ -819,18 +821,18 @@ git commit -m "feat(records): record types and CKAN SQL client"
 import { describe, it, expect } from 'vitest';
 import { buildIdentity, toCanonicalParcel, toNumericParcel } from '../records/identity';
 
-const base = { id: 'b1', address: '23-27 Lanark Rd, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: null, sam_id: null };
+const base = { id: 'b1', address: '52-68 Tarnwick Pl, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: null, sam_id: null };
 
 describe('buildIdentity', () => {
   it('splits a ranged address into numbers, keeps the range, and normalizes the suffix', () => {
     const id = buildIdentity(base);
-    expect(id.numbers).toEqual(['23', '27']);
-    expect(id.rangeForm).toBe('23-27');
-    expect(id.streetShort).toBe('LANARK RD');
-    expect(id.streetLong).toBe('LANARK ROAD');
-    expect(id.streetBase).toBe('LANARK');
-    expect(id.addressFormsShort).toEqual(['23 LANARK RD', '27 LANARK RD', '23-27 LANARK RD']);
-    expect(id.addressFormsLong).toEqual(['23 LANARK ROAD', '27 LANARK ROAD', '23-27 LANARK ROAD']);
+    expect(id.numbers).toEqual(['52', '68']);
+    expect(id.rangeForm).toBe('52-68');
+    expect(id.streetShort).toBe('TARNWICK PL');
+    expect(id.streetLong).toBe('TARNWICK PLACE');
+    expect(id.streetBase).toBe('TARNWICK');
+    expect(id.addressFormsShort).toEqual(['52 TARNWICK PL', '68 TARNWICK PL', '52-68 TARNWICK PL']);
+    expect(id.addressFormsLong).toEqual(['52 TARNWICK PLACE', '68 TARNWICK PLACE', '52-68 TARNWICK PLACE']);
     expect(id.zip).toBe('02135');
     expect(id.parcelId).toBeNull();
     expect(id.condominium).toBe(false);
@@ -860,14 +862,14 @@ describe('buildIdentity', () => {
   });
 
   it('throws on an address it cannot parse', () => {
-    expect(() => buildIdentity({ ...base, address: 'Lanark Road' })).toThrow(/parse/i);
+    expect(() => buildIdentity({ ...base, address: 'Tarnwick Place' })).toThrow(/parse/i);
   });
 });
 
 describe('parcel helpers', () => {
   it('canonical form keeps ten digits with a leading zero; numeric strips it', () => {
     expect(toCanonicalParcel('100001000')).toBe('0100001000');
-    expect(toCanonicalParcel('2102098000')).toBe('2102098000');
+    expect(toCanonicalParcel('2109417000')).toBe('2109417000');
     expect(toNumericParcel('0100001000')).toBe('100001000');
     expect(toCanonicalParcel('12ab')).toBeNull();
   });
@@ -994,9 +996,9 @@ git commit -m "feat(records): building identity with address and parcel forms"
 
 **Files:**
 - Create: `src/lib/__tests__/helpers/records/fixtureFetch.ts`
-- Create: `src/lib/__tests__/helpers/records/assessor-fy2026-lanark.json`
+- Create: `src/lib/__tests__/helpers/records/assessor-fy2026-tarnwick.json`
 - Create: `src/lib/__tests__/helpers/records/assessor-fy2026-condo.json`
-- Create: `src/lib/__tests__/helpers/records/assessor-fy2021-lanark.json`
+- Create: `src/lib/__tests__/helpers/records/assessor-fy2021-tarnwick.json`
 - Create: `src/lib/records/sources/boston/assessor.ts`
 - Test: `src/lib/__tests__/recordsAssessor.test.ts`
 
@@ -1042,42 +1044,42 @@ export function fixtureFetch(routes: FixtureRoute[]): FetchLike & { calls: strin
 
 - [ ] **Step 2: Write the three assessor fixtures**
 
-`src/lib/__tests__/helpers/records/assessor-fy2026-lanark.json` (one row, values verified live 2026-09-06):
+`src/lib/__tests__/helpers/records/assessor-fy2026-tarnwick.json` (one row; columns verified live 2026-09-06, values fictional):
 
 ```json
 [
   {
-    "PID": "2102098000", "ST_NUM": "23", "ST_NUM2": "27", "ST_NAME": "Lanark RD", "CITY": "BRIGHTON", "ZIP_CODE": "02135",
-    "LU": "A", "LU_DESC": "APT 7-30 UNITS", "OWNER": "LANARK ROAD LLC MASS LLC",
-    "MAIL_ADDRESSEE": "C/O ATT <person>", "MAIL_STREET_ADDRESS": "PO BOX 35006", "MAIL_CITY": "BOSTON", "MAIL_STATE": "MA", "MAIL_ZIP_CODE": "02135",
-    "RES_UNITS": null, "COM_UNITS": null, "GROSS_AREA": "34650", "LIVING_AREA": "27720",
-    "LAND_VALUE": "1,620,500", "BLDG_VALUE": "5,099,700", "TOTAL_VALUE": "6,720,200",
-    "YR_BUILT": "1920", "YR_REMODEL": "1980", "NUM_BLDGS": "1"
+    "PID": "2109417000", "ST_NUM": "52", "ST_NUM2": "68", "ST_NAME": "Tarnwick PL", "CITY": "BRIGHTON", "ZIP_CODE": "02135",
+    "LU": "A", "LU_DESC": "APT 7-30 UNITS", "OWNER": "WRENFIELD REALTY LLC",
+    "MAIL_ADDRESSEE": null, "MAIL_STREET_ADDRESS": "88 FELLWICK AV", "MAIL_CITY": "WELLESLEY", "MAIL_STATE": "MA", "MAIL_ZIP_CODE": "02481",
+    "RES_UNITS": null, "COM_UNITS": null, "GROSS_AREA": "21648", "LIVING_AREA": "12716",
+    "LAND_VALUE": "1,302,900", "BLDG_VALUE": "3,217,700", "TOTAL_VALUE": "4,520,600",
+    "YR_BUILT": "1948", "YR_REMODEL": "1996", "NUM_BLDGS": "1"
   }
 ]
 ```
 
-`src/lib/__tests__/helpers/records/assessor-fy2026-condo.json` (55 Lanark: a CM master row plus CD unit rows, trimmed to the columns the resolver reads):
+`src/lib/__tests__/helpers/records/assessor-fy2026-condo.json` (127-129 Tarnwick: a CM master row plus a CD unit row on each of its numbers, trimmed to the columns the resolver reads):
 
 ```json
 [
-  { "PID": "2102110000", "ST_NUM": "55", "ST_NUM2": "65", "ST_NAME": "Lanark RD", "LU": "CM", "OWNER": "GRAND LANARK CONDO TR" },
-  { "PID": "2102110002", "ST_NUM": "55", "ST_NUM2": null, "ST_NAME": "Lanark RD", "LU": "CD", "OWNER": "SRIVATSA SRINI" },
-  { "PID": "2102110004", "ST_NUM": "55", "ST_NUM2": null, "ST_NAME": "Lanark RD", "LU": "CD", "OWNER": "MATTCAM LLC" }
+  { "PID": "2108871000", "ST_NUM": "127", "ST_NUM2": "129", "ST_NAME": "Tarnwick PL", "LU": "CM", "OWNER": "WYNSTABLE CONDO TR" },
+  { "PID": "2108871002", "ST_NUM": "127", "ST_NUM2": null, "ST_NAME": "Tarnwick PL", "LU": "CD", "OWNER": "ELLERBY MORGAN" },
+  { "PID": "2108871004", "ST_NUM": "129", "ST_NUM2": null, "ST_NAME": "Tarnwick PL", "LU": "CD", "OWNER": "PELLOWAY CORA" }
 ]
 ```
 
-`src/lib/__tests__/helpers/records/assessor-fy2021-lanark.json` (legacy column names and dollar formatting):
+`src/lib/__tests__/helpers/records/assessor-fy2021-tarnwick.json` (legacy column names and dollar formatting):
 
 ```json
 [
   {
-    "PID": "2102098000", "ST_NUM": "23  27", "ST_NAME": "LANARK RD", "ZIPCODE": "02135",
-    "LU": "A", "LU_DESC": "APT 7-30 UNITS", "OWNER": "LANARK ROAD LLC MASS LLC",
-    "MAIL_ADDRESSEE": "C/O ATT <person>", "MAIL_ADDRESS": "PO BOX 35006", "MAIL_CITY": "BOSTON", "MAIL_STATE": "MA", "MAIL_ZIPCODE": "02135",
-    "RES_UNITS": null, "COM_UNITS": null, "GROSS_AREA": "34650", "LIVING_AREA": "27720",
-    "LAND_VALUE": "$1,488,900.00 ", "BLDG_VALUE": "$5,160,300.00 ", "TOTAL_VALUE": "$6,649,200.00 ",
-    "YR_BUILT": "1920", "YR_REMODEL": "1980"
+    "PID": "2109417000", "ST_NUM": "52  68", "ST_NAME": "TARNWICK PL", "ZIPCODE": "02135",
+    "LU": "A", "LU_DESC": "APT 7-30 UNITS", "OWNER": "WRENFIELD REALTY LLC",
+    "MAIL_ADDRESSEE": null, "MAIL_ADDRESS": "88 FELLWICK AV", "MAIL_CITY": "WELLESLEY", "MAIL_STATE": "MA", "MAIL_ZIPCODE": "02481",
+    "RES_UNITS": null, "COM_UNITS": null, "GROSS_AREA": "21648", "LIVING_AREA": "12716",
+    "LAND_VALUE": "$1,108,500.00 ", "BLDG_VALUE": "$3,026,400.00 ", "TOTAL_VALUE": "$4,134,900.00 ",
+    "YR_BUILT": "1948", "YR_REMODEL": "1996"
   }
 ]
 ```
@@ -1091,46 +1093,46 @@ import { buildIdentity } from '../records/identity';
 import { resolveParcel, assessorSource, ASSESSOR_YEARS, FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import type { AssessmentPayload } from '../records/types';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
-import lanark2026 from './helpers/records/assessor-fy2026-lanark.json';
+import tarnwick2026 from './helpers/records/assessor-fy2026-tarnwick.json';
 import condo2026 from './helpers/records/assessor-fy2026-condo.json';
-import lanark2021 from './helpers/records/assessor-fy2021-lanark.json';
+import tarnwick2021 from './helpers/records/assessor-fy2021-tarnwick.json';
 
-const lanark = buildIdentity({ id: 'b1', address: '23-27 Lanark Rd, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: null, sam_id: null });
+const tarnwick = buildIdentity({ id: 'b1', address: '52-68 Tarnwick Pl, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: null, sam_id: null });
 const FY2021_RESOURCE_ID = 'c4b7331e-e213-45a5-adda-052e4dd31d41';
 
 describe('resolveParcel', () => {
   it('finds a whole-building parcel by ST_NUM or ST_NUM2 with case-folded street', async () => {
-    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
-    const result = await resolveParcel(lanark, fetchImpl);
-    expect(result).toEqual({ parcelId: '2102098000', condominium: false, candidates: 1 });
-    expect(fetchImpl.calls[0]).toContain(`upper("ST_NAME") = 'LANARK RD'`);
-    expect(fetchImpl.calls[0]).toContain(`"ST_NUM" IN ('23','27','23-27')`);
-    expect(fetchImpl.calls[0]).toContain(`"ST_NUM2" IN ('23','27')`);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }]);
+    const result = await resolveParcel(tarnwick, fetchImpl);
+    expect(result).toEqual({ parcelId: '2109417000', condominium: false, candidates: 1 });
+    expect(fetchImpl.calls[0]).toContain(`upper("ST_NAME") = 'TARNWICK PL'`);
+    expect(fetchImpl.calls[0]).toContain(`"ST_NUM" IN ('52','68','52-68')`);
+    expect(fetchImpl.calls[0]).toContain(`"ST_NUM2" IN ('52','68')`);
   });
 
   it('reports a condominium when only CD and CM rows match, and stores no parcel', async () => {
     const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: condo2026 }]);
-    const fiftyFive = buildIdentity({ id: 'b2', address: '55 Lanark Rd, Boston, MA', city: 'Boston', state: 'MA', zip_code: null, parcel_id: null, sam_id: null });
-    expect(await resolveParcel(fiftyFive, fetchImpl)).toEqual({ parcelId: null, condominium: true, candidates: 3 });
+    const oneTwentySeven = buildIdentity({ id: 'b2', address: '127-129 Tarnwick Pl, Boston, MA', city: 'Boston', state: 'MA', zip_code: null, parcel_id: null, sam_id: null });
+    expect(await resolveParcel(oneTwentySeven, fetchImpl)).toEqual({ parcelId: null, condominium: true, candidates: 3 });
   });
 
   it('returns no parcel and the candidate count when several whole-building rows match', async () => {
     const two = [
-      { ...lanark2026[0], PID: '1' },
-      { ...lanark2026[0], PID: '2' },
+      { ...tarnwick2026[0], PID: '1' },
+      { ...tarnwick2026[0], PID: '2' },
     ];
     const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: two }]);
-    expect(await resolveParcel(lanark, fetchImpl)).toEqual({ parcelId: null, condominium: false, candidates: 2 });
+    expect(await resolveParcel(tarnwick, fetchImpl)).toEqual({ parcelId: null, condominium: false, candidates: 2 });
   });
 
   it('returns zero candidates when nothing matches', async () => {
     const fetchImpl = fixtureFetch([]);
-    expect(await resolveParcel(lanark, fetchImpl)).toEqual({ parcelId: null, condominium: false, candidates: 0 });
+    expect(await resolveParcel(tarnwick, fetchImpl)).toEqual({ parcelId: null, condominium: false, candidates: 0 });
   });
 });
 
 describe('assessorSource', () => {
-  const withParcel = { ...lanark, parcelId: '2102098000', parcelNumeric: '2102098000' };
+  const withParcel = { ...tarnwick, parcelId: '2109417000', parcelNumeric: '2109417000' };
 
   it('has six fiscal years, newest first, each owning its own source key', () => {
     expect(ASSESSOR_YEARS.map((y) => y.fiscalYear)).toEqual(['FY2026', 'FY2025', 'FY2024', 'FY2023', 'FY2022', 'FY2021']);
@@ -1139,32 +1141,32 @@ describe('assessorSource', () => {
   });
 
   it('maps a modern row to an AssessmentPayload with parsed numbers', async () => {
-    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }]);
     const result = await assessorSource(ASSESSOR_YEARS[0]).run(withParcel, fetchImpl);
-    expect(result.query).toContain(`"PID" IN ('2102098000')`);
+    expect(result.query).toContain(`"PID" IN ('2109417000')`);
     expect(result.rows).toHaveLength(1);
     const payload = result.rows[0].payload as AssessmentPayload;
     expect(result.rows[0].sourceKey).toBe('FY2026');
     expect(payload).toMatchObject({
-      fiscalYear: 'FY2026', parcelId: '2102098000', owner: 'LANARK ROAD LLC MASS LLC',
-      mailAddressee: 'C/O ATT <person>', mailStreet: 'PO BOX 35006', mailCity: 'BOSTON', mailState: 'MA', mailZip: '02135',
-      landUse: 'A', landUseDescription: 'APT 7-30 UNITS', yearBuilt: 1920, yearRemodel: 1980,
-      grossArea: 34650, livingArea: 27720, residentialUnits: null, commercialUnits: null,
-      totalValue: 6720200, landValue: 1620500, buildingValue: 5099700, condominium: false,
+      fiscalYear: 'FY2026', parcelId: '2109417000', owner: 'WRENFIELD REALTY LLC',
+      mailAddressee: null, mailStreet: '88 FELLWICK AV', mailCity: 'WELLESLEY', mailState: 'MA', mailZip: '02481',
+      landUse: 'A', landUseDescription: 'APT 7-30 UNITS', yearBuilt: 1948, yearRemodel: 1996,
+      grossArea: 21648, livingArea: 12716, residentialUnits: null, commercialUnits: null,
+      totalValue: 4520600, landValue: 1302900, buildingValue: 3217700, condominium: false,
     });
   });
 
   it('maps a legacy FY2021 row through its column map', async () => {
-    const fetchImpl = fixtureFetch([{ resourceId: FY2021_RESOURCE_ID, records: lanark2021 }]);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2021_RESOURCE_ID, records: tarnwick2021 }]);
     const year = ASSESSOR_YEARS.find((y) => y.fiscalYear === 'FY2021')!;
     const result = await assessorSource(year).run(withParcel, fetchImpl);
     const payload = result.rows[0].payload as AssessmentPayload;
-    expect(payload).toMatchObject({ fiscalYear: 'FY2021', mailStreet: 'PO BOX 35006', mailZip: '02135', totalValue: 6649200, landValue: 1488900 });
+    expect(payload).toMatchObject({ fiscalYear: 'FY2021', mailStreet: '88 FELLWICK AV', mailZip: '02481', totalValue: 4134900, landValue: 1108500 });
   });
 
   it('queries both parcel forms when the parcel has a leading zero', async () => {
     const fetchImpl = fixtureFetch([]);
-    const zero = { ...lanark, parcelId: '0100001000', parcelNumeric: '100001000' };
+    const zero = { ...tarnwick, parcelId: '0100001000', parcelNumeric: '100001000' };
     const result = await assessorSource(ASSESSOR_YEARS[0]).run(zero, fetchImpl);
     expect(result.query).toContain(`"PID" IN ('0100001000','100001000')`);
     expect(result.rows).toEqual([]);
@@ -1172,7 +1174,7 @@ describe('assessorSource', () => {
 
   it('emits a single owner-less condominium row for the current year and nothing for history', async () => {
     const fetchImpl = fixtureFetch([]);
-    const condo = { ...lanark, condominium: true };
+    const condo = { ...tarnwick, condominium: true };
     const current = await assessorSource(ASSESSOR_YEARS[0]).run(condo, fetchImpl);
     expect(current.rows).toHaveLength(1);
     expect((current.rows[0].payload as AssessmentPayload)).toMatchObject({ condominium: true, owner: null, parcelId: null });
@@ -1191,7 +1193,7 @@ describe('assessorSource', () => {
   });
 
   it('throws when the parcel is unresolved and the building is not a condominium', async () => {
-    await expect(assessorSource(ASSESSOR_YEARS[0]).run(lanark, fixtureFetch([]))).rejects.toThrow(/parcel/i);
+    await expect(assessorSource(ASSESSOR_YEARS[0]).run(tarnwick, fixtureFetch([]))).rejects.toThrow(/parcel/i);
   });
 });
 ```
@@ -1314,7 +1316,7 @@ function mapRow(row: Row, year: AssessorYear): AssessmentPayload {
   let mailState = pick(c.mailState);
   let mailZip = pick(c.mailZip);
   if (c.mailCombined) {
-    // "PO BOX 35006 C/O ATT <person>, BOSTON, MA 02135"
+    // "88 FELLWICK AV, WELLESLEY, MA 02481"
     const combined = pick(c.mailCombined) ?? '';
     const parts = combined.split(',').map((p) => p.trim());
     mailStreet = parts[0] || null;
@@ -1408,30 +1410,30 @@ git commit -m "feat(records): Boston assessor source with parcel resolution and 
 
 - [ ] **Step 1: Write the fixture**
 
-Shape copied from a live permit row; address and parcel changed to the 55-65 Lanark positive control.
+Shape copied from a live permit row; the values are fictional, and the address and parcel are those of the 127-129 Tarnwick condo positive control.
 
 ```json
 [
   {
-    "permitnumber": "A1000569", "worktype": "INTEXT", "permittypedescr": "Amendment to a Long Form",
-    "description": "Interior/Exterior Work", "comments": "Install new wheelchair lift.", "applicant": "Patrick Sharkey",
-    "declared_valuation": "$36,500.00", "total_fees": "$390.00", "issued_date": "2021-01-28T16:29:26",
-    "expiration_date": "2021-07-28T04:00:00", "status": "Closed", "occupancytype": "Mixed",
-    "address": "55-65 Lanark RD", "city": "Boston", "state": "MA", "zip": "02135", "parcel_id": 2102110000
+    "permitnumber": "SF437182", "worktype": "EXTREN", "permittypedescr": "Short Form Bldg Permit",
+    "description": "Renovations - Exterior", "comments": "Repoint rear parapet wall.", "applicant": "Morgan Fasket",
+    "declared_valuation": "$23,600.00", "total_fees": "$263.00", "issued_date": "2022-12-05T11:24:37",
+    "expiration_date": "2021-09-16T04:00:00", "status": "Closed", "occupancytype": "Mixed",
+    "address": "127-129 Tarnwick PL", "city": "Boston", "state": "MA", "zip": "02135", "parcel_id": 2108871000
   },
   {
     "permitnumber": "E123", "worktype": "ELECTRICAL", "permittypedescr": "Electrical Permit",
     "description": "Electrical", "comments": null, "applicant": "Jane Spark",
-    "declared_valuation": "$1,200.00", "total_fees": "$50.00", "issued_date": "2019-05-02T09:00:00",
+    "declared_valuation": "$4,700.00", "total_fees": "$50.00", "issued_date": "2019-06-11T09:30:00",
     "expiration_date": null, "status": "Open", "occupancytype": "Multi",
-    "address": "55 Lanark RD", "city": "Boston", "state": "MA", "zip": "02135", "parcel_id": 2102110000
+    "address": "129 Tarnwick PL", "city": "Boston", "state": "MA", "zip": "02135", "parcel_id": 2108871000
   },
   {
     "permitnumber": "E123", "worktype": "ELECTRICAL", "permittypedescr": "Electrical Permit",
     "description": "duplicate row for dedupe test", "comments": null, "applicant": "Jane Spark",
-    "declared_valuation": "$1,200.00", "total_fees": "$50.00", "issued_date": "2019-05-02T09:00:00",
+    "declared_valuation": "$4,700.00", "total_fees": "$50.00", "issued_date": "2019-06-11T09:30:00",
     "expiration_date": null, "status": "Open", "occupancytype": "Multi",
-    "address": "55 Lanark RD", "city": "Boston", "state": "MA", "zip": "02135", "parcel_id": 2102110000
+    "address": "129 Tarnwick PL", "city": "Boston", "state": "MA", "zip": "02135", "parcel_id": 2108871000
   }
 ]
 ```
@@ -1447,34 +1449,34 @@ import type { PermitPayload } from '../records/types';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
 import positive from './helpers/records/permits-positive.json';
 
-const fiftyFive = {
-  ...buildIdentity({ id: 'b2', address: '55-65 Lanark Rd, Boston, MA', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: '2102110000', sam_id: null }),
+const oneTwentySeven = {
+  ...buildIdentity({ id: 'b2', address: '127-129 Tarnwick Pl, Boston, MA', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: '2108871000', sam_id: null }),
 };
 
 describe('permitsSource', () => {
   it('queries by numeric parcel and every address form, both suffix spellings', async () => {
     const fetchImpl = fixtureFetch([{ resourceId: PERMITS_RESOURCE_ID, records: positive }]);
-    const result = await permitsSource.run(fiftyFive, fetchImpl);
-    expect(result.query).toContain('"parcel_id" = 2102110000');
-    expect(result.query).toContain(`upper("address") LIKE '55 LANARK RD%'`);
-    expect(result.query).toContain(`upper("address") LIKE '55-65 LANARK ROAD%'`);
+    const result = await permitsSource.run(oneTwentySeven, fetchImpl);
+    expect(result.query).toContain('"parcel_id" = 2108871000');
+    expect(result.query).toContain(`upper("address") LIKE '127 TARNWICK PL%'`);
+    expect(result.query).toContain(`upper("address") LIKE '127-129 TARNWICK PLACE%'`);
     expect(result.query).toContain('ORDER BY "issued_date" DESC');
   });
 
   it('maps rows, parses money, and deduplicates on permit number', async () => {
     const fetchImpl = fixtureFetch([{ resourceId: PERMITS_RESOURCE_ID, records: positive }]);
-    const result = await permitsSource.run(fiftyFive, fetchImpl);
-    expect(result.rows.map((r) => r.sourceKey)).toEqual(['A1000569', 'E123']);
+    const result = await permitsSource.run(oneTwentySeven, fetchImpl);
+    expect(result.rows.map((r) => r.sourceKey)).toEqual(['SF437182', 'E123']);
     const first = result.rows[0].payload as PermitPayload;
     expect(first).toMatchObject({
-      permitNumber: 'A1000569', permitType: 'Amendment to a Long Form', declaredValuation: 36500, totalFees: 390,
-      issuedDate: '2021-01-28T16:29:26', status: 'Closed', address: '55-65 Lanark RD',
+      permitNumber: 'SF437182', permitType: 'Short Form Bldg Permit', declaredValuation: 23600, totalFees: 263,
+      issuedDate: '2022-12-05T11:24:37', status: 'Closed', address: '127-129 Tarnwick PL',
     });
     expect(result.rows[0].kind).toBe('permit');
   });
 
   it('omits the parcel clause when the building has no parcel', async () => {
-    const noParcel = { ...fiftyFive, parcelId: null, parcelNumeric: null };
+    const noParcel = { ...oneTwentySeven, parcelId: null, parcelNumeric: null };
     const fetchImpl = fixtureFetch([]);
     const result = await permitsSource.run(noParcel, fetchImpl);
     expect(result.query).not.toContain('parcel_id');
@@ -1578,16 +1580,42 @@ Both feeds share one row shape (`case_no`, `code`, `status`, `status_dttm`, `vio
 - Create: `src/lib/records/sources/boston/violationFeeds.ts`
 - Create: `src/lib/records/sources/boston/violations.ts`
 - Create: `src/lib/records/sources/boston/enforcement.ts`
-- Create: `src/lib/__tests__/helpers/records/enforcement-lanark.json`
+- Create: `src/lib/__tests__/helpers/records/enforcement-tarnwick.json`
 - Test: `src/lib/__tests__/recordsViolations.test.ts`
 
-- [ ] **Step 1: Write the fixture (three real Lanark rows, verified live 2026-09-06)**
+- [ ] **Step 1: Write the fixture (29 fictional lines on 16 tickets, most tickets with two codes)**
 
 ```json
 [
-  { "case_no": "CE7067", "ticket_no": "T1", "status_dttm": "2008-08-30 09:42:00", "status": "Closed", "code": "1", "value": "50", "description": "Improper storage trash: res", "violation_stno": "23", "violation_street": "Lanark", "violation_suffix": "RD", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "1505 COMMONWEALTH  AV", "sam_id": "83763" },
-  { "case_no": "CE7067", "ticket_no": "T1", "status_dttm": "2008-08-30 09:42:00", "status": "Closed", "code": "9a", "value": "50", "description": "Illegal dumping < 1 cubic yd", "violation_stno": "23", "violation_street": "Lanark", "violation_suffix": "RD", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "1505 COMMONWEALTH  AV", "sam_id": "83763" },
-  { "case_no": "CE5252", "ticket_no": "T2", "status_dttm": "2008-08-05 09:15:00", "status": "Closed", "code": "9b", "value": "100", "description": "Illegal dumping 1-5 cubic yd.:", "violation_stno": "23", "violation_street": "Lanark", "violation_suffix": "RD", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "1505 COMMONWEALTH  AV", "sam_id": "83763" }
+  { "case_no": "CE0916", "ticket_no": "T16", "status_dttm": "2025-01-23 08:31:00", "status": "Open", "code": "1", "value": "25", "description": "Improper storage trash: res", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0916", "ticket_no": "T16", "status_dttm": "2025-01-23 08:31:00", "status": "Open", "code": "3", "value": "100", "description": "Overfilling of barrel/dumpster", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0915", "ticket_no": "T15", "status_dttm": "2024-09-11 13:13:00", "status": "Closed", "code": "1", "value": "25", "description": "Improper storage trash: res", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0914", "ticket_no": "T14", "status_dttm": "2023-07-19 15:37:00", "status": "Closed", "code": "1", "value": "25", "description": "Improper storage trash: res", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0914", "ticket_no": "T14", "status_dttm": "2023-07-19 15:37:00", "status": "Closed", "code": "21a", "value": "150", "description": "illegal parking prop owner 1", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0913", "ticket_no": "T13", "status_dttm": "2022-03-10 12:43:00", "status": "Closed", "code": "17a", "value": "50", "description": "Failure clear sidewalk - snow", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0913", "ticket_no": "T13", "status_dttm": "2022-03-10 12:43:00", "status": "Closed", "code": "17c", "value": "200", "description": "Failure clear sidewalk - snow", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0912", "ticket_no": "T12", "status_dttm": "2021-09-08 07:21:00", "status": "Closed", "code": "24", "value": "15", "description": "Overgrown Weeds On Property", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0912", "ticket_no": "T12", "status_dttm": "2021-09-08 07:21:00", "status": "Closed", "code": "1", "value": "25", "description": "Improper storage trash: res", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0911", "ticket_no": "T11", "status_dttm": "2020-11-20 14:37:00", "status": "Closed", "code": "3", "value": "100", "description": "Overfilling of barrel/dumpster", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0911", "ticket_no": "T11", "status_dttm": "2020-11-20 14:37:00", "status": "Closed", "code": "25", "value": "50", "description": "No Number On A Building", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0910", "ticket_no": "T10", "status_dttm": "2019-03-13 09:18:00", "status": "Closed", "code": "1", "value": "25", "description": "Improper storage trash: res", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0910", "ticket_no": "T10", "status_dttm": "2019-03-13 09:18:00", "status": "Closed", "code": "3", "value": "100", "description": "Overfilling of barrel/dumpster", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0909", "ticket_no": "T9", "status_dttm": "2018-10-25 10:49:00", "status": "Closed", "code": "1", "value": "25", "description": "Improper storage trash: res", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0909", "ticket_no": "T9", "status_dttm": "2018-10-25 10:49:00", "status": "Closed", "code": "25", "value": "50", "description": "No Number On A Building", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0908", "ticket_no": "T8", "status_dttm": "2017-02-22 13:17:00", "status": "Closed", "code": "17a", "value": "50", "description": "Failure clear sidewalk - snow", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0907", "ticket_no": "T7", "status_dttm": "2016-08-03 14:10:00", "status": "Closed", "code": "1", "value": "25", "description": "Improper storage trash: res", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0907", "ticket_no": "T7", "status_dttm": "2016-08-03 14:10:00", "status": "Closed", "code": "24", "value": "15", "description": "Overgrown Weeds On Property", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0906", "ticket_no": "T6", "status_dttm": "2015-06-16 13:30:00", "status": "Closed", "code": "1", "value": "25", "description": "Improper storage trash: res", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0906", "ticket_no": "T6", "status_dttm": "2015-06-16 13:30:00", "status": "Closed", "code": "3", "value": "100", "description": "Overfilling of barrel/dumpster", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0905", "ticket_no": "T5", "status_dttm": "2014-06-11 15:23:00", "status": "Closed", "code": "21a", "value": "150", "description": "illegal parking prop owner 1", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0905", "ticket_no": "T5", "status_dttm": "2014-06-11 15:23:00", "status": "Closed", "code": "1", "value": "25", "description": "Improper storage trash: res", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0904", "ticket_no": "T4", "status_dttm": "2013-06-20 08:27:00", "status": "Closed", "code": "24", "value": "15", "description": "Overgrown Weeds On Property", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0904", "ticket_no": "T4", "status_dttm": "2013-06-20 08:27:00", "status": "Closed", "code": "25", "value": "50", "description": "No Number On A Building", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0903", "ticket_no": "T3", "status_dttm": "2012-10-08 10:51:00", "status": "Closed", "code": "1", "value": "25", "description": "Improper storage trash: res", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0902", "ticket_no": "T2", "status_dttm": "2011-10-03 11:13:00", "status": "Closed", "code": "1", "value": "25", "description": "Improper storage trash: res", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0902", "ticket_no": "T2", "status_dttm": "2011-10-03 11:13:00", "status": "Closed", "code": "3", "value": "100", "description": "Overfilling of barrel/dumpster", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0901", "ticket_no": "T1", "status_dttm": "2011-03-28 13:52:00", "status": "Closed", "code": "1", "value": "25", "description": "Improper storage trash: res", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" },
+  { "case_no": "CE0901", "ticket_no": "T1", "status_dttm": "2011-03-28 13:52:00", "status": "Closed", "code": "3", "value": "100", "description": "Overfilling of barrel/dumpster", "violation_stno": "52", "violation_street": "Tarnwick", "violation_suffix": "PL", "violation_city": "Brighton", "violation_zip": "02135", "contact_addr1": "88 FELLWICK  AV", "sam_id": "58344" }
 ]
 ```
 
@@ -1601,27 +1629,33 @@ import { violationsSource, VIOLATIONS_RESOURCE_ID } from '../records/sources/bos
 import { enforcementSource, ENFORCEMENT_RESOURCE_ID } from '../records/sources/boston/enforcement';
 import type { EnforcementTicketPayload } from '../records/types';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
-import enforcementLanark from './helpers/records/enforcement-lanark.json';
+import enforcementTarnwick from './helpers/records/enforcement-tarnwick.json';
 
-const lanark = buildIdentity({ id: 'b1', address: '23-27 Lanark Rd, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: '2102098000', sam_id: null });
+const tarnwick = buildIdentity({ id: 'b1', address: '52-68 Tarnwick Pl, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: '2109417000', sam_id: null });
 
 describe('enforcementSource', () => {
   it('queries by bare street name and every number form', async () => {
-    const fetchImpl = fixtureFetch([{ resourceId: ENFORCEMENT_RESOURCE_ID, records: enforcementLanark }]);
-    const result = await enforcementSource.run(lanark, fetchImpl);
-    expect(result.query).toContain(`upper("violation_street") = 'LANARK'`);
-    expect(result.query).toContain(`"violation_stno" IN ('23','27','23-27')`);
+    const fetchImpl = fixtureFetch([{ resourceId: ENFORCEMENT_RESOURCE_ID, records: enforcementTarnwick }]);
+    const result = await enforcementSource.run(tarnwick, fetchImpl);
+    expect(result.query).toContain(`upper("violation_street") = 'TARNWICK'`);
+    expect(result.query).toContain(`"violation_stno" IN ('52','68','52-68')`);
     expect(result.query).toContain('ORDER BY "status_dttm" DESC');
   });
 
-  it('keys rows on case number plus code so one case with two codes keeps both', async () => {
-    const fetchImpl = fixtureFetch([{ resourceId: ENFORCEMENT_RESOURCE_ID, records: enforcementLanark }]);
-    const result = await enforcementSource.run(lanark, fetchImpl);
-    expect(result.rows.map((r) => r.sourceKey)).toEqual(['CE7067:1', 'CE7067:9a', 'CE5252:9b']);
+  it('keys rows on case number plus code so a case with two codes keeps both', async () => {
+    const fetchImpl = fixtureFetch([{ resourceId: ENFORCEMENT_RESOURCE_ID, records: enforcementTarnwick }]);
+    const result = await enforcementSource.run(tarnwick, fetchImpl);
+    expect(result.rows.map((r) => r.sourceKey)).toEqual([
+      'CE0916:1', 'CE0916:3', 'CE0915:1', 'CE0914:1', 'CE0914:21a', 'CE0913:17a',
+      'CE0913:17c', 'CE0912:24', 'CE0912:1', 'CE0911:3', 'CE0911:25', 'CE0910:1',
+      'CE0910:3', 'CE0909:1', 'CE0909:25', 'CE0908:17a', 'CE0907:1', 'CE0907:24',
+      'CE0906:1', 'CE0906:3', 'CE0905:21a', 'CE0905:1', 'CE0904:24', 'CE0904:25',
+      'CE0903:1', 'CE0902:1', 'CE0902:3', 'CE0901:1', 'CE0901:3',
+    ]);
     const payload = result.rows[0].payload as EnforcementTicketPayload;
     expect(payload).toMatchObject({
-      caseNumber: 'CE7067', ticketNumber: 'T1', code: '1', description: 'Improper storage trash: res', status: 'Closed',
-      statusDate: '2008-08-30 09:42:00', address: '23 Lanark RD', contactAddress: '1505 COMMONWEALTH  AV', samId: '83763',
+      caseNumber: 'CE0916', ticketNumber: 'T16', code: '1', description: 'Improper storage trash: res', status: 'Open',
+      statusDate: '2025-01-23 08:31:00', address: '52 Tarnwick PL', contactAddress: '88 FELLWICK  AV', samId: '58344',
     });
     expect(result.rows[0].kind).toBe('enforcement_ticket');
   });
@@ -1629,15 +1663,15 @@ describe('enforcementSource', () => {
 
 describe('violationsSource', () => {
   it('uses the violations resource, the violation kind, and no ticket number', async () => {
-    const fetchImpl = fixtureFetch([{ resourceId: VIOLATIONS_RESOURCE_ID, records: [{ ...enforcementLanark[0], ticket_no: undefined }] }]);
-    const result = await violationsSource.run(lanark, fetchImpl);
+    const fetchImpl = fixtureFetch([{ resourceId: VIOLATIONS_RESOURCE_ID, records: [{ ...enforcementTarnwick[0], ticket_no: undefined }] }]);
+    const result = await violationsSource.run(tarnwick, fetchImpl);
     expect(result.query).toContain(VIOLATIONS_RESOURCE_ID);
     expect(result.rows[0].kind).toBe('violation');
     expect('ticketNumber' in result.rows[0].payload).toBe(false);
   });
 
-  it('returns empty for Lanark when the feed has nothing', async () => {
-    const result = await violationsSource.run(lanark, fixtureFetch([]));
+  it('returns empty for the practice identity when the feed has nothing', async () => {
+    const result = await violationsSource.run(tarnwick, fixtureFetch([]));
     expect(result.rows).toEqual([]);
   });
 });
@@ -1763,7 +1797,7 @@ Expected: PASS (4 tests)
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/lib/records/sources/boston/violationFeeds.ts src/lib/records/sources/boston/violations.ts src/lib/records/sources/boston/enforcement.ts src/lib/__tests__/helpers/records/enforcement-lanark.json src/lib/__tests__/recordsViolations.test.ts
+git add src/lib/records/sources/boston/violationFeeds.ts src/lib/records/sources/boston/violations.ts src/lib/records/sources/boston/enforcement.ts src/lib/__tests__/helpers/records/enforcement-tarnwick.json src/lib/__tests__/recordsViolations.test.ts
 git commit -m "feat(records): Boston violations and code-enforcement sources"
 ```
 
@@ -1773,30 +1807,49 @@ git commit -m "feat(records): Boston violations and code-enforcement sources"
 
 **Files:**
 - Create: `src/lib/records/sources/boston/serviceRequests.ts`
-- Create: `src/lib/__tests__/helpers/records/311-2024-lanark.json`
-- Create: `src/lib/__tests__/helpers/records/311-new-lanark.json`
+- Create: `src/lib/__tests__/helpers/records/311-2024-tarnwick.json`
+- Create: `src/lib/__tests__/helpers/records/311-new-tarnwick.json`
 - Test: `src/lib/__tests__/recordsServiceRequests.test.ts`
 
 - [ ] **Step 1: Write the fixtures**
 
-`311-2024-lanark.json`: five real rows plus one synthetic Housing row to exercise classification.
+`311-2024-tarnwick.json`: fifteen fictional rows covering each group the classification tests need, a Housing row among them.
 
 ```json
 [
-  { "case_enquiry_id": "101005238959", "open_dt": "2024-01-06 12:20:00", "closed_dt": null, "case_status": "Open", "closure_reason": null, "case_title": "Schedule a Bulk Item Pickup", "subject": "Public Works Department", "reason": "Sanitation", "type": "Schedule a Bulk Item Pickup", "location": "23 Lanark Rd  Brighton  MA  02135", "source": "Constituent Call" },
-  { "case_enquiry_id": "101005577502", "open_dt": "2024-07-21 07:49:30.757", "closed_dt": null, "case_status": "Open", "closure_reason": null, "case_title": "Schedule Bulk Item Pickup", "subject": "Public Works Department", "reason": "Sanitation", "type": "Schedule a Bulk Item Pickup SS", "location": "23 Lanark Rd  Brighton  MA  02135", "source": "Self Service" },
-  { "case_enquiry_id": "101005650794", "open_dt": "2024-08-31 22:31:23.187", "closed_dt": "2024-09-03 10:12:23.37", "case_status": "Closed", "closure_reason": "Case Closed", "case_title": "Abandoned Vehicles", "subject": "Transportation - Traffic Division", "reason": "Enforcement & Abandoned Vehicles", "type": "Abandoned Vehicles", "location": "23-27 Lanark Rd  Brighton  MA  02135", "source": "Employee Generated" },
-  { "case_enquiry_id": "101005740377", "open_dt": "2024-10-21 10:29:53.583", "closed_dt": null, "case_status": "Open", "closure_reason": null, "case_title": "Schedule Bulk Item Pickup", "subject": "Public Works Department", "reason": "Sanitation", "type": "Schedule a Bulk Item Pickup SS", "location": "23 Lanark Rd  Brighton  MA  02135", "source": "Self Service" },
-  { "case_enquiry_id": "101005778262", "open_dt": "2024-11-13 05:58:00.103", "closed_dt": null, "case_status": "Open", "closure_reason": null, "case_title": "Parking Enforcement", "subject": "Transportation - Traffic Division", "reason": "Enforcement & Abandoned Vehicles", "type": "Parking Enforcement", "location": "23-27 Lanark Rd  Brighton  MA  02135", "source": "Employee Generated" },
-  { "case_enquiry_id": "101009999999", "open_dt": "2024-12-01 08:00:00", "closed_dt": "2024-12-20 08:00:00", "case_status": "Closed", "closure_reason": "Case Resolved", "case_title": "Heat - Excessive  Insufficient", "subject": "Inspectional Services", "reason": "Housing", "type": "Heat - Excessive  Insufficient", "location": "27 Lanark Rd  Brighton  MA  02135", "source": "Constituent Call" }
+  { "case_enquiry_id": "101009000101", "open_dt": "2024-05-14 10:42:00", "closed_dt": null, "case_status": "Open", "closure_reason": null, "case_title": "Request for Pothole Repair", "subject": "Public Works Department", "reason": "Highway Maintenance", "type": "Request for Pothole Repair", "location": "52 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "Citizens Connect App" },
+  { "case_enquiry_id": "101009000102", "open_dt": "2024-01-30 18:22:47.305", "closed_dt": "2024-02-02 11:06:12.84", "case_status": "Closed", "closure_reason": "Case Closed. Closed date : 2024-02-02 11:06:12.84 Resolved", "case_title": "Street Light Outages", "subject": "Public Works Department", "reason": "Street Lights", "type": "Street Light Outages", "location": "52 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "Employee Generated" },
+  { "case_enquiry_id": "101009000103", "open_dt": "2024-03-28 13:19:54.207", "closed_dt": "2024-03-30 08:51:30.66", "case_status": "Closed", "closure_reason": "Case Closed. Closed date : 2024-03-30 08:51:30.66 Resolved", "case_title": "Empty Litter Basket", "subject": "Public Works Department", "reason": "Highway Maintenance", "type": "Empty Litter Basket", "location": "52-68 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "Citizens Connect App" },
+  { "case_enquiry_id": "101009000104", "open_dt": "2024-07-05 09:47:15.381", "closed_dt": "2024-07-08 14:12:40.903", "case_status": "Closed", "closure_reason": "Case Closed. Closed date : 2024-07-08 14:12:40.903 Resolved", "case_title": "Poor Conditions of Property", "subject": "Public Works Department", "reason": "Code Enforcement", "type": "Poor Conditions of Property", "location": "52 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "Employee Generated" },
+  { "case_enquiry_id": "101009000105", "open_dt": "2024-08-07 16:28:03.744", "closed_dt": "2024-08-21 07:55:19.02", "case_status": "Closed", "closure_reason": "Case Closed. Closed date : 2024-08-21 07:55:19.02 Resolved", "case_title": "Tree Maintenance Requests", "subject": "Parks & Recreation Department", "reason": "Trees", "type": "Tree Maintenance Requests", "location": "52 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "Employee Generated" },
+  { "case_enquiry_id": "101009999999", "open_dt": "2024-12-04 09:00:00", "closed_dt": "2024-12-17 09:00:00", "case_status": "Closed", "closure_reason": "Case Closed. Closed date : 2024-12-17 09:00:00 Resolved", "case_title": "Heat - Excessive  Insufficient", "subject": "Inspectional Services", "reason": "Housing", "type": "Heat - Excessive  Insufficient", "location": "68 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "Constituent Call" },
+  { "case_enquiry_id": "101009000106", "open_dt": "2024-10-14 08:36:00", "closed_dt": null, "case_status": "Open", "closure_reason": null, "case_title": "Illegal Dumping", "subject": "Public Works Department", "reason": "Code Enforcement", "type": "Illegal Dumping", "location": "52 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "Employee Generated" },
+  { "case_enquiry_id": "101009000107", "open_dt": "2024-02-22 17:29:28.831", "closed_dt": "2024-02-23 14:33:41.959", "case_status": "Closed", "closure_reason": "Case Closed. Closed date : 2024-02-23 14:33:41.959 Resolved", "case_title": "Request for Recycling Cart", "subject": "Public Works Department", "reason": "Recycling", "type": "Request for Recycling Cart", "location": "68 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "Constituent Call" },
+  { "case_enquiry_id": "101009000108", "open_dt": "2024-03-19 07:30:48.089", "closed_dt": "2024-03-22 08:39:22.768", "case_status": "Closed", "closure_reason": "Case Closed. Closed date : 2024-03-22 08:39:22.768 Resolved", "case_title": "Pick up Dead Animal", "subject": "Public Works Department", "reason": "Street Cleaning", "type": "Pick up Dead Animal", "location": "52 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "Employee Generated" },
+  { "case_enquiry_id": "101009000109", "open_dt": "2024-04-08 14:03:27.519", "closed_dt": "2024-04-15 09:20:48.177", "case_status": "Closed", "closure_reason": "Case Closed. Closed date : 2024-04-15 09:20:48.177 Resolved", "case_title": "New Tree Requests", "subject": "Parks & Recreation Department", "reason": "Trees", "type": "New Tree Requests", "location": "52 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "Citizens Connect App" },
+  { "case_enquiry_id": "101009000110", "open_dt": "2024-04-26 12:44:22.663", "closed_dt": "2024-04-27 10:27:25.212", "case_status": "Closed", "closure_reason": "Case Closed. Closed date : 2024-04-27 10:27:25.212 Resolved", "case_title": "Contractor Complaints", "subject": "Public Works Department", "reason": "Highway Maintenance", "type": "Contractor Complaints", "location": "52 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "Constituent Call" },
+  { "case_enquiry_id": "101009000111", "open_dt": "2024-06-03 16:16:21.384", "closed_dt": "2024-06-04 17:09:33.120", "case_status": "Closed", "closure_reason": "Case Closed. Closed date : 2024-06-04 17:09:33.120 Resolved", "case_title": "Requests for Street Cleaning", "subject": "Public Works Department", "reason": "Street Cleaning", "type": "Requests for Street Cleaning", "location": "68 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "Citizens Connect App" },
+  { "case_enquiry_id": "101009000112", "open_dt": "2024-06-22 12:11:51.851", "closed_dt": "2024-06-23 13:39:38.327", "case_status": "Closed", "closure_reason": "Case Closed. Closed date : 2024-06-23 13:39:38.327 Resolved", "case_title": "Sidewalk Repair (Make Safe)", "subject": "Public Works Department", "reason": "Highway Maintenance", "type": "Sidewalk Repair (Make Safe)", "location": "52 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "Citizens Connect App" },
+  { "case_enquiry_id": "101009000113", "open_dt": "2024-06-29 09:07:17.298", "closed_dt": "2024-06-29 11:22:41.506", "case_status": "Closed", "closure_reason": "Case Closed. Closed date : 2024-06-29 11:22:41.506 Resolved", "case_title": "CE Collection", "subject": "Public Works Department", "reason": "Street Cleaning", "type": "CE Collection", "location": "52 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "City Worker App" },
+  { "case_enquiry_id": "101009000114", "open_dt": "2024-09-28 11:18:47.461", "closed_dt": "2024-10-01 15:44:33.163", "case_status": "Closed", "closure_reason": "Case Closed. Closed date : 2024-10-01 15:44:33.163 Resolved", "case_title": "Sign Repair", "subject": "Transportation - Traffic Division", "reason": "Signs & Signals", "type": "Sign Repair", "location": "52 Tarnwick Pl  Brighton  MA  02135", "location_zipcode": "02135", "source": "Citizens Connect App" }
 ]
 ```
 
-`311-new-lanark.json`: one synthetic new-system row routed to Inspectional Services.
+`311-new-tarnwick.json`: eleven synthetic new-system rows, the first routed to Inspectional Services.
 
 ```json
 [
-  { "case_id": "BCS-00300001", "open_date": "2026-08-01 10:00:00+00", "close_date": null, "case_status": "Open", "closure_reason": null, "case_topic": "Unsatisfactory Living Conditions", "service_name": "Unsatisfactory Living Conditions", "assigned_department": "Inspectional Services Department (ISD)", "full_address": "27 Lanark Rd, Boston, MA 02135", "street_number": "27", "street_name": "Lanark Rd", "report_source": "BOS311" }
+  { "case_id": "BCS-09000001", "open_date": "2026-03-31 14:25:00+00", "close_date": null, "case_status": "Open", "closure_reason": null, "case_topic": "Pest Infestation - Residential", "service_name": "Pest Infestation - Residential", "assigned_department": "Inspectional Services", "full_address": "68 Tarnwick Pl, Boston, MA 02135", "street_number": "68", "street_name": "Tarnwick Pl", "zip_code": "02135", "report_source": "BOS311" },
+  { "case_id": "BCS-09000002", "open_date": "2025-09-04 19:31:00+00", "close_date": "2025-09-05 19:59:00+00", "case_status": "Closed", "closure_reason": null, "case_topic": "Tree or Stump Removal", "service_name": "Tree or Stump Removal", "assigned_department": "Parks & Recreation", "full_address": "52 Tarnwick Pl, Boston, MA 02135", "street_number": "52", "street_name": "Tarnwick Pl", "zip_code": "02135", "report_source": "Call" },
+  { "case_id": "BCS-09000003", "open_date": "2025-10-11 16:09:00+00", "close_date": "2025-10-18 18:03:00+00", "case_status": "Closed", "closure_reason": null, "case_topic": "Sticker Request", "service_name": "Sticker Request", "assigned_department": "Public Works Department (PWD)", "full_address": "68 Tarnwick Pl, Boston, MA 02135", "street_number": "68", "street_name": "Tarnwick Pl", "zip_code": "02135", "report_source": "Call" },
+  { "case_id": "BCS-09000004", "open_date": "2025-10-15 15:01:00+00", "close_date": "2025-10-19 18:58:00+00", "case_status": "Closed", "closure_reason": null, "case_topic": "Fallen Tree or Branches", "service_name": "Fallen Tree or Branches", "assigned_department": "Parks & Recreation", "full_address": "52 Tarnwick Pl, Boston, MA 02135", "street_number": "52", "street_name": "Tarnwick Pl", "zip_code": "02135", "report_source": "Call" },
+  { "case_id": "BCS-09000005", "open_date": "2025-10-22 16:55:00+00", "close_date": "2025-11-03 19:11:00+00", "case_status": "Closed", "closure_reason": null, "case_topic": "Pruning Request", "service_name": "Pruning Request", "assigned_department": "Parks & Recreation", "full_address": "52 Tarnwick Pl, Boston, MA 02135", "street_number": "52", "street_name": "Tarnwick Pl", "zip_code": "02135", "report_source": "BOS311" },
+  { "case_id": "BCS-09000006", "open_date": "2025-10-29 15:37:00+00", "close_date": "2025-11-02 17:45:00+00", "case_status": "Closed", "closure_reason": null, "case_topic": "Litter & Debris", "service_name": "Litter & Debris", "assigned_department": "Public Works Department (PWD)", "full_address": "68 Tarnwick Pl, Boston, MA 02135", "street_number": "68", "street_name": "Tarnwick Pl", "zip_code": "02135", "report_source": "Call" },
+  { "case_id": "BCS-09000007", "open_date": "2025-11-19 16:12:00+00", "close_date": null, "case_status": "Open", "closure_reason": null, "case_topic": "Sidewalk Repair", "service_name": "Sidewalk Repair", "assigned_department": "Public Works Department (PWD)", "full_address": "68 Tarnwick Pl, Boston, MA 02135", "street_number": "68", "street_name": "Tarnwick Pl", "zip_code": "02135", "report_source": "BOS311" },
+  { "case_id": "BCS-09000008", "open_date": "2026-01-03 19:54:00+00", "close_date": "2026-01-11 17:41:00+00", "case_status": "Closed", "closure_reason": null, "case_topic": "Dead Animal General", "service_name": "Dead Animal General", "assigned_department": "Public Works Department (PWD)", "full_address": "68 Tarnwick Pl, Boston, MA 02135", "street_number": "68", "street_name": "Tarnwick Pl", "zip_code": "02135", "report_source": "Call" },
+  { "case_id": "BCS-09000009", "open_date": "2026-02-22 13:32:00+00", "close_date": "2026-02-24 14:13:00+00", "case_status": "Closed", "closure_reason": null, "case_topic": "Missed Waste Pick-up", "service_name": "Missed Waste Pick-up", "assigned_department": "Public Works Department (PWD)", "full_address": "52 Tarnwick Pl, Boston, MA 02135", "street_number": "52", "street_name": "Tarnwick Pl", "zip_code": "02135", "report_source": "BOS311" },
+  { "case_id": "BCS-09000010", "open_date": "2026-04-03 13:25:00+00", "close_date": "2026-04-05 18:52:00+00", "case_status": "Closed", "closure_reason": null, "case_topic": "Pothole", "service_name": "Pothole", "assigned_department": "Public Works Department (PWD)", "full_address": "68 Tarnwick Pl, Boston, MA 02135", "street_number": "68", "street_name": "Tarnwick Pl", "zip_code": "02135", "report_source": "Call" },
+  { "case_id": "BCS-09000011", "open_date": "2026-04-25 13:55:00+00", "close_date": "2026-04-26 19:26:00+00", "case_status": "Closed", "closure_reason": null, "case_topic": "Street Light Outage", "service_name": "Street Light Outage", "assigned_department": "Public Works Department (PWD)", "full_address": "52 Tarnwick Pl, Boston, MA 02135", "street_number": "52", "street_name": "Tarnwick Pl", "zip_code": "02135", "report_source": "BOS311" }
 ]
 ```
 
@@ -1809,10 +1862,10 @@ import { buildIdentity } from '../records/identity';
 import { serviceRequestsSource, LEGACY_311_RESOURCES, NEW_311_RESOURCE_ID, HOUSING_REASONS, classifyLegacy, classifyNew } from '../records/sources/boston/serviceRequests';
 import type { ServiceRequestPayload } from '../records/types';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
-import legacy2024 from './helpers/records/311-2024-lanark.json';
-import newSystem from './helpers/records/311-new-lanark.json';
+import legacy2024 from './helpers/records/311-2024-tarnwick.json';
+import newSystem from './helpers/records/311-new-tarnwick.json';
 
-const lanark = buildIdentity({ id: 'b1', address: '23-27 Lanark Rd, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: '2102098000', sam_id: null });
+const tarnwick = buildIdentity({ id: 'b1', address: '52-68 Tarnwick Pl, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: '2109417000', sam_id: null });
 const R2024 = 'dff4d804-5031-443a-8409-8344efd0e5c8';
 
 describe('serviceRequestsSource', () => {
@@ -1824,12 +1877,12 @@ describe('serviceRequestsSource', () => {
 
   it('runs one query per resource and stores them all as a JSON array', async () => {
     const fetchImpl = fixtureFetch([]);
-    const result = await serviceRequestsSource.run(lanark, fetchImpl);
+    const result = await serviceRequestsSource.run(tarnwick, fetchImpl);
     expect(fetchImpl.calls).toHaveLength(17);
     const queries = JSON.parse(result.query) as string[];
     expect(queries).toHaveLength(17);
-    expect(queries.some((q) => q.includes(R2024) && q.includes(`upper("location") LIKE '23-27 LANARK RD%'`) && q.includes(`'27 LANARK ROAD%'`))).toBe(true);
-    expect(queries.some((q) => q.includes(NEW_311_RESOURCE_ID) && q.includes(`upper("street_name") IN ('LANARK RD','LANARK ROAD')`) && q.includes(`"street_number" IN ('23','27','23-27')`))).toBe(true);
+    expect(queries.some((q) => q.includes(R2024) && q.includes(`upper("location") LIKE '52-68 TARNWICK PL%'`) && q.includes(`'68 TARNWICK PLACE%'`))).toBe(true);
+    expect(queries.some((q) => q.includes(NEW_311_RESOURCE_ID) && q.includes(`upper("street_name") IN ('TARNWICK PL','TARNWICK PLACE')`) && q.includes(`"street_number" IN ('52','68','52-68')`))).toBe(true);
   });
 
   it('maps legacy and new rows, classifies housing, and deduplicates on case id', async () => {
@@ -1838,17 +1891,17 @@ describe('serviceRequestsSource', () => {
       { resourceId: LEGACY_311_RESOURCES.find((r) => r.year === 2023)!.resourceId, records: [legacy2024[0]] }, // same case id again
       { resourceId: NEW_311_RESOURCE_ID, records: newSystem },
     ]);
-    const result = await serviceRequestsSource.run(lanark, fetchImpl);
-    expect(result.rows).toHaveLength(7);
+    const result = await serviceRequestsSource.run(tarnwick, fetchImpl);
+    expect(result.rows).toHaveLength(26);
     const byKey = Object.fromEntries(result.rows.map((r) => [r.sourceKey, r.payload as ServiceRequestPayload]));
-    expect(byKey['101005238959']).toMatchObject({ system: 'legacy', classification: 'other', reason: 'Sanitation', openedAt: '2024-01-06 12:20:00', status: 'Open' });
-    expect(byKey['101009999999']).toMatchObject({ classification: 'housing', reason: 'Housing', closedAt: '2024-12-20 08:00:00' });
-    expect(byKey['BCS-00300001']).toMatchObject({ system: 'new', classification: 'housing', title: 'Unsatisfactory Living Conditions', location: '27 Lanark Rd, Boston, MA 02135' });
+    expect(byKey['101009000101']).toMatchObject({ system: 'legacy', classification: 'other', reason: 'Highway Maintenance', openedAt: '2024-05-14 10:42:00', status: 'Open' });
+    expect(byKey['101009999999']).toMatchObject({ classification: 'housing', reason: 'Housing', closedAt: '2024-12-17 09:00:00' });
+    expect(byKey['BCS-09000001']).toMatchObject({ system: 'new', classification: 'housing', title: 'Pest Infestation - Residential', location: '68 Tarnwick Pl, Boston, MA 02135' });
   });
 
   it('fails the whole source if any year fails, so stale rows are kept rather than half-replaced', async () => {
     const fetchImpl = fixtureFetch([{ resourceId: R2024, errorStatus: 503, errorMessage: 'gateway' }]);
-    await expect(serviceRequestsSource.run(lanark, fetchImpl)).rejects.toThrow(/503/);
+    await expect(serviceRequestsSource.run(tarnwick, fetchImpl)).rejects.toThrow(/503/);
   });
 });
 
@@ -1996,7 +2049,7 @@ Expected: PASS (5 tests)
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/lib/records/sources/boston/serviceRequests.ts src/lib/__tests__/helpers/records/311-2024-lanark.json src/lib/__tests__/helpers/records/311-new-lanark.json src/lib/__tests__/recordsServiceRequests.test.ts
+git add src/lib/records/sources/boston/serviceRequests.ts src/lib/__tests__/helpers/records/311-2024-tarnwick.json src/lib/__tests__/helpers/records/311-new-tarnwick.json src/lib/__tests__/recordsServiceRequests.test.ts
 git commit -m "feat(records): Boston 311 source with published housing classification"
 ```
 
@@ -2007,17 +2060,15 @@ git commit -m "feat(records): Boston 311 source with published housing classific
 **Files:**
 - Create: `src/lib/records/sources/boston/rentsmart.ts`
 - Create: `src/lib/records/jurisdictions.ts`
-- Create: `src/lib/__tests__/helpers/records/rentsmart-lanark.json`
+- Create: `src/lib/__tests__/helpers/records/rentsmart-tarnwick.json`
 - Test: `src/lib/__tests__/recordsJurisdictions.test.ts`
 
-- [ ] **Step 1: Write the fixture (four real rows)**
+- [ ] **Step 1: Write the fixture (two fictional rows)**
 
 ```json
 [
-  { "_id": 90001, "date": "2026-07-17 13:56:00+00", "violation_type": "Housing Complaints", "description": "Unsatisfactory Living Conditions", "address": "23-27 Lanark Rd, 02135", "parcel": "2102098000" },
-  { "_id": 90002, "date": "2026-07-14 18:52:00+00", "violation_type": "Housing Complaints", "description": "Maintenance Complaint - Residential", "address": "23-27 Lanark Rd, 02135", "parcel": "2102098000" },
-  { "_id": 90003, "date": "2025-12-27 16:50:00+00", "violation_type": "Housing Complaints", "description": "Heat - Excessive, Insufficient", "address": "23-27 Lanark Rd, 02135", "parcel": "2102098000" },
-  { "_id": 90004, "date": "2024-09-01 02:31:23.187+00", "violation_type": "Sanitation Requests", "description": "Abandoned Vehicles", "address": "23-27 Lanark Rd, 02135", "parcel": "2102098000" }
+  { "_id": 90001, "date": "2025-06-30 13:52:00+00", "violation_type": "Housing Complaints", "description": "Chronic Dampness/Mold", "address": "52-68 Tarnwick Pl, 02135", "parcel": "2109417000" },
+  { "_id": 90002, "date": "2025-06-13 16:07:00+00", "violation_type": "Housing Complaints", "description": "Pest Infestation - Residential", "address": "52-68 Tarnwick Pl, 02135", "parcel": "2109417000" }
 ]
 ```
 
@@ -2031,23 +2082,23 @@ import { rentsmartSource, RENTSMART_RESOURCE_ID } from '../records/sources/bosto
 import { sourcesForCity, jurisdictionForCity } from '../records/jurisdictions';
 import type { RentSmartPayload } from '../records/types';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
-import rentsmartLanark from './helpers/records/rentsmart-lanark.json';
+import rentsmartTarnwick from './helpers/records/rentsmart-tarnwick.json';
 
-const lanark = buildIdentity({ id: 'b1', address: '23-27 Lanark Rd, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: '2102098000', sam_id: null });
+const tarnwick = buildIdentity({ id: 'b1', address: '52-68 Tarnwick Pl, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: '2109417000', sam_id: null });
 
 describe('rentsmartSource', () => {
   it('queries by parcel forms and maps rows keyed on the CKAN row id', async () => {
-    const fetchImpl = fixtureFetch([{ resourceId: RENTSMART_RESOURCE_ID, records: rentsmartLanark }]);
-    const result = await rentsmartSource.run(lanark, fetchImpl);
-    expect(result.query).toContain(`"parcel" IN ('2102098000')`);
-    expect(result.rows).toHaveLength(4);
+    const fetchImpl = fixtureFetch([{ resourceId: RENTSMART_RESOURCE_ID, records: rentsmartTarnwick }]);
+    const result = await rentsmartSource.run(tarnwick, fetchImpl);
+    expect(result.query).toContain(`"parcel" IN ('2109417000')`);
+    expect(result.rows).toHaveLength(2);
     expect(result.rows[0].sourceKey).toBe('90001');
-    expect(result.rows[0].payload as RentSmartPayload).toMatchObject({ violationType: 'Housing Complaints', description: 'Unsatisfactory Living Conditions', parcel: '2102098000' });
+    expect(result.rows[0].payload as RentSmartPayload).toMatchObject({ violationType: 'Housing Complaints', description: 'Chronic Dampness/Mold', parcel: '2109417000' });
   });
 
   it('returns empty without a query when the building has no parcel', async () => {
     const fetchImpl = fixtureFetch([]);
-    const result = await rentsmartSource.run({ ...lanark, parcelId: null, parcelNumeric: null }, fetchImpl);
+    const result = await rentsmartSource.run({ ...tarnwick, parcelId: null, parcelNumeric: null }, fetchImpl);
     expect(result.rows).toEqual([]);
     expect(fetchImpl.calls).toEqual([]);
   });
@@ -2157,7 +2208,7 @@ Expected: PASS (4 tests)
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/lib/records/sources/boston/rentsmart.ts src/lib/records/jurisdictions.ts src/lib/__tests__/helpers/records/rentsmart-lanark.json src/lib/__tests__/recordsJurisdictions.test.ts
+git add src/lib/records/sources/boston/rentsmart.ts src/lib/records/jurisdictions.ts src/lib/__tests__/helpers/records/rentsmart-tarnwick.json src/lib/__tests__/recordsJurisdictions.test.ts
 git commit -m "feat(records): RentSmart source and jurisdiction map"
 ```
 
@@ -2182,10 +2233,10 @@ import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import { ENFORCEMENT_RESOURCE_ID } from '../records/sources/boston/enforcement';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
 import { RENTSMART_RESOURCE_ID } from '../records/sources/boston/rentsmart';
-import lanark2026 from './helpers/records/assessor-fy2026-lanark.json';
+import tarnwick2026 from './helpers/records/assessor-fy2026-tarnwick.json';
 import condo2026 from './helpers/records/assessor-fy2026-condo.json';
-import enforcementLanark from './helpers/records/enforcement-lanark.json';
-import rentsmartLanark from './helpers/records/rentsmart-lanark.json';
+import enforcementTarnwick from './helpers/records/enforcement-tarnwick.json';
+import rentsmartTarnwick from './helpers/records/rentsmart-tarnwick.json';
 import permitsPositive from './helpers/records/permits-positive.json';
 
 const suite = sqliteAvailable ? describe : describe.skip;
@@ -2199,55 +2250,55 @@ suite('pullBuildingRecords', () => {
     const db = createRecordsTestDb();
     const id = await insertBuilding(db);
     const fetchImpl = fixtureFetch([
-      { resourceId: FY2026_RESOURCE_ID, records: lanark2026 },
-      { resourceId: ENFORCEMENT_RESOURCE_ID, records: enforcementLanark },
-      { resourceId: RENTSMART_RESOURCE_ID, records: rentsmartLanark },
+      { resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 },
+      { resourceId: ENFORCEMENT_RESOURCE_ID, records: enforcementTarnwick },
+      { resourceId: RENTSMART_RESOURCE_ID, records: rentsmartTarnwick },
     ]);
     const building = (await loadBuilding(db, id))!;
     const summary = await pullBuildingRecords(db, building, { fetchImpl, triggeredBy: 'admin-1' });
 
-    expect(summary.parcelId).toBe('2102098000');
+    expect(summary.parcelId).toBe('2109417000');
     expect(summary.condominium).toBe(false);
     expect(summary.sources).toHaveLength(11);
     const byLabel = Object.fromEntries(summary.sources.map((s) => [s.label, s]));
     expect(byLabel['Property Assessment FY2026']).toMatchObject({ status: 'ok', rowCount: 1 });
     expect(byLabel['Property Assessment FY2025']).toMatchObject({ status: 'empty', rowCount: 0 });
-    expect(byLabel['Public Works Code Enforcement']).toMatchObject({ status: 'ok', rowCount: 3 });
+    expect(byLabel['Public Works Code Enforcement']).toMatchObject({ status: 'ok', rowCount: 29 });
     expect(byLabel['Building and Property Violations']).toMatchObject({ status: 'empty' });
-    expect(byLabel['RentSmart']).toMatchObject({ status: 'ok', rowCount: 4 });
+    expect(byLabel['RentSmart']).toMatchObject({ status: 'ok', rowCount: 2 });
 
     const updated = await loadBuilding(db, id);
-    expect(updated?.parcel_id).toBe('2102098000');
-    expect(updated?.sam_id).toBe('83763');
+    expect(updated?.parcel_id).toBe('2109417000');
+    expect(updated?.sam_id).toBe('58344');
 
     const pulls = await db.prepare('SELECT source_label, status, row_count, triggered_by, query FROM record_pulls WHERE building_id = ? ORDER BY rowid').bind(id).all<{ source_label: string; status: string; row_count: number; triggered_by: string; query: string }>();
     expect(pulls.results).toHaveLength(11);
     expect(pulls.results.every((p) => p.triggered_by === 'admin-1')).toBe(true);
-    expect(pulls.results.find((p) => p.source_label === 'Public Works Code Enforcement')?.query).toContain('LANARK');
+    expect(pulls.results.find((p) => p.source_label === 'Public Works Code Enforcement')?.query).toContain('TARNWICK');
 
     const records = await db.prepare('SELECT kind, COUNT(*) AS n FROM building_records WHERE building_id = ? GROUP BY kind ORDER BY kind').bind(id).all<{ kind: string; n: number }>();
     expect(records.results).toEqual([
       { kind: 'assessment', n: 1 },
-      { kind: 'enforcement_ticket', n: 3 },
-      { kind: 'rentsmart', n: 4 },
+      { kind: 'enforcement_ticket', n: 29 },
+      { kind: 'rentsmart', n: 2 },
     ]);
   });
 
   it('re-pull replaces a source\'s rows without duplicating, and one fiscal year never removes another', async () => {
     const db = createRecordsTestDb();
-    const id = await insertBuilding(db, { parcel_id: '2102098000' });
+    const id = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = (await loadBuilding(db, id))!;
     const fy2025 = '6b7e460e-33f6-4e61-80bc-1bef2e73ac54';
 
     const first = fixtureFetch([
-      { resourceId: FY2026_RESOURCE_ID, records: lanark2026 },
-      { resourceId: fy2025, records: lanark2026 },
+      { resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 },
+      { resourceId: fy2025, records: tarnwick2026 },
       { resourceId: PERMITS_RESOURCE_ID, records: permitsPositive },
     ]);
     await pullBuildingRecords(db, building, { fetchImpl: first, triggeredBy: 'admin-1' });
 
     const second = fixtureFetch([
-      { resourceId: FY2026_RESOURCE_ID, records: lanark2026 },
+      { resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 },
       // FY2025 now returns nothing; permits returns only one row
       { resourceId: PERMITS_RESOURCE_ID, records: [permitsPositive[0]] },
     ]);
@@ -2257,7 +2308,7 @@ suite('pullBuildingRecords', () => {
     // The empty FY2025 pull clears only FY2025; FY2026 survives; permits shrank to one.
     expect(rows.results).toEqual([
       { kind: 'assessment', source_key: 'FY2026' },
-      { kind: 'permit', source_key: 'A1000569' },
+      { kind: 'permit', source_key: 'SF437182' },
     ]);
 
     const pullCount = await db.prepare('SELECT COUNT(*) AS n FROM record_pulls WHERE building_id = ?').bind(id).first<{ n: number }>();
@@ -2266,15 +2317,15 @@ suite('pullBuildingRecords', () => {
 
   it('a failing source records error, keeps its prior rows, and does not stop the others', async () => {
     const db = createRecordsTestDb();
-    const id = await insertBuilding(db, { parcel_id: '2102098000' });
+    const id = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = (await loadBuilding(db, id))!;
 
     await pullBuildingRecords(db, building, {
-      fetchImpl: fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }, { resourceId: PERMITS_RESOURCE_ID, records: permitsPositive }]),
+      fetchImpl: fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }, { resourceId: PERMITS_RESOURCE_ID, records: permitsPositive }]),
       triggeredBy: 'admin-1',
     });
     const summary = await pullBuildingRecords(db, building, {
-      fetchImpl: fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }, { resourceId: PERMITS_RESOURCE_ID, errorStatus: 503, errorMessage: 'gateway' }]),
+      fetchImpl: fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }, { resourceId: PERMITS_RESOURCE_ID, errorStatus: 503, errorMessage: 'gateway' }]),
       triggeredBy: 'admin-1',
     });
 
@@ -2292,7 +2343,7 @@ suite('pullBuildingRecords', () => {
 
   it('records a condominium: no parcel written, one owner-less assessment row, history skipped', async () => {
     const db = createRecordsTestDb();
-    const id = await insertBuilding(db, { address: '55 Lanark Rd, Boston, MA 02135' });
+    const id = await insertBuilding(db, { address: '127 Tarnwick Pl, Boston, MA 02135' });
     const building = (await loadBuilding(db, id))!;
     const summary = await pullBuildingRecords(db, building, { fetchImpl: fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: condo2026 }]), triggeredBy: 'admin-1' });
     expect(summary).toMatchObject({ parcelId: null, condominium: true });
@@ -2306,7 +2357,7 @@ suite('pullBuildingRecords', () => {
     const db = createRecordsTestDb();
     const id = await insertBuilding(db);
     const building = (await loadBuilding(db, id))!;
-    const two = [{ ...lanark2026[0], PID: '1000000001' }, { ...lanark2026[0], PID: '1000000002' }];
+    const two = [{ ...tarnwick2026[0], PID: '1000000001' }, { ...tarnwick2026[0], PID: '1000000002' }];
     const summary = await pullBuildingRecords(db, building, { fetchImpl: fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: two }]), triggeredBy: 'admin-1' });
     expect(summary.sources).toHaveLength(11);
     expect(summary.sources.every((s) => s.status === 'error')).toBe(true);
@@ -2327,9 +2378,9 @@ suite('pullBuildingRecords', () => {
 
   it('stamps the correction id on every pull row when given', async () => {
     const db = createRecordsTestDb();
-    const id = await insertBuilding(db, { parcel_id: '2102098000' });
+    const id = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = (await loadBuilding(db, id))!;
-    await pullBuildingRecords(db, building, { fetchImpl: fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]), triggeredBy: 'admin-1', correctionId: 'corr-1' });
+    await pullBuildingRecords(db, building, { fetchImpl: fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }]), triggeredBy: 'admin-1', correctionId: 'corr-1' });
     const n = await db.prepare("SELECT COUNT(*) AS n FROM record_pulls WHERE building_id = ? AND correction_id = 'corr-1'").bind(id).first<{ n: number }>();
     expect(n?.n).toBe(11);
   });
@@ -2461,7 +2512,7 @@ export async function pullBuildingRecords(db: RecordsDb, building: BuildingRowFo
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/lib/__tests__/recordsPull.test.ts`
-Expected: PASS (7 tests). Note in the second test the FY2025 row is removed by its own empty pull (an empty pull still replaces the rows it owns), so the surviving rows are FY2026 and permit A1000569, and the pull count is 22 (11 per run).
+Expected: PASS (7 tests). Note in the second test the FY2025 row is removed by its own empty pull (an empty pull still replaces the rows it owns), so the surviving rows are FY2026 and permit SF437182, and the pull count is 22 (11 per run).
 
 - [ ] **Step 5: Commit**
 
@@ -2492,8 +2543,8 @@ import { pullBuildingRecords } from '../records/pull';
 import { getBuildingRecords, validatePayload } from '../records/query';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import { ENFORCEMENT_RESOURCE_ID } from '../records/sources/boston/enforcement';
-import lanark2026 from './helpers/records/assessor-fy2026-lanark.json';
-import enforcementLanark from './helpers/records/enforcement-lanark.json';
+import tarnwick2026 from './helpers/records/assessor-fy2026-tarnwick.json';
+import enforcementTarnwick from './helpers/records/enforcement-tarnwick.json';
 
 const suite = sqliteAvailable ? describe : describe.skip;
 
@@ -2507,15 +2558,15 @@ suite('getBuildingRecords', () => {
   it('groups validated rows by kind and attaches the latest status per source', async () => {
     const db = createRecordsTestDb();
     const id = await insertBuilding(db);
-    const building = { id, address: '23-27 Lanark Rd, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: null, sam_id: null };
+    const building = { id, address: '52-68 Tarnwick Pl, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: null, sam_id: null };
     await pullBuildingRecords(db, building, {
       triggeredBy: 'admin-1',
-      fetchImpl: fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }, { resourceId: ENFORCEMENT_RESOURCE_ID, records: enforcementLanark }]),
+      fetchImpl: fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }, { resourceId: ENFORCEMENT_RESOURCE_ID, records: enforcementTarnwick }]),
     });
     const view = (await getBuildingRecords(db, id))!;
     expect(view.assessments).toHaveLength(1);
     expect(view.assessments[0].fiscalYear).toBe('FY2026');
-    expect(view.enforcement).toHaveLength(3);
+    expect(view.enforcement).toHaveLength(29);
     expect(view.permits).toEqual([]);
     expect(view.serviceRequests).toEqual([]);
     expect(view.pulledAt).toBeGreaterThan(0);
@@ -2568,21 +2619,21 @@ import type { PermitPayload, RentSmartPayload, ServiceRequestPayload } from '../
 
 describe('showMailingAddress', () => {
   it('shows for entities, never for individuals or missing owners', () => {
-    expect(showMailingAddress('LANARK ROAD LLC MASS LLC')).toBe(true);
-    expect(showMailingAddress('KELLEHER FAMILY LP MASS LP')).toBe(true);
-    expect(showMailingAddress('GRAND LANARK CONDO TR')).toBe(true);
-    expect(showMailingAddress('PASCUCCI CARLO')).toBe(false);
+    expect(showMailingAddress('WRENFIELD REALTY LLC')).toBe(true);
+    expect(showMailingAddress('QUARROW FAMILY LP MASS LP')).toBe(true);
+    expect(showMailingAddress('WYNSTABLE CONDO TR')).toBe(true);
+    expect(showMailingAddress('BRAMMOCK ELLIS')).toBe(false);
     expect(showMailingAddress(null)).toBe(false);
   });
 });
 
 describe('formatters', () => {
   it('formats dollars and record dates from every timestamp shape seen', () => {
-    expect(formatDollars(6720200)).toBe('$6,720,200');
+    expect(formatDollars(4520600)).toBe('$4,520,600');
     expect(formatDollars(null)).toBe('Not recorded');
-    expect(formatRecordDate('2008-08-30 09:42:00')).toBe('Aug 30, 2008');
-    expect(formatRecordDate('2021-01-28T16:29:26')).toBe('Jan 28, 2021');
-    expect(formatRecordDate('2026-07-17 13:56:00+00')).toBe('Jul 17, 2026');
+    expect(formatRecordDate('2015-07-23 10:27:00')).toBe('Jul 23, 2015');
+    expect(formatRecordDate('2022-12-05T11:24:37')).toBe('Dec 5, 2022');
+    expect(formatRecordDate('2025-06-30 13:52:00+00')).toBe('Jun 30, 2025');
     expect(formatRecordDate(null)).toBe('Date not recorded');
     expect(formatRecordDate('garbage')).toBe('Date not recorded');
   });
@@ -2594,8 +2645,8 @@ describe('permitSummary', () => {
     declaredValuation: value, totalFees: null, issuedDate: date, expirationDate: null, status: null, occupancyType: null, address: null,
   });
   it('counts, sums declared valuation, and finds the date range', () => {
-    const s = permitSummary([permit('a', '2021-01-28T16:29:26', 36500), permit('b', '2019-05-02T09:00:00', 1200), permit('c', null, null)]);
-    expect(s).toEqual({ count: 3, declaredTotal: 37700, earliest: '2019-05-02T09:00:00', latest: '2021-01-28T16:29:26' });
+    const s = permitSummary([permit('a', '2022-12-05T11:24:37', 23600), permit('b', '2019-06-11T09:30:00', 4700), permit('c', null, null)]);
+    expect(s).toEqual({ count: 3, declaredTotal: 28300, earliest: '2019-06-11T09:30:00', latest: '2022-12-05T11:24:37' });
   });
   it('handles zero permits', () => {
     expect(permitSummary([])).toEqual({ count: 0, declaredTotal: 0, earliest: null, latest: null });
@@ -2821,7 +2872,7 @@ export function formatDollars(value: number | null): string {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** Accepts '2008-08-30 09:42:00', '2021-01-28T16:29:26', '2026-07-17 13:56:00+00'. Public-record dates are exact by design. */
+/** Accepts '2015-07-23 10:27:00', '2022-12-05T11:24:37', '2025-06-30 13:52:00+00'. Public-record dates are exact by design. */
 export function formatRecordDate(value: string | null): string {
   const match = value?.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!match) return 'Date not recorded';
@@ -2896,7 +2947,7 @@ import { sqliteAvailable } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
-import lanark2026 from './helpers/records/assessor-fy2026-lanark.json';
+import tarnwick2026 from './helpers/records/assessor-fy2026-tarnwick.json';
 
 const suite = sqliteAvailable ? describe : describe.skip;
 
@@ -2931,15 +2982,15 @@ suite('POST /api/admin/buildings/[id]/records/pull', () => {
   });
 
   it('runs the pull, applies a parcel override, returns the summary, and writes an audit row', async () => {
-    vi.stubGlobal('fetch', fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]));
+    vi.stubGlobal('fetch', fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }]));
     try {
       const { POST } = await import('../../pages/api/admin/buildings/[id]/records/pull');
       const db = createRecordsTestDb();
       const id = await insertBuilding(db);
-      const response = await POST(createContext(db, id, { parcelId: '2102098000' }, { id: 'admin', isAdmin: true }));
+      const response = await POST(createContext(db, id, { parcelId: '2109417000' }, { id: 'admin', isAdmin: true }));
       expect(response.status).toBe(200);
       const body = await response.json() as { data: { parcelId: string; sources: Array<{ status: string }> } };
-      expect(body.data.parcelId).toBe('2102098000');
+      expect(body.data.parcelId).toBe('2109417000');
       expect(body.data.sources).toHaveLength(11);
 
       const audit = await db.prepare("SELECT action_type, entity_type, entity_id, admin_user_id FROM audit_logs").first<{ action_type: string; entity_type: string; entity_id: string; admin_user_id: string }>();
@@ -3584,7 +3635,7 @@ function createContext(db: unknown, body: unknown, options: { contentType?: stri
   } as unknown as APIContext;
 }
 
-const goodBody = { buildingId: 'bldg-lanark', recordKind: 'permit', claim: 'The 2019 roof permit ALT123 is missing from the list.', contactEmail: 'Filer@Example.com', turnstileToken: 'good' };
+const goodBody = { buildingId: 'bldg-tarnwick', recordKind: 'permit', claim: 'The 2019 roof permit ALT123 is missing from the list.', contactEmail: 'Filer@Example.com', turnstileToken: 'good' };
 
 suite('POST /api/records/corrections', () => {
   let POST: (c: APIContext) => Promise<Response>;
@@ -3624,7 +3675,7 @@ suite('POST /api/records/corrections', () => {
     expect(response.status).toBe(201);
     const body = (await response.json()) as { data: { id: string } };
     const row = await db.prepare('SELECT building_id, record_kind, claim, contact_email, status FROM record_corrections WHERE id = ?').bind(body.data.id).first();
-    expect(row).toEqual({ building_id: 'bldg-lanark', record_kind: null, claim: goodBody.claim, contact_email: 'filer@example.com', status: 'pending' });
+    expect(row).toEqual({ building_id: 'bldg-tarnwick', record_kind: null, claim: goodBody.claim, contact_email: 'filer@example.com', status: 'pending' });
   });
 });
 ```
@@ -3985,7 +4036,7 @@ import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
 import { PERMITS_RESOURCE_ID } from '../records/sources/boston/permits';
-import lanark2026 from './helpers/records/assessor-fy2026-lanark.json';
+import tarnwick2026 from './helpers/records/assessor-fy2026-tarnwick.json';
 import permitsPositive from './helpers/records/permits-positive.json';
 
 const sendOutcome = vi.fn(async () => ({ success: true }));
@@ -4005,7 +4056,7 @@ function ctx(db: unknown, method: string, path: string, body: unknown, user: { i
 }
 
 async function seedCorrection(db: ReturnType<typeof createRecordsTestDb>, email: string | null = 'filer@example.com'): Promise<string> {
-  await db.prepare("INSERT INTO record_corrections (id, building_id, record_kind, claim, contact_email) VALUES ('c1', 'bldg-lanark', 'permit', 'The roof permit is missing from the list.', ?)").bind(email).run();
+  await db.prepare("INSERT INTO record_corrections (id, building_id, record_kind, claim, contact_email) VALUES ('c1', 'bldg-tarnwick', 'permit', 'The roof permit is missing from the list.', ?)").bind(email).run();
   return 'c1';
 }
 
@@ -4022,15 +4073,15 @@ suite('admin record corrections', () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as { data: Array<{ id: string; building_address: string; building_slug: string; status: string; contact_email: string }> };
     expect(body.data).toHaveLength(1);
-    expect(body.data[0]).toMatchObject({ id: 'c1', building_address: '23-27 Lanark Rd, Boston, MA 02135', building_slug: 'bldg-lanark', status: 'pending' });
+    expect(body.data[0]).toMatchObject({ id: 'c1', building_address: '52-68 Tarnwick Pl, Boston, MA 02135', building_slug: 'bldg-tarnwick', status: 'pending' });
   });
 
   it('POST repull re-pulls with the correction id and returns a diff', async () => {
-    vi.stubGlobal('fetch', fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }, { resourceId: PERMITS_RESOURCE_ID, records: permitsPositive }]));
+    vi.stubGlobal('fetch', fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }, { resourceId: PERMITS_RESOURCE_ID, records: permitsPositive }]));
     try {
       const { POST } = await import('../../pages/api/admin/records/corrections/[id]/repull');
       const db = createRecordsTestDb();
-      await insertBuilding(db, { parcel_id: '2102098000' });
+      await insertBuilding(db, { parcel_id: '2109417000' });
       await seedCorrection(db);
       const response = await POST(ctx(db, 'POST', '/api/admin/records/corrections/c1/repull', {}, admin, 'c1'));
       expect(response.status).toBe(200);
@@ -4058,7 +4109,7 @@ suite('admin record corrections', () => {
     const row = await db.prepare('SELECT status, resolution, resolution_notes, resolved_by FROM record_corrections WHERE id = ?').bind('c1').first();
     expect(row).toEqual({ status: 'resolved', resolution: 'source_mismatch_noted', resolution_notes: 'The city record lags the permit office.', resolved_by: 'admin' });
     const audit = await db.prepare('SELECT action_type, entity_type, entity_id, notes FROM audit_logs').first<{ action_type: string; entity_type: string; entity_id: string; notes: string }>();
-    expect(audit).toMatchObject({ action_type: 'record_correction_resolved', entity_type: 'building', entity_id: 'bldg-lanark' });
+    expect(audit).toMatchObject({ action_type: 'record_correction_resolved', entity_type: 'building', entity_id: 'bldg-tarnwick' });
     expect(audit?.notes).toContain('c1');
     expect(sendOutcome).toHaveBeenCalledTimes(1);
     expect(sendOutcome.mock.calls[0][1]).toBe('filer@example.com');
@@ -4591,7 +4642,7 @@ git commit -m "feat(records): admin record-corrections queue and nav entry"
 ```ts
 // scripts/records-fixture-check.ts
 /**
- * Live check of the Boston adapters against 23-27 Lanark Road (the brief's fixture).
+ * Live check of the Boston adapters against the records fixture building.
  * Hits data.boston.gov. Not a test; run by hand before the first production pull and
  * whenever Boston changes a schema:   npm run records:check
  *
@@ -4604,16 +4655,27 @@ import type { AssessmentPayload, EnforcementTicketPayload, RecordRow, ServiceReq
 
 const fetchImpl = (input: string, init?: RequestInit) => fetch(input, init);
 let failures = 0;
+/**
+ * The counts the live city returned for the practice building when this was written. They are
+ * placeholders here: the counts described a real building, so this plan leaves them out.
+ */
+const RECORDED = {
+  permits: RECORDED_PERMITS,
+  violations: RECORDED_VIOLATIONS,
+  enforcementCases: RECORDED_ENFORCEMENT_CASES,
+  min311: RECORDED_311_FLOOR,
+  housing311: { min: RECORDED_HOUSING_MIN, max: RECORDED_HOUSING_MAX },
+};
 const check = (label: string, ok: boolean, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  (${detail})` : ''}`);
   if (!ok) failures += 1;
 };
 
 async function main() {
-  const identity = buildIdentity({ id: 'fixture', address: '23-27 Lanark Rd, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: null, sam_id: null });
+  const identity = buildIdentity({ id: 'fixture', address: '52-68 Tarnwick Pl, Boston, MA 02135', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: null, sam_id: null });
 
   const resolved = await resolveParcel(identity, fetchImpl);
-  check('parcel resolves to 2102098000', resolved.parcelId === '2102098000', JSON.stringify(resolved));
+  check('parcel resolves to 2109417000', resolved.parcelId === '2109417000', JSON.stringify(resolved));
   identity.parcelId = resolved.parcelId;
   identity.parcelNumeric = resolved.parcelId ? String(Number.parseInt(resolved.parcelId, 10)) : null;
   identity.condominium = resolved.condominium;
@@ -4630,28 +4692,28 @@ async function main() {
   }
 
   const fy2026 = rows.find((r) => r.kind === 'assessment' && r.sourceKey === 'FY2026')?.payload as AssessmentPayload | undefined;
-  check('FY2026 owner is Lanark Road LLC', /LANARK ROAD LLC/.test(fy2026?.owner ?? ''), fy2026?.owner ?? 'none');
-  check('FY2026 mailing address PO BOX 35006', fy2026?.mailStreet === 'PO BOX 35006', fy2026?.mailStreet ?? 'none');
+  check('FY2026 owner is Wrenfield Realty LLC', /WRENFIELD REALTY LLC/.test(fy2026?.owner ?? ''), fy2026?.owner ?? 'none');
+  check('FY2026 mailing address 88 FELLWICK AV', fy2026?.mailStreet === '88 FELLWICK AV', fy2026?.mailStreet ?? 'none');
   check('FY2026 land use A', fy2026?.landUse === 'A');
-  check('FY2026 remodel year 1980', fy2026?.yearRemodel === 1980);
-  check('FY2026 total value 6,720,200', fy2026?.totalValue === 6720200, String(fy2026?.totalValue));
+  check('FY2026 remodel year 1996', fy2026?.yearRemodel === 1996);
+  check('FY2026 total value 4,520,600', fy2026?.totalValue === 4520600, String(fy2026?.totalValue));
   check('six assessment years present', rows.filter((r) => r.kind === 'assessment').length === 6, String(rows.filter((r) => r.kind === 'assessment').length));
 
-  check('zero permits', rows.filter((r) => r.kind === 'permit').length === 0);
-  check('no ISD violations', rows.filter((r) => r.kind === 'violation').length === 0);
+  check('permits match the recorded count', rows.filter((r) => r.kind === 'permit').length === RECORDED.permits);
+  check('ISD violations match the recorded count', rows.filter((r) => r.kind === 'violation').length === RECORDED.violations);
 
   const tickets = rows.filter((r) => r.kind === 'enforcement_ticket').map((r) => r.payload as EnforcementTicketPayload);
   const cases = new Set(tickets.map((t) => t.caseNumber));
-  check('two enforcement cases, all 2008, contact 1505 Commonwealth', cases.size === 2 && tickets.every((t) => t.statusDate?.startsWith('2008') && /1505 COMMONWEALTH/.test(t.contactAddress ?? '')), `${cases.size} cases, ${tickets.length} line items`);
+  check('enforcement cases match the recorded count, contact 88 Fellwick', cases.size === RECORDED.enforcementCases && tickets.every((t) => /88 FELLWICK/.test(t.contactAddress ?? '')), `${cases.size} cases, ${tickets.length} line items`);
 
   const requests = rows.filter((r) => r.kind === 'service_request').map((r) => r.payload as ServiceRequestPayload);
   const housing = requests.filter((r) => r.classification === 'housing');
-  check('311 total near 98 (brief, Sept 2026)', requests.length >= 90, `${requests.length} total`);
-  check('311 housing-related near 4 (brief, Sept 2026)', housing.length >= 3 && housing.length <= 8, `${housing.length} housing`);
+  check('311 total at or above the recorded floor (Sept 2026)', requests.length >= RECORDED.min311, `${requests.length} total`);
+  check('311 housing-related within the recorded band (Sept 2026)', housing.length >= RECORDED.housing311.min && housing.length <= RECORDED.housing311.max, `${housing.length} housing`);
 
   check('RentSmart rows present', rows.some((r) => r.kind === 'rentsmart'));
 
-  console.log(failures === 0 ? '\nBoston adapter reproduces the Lanark fixture.' : `\n${failures} check(s) failed.`);
+  console.log(failures === 0 ? '\nBoston adapter reproduces the records fixture.' : `\n${failures} check(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);
 }
 
@@ -4678,7 +4740,7 @@ Expected: every line `PASS` and the final sentence. If a check fails, the live d
 
 ```bash
 git add scripts/records-fixture-check.ts package.json
-git commit -m "chore(records): live Lanark fixture check script"
+git commit -m "chore(records): live records fixture check script"
 ```
 
 ---
@@ -4880,9 +4942,9 @@ npx wrangler d1 execute ratemyplace-db --remote --file migrations/0030_audit_rec
 
 Verify `audit_logs` row count unchanged and `PRAGMA table_info(buildings)` shows `parcel_id` and `sam_id`. Record in `migrations/AGENTS.md` that 0029 and 0030 were applied out of band, with the date.
 
-- [ ] **Step 5: Merge, then pull Lanark first**
+- [ ] **Step 5: Merge, then pull the brief's building first**
 
-After deploy: `npm run records:check` against live data, then in `/admin/buildings` pull the Lanark building and compare the panel to the brief's section 6 by eye. Then pull the remaining Boston buildings one at a time from the admin table. Submit one real "Report a record error" on production to exercise Turnstile, resolve it in `/admin/records`, and confirm the outcome email arrives.
+After deploy: `npm run records:check` against live data, then in `/admin/buildings` pull the brief's building and compare the panel to the brief's section 6 by eye. Then pull the remaining Boston buildings one at a time from the admin table. Submit one real "Report a record error" on production to exercise Turnstile, resolve it in `/admin/records`, and confirm the outcome email arrives.
 
 ---
 
@@ -4905,7 +4967,7 @@ After deploy: `npm run records:check` against live data, then in `/admin/buildin
 | Admin pull endpoint with audit; per-building control; parcel override for ambiguity | 12 |
 | Correction form fields and bounds; endpoint guard order; rate limit 3/hour; optional email only | 14, 15 |
 | Admin queue; re-pull with diff; three resolutions; notes render only for source mismatch; audit; outcome email | 16, 17 |
-| Offline Lanark fixture; live script by hand | 5 to 10, 18 |
+| Offline records fixture; live script by hand | 5 to 10, 18 |
 | Docs: MASTER, privacy, methodology, strategy, traps, planning | 19 |
 | Rollout order | 20 |
 

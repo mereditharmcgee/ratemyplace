@@ -291,26 +291,31 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   columns still exist. Boston retires 311 resource ids without notice, and a retired id
   fails that whole source on every pull until someone updates `LEGACY_311_RESOURCES` —
   it does not heal on its own. Run it before trusting a source failure. A resource the city
-  empties fails nothing, and the fixture's floor does not notice it either: since the
+  empties fails no query, so only the fixture's empty-file probe (below) sees it: since the
   2026-09-18 reload, the 2011 and 2014 resources answer every query with zero rows (same ids,
   schema intact, CSV downloads still full size). Only those two years' data dictionaries retype
   `precinct` as numeric, and legacy precincts such as `0502A` are not numbers, which is the
   likely reason the load failed. Until the city reloads them, every building's 311 history
   lacks 2011 and 2014.
 - **`fixture.ts` runs inside a Worker**, not just under that script: the scheduler's daily
-  circuit breaker calls `runLanarkFixture`, which pulls in `seed/sam.ts` for the SAM check.
+  circuit breaker calls `runRecordsFixture`, which pulls in `seed/sam.ts` for the SAM check.
   Both files — and anything either imports — must stay runtime-agnostic: no `node:` imports,
   no `fs`/`path`/`process`, nothing that only exists under tsx. The rest of `seed/` is
   script-only and has no such constraint. The fixture runs all eleven Boston sources
   concurrently and applies the results in source order afterwards, so two runs compare label
   for label; it never throws, because the breaker needs a result, not an exception.
+  The building is `RECORDS_FIXTURE`, 2262-2266 Dorchester Ave, a Boston Housing Authority
+  building: its owner is a public body, so nothing the checks compare or print names a private
+  person or company. Take every building value in a check label from that constant, and keep
+  checks off the free-text fields (a permit's applicant, description and comments, a 311
+  closure reason), which name private people; a failed check's detail goes into the alert
+  email and its label into the admin panel.
   The RentSmart checks do not ask for the fixture parcel's rows. RentSmart is the city's
-  current export, not a history: the city reloaded it on 2026-11-13, the parcel's rows went
-  with it, and the old "RentSmart rows present" check paused the fill every morning while the
-  source worked. The checks now ask that the adapter's parcel query answers (zero rows is an
-  answer) and that a city-wide query on the same resource finds a row from the last 60 days
-  with a ten-digit parcel. Before a new check pins one parcel's value, ask whether a reload of
-  that dataset could take the value away.
+  current export, not a history, and a reload of it can drop any parcel's rows, so a check
+  that one parcel has rows can pause the fill every morning while the source works. The checks
+  ask that the adapter's parcel query answers (zero rows is an answer) and that a city-wide
+  query on the same resource finds a row from the last 60 days with a ten-digit parcel. Before
+  a new check pins one parcel's value, ask whether a reload of that dataset could take it away.
   **Notices are the fixture's report-only channel** (`FixtureResult.notices`). They are never
   counted in `checksFailed` or `failures`, so the breaker cannot pause the fill on one or hold
   a fixture pause because of one. The one notice so far asks each of the seventeen 311 files
@@ -320,7 +325,29 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   lists them under their own heading, `/admin/records` shows them under the fixture line, and
   `npm run records:check` prints them as `NOTE` lines without changing its exit code. Something
   the fill should wait for belongs in a check; something only a human or the city can act on
-  belongs here.
+  belongs here. Every 311 check reads the same probe, so a file or two newly emptied, legacy or
+  new system, shows up as a notice and fails nothing. The every-year check skips a year whose
+  whole file answered with no rows (2014 today), so a reloaded year is checked again with no
+  edit. The new-system check is skipped the same way when the new-system file is empty. The
+  total and housing floors are each lowered by what every empty file held for the fixture
+  building when its counts were recorded (`RECORDS_FIXTURE.serviceRequests.recorded`,
+  2026-11-15); the labels never change. 2011 and 2014 were recorded at 0, so they lower
+  nothing. The housing ceiling is never lowered. What a check excused goes in its detail and
+  in its `note`. The email shows a failed check's detail. `/admin/records` shows only its label,
+  because `plan` stores just the failed labels in `records_fixture_last`. Neither shows a
+  passing check, so on a morning that passes only `npm run records:check` shows what was
+  excused, as the note on the `PASS` line.
+  The excuse has a limit: "311 files emptied since the counts were recorded: at most 2" fails
+  once three or more files that held the building's rows answer empty at once. That is a wipe,
+  or 311 moved to new resource ids with the old ones left empty, which is ours to fix in
+  `LEGACY_311_RESOURCES`; every pull meanwhile replaces a building's stored 311 rows with none,
+  so the fill waits and the email goes out. A file whose probe failed is asked once more a
+  second later, before the next file, and only a file that fails both times is unchecked.
+  After two files in a row fail both tries, each later file gets one try until one answers, so
+  a city that is down costs one timeout per file after the first two. An unchecked file excuses
+  nothing and counts toward no limit: the every-year and new-system checks still hold the
+  fixture building to it and it lowers no floor, because an unknown is not an excuse. When the
+  floors are re-recorded, record every file's count again with them.
 - **`queue.ts` is the pull queue, and `attempts` counts CLAIMS, not failures.** One pending
   row per building (0031's partial unique index). `claimBatch` takes a lease by conditional
   `UPDATE`, incrementing `attempts` as it goes; `completeRow` resets it to 0; `failRow`
@@ -541,7 +568,7 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
   (`ledger.ts`), not by code line.
 - **`display.ts` holds a privacy gate.** `showMailingAddress` publishes a tax mailing
   address only for an owner that reads as an entity, and `mailingAddressLine` holds the
-  addressee to the same test — an entity can list a person as its `C/O ATT`. It errs
+  addressee to the same test, since an entity can list a person as its `C/O` addressee. It errs
   toward hiding: a hidden business address costs a reader one lookup, a published home
   address cannot be taken back. `BANNED_WORDS` in the same file is scanned against the
   panel's templates by `__tests__/recordsPanelCopy.test.ts`.

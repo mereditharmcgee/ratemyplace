@@ -235,8 +235,8 @@ function trailingLocalityWordCount(words: readonly string[]): number {
  * so it is never treated as a state. A lone "MA" after a street is only read as the state
  * when a ZIP was just removed or a locality precedes it: nothing has verified that no Boston
  * street name ends in a bare "MA", so the guard errs toward not stripping, at the known cost
- * that '23 Lanark Rd MA' keys as `LANARK RD MA` while '23 Lanark Rd MA 02135' keys as
- * `LANARK RD`. Called by `addressKey` and `buildIdentity`, which both consume user-entered
+ * that '52 Tarnwick Pl MA' keys as `TARNWICK PL MA` while '52 Tarnwick Pl MA 02135' keys as
+ * `TARNWICK PL`. Called by `addressKey` and `buildIdentity`, which both consume user-entered
  * `buildings.address`; not by `streetKey`, whose input is a bare assessor street name.
  */
 export function stripTrailingLocality(streetUpper: string): string {
@@ -395,7 +395,7 @@ export function splitSuffix(street: string): { base: string; spellings: readonly
 
 /**
  * The lookup key shared by seeded rows and reviewer dedupe: base name plus the assessor's
- * spelling of the suffix ('LANARK RD'), or the bare base when there is no suffix. Null
+ * spelling of the suffix ('TARNWICK PL'), or the bare base when there is no suffix. Null
  * when the street is degenerate — the same rule `buildIdentity` throws on, so a bare
  * suffix ('Ave') or an empty street never becomes a key that silently collides.
  */

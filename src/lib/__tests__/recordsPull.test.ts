@@ -9,9 +9,9 @@ import { RENTSMART_RESOURCE_ID } from '../records/sources/boston/rentsmart';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
-import lanark2026 from './helpers/records/assessor-fy2026-lanark.json';
-import enforcementLanark from './helpers/records/enforcement-lanark.json';
-import rentsmartLanark from './helpers/records/rentsmart-lanark.json';
+import tarnwick2026 from './helpers/records/assessor-fy2026-tarnwick.json';
+import enforcementTarnwick from './helpers/records/enforcement-tarnwick.json';
+import rentsmartTarnwick from './helpers/records/rentsmart-tarnwick.json';
 import permitsPositive from './helpers/records/permits-positive.json';
 
 const suite = sqliteAvailable ? describe : describe.skip;
@@ -124,33 +124,33 @@ suite('pullBuildingRecords', () => {
     const building = await loadBuilding(db, buildingId);
     const fetchImpl = fixtureFetch([
       // The resolver and the FY2026 year query hit the same resource with different SQL.
-      { resourceId: FY2026_RESOURCE_ID, sqlIncludes: 'NOT IN', records: lanark2026 },
-      { resourceId: FY2026_RESOURCE_ID, sqlIncludes: '"PID" IN', records: lanark2026 },
-      { resourceId: ENFORCEMENT_RESOURCE_ID, records: enforcementLanark },
-      { resourceId: RENTSMART_RESOURCE_ID, records: rentsmartLanark },
+      { resourceId: FY2026_RESOURCE_ID, sqlIncludes: 'NOT IN', records: tarnwick2026 },
+      { resourceId: FY2026_RESOURCE_ID, sqlIncludes: '"PID" IN', records: tarnwick2026 },
+      { resourceId: ENFORCEMENT_RESOURCE_ID, records: enforcementTarnwick },
+      { resourceId: RENTSMART_RESOURCE_ID, records: rentsmartTarnwick },
     ]);
 
     const summary = await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl });
 
     expect(summary.buildingId).toBe(buildingId);
     expect(summary.jurisdiction).toBe('boston');
-    expect(summary.parcelId).toBe('2102098000');
+    expect(summary.parcelId).toBe('2109417000');
     expect(summary.condominium).toBe(false);
     expect(summary.sources).toHaveLength(BOSTON_SOURCE_COUNT);
 
     const byLabel = (label: string) => summary.sources.find((s) => s.label === label);
     expect(byLabel('Property Assessment FY2026')).toMatchObject({ status: 'ok', rowCount: 1 });
     expect(byLabel('Property Assessment FY2025')).toMatchObject({ status: 'empty', rowCount: 0 });
-    expect(byLabel('Public Works Code Enforcement')).toMatchObject({ status: 'ok', rowCount: 3 });
+    expect(byLabel('Public Works Code Enforcement')).toMatchObject({ status: 'ok', rowCount: 29 });
     expect(byLabel('Building and Property Violations')).toMatchObject({ status: 'empty', rowCount: 0 });
-    expect(byLabel('RentSmart')).toMatchObject({ status: 'ok', rowCount: 4 });
+    expect(byLabel('RentSmart')).toMatchObject({ status: 'ok', rowCount: 2 });
     expect(byLabel('311 Service Requests')).toMatchObject({ status: 'empty', rowCount: 0 });
 
     const stored = await db
       .prepare('SELECT parcel_id, sam_id FROM buildings WHERE id = ?')
       .bind(buildingId)
       .first<{ parcel_id: string | null; sam_id: string | null }>();
-    expect(stored).toEqual({ parcel_id: '2102098000', sam_id: '83763' });
+    expect(stored).toEqual({ parcel_id: '2109417000', sam_id: '58344' });
 
     const pulls = await db
       .prepare('SELECT source_label, query, status, triggered_by FROM record_pulls WHERE building_id = ?')
@@ -159,57 +159,57 @@ suite('pullBuildingRecords', () => {
     expect(pulls.results).toHaveLength(BOSTON_SOURCE_COUNT);
     expect(pulls.results.every((p) => p.triggered_by === ADMIN_ID)).toBe(true);
     const enforcementPull = pulls.results.find((p) => p.source_label === 'Public Works Code Enforcement');
-    expect(enforcementPull?.query).toContain('LANARK');
+    expect(enforcementPull?.query).toContain('TARNWICK');
 
-    expect(await recordCounts(db, buildingId)).toEqual({ assessment: 1, enforcement_ticket: 3, rentsmart: 4 });
+    expect(await recordCounts(db, buildingId)).toEqual({ assessment: 1, enforcement_ticket: 29, rentsmart: 2 });
   });
 
   it('replaces rows on re-pull without one fiscal year clearing another', async () => {
     const db = await createDbWithAdmin();
-    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const buildingId = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = await loadBuilding(db, buildingId);
 
     const firstFetch = fixtureFetch([
-      { resourceId: FY2026_RESOURCE_ID, records: lanark2026 },
-      { resourceId: FY2025_RESOURCE_ID, sqlIncludes: '"PID" IN', records: lanark2026 },
+      { resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 },
+      { resourceId: FY2025_RESOURCE_ID, sqlIncludes: '"PID" IN', records: tarnwick2026 },
       { resourceId: PERMITS_RESOURCE_ID, records: permitsPositive },
     ]);
     await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl: firstFetch });
     expect(await recordKeys(db, buildingId)).toEqual([
       { kind: 'assessment', source_key: 'FY2025' },
       { kind: 'assessment', source_key: 'FY2026' },
-      { kind: 'permit', source_key: 'A1000569' },
       { kind: 'permit', source_key: 'E123' },
+      { kind: 'permit', source_key: 'SF437182' },
     ]);
 
     // FY2025 now returns nothing, and permits returns one of its two rows.
     const secondFetch = fixtureFetch([
-      { resourceId: FY2026_RESOURCE_ID, records: lanark2026 },
+      { resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 },
       { resourceId: PERMITS_RESOURCE_ID, records: [permitsPositive[0]] },
     ]);
     await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl: secondFetch });
 
     expect(await recordKeys(db, buildingId)).toEqual([
       { kind: 'assessment', source_key: 'FY2026' },
-      { kind: 'permit', source_key: 'A1000569' },
+      { kind: 'permit', source_key: 'SF437182' },
     ]);
     expect(await pullRowCount(db, buildingId)).toBe(BOSTON_SOURCE_COUNT * 2);
   });
 
   it('keeps prior rows when a source fails and still runs the sources after it', async () => {
     const db = await createDbWithAdmin();
-    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const buildingId = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = await loadBuilding(db, buildingId);
 
     const firstFetch = fixtureFetch([
-      { resourceId: FY2026_RESOURCE_ID, records: lanark2026 },
+      { resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 },
       { resourceId: PERMITS_RESOURCE_ID, records: permitsPositive },
     ]);
     await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl: firstFetch });
     expect((await recordCounts(db, buildingId)).permit).toBe(2);
 
     const secondFetch = fixtureFetch([
-      { resourceId: FY2026_RESOURCE_ID, records: lanark2026 },
+      { resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 },
       { resourceId: PERMITS_RESOURCE_ID, errorStatus: 503, errorMessage: 'upstream unavailable' },
     ]);
     const summary = await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl: secondFetch });
@@ -233,12 +233,12 @@ suite('pullBuildingRecords', () => {
 
   it('stores "no query" when a source fails with something other than a SourceError', async () => {
     const db = await createDbWithAdmin();
-    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const buildingId = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = await loadBuilding(db, buildingId);
     // ckanSql wraps anything the fetch itself throws in a SourceError, so the only route
     // into the non-SourceError branch is a throw after a successful response: CKAN
     // answering with `records` as an object makes ckanSql's `.slice` a plain TypeError.
-    const base = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
+    const base = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }]);
     const fetchImpl: FetchLike = async (input, init) =>
       input.includes(PERMITS_RESOURCE_ID)
         ? new Response(JSON.stringify({ success: true, result: { records: { notAnArray: true } } }), { status: 200 })
@@ -259,7 +259,7 @@ suite('pullBuildingRecords', () => {
 
   it('truncates a long error message to the stored budget, ellipsis included', async () => {
     const db = await createDbWithAdmin();
-    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const buildingId = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = await loadBuilding(db, buildingId);
     const base = fixtureFetch([]);
     const fetchImpl: FetchLike = async (input, init) => {
@@ -284,9 +284,9 @@ suite('pullBuildingRecords', () => {
   it('writes pull rows with no triggered_by when nobody triggered the pull', async () => {
     // No admin user exists: a scheduled Worker run (sub-project C) has none to point at.
     const db = createRecordsTestDb();
-    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const buildingId = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = await loadBuilding(db, buildingId);
-    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }]);
 
     const summary = await pullBuildingRecords(db, building, { triggeredBy: null, fetchImpl });
 
@@ -301,12 +301,12 @@ suite('pullBuildingRecords', () => {
 
   it('keeps a source’s prior rows when its write fails and still runs the sources after it', async () => {
     const db = await createDbWithAdmin();
-    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const buildingId = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = await loadBuilding(db, buildingId);
     const fetchImpl = fixtureFetch([
-      { resourceId: FY2026_RESOURCE_ID, records: lanark2026 },
+      { resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 },
       { resourceId: PERMITS_RESOURCE_ID, records: permitsPositive },
-      { resourceId: RENTSMART_RESOURCE_ID, records: rentsmartLanark },
+      { resourceId: RENTSMART_RESOURCE_ID, records: rentsmartTarnwick },
     ]);
     await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl });
     expect((await recordCounts(db, buildingId)).permit).toBe(2);
@@ -321,7 +321,7 @@ suite('pullBuildingRecords', () => {
     // The batch rolled back, so the deletes never landed either.
     expect((await recordCounts(db, buildingId)).permit).toBe(2);
     // RentSmart runs after permits, so a failed write above it must not stop the loop.
-    expect(summary.sources.find((s) => s.label === 'RentSmart')).toMatchObject({ status: 'ok', rowCount: 4 });
+    expect(summary.sources.find((s) => s.label === 'RentSmart')).toMatchObject({ status: 'ok', rowCount: 2 });
 
     const errorPull = await db
       .prepare("SELECT row_count, error_message, query FROM record_pulls WHERE building_id = ? AND source_id = ? AND status = 'error'")
@@ -334,7 +334,7 @@ suite('pullBuildingRecords', () => {
 
   it('stores one row per source key when a source returns duplicates', async () => {
     const db = await createDbWithAdmin();
-    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const buildingId = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = await loadBuilding(db, buildingId);
     // permits-positive.json repeats permit E123. building_records' UNIQUE
     // (building_id, kind, source_key) would fail the whole batch if it reached the inserts.
@@ -344,14 +344,14 @@ suite('pullBuildingRecords', () => {
 
     expect(summary.sources.find((s) => s.label === 'Approved Building Permits')).toMatchObject({ status: 'ok', rowCount: 2 });
     expect(await recordKeys(db, buildingId)).toEqual([
-      { kind: 'permit', source_key: 'A1000569' },
       { kind: 'permit', source_key: 'E123' },
+      { kind: 'permit', source_key: 'SF437182' },
     ]);
   });
 
   it('clears an assessment year that has rolled off the assessor year list', async () => {
     const db = await createDbWithAdmin();
-    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const buildingId = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = await loadBuilding(db, buildingId);
     // A year no source owns any more: nothing narrows a delete to FY2019, so without the
     // rollover cleanup this row would outlive every future pull.
@@ -370,7 +370,7 @@ suite('pullBuildingRecords', () => {
       .bind(buildingId)
       .run();
 
-    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }]);
     await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl });
 
     expect(await recordKeys(db, buildingId)).toEqual([{ kind: 'assessment', source_key: 'FY2026' }]);
@@ -382,21 +382,21 @@ suite('pullBuildingRecords', () => {
     // updated_at means "an admin edited this building"; a pull is not an admin edit.
     await db.prepare('UPDATE buildings SET updated_at = 1 WHERE id = ?').bind(buildingId).run();
     const building = await loadBuilding(db, buildingId);
-    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, sqlIncludes: 'NOT IN', records: lanark2026 }]);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, sqlIncludes: 'NOT IN', records: tarnwick2026 }]);
 
     const summary = await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl });
 
-    expect(summary.parcelId).toBe('2102098000');
+    expect(summary.parcelId).toBe('2109417000');
     const stored = await db
       .prepare('SELECT parcel_id, updated_at FROM buildings WHERE id = ?')
       .bind(buildingId)
       .first<{ parcel_id: string | null; updated_at: number }>();
-    expect(stored).toEqual({ parcel_id: '2102098000', updated_at: 1 });
+    expect(stored).toEqual({ parcel_id: '2109417000', updated_at: 1 });
   });
 
   it('records a condominium address as a flag, not a parcel', async () => {
     const db = await createDbWithAdmin();
-    const buildingId = await insertBuilding(db, { id: 'bldg-condo', address: '55 Lanark Rd, Boston, MA 02135' });
+    const buildingId = await insertBuilding(db, { id: 'bldg-condo', address: '127 Tarnwick Pl, Boston, MA 02135' });
     const building = await loadBuilding(db, buildingId);
     const fetchImpl = fixtureFetch([
       { resourceId: FY2026_RESOURCE_ID, sqlIncludes: 'NOT IN', records: [] },
@@ -432,8 +432,8 @@ suite('pullBuildingRecords', () => {
         resourceId: FY2026_RESOURCE_ID,
         sqlIncludes: 'NOT IN',
         records: [
-          { ...lanark2026[0], PID: '2102098000' },
-          { ...lanark2026[0], PID: '2102099000' },
+          { ...tarnwick2026[0], PID: '2109417000' },
+          { ...tarnwick2026[0], PID: '2109418000' },
         ],
       },
     ]);
@@ -468,9 +468,9 @@ suite('pullBuildingRecords', () => {
 
   it('stamps the correction id on every pull row', async () => {
     const db = await createDbWithAdmin();
-    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const buildingId = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = await loadBuilding(db, buildingId);
-    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }]);
 
     await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, correctionId: 'corr-9', fetchImpl });
 
@@ -484,9 +484,9 @@ suite('pullBuildingRecords', () => {
 
   it('writes the trigger reason on every pull row and leaves triggered_by null for a non-admin pull', async () => {
     const db = createRecordsTestDb();
-    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const buildingId = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = await loadBuilding(db, buildingId);
-    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }]);
 
     await pullBuildingRecords(db, building, { triggeredBy: null, triggerReason: 'queue:fill', fetchImpl });
 
@@ -499,9 +499,9 @@ suite('pullBuildingRecords', () => {
 
   it('defaults trigger_reason to admin when an admin id is given and no reason is', async () => {
     const db = await createDbWithAdmin();
-    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const buildingId = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = await loadBuilding(db, buildingId);
-    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }]);
 
     await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl });
 
@@ -518,9 +518,9 @@ suite('pullBuildingRecords', () => {
   // left out — a uuid, a long SQL string, and a clock.
   it('stamps the whole provenance tuple on a correction re-pull', async () => {
     const db = await createDbWithAdmin();
-    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const buildingId = await insertBuilding(db, { parcel_id: '2109417000' });
     const building = await loadBuilding(db, buildingId);
-    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]);
+    const fetchImpl = fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }]);
     const currentYear = ASSESSOR_YEARS[0];
 
     await pullBuildingRecords(db, building, { triggeredBy: ADMIN_ID, fetchImpl });
@@ -556,7 +556,7 @@ suite('pullBuildingRecords', () => {
 
   it('reports an unparseable address as a resolution error instead of throwing', async () => {
     const db = await createDbWithAdmin();
-    const buildingId = await insertBuilding(db, { id: 'bldg-noaddr', address: 'Lanark Road' });
+    const buildingId = await insertBuilding(db, { id: 'bldg-noaddr', address: 'Tarnwick Place' });
     const building = await loadBuilding(db, buildingId);
     const fetchImpl = fixtureFetch([]);
 

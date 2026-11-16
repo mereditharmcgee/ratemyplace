@@ -12,11 +12,11 @@ import {
 } from '../records/sources/boston/serviceRequests';
 import type { RecordRow, ServiceRequestPayload } from '../records/types';
 import { fixtureFetch, type FixtureRoute } from './helpers/records/fixtureFetch';
-import lanark2024 from './helpers/records/311-2024-lanark.json';
-import lanarkNew from './helpers/records/311-new-lanark.json';
+import tarnwick2024 from './helpers/records/311-2024-tarnwick.json';
+import tarnwickNew from './helpers/records/311-new-tarnwick.json';
 
-const lanark = buildIdentity({
-  id: 'b1', address: '23-27 Lanark Rd, Boston, MA', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: null, sam_id: null,
+const tarnwick = buildIdentity({
+  id: 'b1', address: '52-68 Tarnwick Pl, Boston, MA', city: 'Boston', state: 'MA', zip_code: '02135', parcel_id: null, sam_id: null,
 });
 
 function payloadOf(row: RecordRow): ServiceRequestPayload {
@@ -43,7 +43,7 @@ describe('serviceRequestsSource', () => {
 
   it('runs exactly 17 queries and stores them as a JSON array', async () => {
     const fetchImpl = fixtureFetch([]);
-    const result = await serviceRequestsSource.run(lanark, fetchImpl);
+    const result = await serviceRequestsSource.run(tarnwick, fetchImpl);
     expect(fetchImpl.calls).toHaveLength(17);
     const queries = JSON.parse(result.query);
     expect(Array.isArray(queries)).toBe(true);
@@ -52,24 +52,24 @@ describe('serviceRequestsSource', () => {
 
   it('builds the expected legacy query shape, address forms and zip predicate', async () => {
     const fetchImpl = fixtureFetch([]);
-    const result = await serviceRequestsSource.run(lanark, fetchImpl);
+    const result = await serviceRequestsSource.run(tarnwick, fetchImpl);
     const queries: string[] = JSON.parse(result.query);
     const q = queries.find((sql) => sql.includes(year2024.resourceId));
     expect(q).toBeDefined();
-    expect(q).toContain(`upper("location") LIKE '23-27 LANARK RD%' ESCAPE '!'`);
-    expect(q).toContain(`upper("location") LIKE '27 LANARK ROAD%' ESCAPE '!'`);
+    expect(q).toContain(`upper("location") LIKE '52-68 TARNWICK PL%' ESCAPE '!'`);
+    expect(q).toContain(`upper("location") LIKE '68 TARNWICK PLACE%' ESCAPE '!'`);
     expect(q).toContain(`("location_zipcode" IS NULL OR "location_zipcode" = '02135')`);
     expect(q).toContain(`ORDER BY "open_dt" DESC, "case_enquiry_id" LIMIT 500`);
   });
 
   it('builds the expected new-system query shape, street forms, numbers and zip predicate', async () => {
     const fetchImpl = fixtureFetch([]);
-    const result = await serviceRequestsSource.run(lanark, fetchImpl);
+    const result = await serviceRequestsSource.run(tarnwick, fetchImpl);
     const queries: string[] = JSON.parse(result.query);
     const q = queries.find((sql) => sql.includes(NEW_311_RESOURCE_ID));
     expect(q).toBeDefined();
-    expect(q).toContain(`upper("street_name") IN ('LANARK RD','LANARK ROAD')`);
-    expect(q).toContain(`upper("street_number") IN ('23','25','27','23-27')`);
+    expect(q).toContain(`upper("street_name") IN ('TARNWICK PL','TARNWICK PLACE')`);
+    expect(q).toContain(`upper("street_number") IN ('52','54','56','58','60','62','64','66','68','52-68')`);
     expect(q).toContain(`("zip_code" IS NULL OR "zip_code" = '02135')`);
     expect(q).toContain(`ORDER BY "open_date" DESC, "case_id" LIMIT 500`);
   });
@@ -94,39 +94,39 @@ describe('serviceRequestsSource', () => {
 
   it('maps, classifies, and dedupes rows across legacy years and the new system', async () => {
     const fetchImpl = fixtureFetch([
-      { resourceId: year2024.resourceId, records: lanark2024 },
-      { resourceId: year2023.resourceId, records: [lanark2024[0]] },
-      { resourceId: NEW_311_RESOURCE_ID, records: lanarkNew },
+      { resourceId: year2024.resourceId, records: tarnwick2024 },
+      { resourceId: year2023.resourceId, records: [tarnwick2024[0]] },
+      { resourceId: NEW_311_RESOURCE_ID, records: tarnwickNew },
     ]);
-    const result = await serviceRequestsSource.run(lanark, fetchImpl);
-    expect(result.rows).toHaveLength(8);
+    const result = await serviceRequestsSource.run(tarnwick, fetchImpl);
+    expect(result.rows).toHaveLength(26);
 
-    const sanitation = payloadOf(result.rows.find((r) => payloadOf(r).caseId === '101005238959')!);
-    expect(sanitation).toMatchObject({
-      system: 'legacy', classification: 'other', reason: 'Sanitation', openedAt: '2024-01-06 12:20:00', status: 'Open',
+    const pothole = payloadOf(result.rows.find((r) => payloadOf(r).caseId === '101009000101')!);
+    expect(pothole).toMatchObject({
+      system: 'legacy', classification: 'other', reason: 'Highway Maintenance', openedAt: '2024-05-14 10:42:00', status: 'Open',
     });
 
     const housing = payloadOf(result.rows.find((r) => payloadOf(r).caseId === '101009999999')!);
     expect(housing.classification).toBe('housing');
-    expect(housing.closedAt).toBe('2024-12-20 08:00:00');
+    expect(housing.closedAt).toBe('2024-12-17 09:00:00');
 
-    const newRow = payloadOf(result.rows.find((r) => payloadOf(r).caseId === 'BCS-00300001')!);
+    const newRow = payloadOf(result.rows.find((r) => payloadOf(r).caseId === 'BCS-09000001')!);
     expect(newRow).toMatchObject({
-      system: 'new', classification: 'housing', title: 'Unsatisfactory Living Conditions', location: '27 Lanark Rd, Boston, MA 02135',
+      system: 'new', classification: 'housing', title: 'Pest Infestation - Residential', location: '68 Tarnwick Pl, Boston, MA 02135',
     });
 
     // Documents current behavior: "Code Enforcement" is in HOUSING_REASONS (see that
-    // constant's comment), so a trash-barrel complaint about the property's exterior
+    // constant's comment), so a dumping complaint about the property's exterior
     // classifies as "housing" here, same as an interior heat or pest complaint.
-    const codeEnforcement = payloadOf(result.rows.find((r) => payloadOf(r).caseId === '101005890001')!);
+    const codeEnforcement = payloadOf(result.rows.find((r) => payloadOf(r).caseId === '101009000106')!);
     expect(codeEnforcement).toMatchObject({
-      system: 'legacy', reason: 'Code Enforcement', type: 'Improper Storage of Trash (Barrels)', classification: 'housing',
+      system: 'legacy', reason: 'Code Enforcement', type: 'Illegal Dumping', classification: 'housing',
     });
   });
 
   it('fails the whole source when any single query fails', async () => {
     const fetchImpl = fixtureFetch([{ resourceId: year2024.resourceId, errorStatus: 503 }]);
-    await expect(serviceRequestsSource.run(lanark, fetchImpl)).rejects.toThrow(/503/);
+    await expect(serviceRequestsSource.run(tarnwick, fetchImpl)).rejects.toThrow(/503/);
   });
 
   it('caps at the count of distinct ids after dedupe, not at the raw pre-dedupe row count', async () => {
@@ -144,7 +144,7 @@ describe('serviceRequestsSource', () => {
       subject: 'Public Works Department',
       reason: 'Sanitation',
       type: 'Test',
-      location: '23 Lanark Rd  Brighton  MA  02135',
+      location: '52 Tarnwick Pl  Brighton  MA  02135',
       source: 'Constituent Call',
     }));
     const [yearA, yearB] = LEGACY_311_RESOURCES;
@@ -152,7 +152,7 @@ describe('serviceRequestsSource', () => {
       { resourceId: yearA.resourceId, records: sharedRecords },
       { resourceId: yearB.resourceId, records: sharedRecords },
     ]);
-    const result = await serviceRequestsSource.run(lanark, fetchImpl);
+    const result = await serviceRequestsSource.run(tarnwick, fetchImpl);
     expect(result.rows).toHaveLength(300);
     expect(new Set(result.rows.map((r) => payloadOf(r).caseId)).size).toBe(300);
   });
@@ -178,7 +178,7 @@ describe('serviceRequestsSource', () => {
           subject: 'Public Works Department',
           reason: 'Sanitation',
           type: 'Test',
-          location: '23 Lanark Rd  Brighton  MA  02135',
+          location: '52 Tarnwick Pl  Brighton  MA  02135',
           source: 'Constituent Call',
         };
       }),
@@ -194,16 +194,16 @@ describe('serviceRequestsSource', () => {
         case_topic: 'Test',
         service_name: 'Test',
         assigned_department: 'Public Works Department (PWD)',
-        full_address: '27 Lanark Rd, Boston, MA 02135',
-        street_number: '27',
-        street_name: 'Lanark Rd',
+        full_address: '68 Tarnwick Pl, Boston, MA 02135',
+        street_number: '68',
+        street_name: 'Tarnwick Pl',
         zip_code: '02135',
         report_source: 'BOS311',
       }],
     });
 
     const fetchImpl = fixtureFetch(routes);
-    const result = await serviceRequestsSource.run(lanark, fetchImpl);
+    const result = await serviceRequestsSource.run(tarnwick, fetchImpl);
     expect(result.rows).toHaveLength(ROW_CAP);
 
     const survivingIds = new Set(result.rows.map((r) => payloadOf(r).caseId));
@@ -232,7 +232,7 @@ describe('serviceRequestsSource', () => {
   });
 
   it('omits zip predicates from both query shapes when identity has no zip', async () => {
-    const noZip = { ...lanark, zip: null };
+    const noZip = { ...tarnwick, zip: null };
     const fetchImpl = fixtureFetch([]);
     const result = await serviceRequestsSource.run(noZip, fetchImpl);
     const queries: string[] = JSON.parse(result.query);

@@ -33,7 +33,7 @@ function fixtureResult(overrides: Partial<FixtureResult> = {}): FixtureResult {
     sourceErrors: [],
     rowsBySource: {},
     notices: [],
-    parcelId: '2102098000',
+    parcelId: '2109417000',
     condominium: false,
     ...overrides,
   };
@@ -45,18 +45,18 @@ const EMPTY_FILE_NOTICES: FixtureResult['notices'] = [
   { label: '311 2011 file has no rows', detail: 'resource 94b499d9 answered with no rows' },
 ];
 
-/** A day the Lanark fixture passed: one check ran and came back ok, and no source threw. */
+/** A day the records fixture passed: one check ran and came back ok, and no source threw. */
 function passingFixture(): FixtureResult {
   return fixtureResult({
-    checks: [{ label: 'parcel resolves to 2102098000', ok: true, detail: '2102098000' }],
-    rowsBySource: { RentSmart: 4 },
+    checks: [{ label: 'parcel resolves to 2109417000', ok: true, detail: '2109417000' }],
+    rowsBySource: { RentSmart: 2 },
   });
 }
 
 /** A day the city portal 502'd mid-fixture, like 2026-09-17. */
 function failingFixture(): FixtureResult {
   return fixtureResult({
-    checks: [{ label: 'parcel resolves to 2102098000', ok: false, detail: 'got null' }],
+    checks: [{ label: 'parcel resolves to 2109417000', ok: false, detail: 'got null' }],
     checksFailed: 1,
     failures: 2,
     sourceErrors: [{ label: 'RentSmart', message: 'HTTP 502' }],
@@ -373,10 +373,10 @@ describe('plan', () => {
       fixture: async () =>
         fixtureResult({
           checks: [
-            { label: 'parcel resolves to 2102098000', ok: true, detail: '2102098000' },
-            { label: 'RentSmart rows', ok: true, detail: '4 rows' },
+            { label: 'parcel resolves to 2109417000', ok: true, detail: '2109417000' },
+            { label: 'RentSmart rows', ok: true, detail: '2 rows' },
           ],
-          rowsBySource: { 'Approved Building Permits': 0, RentSmart: 4 },
+          rowsBySource: { 'Approved Building Permits': 6, RentSmart: 2 },
         }),
     });
     await plan(d);
@@ -392,7 +392,7 @@ describe('plan', () => {
       checksTotal: 2,
       failed: [],
       sourceErrors: [],
-      rowsBySource: { 'Approved Building Permits': 0, RentSmart: 4 },
+      rowsBySource: { 'Approved Building Permits': 6, RentSmart: 2 },
       notices: [],
     });
     expect(await settingOf(db, SCHEDULER_SETTING_KEYS.lastAlert)).toBeNull();
@@ -437,11 +437,11 @@ describe('plan', () => {
     const d = deps(db, {
       fixture: async () =>
         fixtureResult({
-          checks: [{ label: 'parcel resolves to 2102098000', ok: false, detail: 'got null' }],
+          checks: [{ label: 'parcel resolves to 2109417000', ok: false, detail: 'got null' }],
           checksFailed: 1,
           failures: 2,
           sourceErrors: [{ label: 'RentSmart', message: 'HTTP 503' }],
-          rowsBySource: { 'Approved Building Permits': 0 },
+          rowsBySource: { 'Approved Building Permits': 6 },
         }),
     });
 
@@ -449,21 +449,50 @@ describe('plan', () => {
     expect(JSON.parse((await settingOf(db, SCHEDULER_SETTING_KEYS.lastFixture))!)).toMatchObject({
       checksFailed: 1,
       checksTotal: 1,
-      failed: ['parcel resolves to 2102098000'],
+      failed: ['parcel resolves to 2109417000'],
     });
     expect(await getFillPaused(db)).toBe(true);
     expect(d.alerts).toHaveLength(1);
     expect(d.alerts[0]).toContain('1 check failed, 1 source threw');
     // The headline is the fixture report's first line and nothing repeats it above.
     expect(d.alerts[0].split('1 check failed, 1 source threw')).toHaveLength(2);
-    expect(d.alerts[0]).toContain('parcel resolves to 2102098000: got null');
+    expect(d.alerts[0]).toContain('parcel resolves to 2109417000: got null');
     expect(d.alerts[0]).toContain('RentSmart threw: HTTP 503');
-    expect(d.alerts[0]).toContain('Approved Building Permits: 0');
+    expect(d.alerts[0]).toContain('Approved Building Permits: 6');
     expect(await settingOf(db, SCHEDULER_SETTING_KEYS.lastAlert)).toBe(String(NOW));
     expect(d.logs).toContain('records_fill_paused');
 
     expect(await plan(d)).toMatchObject({ paused: true, alerted: false });
     expect(d.alerts).toHaveLength(1);
+  });
+
+  // The runbook sends an operator to the email or `npm run records:check` for a failed check's
+  // detail, and to `npm run records:check` alone for what a passing check excused. That holds
+  // only while the stored result the panel reads carries labels and no detail or note.
+  it("stores a failed check's label for the panel, mails its detail, and keeps a passing check's note out of both", async () => {
+    const db = createRecordsTestDb();
+    const failedDetail = 'no rows opened in 2019; the empty-file check could not reach 2019';
+    const passedNote = 'floor lowered by 18 to 182 for 2020, whose file has no rows';
+    const d = deps(db, {
+      fixture: async () =>
+        fixtureResult({
+          checks: [
+            { label: '311 rows opened in every year 2015-2026 whose file has rows', ok: false, detail: failedDetail },
+            { label: '311 total >= 200', ok: true, detail: `got 230 rows; ${passedNote}`, note: passedNote },
+          ],
+          checksFailed: 1,
+          failures: 1,
+        }),
+    });
+
+    expect(await plan(d)).toMatchObject({ paused: true, alerted: true });
+    const stored = (await settingOf(db, SCHEDULER_SETTING_KEYS.lastFixture))!;
+    expect(JSON.parse(stored).failed).toEqual(['311 rows opened in every year 2015-2026 whose file has rows']);
+    expect(stored).not.toContain('could not reach');
+    expect(stored).not.toContain('floor lowered');
+    expect(d.alerts[0]).toContain(`311 rows opened in every year 2015-2026 whose file has rows: ${failedDetail}`);
+    expect(d.alerts[0]).not.toContain('311 total >= 200');
+    expect(d.alerts[0]).not.toContain('floor lowered');
   });
 
   it('pauses when any source error rate exceeds the threshold with enough attempts, not below it', async () => {
@@ -521,7 +550,8 @@ describe('plan', () => {
     expect(d.alerts).toHaveLength(2);
     expect(d.alerts[0].startsWith(`${RECORDS_PAUSED_SUBJECT}\n`)).toBe(true);
     expect(d.alerts[1].startsWith(`${RECORDS_RESUMED_SUBJECT}\n`)).toBe(true);
-    expect(d.alerts[1]).toContain('Lanark fixture: 0 checks failed, 0 sources threw');
+    expect(d.alerts[1]).toContain('Records fixture: 0 checks failed, 0 sources threw');
+    expect(d.alerts[1]).toContain('The breaker paused it because the records fixture failed.');
     const resumed = d.logged.find((entry) => entry.event === 'records_fill_resumed');
     expect(resumed?.context).toMatchObject({ checksTotal: 1, checksFailed: 0, sourceErrors: 0 });
 
@@ -656,7 +686,7 @@ describe('plan', () => {
     const d = deps(db, {
       fixture: async () =>
         fixtureResult({
-          checks: [{ label: 'parcel resolves to 2102098000', ok: false, detail: 'got null' }],
+          checks: [{ label: 'parcel resolves to 2109417000', ok: false, detail: 'got null' }],
           checksFailed: 1,
           failures: 1,
         }),

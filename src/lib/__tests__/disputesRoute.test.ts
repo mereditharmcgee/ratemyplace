@@ -36,13 +36,13 @@ async function disputesDb(): Promise<TestD1Database> {
   await db.prepare("INSERT INTO users (id, email) VALUES ('tenant-1', 'tenant@example.com')").run();
   await insertBuilding(db);
   await db
-    .prepare("INSERT INTO reviews (id, user_id, building_id, status) VALUES ('rev-1', 'tenant-1', 'bldg-lanark', 'approved')")
+    .prepare("INSERT INTO reviews (id, user_id, building_id, status) VALUES ('rev-1', 'tenant-1', 'bldg-tarnwick', 'approved')")
     .run();
   return db;
 }
 
 const body = {
-  reviewUrl: 'https://ratemyplace.org/building/bldg-lanark#review-rev-1',
+  reviewUrl: 'https://ratemyplace.org/building/bldg-tarnwick#review-rev-1',
   landlordName: 'Acme LLC',
   landlordEmail: 'landlord@example.com',
   landlordPhone: '617-555-0100',
@@ -83,14 +83,14 @@ describe.skipIf(!sqliteAvailable)('POST /api/disputes owner notice and tracked r
 
     expect(response.status).toBe(201);
     expect(queued).toHaveBeenCalledOnce();
-    expect(queued.mock.calls[0][1]).toEqual({ kind: 'dispute', buildingId: 'bldg-lanark' });
+    expect(queued.mock.calls[0][1]).toEqual({ kind: 'dispute', buildingId: 'bldg-tarnwick' });
     expect(confirmation).toHaveBeenCalledOnce();
     await flushBackground();
   });
 
   it('does not queue for a review that does not exist', async () => {
     const db = await disputesDb();
-    const response = await POST(context(db, { ...body, reviewUrl: 'https://ratemyplace.org/building/bldg-lanark#review-nope' }));
+    const response = await POST(context(db, { ...body, reviewUrl: 'https://ratemyplace.org/building/bldg-tarnwick#review-nope' }));
     expect(response.status).toBe(404);
     expect(queued).not.toHaveBeenCalled();
   });

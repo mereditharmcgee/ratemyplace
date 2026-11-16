@@ -23,7 +23,7 @@
 - `src/lib/rateLimit.ts`: `checkRateLimit(db, identifier, endpoint, maxAttempts, windowSeconds)` consumes a slot per call; `getClientIP(context)` reads `CF-Connecting-IP`.
 - `src/pages/api/buildings/[id]/save.ts` POST: 401 → 400 (no id) → building 404 → `INSERT INTO saved_buildings`, UNIQUE swallowed as idempotent `{ saved: true }`. No test exists for it.
 - `src/pages/api/buildings.ts` POST: auth 401 → `checkRateLimit(db, user.id, 'building-create', 20, 3600)` → `request.json()` with no guard → body `{ placeId, streetAddress, neighborhood, city, state, zipCode, latitude, longitude }` → sanitize → dedupe by `google_place_id` when `placeId` is set, else exact `LOWER(address)`/`LOWER(city)` → inline slug (address body + `-` + city, single collision check adding `Date.now().toString(36)`) → 10-column INSERT → 201 `{ building: { id, slug }, created: true }` / 200 `{ …, created: false }`. It never writes `street_key`, `st_num_lo`, `st_num_hi`, or `source`. Called only by `src/components/reviews/ReviewForm.tsx` (manual path sends no `placeId`; Google path sends all eight fields).
-- `src/lib/records/identity.ts`: `addressKey(address) → { streetKey, numLo, numHi } | null`, `streetKey(street)`, `splitSuffix`, `isDegenerateStreet`, private `normalizeStreet` (drops everything from the first comma, so a comma-delimited "…, Boston, MA 02135" tail is already handled) and private `splitStreet`. Keys use the assessor spelling (`'COMMONWEALTH AV'`, `'LANARK RD'`). No helper strips a comma-less trailing "Boston" / "MA" / ZIP; `addressKey('1027 Commonwealth Ave Boston')` currently yields the wrong key `'COMMONWEALTH AVE BOSTON'`.
+- `src/lib/records/identity.ts`: `addressKey(address) → { streetKey, numLo, numHi } | null`, `streetKey(street)`, `splitSuffix`, `isDegenerateStreet`, private `normalizeStreet` (drops everything from the first comma, so a comma-delimited "…, Boston, MA 02135" tail is already handled) and private `splitStreet`. Keys use the assessor spelling (`'COMMONWEALTH AV'`, `'TARNWICK PL'`). No helper strips a comma-less trailing "Boston" / "MA" / ZIP; `addressKey('1027 Commonwealth Ave Boston')` currently yields the wrong key `'COMMONWEALTH AVE BOSTON'`.
 - `rangeContains(parcel, key)` in `src/lib/records/seed/match.ts:49` carries the street-side parity rule; `zip5(value)` in `src/lib/records/seed/sam.ts:40` normalizes ZIPs.
 - `src/lib/locality.ts` has a private `KNOWN_NEIGHBORHOODS` set (Boston plus four New Haven names) and exports `displayLocality`, `localityLine`.
 - Search: `src/pages/search.astro` (eight queries, `HAVING COUNT(r.id) > 0` in all; buildings search-mode count at lines 31-41 and rows at 45-58; browse mode below) and `src/pages/api/search/results.ts` (a `baseQuery` template chosen on `query`; `HAVING` in both variants). The LIKE escape is written `ESCAPE '\\'` inside template literals. `normalizeSearchQuery(query): string[][]` in `src/lib/searchQuery.ts` has **no production caller**. `SearchResults.tsx` `BuildingCard` already renders "No reviews yet" when `avg_overall` is falsy. The map (`src/pages/api/buildings/map.ts`) has its own `HAVING` and is not touched. Autocomplete already returns unreviewed buildings. **There is no page/endpoint parity test.**
@@ -108,7 +108,7 @@ describe('stripTrailingLocality', () => {
 
   it('leaves a street whose name or suffix merely resembles a locality token', () => {
     expect(stripTrailingLocality('BOSTON ST')).toBe('BOSTON ST');
-    expect(stripTrailingLocality('LANARK CT')).toBe('LANARK CT');
+    expect(stripTrailingLocality('TARNWICK CT')).toBe('TARNWICK CT');
     expect(stripTrailingLocality('BEACON ST')).toBe('BEACON ST');
     expect(stripTrailingLocality('DORCHESTER AVE')).toBe('DORCHESTER AVE');
   });
@@ -120,8 +120,8 @@ describe('stripTrailingLocality', () => {
   });
 
   it('only treats MA as a state when a ZIP or a locality sits beside it', () => {
-    expect(stripTrailingLocality('LANARK RD MA')).toBe('LANARK RD MA');
-    expect(stripTrailingLocality('LANARK RD BOSTON MA')).toBe('LANARK RD');
+    expect(stripTrailingLocality('TARNWICK PL MA')).toBe('TARNWICK PL MA');
+    expect(stripTrailingLocality('TARNWICK PL BOSTON MA')).toBe('TARNWICK PL');
   });
 });
 
@@ -133,9 +133,9 @@ describe('addressKey with a trailing locality', () => {
   });
 
   it('still keys the comma form and the plain form', () => {
-    expect(addressKey('23-27 Lanark Rd, Boston, MA 02135')).toEqual({ streetKey: 'LANARK RD', numLo: 23, numHi: 27 });
+    expect(addressKey('52-68 Tarnwick Pl, Boston, MA 02135')).toEqual({ streetKey: 'TARNWICK PL', numLo: 52, numHi: 68 });
     expect(addressKey('5 Boston St')).toEqual({ streetKey: 'BOSTON ST', numLo: 5, numHi: 5 });
-    expect(addressKey('12 Lanark Ct')).toEqual({ streetKey: 'LANARK CT', numLo: 12, numHi: 12 });
+    expect(addressKey('12 Tarnwick Ct')).toEqual({ streetKey: 'TARNWICK CT', numLo: 12, numHi: 12 });
   });
 });
 ```
@@ -197,7 +197,7 @@ function trailingLocalityLength(words: readonly string[]): number {
  * comma-free) street. Every step keeps at least one word, so a street that *is* a locality
  * word ("BOSTON") survives. "MA" is only a state when a ZIP was just removed or a locality
  * precedes it — otherwise it is left alone, and "CT" is never touched at all, because both
- * are also street suffixes ("Lanark Ct"). Called by `addressKey`, which is what the seed's
+ * are also street suffixes ("Tarnwick Ct"). Called by `addressKey`, which is what the seed's
  * existing-row matcher and the reviewer dedupe both key with; not by `streetKey`, whose
  * input is a bare assessor street name.
  */
@@ -284,9 +284,9 @@ export async function insertBuilding(
   }> = {},
 ): Promise<string> {
   const row = {
-    id: 'bldg-lanark',
-    address: '23-27 Lanark Rd, Boston, MA 02135',
-    slug: overrides.id ?? 'bldg-lanark',
+    id: 'bldg-tarnwick',
+    address: '52-68 Tarnwick Pl, Boston, MA 02135',
+    slug: overrides.id ?? 'bldg-tarnwick',
     neighborhood: null,
     city: 'Boston',
     state: 'MA',
@@ -312,7 +312,7 @@ export async function insertBuilding(
 }
 ```
 
-Keep the existing defaults (id `bldg-lanark`, slug = id) so current callers are unchanged. Also add two stub tables to `createRecordsStubDb()` (needed by Tasks 6–8; harmless now) and two columns to the `reviews` stub:
+Keep the existing defaults (id `bldg-tarnwick`, slug = id) so current callers are unchanged. Also add two stub tables to `createRecordsStubDb()` (needed by Tasks 6–8; harmless now) and two columns to the `reviews` stub:
 
 ```sql
 CREATE TABLE landlords (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL);
@@ -1318,25 +1318,25 @@ import { describe, expect, it } from 'vitest';
 import { buildingPageMeta } from '../buildingMeta';
 
 describe('buildingPageMeta', () => {
-  const seeded = { address: '23-27 Lanark Road', city: 'Boston', neighborhood: 'Aberdeen', parcel_id: '2102396000' };
+  const seeded = { address: '52-68 Tarnwick Place', city: 'Boston', neighborhood: 'Aberdeen', parcel_id: '2109452000' };
 
   it('describes a seeded page by its city records when no review exists', () => {
     expect(buildingPageMeta(seeded, 0)).toEqual({
-      title: '23-27 Lanark Road, Boston',
+      title: '52-68 Tarnwick Place, Boston',
       description:
-        'City of Boston records for 23-27 Lanark Road: assessment, permits, violations, code enforcement, and 311 requests. No tenant reviews yet.',
+        'City of Boston records for 52-68 Tarnwick Place: assessment, permits, violations, code enforcement, and 311 requests. No tenant reviews yet.',
     });
   });
 
   it('switches to review metadata once a review exists', () => {
     expect(buildingPageMeta(seeded, 1)).toEqual({
-      title: '23-27 Lanark Road',
-      description: 'Reviews for 23-27 Lanark Road in Aberdeen',
+      title: '52-68 Tarnwick Place',
+      description: 'Reviews for 52-68 Tarnwick Place in Aberdeen',
     });
   });
 
   it('keeps review metadata for a building without a parcel or outside Boston', () => {
-    expect(buildingPageMeta({ ...seeded, parcel_id: null }, 0).title).toBe('23-27 Lanark Road');
+    expect(buildingPageMeta({ ...seeded, parcel_id: null }, 0).title).toBe('52-68 Tarnwick Place');
     expect(buildingPageMeta({ address: '1 Elm St', city: 'New Haven', neighborhood: null, parcel_id: '1' }, 0).description).toBe(
       'Reviews for 1 Elm St in New Haven',
     );
@@ -1494,21 +1494,21 @@ suite('building search SQL', () => {
 
   it('puts reviewed buildings first in the old order, then the rest by address', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'z', address: '9 Lanark Rd', parcel_id: '1', source: 'seed' });
-    await insertBuilding(db, { id: 'y', address: '5 Lanark Rd', parcel_id: '2', source: 'seed' });
-    await insertBuilding(db, { id: 'x', address: '7 Lanark Rd', parcel_id: '3' });
-    await insertBuilding(db, { id: 'w', address: '3 Lanark Rd', parcel_id: '4' });
+    await insertBuilding(db, { id: 'z', address: '9 Tarnwick Pl', parcel_id: '1', source: 'seed' });
+    await insertBuilding(db, { id: 'y', address: '5 Tarnwick Pl', parcel_id: '2', source: 'seed' });
+    await insertBuilding(db, { id: 'x', address: '7 Tarnwick Pl', parcel_id: '3' });
+    await insertBuilding(db, { id: 'w', address: '3 Tarnwick Pl', parcel_id: '4' });
     await review(db, 'x', 4);
     await review(db, 'w', 3, 'w-1');
     await review(db, 'w', 5, 'w-2');
-    expect((await search(db, 'lanark')).map((r) => r.slug)).toEqual(['w', 'x', 'y', 'z']);
+    expect((await search(db, 'tarnwick')).map((r) => r.slug)).toEqual(['w', 'x', 'y', 'z']);
   });
 
   it('flags city records only for Boston buildings with a parcel', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'p', address: '1 Lanark Rd', parcel_id: '1' });
-    await insertBuilding(db, { id: 'q', address: '2 Lanark Rd', parcel_id: null });
-    const rows = await search(db, 'lanark');
+    await insertBuilding(db, { id: 'p', address: '1 Tarnwick Pl', parcel_id: '1' });
+    await insertBuilding(db, { id: 'q', address: '2 Tarnwick Pl', parcel_id: null });
+    const rows = await search(db, 'tarnwick');
     expect(rows.find((r) => r.slug === 'p')?.has_records).toBe(1);
     expect(rows.find((r) => r.slug === 'q')?.has_records).toBe(0);
   });
@@ -1664,7 +1664,7 @@ Import `{ BUILDING_SEARCH_ORDER, buildingSearchSelect, buildingSearchWhere } fro
 - [ ] **Step 5: Run**
 
 Run: `npx vitest run recordsSearchSql recordsSearchParity searchResults && npm run check && npm run build`
-Expected: PASS. Then start the dev server (`npm run dev` on the worktree's local D1, which holds the seeded rows) and confirm in the browser: `/search?q=1027+comm+ave` lists Commonwealth Avenue buildings with the seeded line; `/search?q=lanark` shows the reviewed 27 Lanark Road first; `/search` (browse) is unchanged; Load more on a large result set keeps the seeded ordering.
+Expected: PASS. Then start the dev server (`npm run dev` on the worktree's local D1, which holds the seeded rows) and confirm in the browser: `/search?q=1027+comm+ave` lists Commonwealth Avenue buildings with the seeded line; a search for the street of a reviewed building shows that building first; `/search` (browse) is unchanged; Load more on a large result set keeps the seeded ordering.
 
 - [ ] **Step 6: Commit**
 
@@ -1700,9 +1700,9 @@ const suite = sqliteAvailable ? describe : describe.skip;
 suite('findBuildingByAddress', () => {
   it('matches a single number inside a seeded range, under any suffix spelling', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'seed-1', address: '23-27 Lanark Rd', slug: '23-27-lanark-rd-boston', source: 'seed', street_key: 'LANARK RD', st_num_lo: 23, st_num_hi: 27, parcel_id: '1' });
-    const hit = await findBuildingByAddress(db, { address: '25 Lanark Road', city: 'Boston', zip: null });
-    expect(hit).toEqual({ id: 'seed-1', slug: '23-27-lanark-rd-boston' });
+    await insertBuilding(db, { id: 'seed-1', address: '52-68 Tarnwick Pl', slug: '52-68-tarnwick-pl-boston', source: 'seed', street_key: 'TARNWICK PL', st_num_lo: 52, st_num_hi: 68, parcel_id: '1' });
+    const hit = await findBuildingByAddress(db, { address: '56 Tarnwick Place', city: 'Boston', zip: null });
+    expect(hit).toEqual({ id: 'seed-1', slug: '52-68-tarnwick-pl-boston' });
   });
 
   it('respects street-side parity', async () => {
@@ -1736,10 +1736,10 @@ suite('findBuildingByAddress', () => {
 
   it('returns null outside Boston, for an unparseable address, or with no candidate', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'c', address: '1 Lanark Rd', source: 'seed', street_key: 'LANARK RD', st_num_lo: 1, st_num_hi: 1 });
-    expect(await findBuildingByAddress(db, { address: '1 Lanark Rd', city: 'New Haven', zip: null })).toBeNull();
-    expect(await findBuildingByAddress(db, { address: 'Lanark Rd', city: 'Boston', zip: null })).toBeNull();
-    expect(await findBuildingByAddress(db, { address: '3 Lanark Rd', city: 'Boston', zip: null })).toBeNull();
+    await insertBuilding(db, { id: 'c', address: '1 Tarnwick Pl', source: 'seed', street_key: 'TARNWICK PL', st_num_lo: 1, st_num_hi: 1 });
+    expect(await findBuildingByAddress(db, { address: '1 Tarnwick Pl', city: 'New Haven', zip: null })).toBeNull();
+    expect(await findBuildingByAddress(db, { address: 'Tarnwick Pl', city: 'Boston', zip: null })).toBeNull();
+    expect(await findBuildingByAddress(db, { address: '3 Tarnwick Pl', city: 'Boston', zip: null })).toBeNull();
   });
 });
 
@@ -1781,7 +1781,7 @@ suite('POST /api/buildings with seeded dedupe', () => {
   beforeEach(async () => {
     db = createRecordsTestDb();
     await db.prepare("INSERT INTO users (id, email) VALUES ('user-1', 'u@example.com')").run();
-    await insertBuilding(db, { id: 'seed-1', address: '23-27 Lanark Rd', slug: '23-27-lanark-rd-boston', source: 'seed', street_key: 'LANARK RD', st_num_lo: 23, st_num_hi: 27, parcel_id: '1', latitude: null, longitude: null });
+    await insertBuilding(db, { id: 'seed-1', address: '52-68 Tarnwick Pl', slug: '52-68-tarnwick-pl-boston', source: 'seed', street_key: 'TARNWICK PL', st_num_lo: 52, st_num_hi: 68, parcel_id: '1', latitude: null, longitude: null });
   });
 
   it('415 on a non-JSON body and 400 on a non-object body', async () => {
@@ -1790,9 +1790,9 @@ suite('POST /api/buildings with seeded dedupe', () => {
   });
 
   it('a Google place inside a seeded range lands on the seeded row and stamps place id and coordinates', async () => {
-    const res = await POST(createContext(db, { placeId: 'gp-1', streetAddress: '25 Lanark Rd', neighborhood: 'Brighton', city: 'Boston', state: 'MA', zipCode: '02135', latitude: 42.34, longitude: -71.15 }));
+    const res = await POST(createContext(db, { placeId: 'gp-1', streetAddress: '56 Tarnwick Pl', neighborhood: 'Brighton', city: 'Boston', state: 'MA', zipCode: '02135', latitude: 42.34, longitude: -71.15 }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ building: { id: 'seed-1', slug: '23-27-lanark-rd-boston' }, created: false });
+    expect(await res.json()).toEqual({ building: { id: 'seed-1', slug: '52-68-tarnwick-pl-boston' }, created: false });
     const [seed] = await rows(db);
     expect(seed.google_place_id).toBe('gp-1');
     expect(seed.latitude).toBe(42.34);
@@ -1800,7 +1800,7 @@ suite('POST /api/buildings with seeded dedupe', () => {
   });
 
   it('a manual entry with a comma-less city tail lands on the seeded row', async () => {
-    const res = await POST(createContext(db, { streetAddress: '27 Lanark Road Boston', city: 'Boston', state: 'MA', zipCode: null }));
+    const res = await POST(createContext(db, { streetAddress: '68 Tarnwick Place Boston', city: 'Boston', state: 'MA', zipCode: null }));
     expect(res.status).toBe(200);
     expect((await res.json()).building.id).toBe('seed-1');
     expect((await rows(db)).length).toBe(1);
@@ -2298,6 +2298,6 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - `npm test`, `npm run check`, `npm run build` are clean on `feat/boston-coverage-c3`.
 - On the local seeded D1: a seeded page shows the facts strip, four "Not retrieved yet" rows, the records button, the no-reviews card, and the records-page `<title>`; pressing the button (Turnstile passes locally with no secret) yields the "Records requested" line and one `button` row in `records_queue`; a second press does not add a row; a page with a pending `button` row shows the line and no button.
 - `/search?q=1027+comm+ave` returns Commonwealth Avenue buildings with the seeded line; a reviewed building sorts above seeded ones for the same query; `/search` browse and `/map` are unchanged.
-- Signing in and creating a review at "25 Lanark Rd, Boston" lands on the existing `27-lanark-road-boston` page rather than creating a row.
+- Signing in and creating a review at another house number within the seeded range of a reviewed Boston building page (pick one from /search) lands on that existing page rather than creating a row.
 - `/sitemap.xml` lists `static.xml` plus four building chunks; `/robots.txt` names it.
 - PR opened against `main` with the owner's post-merge checklist: deploy the Worker (still pending from C2: token permission, secrets, `records:worker:deploy`), verify Turnstile on the production button, then turn the fill on per the runbook.

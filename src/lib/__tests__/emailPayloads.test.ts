@@ -51,7 +51,7 @@ describe('email payloads (snapshot)', () => {
       await payloadOf(() =>
         sendDisputeConfirmationEmail('k', 'https://ratemyplace.org', 'landlord@example.com', {
           landlordName: 'Acme LLC',
-          buildingAddress: '23-27 Lanark Rd, Boston, MA 02135',
+          buildingAddress: '52-68 Tarnwick Pl, Boston, MA 02135',
           disputeReasons: ['Not a tenant', '<b>x</b>'],
           disputeExplanation: 'The reviewer <never> lived here & says so',
         }),
@@ -64,7 +64,7 @@ describe('email payloads (snapshot)', () => {
       await payloadOf(() =>
         sendDisputeConfirmationEmail('k', 'https://ratemyplace.org', 'landlord@example.com', {
           landlordName: 'Acme LLC',
-          buildingAddress: '23-27 Lanark Rd, Boston, MA 02135',
+          buildingAddress: '52-68 Tarnwick Pl, Boston, MA 02135',
           disputeReasons: ['Not a tenant', '<b>x</b>'],
         }),
       ),
@@ -109,8 +109,8 @@ describe('email payloads (snapshot)', () => {
           sendRecordCorrectionOutcomeEmail(
             'k',
             'filer@example.com',
-            '23-27 Lanark Rd <b>',
-            'https://ratemyplace.org/building/bldg-lanark#records',
+            '52-68 Tarnwick Pl <b>',
+            'https://ratemyplace.org/building/bldg-tarnwick#records',
             outcome,
           ),
         ),

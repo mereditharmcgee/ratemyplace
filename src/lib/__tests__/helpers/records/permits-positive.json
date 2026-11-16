@@ -1,23 +1,23 @@
 [
   {
-    "permitnumber": "A1000569", "worktype": "INTEXT", "permittypedescr": "Amendment to a Long Form",
-    "description": "Interior/Exterior Work", "comments": "Install new wheelchair lift.", "applicant": "Patrick Sharkey",
-    "declared_valuation": "$36,500.00", "total_fees": "$390.00", "issued_date": "2021-01-28T16:29:26",
-    "expiration_date": "2021-07-28T04:00:00", "status": "Closed", "occupancytype": "Mixed",
-    "address": "55-65 Lanark RD", "city": "Boston", "state": "MA", "zip": "02135", "parcel_id": 2102110000
+    "permitnumber": "SF437182", "worktype": "EXTREN", "permittypedescr": "Short Form Bldg Permit",
+    "description": "Renovations - Exterior", "comments": "Repoint rear parapet wall.", "applicant": "Morgan Fasket",
+    "declared_valuation": "$23,600.00", "total_fees": "$263.00", "issued_date": "2022-12-05T11:24:37",
+    "expiration_date": "2023-06-05T04:00:00", "status": "Closed", "occupancytype": "Multi",
+    "address": "127-129 Tarnwick PL", "city": "Boston", "state": "MA", "zip": "02135", "parcel_id": 2108871000
   },
   {
     "permitnumber": "E123", "worktype": "ELECTRICAL", "permittypedescr": "Electrical Permit",
     "description": "Electrical", "comments": null, "applicant": "Jane Spark",
-    "declared_valuation": "$1,200.00", "total_fees": "$50.00", "issued_date": "2019-05-02T09:00:00",
+    "declared_valuation": "$4,700.00", "total_fees": "$50.00", "issued_date": "2019-06-11T09:30:00",
     "expiration_date": null, "status": "Open", "occupancytype": "Multi",
-    "address": "55 Lanark RD", "city": "Boston", "state": "MA", "zip": "02135", "parcel_id": 2102110000
+    "address": "129 Tarnwick PL", "city": "Boston", "state": "MA", "zip": "02135", "parcel_id": 2108871000
   },
   {
     "permitnumber": "E123", "worktype": "ELECTRICAL", "permittypedescr": "Electrical Permit",
     "description": "duplicate row for dedupe test", "comments": null, "applicant": "Jane Spark",
-    "declared_valuation": "$1,200.00", "total_fees": "$50.00", "issued_date": "2019-05-02T09:00:00",
+    "declared_valuation": "$4,700.00", "total_fees": "$50.00", "issued_date": "2019-06-11T09:30:00",
     "expiration_date": null, "status": "Open", "occupancytype": "Multi",
-    "address": "55 Lanark RD", "city": "Boston", "state": "MA", "zip": "02135", "parcel_id": 2102110000
+    "address": "129 Tarnwick PL", "city": "Boston", "state": "MA", "zip": "02135", "parcel_id": 2108871000
   }
 ]

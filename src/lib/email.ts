@@ -610,7 +610,7 @@ export async function sendRecordCorrectionOutcomeEmail(
 
 /**
  * The records scheduler's first email: the city-wide fill just paused itself, either because
- * the Lanark fixture failed or because a source is erroring past its threshold.
+ * the records fixture failed or because a source is erroring past its threshold.
  *
  * Plain text, not HTML. This goes to the maintainer, not to a member of the public, and its
  * body is a diagnostic report — failed check labels, per-source row counts, error rates —
@@ -633,7 +633,7 @@ export async function sendRecordsBreakerEmail(
 
 /**
  * The records scheduler's second email: the daily planner lifted a pause the breaker had put
- * on because the Lanark fixture failed, now that the fixture passes again. Same plain-text
+ * on because the records fixture failed, now that the fixture passes again. Same plain-text
  * shape and same recipient as the pause email, so the two read as a pair in the inbox.
  *
  * @param apiKey - Resend API key

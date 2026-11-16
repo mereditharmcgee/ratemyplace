@@ -57,7 +57,7 @@ function createContext(db: TestD1Database, options: ContextOptions = {}): APICon
  * A building whose records panel actually exists: the route refuses a report for a
  * building with no `record_pulls` row, because no panel — and so no form — renders there.
  */
-async function insertPulledBuilding(db: TestD1Database, id = 'bldg-lanark'): Promise<string> {
+async function insertPulledBuilding(db: TestD1Database, id = 'bldg-tarnwick'): Promise<string> {
   await insertBuilding(db, { id });
   await db
     .prepare(
@@ -70,7 +70,7 @@ async function insertPulledBuilding(db: TestD1Database, id = 'bldg-lanark'): Pro
 }
 
 const validBody = {
-  buildingId: 'bldg-lanark',
+  buildingId: 'bldg-tarnwick',
   recordKind: 'permit',
   claim: 'This permit lists the wrong applicant name for the 2023 renovation.',
   turnstileToken: 'good',
@@ -210,9 +210,9 @@ suite('POST /api/records/corrections', () => {
     expect(await response.json()).toEqual({ error: 'Building not found' });
   });
 
-  it('404s for a real building that has never been pulled, so no panel or form renders there', async () => {
+  it('404s for an existing building that has never been pulled, so no panel or form renders there', async () => {
     const db = createRecordsTestDb();
-    await insertBuilding(db, { id: 'bldg-lanark' });
+    await insertBuilding(db, { id: 'bldg-tarnwick' });
     const context = createContext(db, { ip: '198.51.100.9', body: validBody });
 
     const response = await POST(context);
@@ -233,7 +233,7 @@ suite('POST /api/records/corrections', () => {
     const context = createContext(db, {
       ip: '198.51.100.5',
       body: {
-        buildingId: 'bldg-lanark',
+        buildingId: 'bldg-tarnwick',
         recordKind: 'panel',
         claim: 'The entire records panel fails to load for this building address.',
         contactEmail: 'Tenant@Example.com',
@@ -253,7 +253,7 @@ suite('POST /api/records/corrections', () => {
       .first<{ building_id: string; record_kind: string | null; claim: string; contact_email: string; status: string }>();
 
     expect(row).toMatchObject({
-      building_id: 'bldg-lanark',
+      building_id: 'bldg-tarnwick',
       record_kind: null,
       claim: 'The entire records panel fails to load for this building address.',
       contact_email: 'tenant@example.com',
@@ -271,7 +271,7 @@ suite('POST /api/records/corrections', () => {
 
     expect(response.status).toBe(201);
     expect(queued).toHaveBeenCalledOnce();
-    expect(queued.mock.calls[0][1]).toEqual({ kind: 'record_correction', buildingId: 'bldg-lanark' });
+    expect(queued.mock.calls[0][1]).toEqual({ kind: 'record_correction', buildingId: 'bldg-tarnwick' });
 
     const row = await db
       .prepare('SELECT record_kind FROM record_corrections WHERE id = ?')

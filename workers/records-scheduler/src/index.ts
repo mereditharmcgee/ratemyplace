@@ -3,7 +3,7 @@
 // against the node:sqlite D1 double. This file only wires bindings to those dependencies.
 import type { D1Database, ScheduledEvent } from '@cloudflare/workers-types';
 import { errorMessage } from '../../../src/lib/records/errors';
-import { runLanarkFixture } from '../../../src/lib/records/fixture';
+import { runRecordsFixture } from '../../../src/lib/records/fixture';
 import { drain, liveDeps, plan, type SchedulerDeps } from '../../../src/lib/records/scheduler';
 import { schedulerAlert } from '../../../src/lib/records/schedulerAlert';
 import type { FetchLike, RecordsDb } from '../../../src/lib/records/types';
@@ -25,7 +25,7 @@ const DRAIN_CRON = '* * * * *';
 /**
  * This budget covers exactly one request: the fixture's direct SAM fetch, filtered to a
  * single parcel. `fetchAllRows` would otherwise hand that request the 120 s bulk-page
- * budget sized for the 32,000-row seed pull; `runLanarkFixture` already narrows it to
+ * budget sized for the 32,000-row seed pull; `runRecordsFixture` already narrows it to
  * `FETCH_TIMEOUT_MS` (10 s), and 15 s is that with a little more room, which a cron can
  * afford where a user-facing request cannot. Every other request the fixture makes goes
  * out through `ckanSql`'s own 10 s timeout and is unaffected by this number.
@@ -46,7 +46,7 @@ function depsFor(env: Env): SchedulerDeps {
   // exists so the node:sqlite test double can stand in for the real binding.
   const db: RecordsDb = env.DB;
   return liveDeps(db, {
-    fixture: () => runLanarkFixture(fetchImpl, { timeoutMs: FIXTURE_TIMEOUT_MS }),
+    fixture: () => runRecordsFixture(fetchImpl, { timeoutMs: FIXTURE_TIMEOUT_MS }),
     // Sends the pause/resume email and records a failure on /admin; never throws. See
     // src/lib/records/schedulerAlert.ts.
     alert: schedulerAlert({ db, apiKey: env.RESEND_API_KEY, alertEmail: env.RECORDS_ALERT_EMAIL, siteUrl: env.SITE_URL, log }),

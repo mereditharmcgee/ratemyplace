@@ -217,7 +217,7 @@ export function showMailingAddress(owner: string | null): boolean {
 
 /**
  * The tax mailing address as one line, with the addressee held to the same entity gate as the
- * owner. An entity can list a person as its addressee (`C/O ATT <person>`), and printing
+ * owner. An entity can list a person as its addressee (`C/O <person>`), and printing
  * that name beside the address publishes exactly what the owner gate exists to withhold. The
  * street and city lines are kept either way — those belong to the entity.
  */
@@ -250,8 +250,8 @@ const MONTH_ABBREVIATIONS = [
 
 /**
  * Reads only the `YYYY-MM-DD` prefix a record's timestamp starts with, whichever of the
- * three shapes it arrived in (`2008-08-30 09:42:00`, `2021-01-28T16:29:26`,
- * `2026-07-17 13:56:00+00`). Deliberately never touches `Date`: these are public-record
+ * three shapes it arrived in (`2015-07-23 10:27:00`, `2022-12-05T11:24:37`,
+ * `2025-06-30 13:52:00+00`). Deliberately never touches `Date`: these are public-record
  * dates, exact by design, and running them through `Date` risks a timezone shift that
  * would silently move a city-recorded date by a day.
  */

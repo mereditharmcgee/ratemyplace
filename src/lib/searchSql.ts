@@ -21,7 +21,7 @@ const LIKE = "LIKE ? ESCAPE '\\'";
 /**
  * The address as space-delimited words, with a leading and trailing space and commas and
  * periods read as spaces. An alternative spelling is matched against this as `% <spelling> %`,
- * so it only ever hits a whole word: 'lane' finds "Radford La" but not the `la` in "Lanark"
+ * so it only ever hits a whole word: 'lane' finds "Radford La" but not the `la` in "Lawrence"
  * or the `ln` in "Lincoln".
  */
 const ADDRESS_WORDS = "(' ' || REPLACE(REPLACE(b.address, ',', ' '), '.', ' ') || ' ')";

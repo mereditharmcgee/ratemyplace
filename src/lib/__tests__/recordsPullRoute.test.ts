@@ -5,7 +5,7 @@ import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 import { createRecordsTestDb, insertBuilding } from './helpers/recordsDb';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
 import { FY2026_RESOURCE_ID } from '../records/sources/boston/assessor';
-import lanark2026 from './helpers/records/assessor-fy2026-lanark.json';
+import tarnwick2026 from './helpers/records/assessor-fy2026-tarnwick.json';
 
 const suite = sqliteAvailable ? describe : describe.skip;
 
@@ -35,7 +35,7 @@ interface ContextOptions {
 function createContext(db: TestD1Database, options: ContextOptions = {}): APIContext {
   const {
     user = { id: ADMIN_ID, isAdmin: true },
-    buildingId = 'bldg-lanark',
+    buildingId = 'bldg-tarnwick',
     body,
     withContentType = true,
     withBody = true,
@@ -115,16 +115,16 @@ suite('POST /api/admin/buildings/[id]/records/pull', () => {
   it('pulls records, applies a parcel override, and writes two audit logs', async () => {
     const db = await createDbWithAdmin();
     const buildingId = await insertBuilding(db);
-    vi.stubGlobal('fetch', fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: lanark2026 }]));
+    vi.stubGlobal('fetch', fixtureFetch([{ resourceId: FY2026_RESOURCE_ID, records: tarnwick2026 }]));
 
     try {
-      const context = createContext(db, { buildingId, body: { parcelId: '2102098000' } });
+      const context = createContext(db, { buildingId, body: { parcelId: '2109417000' } });
 
       const response = await POST(context);
       const payload = (await response.json()) as { data: { parcelId: string | null; sources: unknown[] } };
 
       expect(response.status).toBe(200);
-      expect(payload.data.parcelId).toBe('2102098000');
+      expect(payload.data.parcelId).toBe('2109417000');
       expect(payload.data.sources).toHaveLength(BOSTON_SOURCE_COUNT);
 
       const auditRows = await db
@@ -152,7 +152,7 @@ suite('POST /api/admin/buildings/[id]/records/pull', () => {
         admin_user_id: ADMIN_ID,
       });
       expect(JSON.parse(overrideRow.old_value ?? 'null')).toMatchObject({ parcelId: null });
-      expect(JSON.parse(overrideRow.new_value ?? 'null')).toMatchObject({ parcelId: '2102098000' });
+      expect(JSON.parse(overrideRow.new_value ?? 'null')).toMatchObject({ parcelId: '2109417000' });
 
       const pulledRow = auditRows.results[1];
       expect(pulledRow).toMatchObject({
@@ -161,7 +161,7 @@ suite('POST /api/admin/buildings/[id]/records/pull', () => {
         entity_id: buildingId,
         admin_user_id: ADMIN_ID,
       });
-      expect(pulledRow.notes ?? '').toContain('parcel override 2102098000');
+      expect(pulledRow.notes ?? '').toContain('parcel override 2109417000');
     } finally {
       vi.unstubAllGlobals();
     }
@@ -169,7 +169,7 @@ suite('POST /api/admin/buildings/[id]/records/pull', () => {
 
   it('works with no request body and no content-type header', async () => {
     const db = await createDbWithAdmin();
-    const buildingId = await insertBuilding(db, { parcel_id: '2102098000' });
+    const buildingId = await insertBuilding(db, { parcel_id: '2109417000' });
     vi.stubGlobal('fetch', fixtureFetch([]));
 
     try {
@@ -191,7 +191,7 @@ suite('POST /api/admin/buildings/[id]/records/pull', () => {
     try {
       const context = createContext(db, {
         buildingId,
-        body: { parcelId: '2102098000' },
+        body: { parcelId: '2109417000' },
         withContentType: false,
       });
 

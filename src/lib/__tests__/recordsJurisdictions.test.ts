@@ -7,42 +7,42 @@ import { jurisdictionForCity as leafJurisdictionForCity, normalizeCity } from '.
 import { rentsmartSource, RENTSMART_RESOURCE_ID } from '../records/sources/boston/rentsmart';
 import type { RentSmartPayload } from '../records/types';
 import { fixtureFetch } from './helpers/records/fixtureFetch';
-// Only `_id` is synthetic here — the rest is a shape-accurate real RentSmart response.
-import lanarkRows from './helpers/records/rentsmart-lanark.json';
+// The columns follow a recorded RentSmart response; every value is fictional.
+import tarnwickRows from './helpers/records/rentsmart-tarnwick.json';
 
-const lanark = buildIdentity({
-  id: 'b1', address: '23-27 Lanark Rd, Boston, MA', city: 'Boston', state: 'MA', zip_code: '02135',
-  parcel_id: '2102098000', sam_id: null,
+const tarnwick = buildIdentity({
+  id: 'b1', address: '52-68 Tarnwick Pl, Boston, MA', city: 'Boston', state: 'MA', zip_code: '02135',
+  parcel_id: '2109417000', sam_id: null,
 });
 
 describe('rentsmartSource', () => {
   it('queries by parcel (single literal when parcelId and numeric match) and returns all rows', async () => {
-    const fetchImpl = fixtureFetch([{ resourceId: RENTSMART_RESOURCE_ID, records: lanarkRows }]);
-    const result = await rentsmartSource.run(lanark, fetchImpl);
-    expect(result.query).toContain(`"parcel" IN ('2102098000')`);
+    const fetchImpl = fixtureFetch([{ resourceId: RENTSMART_RESOURCE_ID, records: tarnwickRows }]);
+    const result = await rentsmartSource.run(tarnwick, fetchImpl);
+    expect(result.query).toContain(`"parcel" IN ('2109417000')`);
     expect(result.query).toContain('ORDER BY "date" DESC, "_id" LIMIT 500');
-    expect(result.rows).toHaveLength(4);
+    expect(result.rows).toHaveLength(2);
     expect(result.rows[0].sourceKey).toBe('90001');
     const first = result.rows[0].payload as RentSmartPayload;
     expect(first).toMatchObject({
       rowId: '90001',
       violationType: 'Housing Complaints',
-      description: 'Unsatisfactory Living Conditions',
-      parcel: '2102098000',
+      description: 'Chronic Dampness/Mold',
+      parcel: '2109417000',
     });
     expect(result.rows[0].kind).toBe('rentsmart');
   });
 
   it('queries both parcel forms when the id has a leading zero', async () => {
-    const leadingZero = { ...lanark, parcelId: '0100001000', parcelNumeric: '100001000' };
+    const leadingZero = { ...tarnwick, parcelId: '0100001000', parcelNumeric: '100001000' };
     const fetchImpl = fixtureFetch([{ resourceId: RENTSMART_RESOURCE_ID, records: [] }]);
     const result = await rentsmartSource.run(leadingZero, fetchImpl);
     expect(result.query).toContain(`"parcel" IN ('0100001000','100001000')`);
   });
 
   it('skips the fetch entirely when the building has no parcel', async () => {
-    const noParcel = { ...lanark, parcelId: null, parcelNumeric: null };
-    const fetchImpl = fixtureFetch([{ resourceId: RENTSMART_RESOURCE_ID, records: lanarkRows }]);
+    const noParcel = { ...tarnwick, parcelId: null, parcelNumeric: null };
+    const fetchImpl = fixtureFetch([{ resourceId: RENTSMART_RESOURCE_ID, records: tarnwickRows }]);
     const result = await rentsmartSource.run(noParcel, fetchImpl);
     expect(result.rows).toEqual([]);
     expect(result.query).toBe('no parcel: RentSmart skipped');
@@ -50,8 +50,8 @@ describe('rentsmartSource', () => {
   });
 
   it('names the condominium skip distinctly from a plain missing parcel', async () => {
-    const condo = { ...lanark, parcelId: null, parcelNumeric: null, condominium: true };
-    const fetchImpl = fixtureFetch([{ resourceId: RENTSMART_RESOURCE_ID, records: lanarkRows }]);
+    const condo = { ...tarnwick, parcelId: null, parcelNumeric: null, condominium: true };
+    const fetchImpl = fixtureFetch([{ resourceId: RENTSMART_RESOURCE_ID, records: tarnwickRows }]);
     const result = await rentsmartSource.run(condo, fetchImpl);
     expect(result.rows).toEqual([]);
     expect(result.query).toBe('condominium: no whole-building parcel, RentSmart skipped');
@@ -59,20 +59,20 @@ describe('rentsmartSource', () => {
   });
 
   it('dedupes a repeated _id, keeping the first row seen', async () => {
-    const withDuplicate = [...lanarkRows, { ...lanarkRows[0], description: 'Duplicate reload of the same row' }];
+    const withDuplicate = [...tarnwickRows, { ...tarnwickRows[0], description: 'Duplicate reload of the same row' }];
     const fetchImpl = fixtureFetch([{ resourceId: RENTSMART_RESOURCE_ID, records: withDuplicate }]);
-    const result = await rentsmartSource.run(lanark, fetchImpl);
-    expect(result.rows).toHaveLength(4);
+    const result = await rentsmartSource.run(tarnwick, fetchImpl);
+    expect(result.rows).toHaveLength(2);
     const first = result.rows[0].payload as RentSmartPayload;
     expect(first.rowId).toBe('90001');
-    expect(first.description).toBe('Unsatisfactory Living Conditions');
+    expect(first.description).toBe('Chronic Dampness/Mold');
   });
 
   it('drops a row with a null _id', async () => {
-    const withNullId = [...lanarkRows, { ...lanarkRows[0], _id: null, description: 'No row number' }];
+    const withNullId = [...tarnwickRows, { ...tarnwickRows[0], _id: null, description: 'No row number' }];
     const fetchImpl = fixtureFetch([{ resourceId: RENTSMART_RESOURCE_ID, records: withNullId }]);
-    const result = await rentsmartSource.run(lanark, fetchImpl);
-    expect(result.rows).toHaveLength(4);
+    const result = await rentsmartSource.run(tarnwick, fetchImpl);
+    expect(result.rows).toHaveLength(2);
     expect(result.rows.some((r) => (r.payload as RentSmartPayload).description === 'No row number')).toBe(false);
   });
 });

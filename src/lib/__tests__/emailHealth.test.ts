@@ -90,7 +90,7 @@ describe('email kinds and labels', () => {
 
 describe('describeEmailFailure / emailSourceNote / emailFailureIsRecent', () => {
   const base: EmailFailureRecord = {
-    at: 1784338200,
+    at: 1779586200,
     kind: 'password_reset',
     reason: 'provider_error',
     code: 'rate_limit_exceeded',
@@ -185,13 +185,13 @@ describe.skipIf(!sqliteAvailable)('email failure trace in app_settings', () => {
       db,
       { kind: 'password_reset', to: 'tenant@example.com', source: 'ratemyplace.org' },
       Promise.resolve(PROVIDER_ERROR),
-      () => 1784338200,
+      () => 1779586200,
     );
     expect(result).toBe(PROVIDER_ERROR);
 
     const stored = await setting('email_last_failure_public');
     expect(JSON.parse(stored ?? 'null')).toEqual({
-      at: 1784338200,
+      at: 1779586200,
       kind: 'password_reset',
       reason: 'provider_error',
       code: 'rate_limit_exceeded',

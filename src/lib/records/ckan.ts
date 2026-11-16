@@ -45,10 +45,11 @@ export function wardEqualsClause(column: string, ward: number): string {
  * Boston's CKAN `datastore_search_sql` rejects any query containing `ESCAPE '\'`
  * with `HTTP 409 Query is not a single statement` — its statement splitter treats
  * the backslash-quote as an unterminated string. Verified live 2026-09-07 against
- * the permits resource: `ESCAPE '!'` returns 200 and works correctly
- * (`LIKE '55!_65 LANARK%' ESCAPE '!'` matches nothing, `LIKE '55-65 LANARK%' ESCAPE '!'`
- * matches). `!` is not a SQL metacharacter and is not used elsewhere in these
- * address forms, so it is safe to use as the escape character here.
+ * the permits resource with a ranged address: `ESCAPE '!'` returns 200 and works
+ * correctly (the range written with an escaped `!_` in place of its hyphen matched
+ * nothing, and the same range written with the hyphen matched). `!` is not a SQL
+ * metacharacter and is not used elsewhere in these address forms, so it is safe to
+ * use as the escape character here.
  */
 function escapeLikeForCkan(value: string): string {
   return value.replace(/!/g, '!!').replace(/%/g, '!%').replace(/_/g, '!_');
@@ -60,8 +61,8 @@ function escapeLikeForCkan(value: string): string {
  * must be a code constant, never user input — it is interpolated as an identifier and only
  * checked against a conservative shape.
  *
- * The trailing `%` is intentionally loose: `'55 LANARK RD%'` also matches
- * `55 LANARK RD REAR`, which is desired, but it cannot exclude an unrelated address that
+ * The trailing `%` is intentionally loose: `'127 TARNWICK PL%'` also matches
+ * `127 TARNWICK PL REAR`, which is desired, but it cannot exclude an unrelated address that
  * happens to share a short form, e.g. `10 UNION PARK ST` when the short form is
  * `UNION PK`. That residual false-positive risk is accepted here; the correction
  * workflow is how a wrongly attached record gets detached.
@@ -150,7 +151,7 @@ export function rangeNumberClause(column: string, identity: BuildingIdentity, op
 }
 
 /**
- * '6,720,200' | '6780500' | '$6,649,200.00 ' -> integer dollars; null when absent.
+ * '4,520,600' | '4326800' | '$4,134,900.00 ' -> integer dollars; null when absent.
  * Assumes non-negative assessor values; a leading minus or accounting parentheses are not interpreted.
  */
 export function parseMoney(value: string | number | null | undefined): number | null {
