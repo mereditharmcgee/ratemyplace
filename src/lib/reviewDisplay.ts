@@ -75,6 +75,126 @@ export function recommendAnswer(value: unknown): RecommendAnswer | null {
   return value === 'yes' || value === 'maybe' || value === 'no' ? value : null;
 }
 
+// ---------------------------------------------------------------------------------------
+// Rent and square footage as ranges
+//
+// Exact rent and square footage, together with bedrooms and bathrooms, can let a landlord
+// work out which unit, and so which tenant, wrote a review. The exact values stay stored for
+// admins and for the reviewer's own edit form; every public surface shows a band from here
+// instead (owner decision, 2026-11-17). Like privacy.ts this is a safety control: do not add
+// a public display path that bypasses it, and do not narrow the bands.
+//
+// The open bounds sit where a $250 or 250 sq ft band would hold too few units to hide one:
+// - Rent under $1,000 is almost never a market rent in Boston or New Haven. It is usually a
+//   tenant's share under a voucher or income-based rent, so a narrow band there would point
+//   at a subsidized household. One open band covers all of it.
+// - Rent from $6,000 is a thin tail (large houses, luxury units), where each $250 band would
+//   hold a unit or two in a building.
+// - Under 500 sq ft is studio and single-room territory, where reported sizes cluster.
+// - From 2,000 sq ft is whole houses and the largest apartments, a thin tail again.
+// ---------------------------------------------------------------------------------------
+
+/** A display band. `lo` is null for the open band at the bottom, `hi` for the one at the top. */
+export interface DisplayBand {
+  lo: number | null;
+  hi: number | null;
+}
+
+/** Band width and the two open bounds, each a multiple of the width. */
+export interface BandScale {
+  width: number;
+  openBelow: number;
+  openFrom: number;
+}
+
+export const RENT_BANDS: BandScale = { width: 250, openBelow: 1000, openFrom: 6000 };
+export const SQUARE_FOOTAGE_BANDS: BandScale = { width: 250, openBelow: 500, openFrom: 2000 };
+
+/** Every word the range labels use, in one place for the owner to edit. */
+export const RANGE_COPY = {
+  under: 'Under',
+  to: 'to',
+  andUp: '+',
+  perMonth: '/mo',
+  squareFeet: 'sq ft',
+} as const;
+
+interface BandFormat {
+  amount: (n: number) => string;
+  suffix: string;
+}
+
+function withCommas(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+const RENT_FORMAT: BandFormat = { amount: (n) => `$${withCommas(n)}`, suffix: RANGE_COPY.perMonth };
+const SQUARE_FOOTAGE_FORMAT: BandFormat = { amount: withCommas, suffix: ` ${RANGE_COPY.squareFeet}` };
+
+/** A stored number or numeric string above zero, or null. Zero is how a skipped field reads. */
+function positiveAmount(value: unknown): number | null {
+  let n = Number.NaN;
+  if (typeof value === 'number') n = value;
+  else if (typeof value === 'string' && value.trim() !== '') n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function bandFor(value: unknown, scale: BandScale): DisplayBand | null {
+  const n = positiveAmount(value);
+  if (n === null) return null;
+  if (n < scale.openBelow) return { lo: null, hi: scale.openBelow };
+  if (n >= scale.openFrom) return { lo: scale.openFrom, hi: null };
+  const lo = Math.floor(n / scale.width) * scale.width;
+  return { lo, hi: lo + scale.width };
+}
+
+/** "$2,250 to $2,500/mo" for one band, or from the low band's floor to the high band's ceiling. */
+function spanLabel(low: DisplayBand, high: DisplayBand, format: BandFormat): string {
+  const { amount, suffix } = format;
+  const oneBand = low.lo === high.lo && low.hi === high.hi;
+  if (oneBand && low.lo === null) return `${RANGE_COPY.under} ${amount(low.hi as number)}${suffix}`;
+  if (oneBand && low.hi === null) return `${amount(low.lo as number)}${RANGE_COPY.andUp}${suffix}`;
+  const start = low.lo === null ? `${RANGE_COPY.under} ${amount(low.hi as number)}` : amount(low.lo);
+  const end = high.hi === null ? `${amount(high.lo as number)}${RANGE_COPY.andUp}` : amount(high.hi);
+  return `${start} ${RANGE_COPY.to} ${end}${suffix}`;
+}
+
+/** The rent band a value falls in, lower bound inclusive. Null when no rent was given. */
+export function rentBand(value: unknown): DisplayBand | null {
+  return bandFor(value, RENT_BANDS);
+}
+
+/** The square footage band a value falls in, lower bound inclusive. Null when none was given. */
+export function squareFootageBand(value: unknown): DisplayBand | null {
+  return bandFor(value, SQUARE_FOOTAGE_BANDS);
+}
+
+/** "$2,250 to $2,500/mo", "Under $1,000/mo" or "$6,000+/mo"; null when no rent was given. */
+export function rentRangeLabel(value: unknown): string | null {
+  const band = rentBand(value);
+  return band ? spanLabel(band, band, RENT_FORMAT) : null;
+}
+
+/** "750 to 1,000 sq ft", "Under 500 sq ft" or "2,000+ sq ft"; null when none was given. */
+export function squareFootageRangeLabel(value: unknown): string | null {
+  const band = squareFootageBand(value);
+  return band ? spanLabel(band, band, SQUARE_FOOTAGE_FORMAT) : null;
+}
+
+/**
+ * One rent line for several reviews, such as a unit group on a building page. Each rent is
+ * banded first and the exact values are not read again, so the line runs from the lowest
+ * band's floor to the highest band's ceiling and says nothing the review cards' own bands do
+ * not. A group of one shows that review's band. Null when no review gave a rent.
+ */
+export function rentRangeAcross(values: readonly unknown[]): string | null {
+  const bands = values.map(rentBand).filter((band): band is DisplayBand => band !== null);
+  if (bands.length === 0) return null;
+  const floor = (band: DisplayBand) => band.lo ?? Number.NEGATIVE_INFINITY;
+  const sorted = [...bands].sort((a, b) => floor(a) - floor(b));
+  return spanLabel(sorted[0], sorted[sorted.length - 1], RENT_FORMAT);
+}
+
 /**
  * Shown in the building page's "Common issues reported" box when no review checked any of
  * the four yes/no issue questions. It names those questions, so it does not read as "these

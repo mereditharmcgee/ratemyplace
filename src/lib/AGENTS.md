@@ -213,6 +213,17 @@ goes through it (or `reviewSeasonChipProps` / `formatMoveIn`), never the two col
 directly. NULL means the review predates the column and is shown as stored. The module is
 a client leaf (`clientLeafModules.test.ts`): the edit form and admin table import it.
 
+### `reviewDisplay.ts` rent and size bands are a safety control too
+
+Exact rent and square footage, with bedrooms and bathrooms, can point at one unit and so at
+its tenant. Public surfaces show `rentRangeLabel` / `squareFootageRangeLabel` ($250 and
+250 sq ft bands, lower bound inclusive, open below $1,000 and 500 sq ft and from $6,000 and
+2,000 sq ft), and a line for several reviews uses `rentRangeAcross`, which bands each rent
+before it compares them, so a group of one never shows its exact rent through a min, max or
+average. The stored values stay exact; the admin review detail and the reviewer's own edit
+form show them. `rentSizeRanges.test.ts` lists every source file that names either field
+and fails on a new one until it is classified.
+
 ### `reviewEdit.ts` and `tenure.ts`: a review edit changes only what it sends
 
 The reviewer's edit page starts every select at the stored answer, so an untouched save

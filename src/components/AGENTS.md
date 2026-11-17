@@ -98,6 +98,8 @@ surface that displays a score uses these helpers. `text-teal-600` is not a score
 
 Public-facing components must never render exact tenancy dates or submission timestamps.
 Route through `formatRecency` and the season/year formatters in `src/lib/privacy.ts`.
+Rent and square footage go through the range helpers in `src/lib/reviewDisplay.ts`
+(`rentRangeLabel`, `squareFootageRangeLabel`, `rentRangeAcross`), never the stored number.
 This is a tenant-safety control, not a formatting preference.
 
 ## Escaping

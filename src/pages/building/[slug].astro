@@ -33,7 +33,7 @@ import {
 import { getCurrentAssessment } from '../../lib/records/query';
 import { localityLine } from '../../lib/locality';
 import { logError } from '../../lib/logger';
-import { NO_CHECKLIST_ISSUES_COPY, resolveUnitType } from '../../lib/reviewDisplay';
+import { NO_CHECKLIST_ISSUES_COPY, rentRangeAcross, resolveUnitType } from '../../lib/reviewDisplay';
 import { buildingPageMeta } from '../../lib/buildingMeta';
 import { entityBreadcrumbs } from '../../lib/jsonLd';
 
@@ -142,8 +142,8 @@ interface UnitStats {
   displayName: string;
   reviewCount: number;
   avgScore: number;
-  minRent: number | null;
-  maxRent: number | null;
+  /** The group's rent as a range of bands, or null when no review gave a rent. */
+  rentRange: string | null;
   recommend: RecommendTally;
   reviews: any[];
 }
@@ -163,8 +163,7 @@ reviews.forEach(review => {
       displayName,
       reviewCount: 0,
       avgScore: 0,
-      minRent: null,
-      maxRent: null,
+      rentRange: null,
       recommend: { yes: 0, no: 0, maybe: 0 },
       reviews: []
     });
@@ -190,11 +189,9 @@ reviewsByUnit.forEach((stats) => {
   });
   stats.avgScore = weightTotal > 0 ? Math.round((weightedSum / weightTotal) * 10) / 10 : 0;
 
-  const rents = stats.reviews.filter(r => r.rent_amount).map(r => r.rent_amount);
-  if (rents.length > 0) {
-    stats.minRent = Math.min(...rents);
-    stats.maxRent = Math.max(...rents);
-  }
+  // Built from each review's rent band, never a min, max or average of exact rents, which in a
+  // group of one would be that tenant's exact rent (reviewDisplay.ts).
+  stats.rentRange = rentRangeAcross(stats.reviews.map(r => r.rent_amount));
 
   // Yes, no and maybe answers, classified as calculateAggregatedScores does. The card's line
   // comes from unitRecommendText, which never turns a lone maybe into "0% recommend".
@@ -477,13 +474,11 @@ const breadcrumbs = entityBreadcrumbs(building.address);
                       </div>
 
                       <div class="flex items-center gap-4">
-                        {(unitStats.minRent || unitStats.maxRent) && (
+                        {unitStats.rentRange && (
                           <div class="text-right hidden sm:block">
                             <p class="text-xs text-gray-500">Rent</p>
-                            <p class="text-sm font-medium text-gray-900">
-                              {unitStats.minRent === unitStats.maxRent
-                                ? `$${unitStats.minRent?.toLocaleString()}`
-                                : `$${unitStats.minRent?.toLocaleString()} - $${unitStats.maxRent?.toLocaleString()}`}
+                            <p class="text-sm font-medium text-gray-900" data-unit-rent>
+                              {unitStats.rentRange}
                             </p>
                           </div>
                         )}
