@@ -142,6 +142,9 @@ describe('containsExactNumber (the leak detector the page tests use)', () => {
     expect(containsExactNumber('{"rent_amount":2137,"x":1}', 2137)).toBe(true);
     expect(containsExactNumber('[0,817]', 817)).toBe(true);
     expect(containsExactNumber('[2137,2611]', 2137)).toBe(true);
+    expect(containsExactNumber('[3,2137]', 2137)).toBe(true);
+    expect(containsExactNumber('[1500, 2137]', 2137)).toBe(true);
+    expect(containsExactNumber('[2611,817]', 817)).toBe(true);
   });
 
   it('does not count a number that is part of a different one', () => {
