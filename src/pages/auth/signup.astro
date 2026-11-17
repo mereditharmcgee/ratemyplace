@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../components/layout/BaseLayout.astro';
 import ReviewSigninNote from '../../components/auth/ReviewSigninNote.astro';
+import ExampleReview from '../../components/auth/ExampleReview.astro';
 import { redirectQuery, safeRedirectPath } from '../../lib/authRedirect';
 import { loadReviewSigninContext } from '../../lib/reviewSignin';
 import { PASSWORD_MIN_LENGTH, SIGNUP_PASSWORD_HINT } from '../../lib/passwordPolicy';
@@ -20,7 +21,8 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
 ---
 
 <BaseLayout title="Sign up" noindex>
-  <div class="min-h-[80vh] flex items-center justify-center px-4 py-12">
+  {/* The example review comes after the form: below it on a phone, beside it on a wide screen. */}
+  <div class="min-h-[80vh] flex flex-col items-center justify-center gap-12 px-4 py-12 xl:flex-row xl:items-start">
     <div class="max-w-md w-full space-y-8">
       <div>
         <h1 class="text-center text-3xl font-bold text-gray-900">Create your account</h1>
@@ -158,6 +160,11 @@ const reviewContext = await loadReviewSigninContext(maybeEnv(Astro.locals)?.DB, 
         </button>
       </form>
     </div>
+
+    {/* Shown to everyone, not only to visitors from "Write a review": most accounts exist to
+        write one, and someone who signs up from the header never passes this page again
+        before they do. */}
+    <ExampleReview class="max-w-xl" />
   </div>
 </BaseLayout>
 

@@ -194,6 +194,7 @@ const RENT_SIZE_READERS: Record<string, string> = {
   'src/lib/validation.ts': 'input validation',
   'src/lib/reviewEdit.ts': 'edit write rules',
   'src/lib/reviewDisplay.ts': 'the range helpers',
+  'src/lib/exampleReview.ts': 'made-up example data that ReviewCard turns into ranges (signupExampleReview.test.ts)',
   'src/components/reviews/ReviewCard.astro': 'public: ranges only',
   'src/pages/building/[slug].astro': 'public: ranges only',
 };

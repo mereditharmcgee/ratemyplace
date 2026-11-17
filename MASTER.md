@@ -245,12 +245,12 @@ We collect precise data for analysis and moderation but display fuzzy data to pr
 
 ### User communication
 
-**Built today, before account creation:** The sign-up page shows links to the Terms of Service and Privacy Policy. Visitors who arrive from "Write a review" also see the building they are reviewing and one line: "Your name and email do not appear on your review and are not given to the landlord."
+**Built today, before account creation:** The sign-up page shows links to the Terms of Service and Privacy Policy. Visitors who arrive from "Write a review" also see the building they are reviewing and one line: "Your name and email do not appear on your review and are not given to the landlord." Every visitor also sees "How your review will look": the real review card with made-up data (no address, no names), labelled as an example, with two lines on what readers see and never see. The copy and data are in `src/lib/exampleReview.ts`.
 
 **Built today, before review submission:** The confirm step shows a "Before you submit" paragraph: "Your landlord may be able to identify you based on details in your review. Avoid mentioning specific dates, unit numbers, or personal details." Submit stays disabled until the reviewer ticks a checkbox that reads "I confirm this review reflects my honest personal experience and agree to the Terms of Service and Review Guidelines." The comments placeholder also asks reviewers to avoid identifying information.
 
 **Planned (from the original spec, not built):**
-- Before account creation: a list of what we collect and don't collect, and an anonymized example of how a review will appear
+- Before account creation: a list of what we collect and don't collect (the example of how a review will appear is built, above)
 - Before review submission: a checklist of things to avoid (names, unit numbers, specific dates) and a checkbox reading "I understand my landlord may be able to identify me based on details in my review"
 
 ### Technical protections
