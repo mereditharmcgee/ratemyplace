@@ -298,13 +298,13 @@ Reviews without verification simply lack the badge — they are not labeled "Unv
 
 ### Accepted documents
 
-Must show address matching the reviewed building:
-- Utility bill (electric, gas, water, internet)
-- Bank statement
-- Government mail
-- Lease agreement (sensitive terms may be redacted)
+Must show the tenant's name and an address matching the reviewed building. The upload form's list (`src/components/profile/VerificationModal.tsx`) is the official one, and the admin checklist on `/admin/verify` matches it:
+- Lease or rental agreement (sensitive terms may be redacted)
+- Utility bill (gas, electric, water)
+- Rent receipt or payment confirmation
+- Any mail showing the tenant's name and this address
 
-**Not accepted:** ID cards (we verify residence, not identity)
+**Not accepted:** photo IDs (we verify residence, not identity)
 
 ### Verification workflow
 
