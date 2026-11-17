@@ -68,11 +68,13 @@ export async function GET(context: APIContext): Promise<Response> {
 
     // Stream the image. r2Object.body is a workers-types ReadableStream, which
     // the DOM Response BodyInit type doesn't recognize; cast. Type-only.
+    // no-store: a proof-of-address document must not sit in the admin's browser
+    // cache after the decision deletes it from R2.
     return new Response(r2Object.body as unknown as ReadableStream, {
       headers: {
         'Content-Type': verification.content_type,
         'Content-Disposition': `inline; filename="${safeFilename}"`,
-        'Cache-Control': 'private, max-age=3600'
+        'Cache-Control': 'private, no-store'
       }
     });
   } catch (error) {

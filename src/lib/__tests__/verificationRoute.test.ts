@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '../../pages/api/admin/verification/[id]';
+import { GET, POST } from '../../pages/api/admin/verification/[id]';
 
 const verification = {
   id: 'verification-1',
@@ -129,4 +129,45 @@ describe('admin verification decisions', () => {
       expect(deleteFailureLogs[0]).not.toHaveProperty('r2_key');
     },
   );
+});
+
+describe('admin verification document view', () => {
+  function getContext(): APIContext {
+    const db = {
+      prepare(sql: string) {
+        return {
+          bind(..._values: unknown[]) {
+            return {
+              async first() {
+                return sql.includes('SELECT r2_key, content_type, filename')
+                  ? { r2_key: verification.r2_key, content_type: 'application/pdf', filename: 'proof.pdf' }
+                  : null;
+              },
+            };
+          },
+        };
+      },
+    };
+    return {
+      params: { id: verification.id },
+      request: new Request('https://ratemyplace.org/api/admin/verification/verification-1'),
+      locals: {
+        user: { id: 'admin-1', isAdmin: true },
+        runtime: {
+          env: {
+            DB: db,
+            VERIFICATION_BUCKET: { get: async () => ({ body: 'document bytes' }) },
+          },
+        },
+      },
+    } as unknown as APIContext;
+  }
+
+  it('tells every cache not to keep the document', async () => {
+    const response = await GET(getContext());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(await response.text()).toBe('document bytes');
+  });
 });
