@@ -4,7 +4,7 @@ import { getEnv } from '../../../lib/runtime';
 import { createVerificationToken } from '../../../lib/tokens';
 import { sendVerificationEmail } from '../../../lib/email';
 import { trackSend } from '../../../lib/trackSend';
-import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
+import { checkRateLimit, getClientIP, buildRateLimitHeaders, rateLimitSecret } from '../../../lib/rateLimit';
 import { logError } from '../../../lib/logger';
 import { EMAIL_ALREADY_VERIFIED } from '../../../lib/contributionCopy';
 
@@ -31,7 +31,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
   // Rate limit: 3 verification emails per hour per IP
   const clientIP = getClientIP(context);
-  const rateLimit = await checkRateLimit(db, clientIP, 'verify_email_resend', 3, 3600);
+  const rateLimit = await checkRateLimit(db, clientIP, 'verify_email_resend', 3, 3600, rateLimitSecret(getEnv(context)));
 
   if (!rateLimit.allowed) {
     const status = rateLimit.error ? 503 : 429;
@@ -41,8 +41,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     if (rateLimit.error) {
       logError('rate_limit_db_failure', {
-        endpoint: 'verify_email_resend',
-        ip: clientIP
+        endpoint: 'verify_email_resend'
       });
     }
 

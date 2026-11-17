@@ -5,7 +5,7 @@ import ReviewForm from '../../components/reviews/ReviewForm';
 import { hasVerifiedEmail } from '../../lib/emailVerification';
 import { logError } from '../../lib/logger';
 import { fetchPlaceDetails } from '../../lib/places';
-import { checkRateLimit } from '../../lib/rateLimit';
+import { checkRateLimit, rateLimitSecret } from '../../lib/rateLimit';
 import {
   HANDOFF_COPY,
   loadReviewFormBuilding,
@@ -83,7 +83,7 @@ if (gated) {
       db,
       fetchPlace: apiKey ? (id) => fetchPlaceDetails(id, apiKey) : null,
       // Spent only right before the paid Google call; a known place id never reaches it.
-      allowPlacesLookup: async () => (await checkRateLimit(db, user.id, 'review-handoff', 30, 3600)).allowed,
+      allowPlacesLookup: async () => (await checkRateLimit(db, user.id, 'review-handoff', 30, 3600, rateLimitSecret(env))).allowed,
     },
     placeIdParam,
   );

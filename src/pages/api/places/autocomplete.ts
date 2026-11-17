@@ -1,7 +1,7 @@
 import type { APIContext } from 'astro';
 import { getEnv } from '../../../lib/runtime';
 import { getDB } from '../../../lib/db';
-import { checkRateLimit, getClientIP } from '../../../lib/rateLimit';
+import { checkRateLimit, getClientIP, rateLimitSecret } from '../../../lib/rateLimit';
 import { logError } from '../../../lib/logger';
 import {
   autocompleteRequestBody,
@@ -32,7 +32,7 @@ export async function GET(context: APIContext): Promise<Response> {
 
   // Rate limit — this proxies a paid Google API, so cap per-IP abuse (120/min).
   const db = getDB(context);
-  const rateLimit = await checkRateLimit(db, getClientIP(context), 'places-autocomplete', 120, 60);
+  const rateLimit = await checkRateLimit(db, getClientIP(context), 'places-autocomplete', 120, 60, rateLimitSecret(getEnv(context)));
   if (!rateLimit.allowed) {
     return new Response(JSON.stringify({ error: 'Too many requests. Please slow down.', predictions: [] }), {
       status: rateLimit.error ? 503 : 429,

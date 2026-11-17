@@ -2,7 +2,8 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import { hashPassword } from '../../../lib/password';
 import { initializeLucia } from '../../../lib/auth';
-import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
+import { checkRateLimit, getClientIP, buildRateLimitHeaders, rateLimitSecret } from '../../../lib/rateLimit';
+import { getEnv } from '../../../lib/runtime';
 import { PASSWORD_MIN_LENGTH } from '../../../lib/passwordPolicy';
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -11,7 +12,7 @@ export async function POST(context: APIContext): Promise<Response> {
   try {
     // Rate limit: 5 reset attempts per hour per IP (defense-in-depth on top of
     // the high-entropy single-use token).
-    const rateLimit = await checkRateLimit(db, getClientIP(context), 'reset-password', 5, 3600);
+    const rateLimit = await checkRateLimit(db, getClientIP(context), 'reset-password', 5, 3600, rateLimitSecret(getEnv(context)));
     if (!rateLimit.allowed) {
       const status = rateLimit.error ? 503 : 429;
       const message = rateLimit.error

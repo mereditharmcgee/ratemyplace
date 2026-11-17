@@ -4,7 +4,7 @@ import { getEnv } from '../../../lib/runtime';
 import { createPasswordResetToken } from '../../../lib/tokens';
 import { sendPasswordResetEmail } from '../../../lib/email';
 import { trackSend } from '../../../lib/trackSend';
-import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
+import { checkRateLimit, getClientIP, buildRateLimitHeaders, rateLimitSecret } from '../../../lib/rateLimit';
 import { logError } from '../../../lib/logger';
 import { verifyTurnstile } from '../../../lib/turnstile';
 
@@ -20,7 +20,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
   // Rate limit: 3 password reset requests per hour per IP
   const clientIP = getClientIP(context);
-  const rateLimit = await checkRateLimit(db, clientIP, 'password_reset', 3, 3600);
+  const rateLimit = await checkRateLimit(db, clientIP, 'password_reset', 3, 3600, rateLimitSecret(getEnv(context)));
 
   if (!rateLimit.allowed) {
     const status = rateLimit.error ? 503 : 429;
@@ -30,8 +30,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     if (rateLimit.error) {
       logError('rate_limit_db_failure', {
-        endpoint: 'forgot_password',
-        ip: clientIP
+        endpoint: 'forgot_password'
       });
     }
 

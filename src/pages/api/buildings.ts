@@ -1,7 +1,8 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../lib/db';
 import { generateIdFromEntropySize } from 'lucia';
-import { checkRateLimit, buildRateLimitHeaders, getClientIP } from '../../lib/rateLimit';
+import { checkRateLimit, buildRateLimitHeaders, getClientIP, rateLimitSecret } from '../../lib/rateLimit';
+import { getEnv } from '../../lib/runtime';
 import { escapeLikePattern, sanitizeText } from '../../lib/validation';
 import { addressKey } from '../../lib/records/identity';
 import { zip5 } from '../../lib/records/seed/sam';
@@ -19,7 +20,7 @@ export async function GET(context: APIContext): Promise<Response> {
   // runs a double `LIKE '%…%'` over 38,000 seeded buildings, which is not something an
   // anonymous caller may do without a ceiling. Both branches are covered: the place-id
   // lookup is cheap, and one budget per IP is simpler to reason about than two.
-  const rateLimit = await checkRateLimit(db, getClientIP(context), 'building-lookup', 120, 60);
+  const rateLimit = await checkRateLimit(db, getClientIP(context), 'building-lookup', 120, 60, rateLimitSecret(getEnv(context)));
   if (!rateLimit.allowed) {
     const status = rateLimit.error ? 503 : 429;
     const message = rateLimit.error
@@ -114,7 +115,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     // Rate limit: 20 building creations per hour per user (anti-abuse; legit
     // users create at most a handful when their address isn't already listed).
-    const rateLimit = await checkRateLimit(db, context.locals.user.id, 'building-create', 20, 3600);
+    const rateLimit = await checkRateLimit(db, context.locals.user.id, 'building-create', 20, 3600, rateLimitSecret(getEnv(context)));
     if (!rateLimit.allowed) {
       const status = rateLimit.error ? 503 : 429;
       const message = rateLimit.error

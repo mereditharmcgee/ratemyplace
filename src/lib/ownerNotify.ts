@@ -13,7 +13,7 @@ import type { OwnerNoticeKind } from './email';
 import { recordEmailProblem, recordOwnerNoticeSent, trackEmail } from './emailHealth';
 import type { OwnerEmailKind } from './emailHealth';
 import { logError } from './logger';
-import { checkRateLimit } from './rateLimit';
+import { checkRateLimit, rateLimitSecret } from './rateLimit';
 import { fireAndForget, getEnv, recipientHash } from './runtime';
 import type { SiteSettingsDb } from './siteSettings';
 import { requestSource } from './trackSend';
@@ -47,6 +47,8 @@ export interface OwnerNoticeDeps {
   source: string | null;
   /** Unix seconds; the notice's received time. Injected by tests. */
   now?: () => number;
+  /** Key material for the cap rows, from `rateLimitSecret(env)`. Unset gives an unkeyed digest. */
+  rateLimitSecret?: string;
 }
 
 function errorMessage(err: unknown): string {
@@ -83,13 +85,13 @@ export async function notifyOwner(deps: OwnerNoticeDeps, notice: OwnerNotice): P
     const emailKind: OwnerEmailKind = `owner_${notice.kind}`;
 
     for (const cap of capsFor(notice.kind)) {
-      const result = await checkRateLimit(deps.db, cap.identifier, cap.endpoint, cap.max, cap.windowSeconds);
+      const result = await checkRateLimit(deps.db, cap.identifier, cap.endpoint, cap.max, cap.windowSeconds, deps.rateLimitSecret);
       if (result.error) {
         // Fail OPEN, unlike request limiting. Every intake but review edit has already run its
         // own fail-closed limiter on this same table and answered 503 before inserting, so in
         // practice only a review edit — or a limiter failure in the moments between the
         // intake's check and this one — reaches here. Losing the notice would hide the intake.
-        logError('owner_notice_cap_unavailable', { kind: notice.kind, cap: `${cap.endpoint}:${cap.identifier}` });
+        logError('owner_notice_cap_unavailable', { kind: notice.kind, cap: cap.endpoint, scope: cap.identifier === 'site' ? 'site' : 'kind' });
         continue;
       }
       if (!result.allowed) {
@@ -142,6 +144,7 @@ export function queueOwnerNotice(context: APIContext, notice: OwnerNotice): void
           apiKey: env.RESEND_API_KEY,
           siteUrl: env.SITE_URL || new URL(context.request.url).origin,
           source: requestSource(context),
+          rateLimitSecret: rateLimitSecret(env),
         },
         notice,
       ),

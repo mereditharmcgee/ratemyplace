@@ -1,6 +1,7 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../../../lib/db';
-import { checkRateLimit, getClientIP } from '../../../../../../lib/rateLimit';
+import { checkRateLimit, getClientIP, rateLimitSecret } from '../../../../../../lib/rateLimit';
+import { getEnv } from '../../../../../../lib/runtime';
 import { createAuditLog } from '../../../../../../lib/audit';
 import { logError } from '../../../../../../lib/logger';
 import { pullBuildingRecords } from '../../../../../../lib/records/pull';
@@ -32,7 +33,7 @@ export async function POST(context: APIContext): Promise<Response> {
   // Debounce, not a lock: this only stops a second pull from starting for the same
   // building within the window. It cannot interrupt a pull already running, and it
   // does nothing to protect two different buildings' concurrent pulls from each other.
-  const guard = await checkRateLimit(db, `building:${buildingId}`, 'records_pull', 1, 120);
+  const guard = await checkRateLimit(db, `building:${buildingId}`, 'records_pull', 1, 120, rateLimitSecret(getEnv(context)));
   if (!guard.allowed) {
     if (guard.error) {
       return json({ error: 'Rate limiter unavailable' }, 503);

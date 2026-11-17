@@ -159,7 +159,7 @@ The `building_scores`, `landlord_scores` and `property_manager_scores` cache tab
 
 **Landlords, managers and owners are different things.** `landlords` and `property_managers` are admin-created profiles, linked through `buildings.landlord_id` and `buildings.property_manager_id`. The names a reviewer types are free text in `reviews.landlord_name` and `reviews.property_manager_name`. Neither table is the owner of record. The assessor's owner of record is in `building_owners`, written by each site or Worker records pull (`src/lib/records/owners.ts`) and by the SQL files that the one-time `npm run records:owners-backfill` writes for a person to apply. The records seed writes no owner rows. `buildings.owner_name`, `owner_entity` and `owner_website` are separate fields that an admin enters.
 
-**IP addresses** are stored in two places only. One is `rate_limits.rate_key`, which holds `<endpoint>:<client IP>` for public endpoints. Some keys use a user id instead (signed-in limits such as review submit, building create, save and verification upload), a building id (the admin records pull) or a notice kind (the owner-notice caps). The other is `audit_logs.admin_ip`, the acting admin's IP. Root AGENTS.md has the rule under "Non-negotiables".
+**IP addresses** are stored raw in one place only: `audit_logs.admin_ip`, the acting admin's IP. `rate_limits.rate_key` holds `<endpoint>:<digest>`, never the raw value. The digest is an HMAC-SHA256 of the client IP, keyed by `RATE_LIMIT_KEY` or, when that is unset, `TURNSTILE_SECRET_KEY`, and cut to 32 hex characters. Some limiters hash a user id instead (signed-in limits such as review submit, building create, save and verification upload), a building id (the admin records pull) or a notice kind (the owner-notice caps). Root AGENTS.md has the rule under "Non-negotiables".
 
 ### Entity Relationships
 
@@ -631,7 +631,7 @@ The records Worker deploys separately, with `npm run records:worker:deploy` (see
 ### Environment
 - **Production:** https://ratemyplace.org
 - **Bindings** (`wrangler.jsonc`): D1 database `ratemyplace-db` as `DB`, and R2 bucket `ratemyplace-verification` as `VERIFICATION_BUCKET`.
-- **Secrets and vars:** set in the Pages project, not in `wrangler.jsonc`. They are typed in `src/env.d.ts` and read through `getEnv` or `Astro.locals.runtime.env`: `TURNSTILE_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_MAPS_API_KEY`, `GOOGLE_PLACES_API_KEY`, `RESEND_API_KEY` and `SITE_URL`.
+- **Secrets and vars:** set in the Pages project, not in `wrangler.jsonc`. They are typed in `src/env.d.ts` and read through `getEnv` or `Astro.locals.runtime.env`: `TURNSTILE_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_MAPS_API_KEY`, `GOOGLE_PLACES_API_KEY`, `RESEND_API_KEY` and `SITE_URL`. `RATE_LIMIT_KEY` is optional: it keys the rate limit digest, and `TURNSTILE_SECRET_KEY` does that job when it is unset.
 - **Previews:** each deployment has its own immutable `https://<8-hex>.ratemyplace-64y.pages.dev` origin, shown in Cloudflare Pages. Pages also serves a mutable branch alias on the same `ratemyplace-64y.pages.dev` domain, which the release smoke refuses. Previews share the production D1 binding, so their writes reach production data. Previews cannot exercise Turnstile or the map.
 - **Records Worker:** its own `workers/records-scheduler/wrangler.jsonc`, with the same D1 database, a `SITE_URL` var and its own secrets.
 

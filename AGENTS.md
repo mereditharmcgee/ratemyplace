@@ -42,10 +42,10 @@ and flag it explicitly if a requested change would erode one.
 1. **Tenant anonymity is a safety feature.** Retaliation is the risk being designed
    against. Exact timestamps and tenure are collected but **never displayed** — public
    surfaces show fuzzy buckets only (`src/lib/privacy.ts`). No per-user analytics.
-   *Accurate scope:* reviewer IPs are never stored. IPs **are** persisted in two
-   operational places — `rate_limits` keys on client IP, and `audit_logs.admin_ip`
-   records the acting admin. Don't widen that, and don't state "no IPs are stored"
-   in public copy.
+   *Accurate scope:* reviewer IPs are never stored. `rate_limits` holds only a keyed
+   digest of the client IP, user id or building id, never the raw value (see Rate
+   limiting below). One raw IP **is** persisted: `audit_logs.admin_ip` records the acting
+   admin. Don't widen that, and don't state "no IPs are stored" in public copy.
 2. **Scoring changes are retroactive and require sign-off.** Touching `ITEM_WEIGHTS`,
    `RECENCY_BANDS`, or the aggregation formula silently rewrites every score in the
    database. Never adjust them as a side effect of another change.
@@ -197,10 +197,10 @@ endpoint once because the query used `SELECT *`.
 ### Rate limiting
 
 ```typescript
-import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../lib/rateLimit';
+import { checkRateLimit, getClientIP, buildRateLimitHeaders, rateLimitSecret } from '../../lib/rateLimit';
 
 const clientIP = getClientIP(context);
-const rateLimit = await checkRateLimit(db, clientIP, 'dispute', 3, 3600); // 3 per hour
+const rateLimit = await checkRateLimit(db, clientIP, 'dispute', 3, 3600, rateLimitSecret(getEnv(context))); // 3 per hour
 
 if (!rateLimit.allowed) {
   const status = rateLimit.error ? 503 : 429;   // fail closed: limiter error → 503, not open
@@ -213,6 +213,13 @@ if (!rateLimit.allowed) {
 
 Rate limiting is **fail-closed**. If the limiter itself errors, the request is refused, not
 allowed through. Preserve that.
+
+The identifier is never stored or logged raw. `checkRateLimit` writes `rate_key` as
+`<endpoint>:<digest>`, an HMAC-SHA256 of the identifier keyed by `RATE_LIMIT_KEY`, or by
+`TURNSTILE_SECRET_KEY` when that is unset; with neither (unit tests, local dev) it is a plain
+SHA-256. The sixth argument is required so a new caller cannot leave it out, and
+`rateLimitKeys.test.ts` fails on a call that does not pass `rateLimitSecret`. Never put the
+client IP in a log line.
 
 ### CSRF — read before adding any endpoint
 

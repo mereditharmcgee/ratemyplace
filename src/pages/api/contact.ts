@@ -3,7 +3,7 @@ import { getDB } from '../../lib/db';
 import { getEnv } from '../../lib/runtime';
 import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
-import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
+import { getClientIP, checkRateLimit, buildRateLimitHeaders, rateLimitSecret } from '../../lib/rateLimit';
 import { validateContactForm } from '../../lib/validation';
 import { OWNER_NOTIFY_EMAIL, sendContactConfirmationEmail, sendContactNotificationEmail } from '../../lib/email';
 import { trackSend } from '../../lib/trackSend';
@@ -25,7 +25,7 @@ export async function POST(context: APIContext): Promise<Response> {
     const ip = getClientIP(context);
 
     // 2. Rate limit (3/hr per IP — SEC-07: Retry-After on 429; SEC-08: X-RateLimit-* on all responses)
-    const rateLimitResult = await checkRateLimit(db, ip, 'contact', 3, 3600);
+    const rateLimitResult = await checkRateLimit(db, ip, 'contact', 3, 3600, rateLimitSecret(getEnv(context)));
     if (!rateLimitResult.allowed) {
       const status = rateLimitResult.error ? 503 : 429;
       const message = rateLimitResult.error

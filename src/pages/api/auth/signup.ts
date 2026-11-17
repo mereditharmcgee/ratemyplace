@@ -4,7 +4,7 @@ import { getDB } from '../../../lib/db';
 import { getEnv } from '../../../lib/runtime';
 import { hashPassword } from '../../../lib/password';
 import { generateIdFromEntropySize } from 'lucia';
-import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
+import { checkRateLimit, getClientIP, buildRateLimitHeaders, rateLimitSecret } from '../../../lib/rateLimit';
 import { createVerificationToken } from '../../../lib/tokens';
 import { sendVerificationEmail } from '../../../lib/email';
 import { trackSend } from '../../../lib/trackSend';
@@ -68,7 +68,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     // Rate limiting: 3 accounts per hour per IP
     const clientIP = getClientIP(context);
-    const rateLimit = await checkRateLimit(db, clientIP, 'signup', 3, 3600);
+    const rateLimit = await checkRateLimit(db, clientIP, 'signup', 3, 3600, rateLimitSecret(getEnv(context)));
 
     if (!rateLimit.allowed) {
       const status = rateLimit.error ? 503 : 429;
@@ -78,8 +78,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
       if (rateLimit.error) {
         logError('rate_limit_db_failure', {
-          endpoint: 'signup',
-          ip: clientIP
+          endpoint: 'signup'
         });
       }
 

@@ -26,6 +26,7 @@ import {
   notifyOwner,
   queueOwnerNotice,
 } from '../ownerNotify';
+import { rateLimitKey } from '../rateLimit';
 
 const AT = 1779586200;
 const SUBJECT_SUFFIX = ' (May 23, 2026, 9:30 PM ET)';
@@ -77,7 +78,9 @@ describe.skipIf(!sqliteAvailable)('notifyOwner', () => {
     return row?.value ?? null;
   }
 
-  async function seedRateRows(key: string, count: number): Promise<void> {
+  /** Rows under the stored (hashed) key for `identifier` at `endpoint`. */
+  async function seedRateRows(endpoint: string, identifier: string, count: number, secret?: string): Promise<void> {
+    const key = await rateLimitKey(identifier, endpoint, secret);
     const now = Math.floor(Date.now() / 1000);
     for (let i = 0; i < count; i++) {
       await db
@@ -160,7 +163,7 @@ describe.skipIf(!sqliteAvailable)('notifyOwner', () => {
   });
 
   it('holds back a kind past its daily cap even when its hourly cap allows', async () => {
-    await seedRateRows('owner-notice-day:bug_report', 15);
+    await seedRateRows('owner-notice-day', 'bug_report', 15);
 
     await notifyOwner(deps(db), { kind: 'bug_report', buildingId: null });
 
@@ -169,12 +172,29 @@ describe.skipIf(!sqliteAvailable)('notifyOwner', () => {
   });
 
   it('holds back any kind past the site-wide daily cap', async () => {
-    await seedRateRows('owner-notice-day:site', 40);
+    await seedRateRows('owner-notice-day', 'site', 40);
 
     await notifyOwner(deps(db), { kind: 'dispute', buildingId: 'bldg-tarnwick' });
 
     expect(mockSend).not.toHaveBeenCalled();
     expect(parseEmailFailure(await setting('email_last_failure_owner'))).toMatchObject({ kind: 'owner_dispute', reason: 'capped' });
+  });
+
+  it('counts its caps under keyed digests when the deps carry a secret', async () => {
+    // Rows keyed with the secret trip the cap; the same count under the unkeyed digest does not.
+    await seedRateRows('owner-notice-day', 'site', 40);
+    await notifyOwner(deps(db, { rateLimitSecret: 'notice-secret' }), { kind: 'dispute', buildingId: null });
+    expect(mockSend).toHaveBeenCalledOnce();
+
+    await seedRateRows('owner-notice-day', 'site', 40, 'notice-secret');
+    await notifyOwner(deps(db, { rateLimitSecret: 'notice-secret' }), { kind: 'dispute', buildingId: null });
+    expect(mockSend).toHaveBeenCalledOnce();
+
+    const { results } = await db.prepare('SELECT DISTINCT rate_key FROM rate_limits').all<{ rate_key: string }>();
+    for (const { rate_key } of results) {
+      expect(rate_key).toMatch(/^owner-notice-(hour|day):[0-9a-f]{32}$/);
+      expect(rate_key).not.toMatch(/dispute|site/);
+    }
   });
 
   it('still sends when the cap cannot be checked, and says so', async () => {
