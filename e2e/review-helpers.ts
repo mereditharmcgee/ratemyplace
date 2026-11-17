@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { REVIEW_CHECKLIST_COPY } from '../src/lib/reviewChecklistCopy';
 
 // Shared by review.spec.ts, a11y.spec.ts and a11y-keyboard.spec.ts, so a change to how a
 // rating is chosen (the A11Y-04 radio groups) or to how a page is kept off Google is made in
@@ -45,4 +46,13 @@ export async function rateAllItemsInStep(page: Page, score: number): Promise<num
     await expect(group.getByRole('radio', { name: String(score), exact: true })).toBeChecked();
   }
   return count;
+}
+
+/**
+ * Tick both boxes in the "Before you submit" block, on the new-review form's last step or on
+ * the edit form. Submit and Save stay disabled until both are ticked.
+ */
+export async function tickAcknowledgements(page: Page): Promise<void> {
+  await page.getByRole('checkbox', { name: REVIEW_CHECKLIST_COPY.identifyAcknowledgement }).check();
+  await page.getByRole('checkbox', { name: /I confirm this review/ }).check();
 }

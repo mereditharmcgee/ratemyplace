@@ -1,7 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, resetE2eAccountReviews } from './fixtures';
 import { executeLocalD1 } from './test-harness';
-import { prepare } from './review-helpers';
+import { prepare, tickAcknowledgements } from './review-helpers';
 import { FY2026_RESOURCE_ID } from '../src/lib/records/sources/boston/assessor';
 
 // Phase 28 keyboard checks that axe cannot make: where focus goes and what state a control
@@ -849,7 +849,7 @@ test.describe('review fixes: focus after mode switches and requests, Enter on ra
     await page.goto(`/review/edit/${SEED_REVIEW_ID}`);
     await hydrated(page);
 
-    await page.getByRole('checkbox', { name: /I confirm this review/ }).check();
+    await tickAcknowledgements(page);
     const group = page.getByRole('radiogroup').first();
     const one = group.getByRole('radio', { name: '1', exact: true });
     const five = group.getByRole('radio', { name: '5', exact: true });

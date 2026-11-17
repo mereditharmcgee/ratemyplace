@@ -24,7 +24,7 @@ data, use Astro instead.
 | Directory | Contents |
 |-----------|----------|
 | `layout/` | `BaseLayout.astro`, `Header`, `Footer` |
-| `reviews/` | `ReviewForm`, `ReviewEditForm`, `ReviewCard`, `form-steps/` |
+| `reviews/` | `ReviewForm`, `ReviewEditForm`, `ReviewCard`, `ReviewAcknowledgements` (the pre-submit checklist and boxes both forms share), `form-steps/` |
 | `admin/` | 9 tables and queues + `AdminLayout.astro` |
 | `profile/` | Tenant dashboard, settings, notifications, verification |
 | `records/` | Public-records panel pieces: `FactsStrip`, `LedgerRow`, `SourceState`, `RecordList`, `YearBars`, `CategoryBars`, `StatusToken`, `CorrectionNotes` (all `.astro`) + the React islands `RecordCorrectionForm.tsx` and `RecordsRequestButton.tsx` |

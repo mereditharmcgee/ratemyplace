@@ -37,8 +37,9 @@ interface Props {
 }
 
 // This island and its steps import only client-safe modules from src/lib (surveyItems,
-// formOptions, locality, reviewPaths, reviewSubmitOutcome), never a server module such as
-// reviewHandoff, buildingResolve, places or records/*: their code would ship to every browser.
+// formOptions, locality, reviewPaths, reviewSubmitOutcome, reviewChecklistCopy), never a
+// server module such as reviewHandoff, buildingResolve, places or records/*: their code
+// would ship to every browser.
 export default function ReviewForm({ building, initialPlace }: Props) {
   const [step, setStep] = useState<Step>(building ? 'unit-details' : 'address');
   const [loading, setLoading] = useState(false);
@@ -121,8 +122,10 @@ export default function ReviewForm({ building, initialPlace }: Props) {
     safelyLit: null,
   });
 
-  // Privacy acknowledgment
+  // The two boxes on the confirm step: the Terms box and "my landlord may be able to identify
+  // me". Kept here, not in the step, so a failed submit or a trip back leaves them ticked.
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
+  const [identifyRiskAcknowledged, setIdentifyRiskAcknowledged] = useState(false);
 
   // Turnstile token
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -493,6 +496,8 @@ export default function ReviewForm({ building, initialPlace }: Props) {
           scores={scores}
           privacyAcknowledged={privacyAcknowledged}
           onPrivacyChange={setPrivacyAcknowledged}
+          identifyRiskAcknowledged={identifyRiskAcknowledged}
+          onIdentifyRiskChange={setIdentifyRiskAcknowledged}
           turnstileToken={turnstileToken}
           onTurnstileToken={setTurnstileToken}
           loading={loading}
