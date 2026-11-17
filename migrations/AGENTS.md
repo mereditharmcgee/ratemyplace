@@ -162,14 +162,15 @@ No rows means it has not run; then apply it once:
 npx wrangler d1 execute ratemyplace-db --remote --file migrations/0035_review_move_in_given.sql
 ```
 
-**`0036` (blank decided verification filenames) is NOT YET APPLIED TO PRODUCTION.** It is
+**`0036` (blank decided verification filenames) was APPLIED TO PRODUCTION 2026-11-17, by hand.** It is
 one `UPDATE` that sets `verification_images.filename` to `''` on every approved or rejected
 row that still has one. The decision route has blanked the filename since November 2026, but
 rows decided before that still hold the tenant's original filename, which often names their
 address or unit. Pending rows are left alone. It binds nothing and is idempotent: a second
-run matches no rows. The owner applies it once by hand, after the code that blanks new
-decisions is live, never through `migrations apply --remote`. First see how many rows it
-will touch (read-only):
+run matches no rows. It blanked 15 approved rows. No row was pending, so no decision could
+keep a filename between the apply and the deploy of the code that blanks new decisions. If
+it ever has to run again, do it by hand, never through `migrations apply --remote`. First
+see how many rows it will touch (read-only):
 
 ```bash
 npx wrangler d1 execute ratemyplace-db --remote --command \
