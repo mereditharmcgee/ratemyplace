@@ -16,6 +16,7 @@ const page = read('src/pages/privacy.astro').replace(/\s+/g, ' ');
 
 describe('privacy page: IP addresses', () => {
   it('says rate limits keep a keyed hash of the IP address, not the address', () => {
+    expect(read('src/lib/rateLimit.ts')).toContain("name: 'HMAC'");
     expect(page).toContain('a scrambled form of your IP address (a keyed hash), never the address itself');
     expect(page).not.toContain('keeps your IP address for one hour');
   });
