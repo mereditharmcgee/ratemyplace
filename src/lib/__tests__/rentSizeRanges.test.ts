@@ -104,9 +104,15 @@ describe('rentRangeAcross (a rent line for several reviews)', () => {
 
   it('runs from the lowest band to the highest band', () => {
     expect(rentRangeAcross([2611, 2137])).toBe('$2,000 to $2,750/mo');
-    expect(rentRangeAcross([800, 2611])).toBe('Under $1,000 to $2,750/mo');
     expect(rentRangeAcross([2611, 9100])).toBe('$2,500 to $6,000+/mo');
-    expect(rentRangeAcross([800, 9100])).toBe('Under $1,000 to $6,000+/mo');
+  });
+
+  it('starts a span that includes the open bottom band with "From under"', () => {
+    // "Under $1,000 to $2,750/mo" could be read as "under ($1,000 to $2,750)".
+    expect(rentRangeAcross([800, 2611])).toBe('From under $1,000 to $2,750/mo');
+    expect(rentRangeAcross([800, 9100])).toBe('From under $1,000 to $6,000+/mo');
+    // One open band on its own keeps the plain wording.
+    expect(rentRangeAcross([800, 450])).toBe('Under $1,000/mo');
   });
 
   it('never names a review exact rent', () => {
@@ -121,6 +127,29 @@ describe('rentRangeAcross (a rent line for several reviews)', () => {
     expect(rentRangeAcross([null, 2137, undefined, 0])).toBe('$2,000 to $2,250/mo');
     expect(rentRangeAcross([])).toBeNull();
     expect(rentRangeAcross([null, 0, ''])).toBeNull();
+  });
+});
+
+describe('containsExactNumber (the leak detector the page tests use)', () => {
+  it('finds a number written as text', () => {
+    expect(containsExactNumber('$2,137/mo', 2137)).toBe(true);
+    expect(containsExactNumber('817 sq ft', 817)).toBe(true);
+  });
+
+  it('finds a number serialized as JSON or as Astro island props', () => {
+    // Astro serializes a prop value as [0,value], HTML-escaped inside the props attribute.
+    expect(containsExactNumber('{&quot;rent_amount&quot;:[0,2137]}', 2137)).toBe(true);
+    expect(containsExactNumber('{"rent_amount":2137,"x":1}', 2137)).toBe(true);
+    expect(containsExactNumber('[0,817]', 817)).toBe(true);
+    expect(containsExactNumber('[2137,2611]', 2137)).toBe(true);
+  });
+
+  it('does not count a number that is part of a different one', () => {
+    expect(containsExactNumber('$12,137/mo', 2137)).toBe(false);
+    expect(containsExactNumber('$2,000 to $2,250/mo', 2137)).toBe(false);
+    expect(containsExactNumber('1,817 sq ft', 817)).toBe(false);
+    expect(containsExactNumber('2.137', 2137)).toBe(false);
+    expect(containsExactNumber('[0,21370]', 2137)).toBe(false);
   });
 });
 

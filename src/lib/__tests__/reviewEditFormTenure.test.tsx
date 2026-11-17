@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/react';
 import ReviewEditForm from '../../components/reviews/ReviewEditForm';
 import type { ReviewDetail } from '../../pages/api/reviews/[id]';
+import { REVIEW_CHECKLIST_COPY } from '../reviewChecklistCopy';
 
 /**
  * The tenure select on the reviewer's edit page starts from what is stored, so saving without
@@ -45,6 +46,7 @@ function tenureSelect(): HTMLSelectElement {
 /** Saves the form untouched and returns the JSON body it sent. */
 function saveUntouched(container: HTMLElement): Record<string, unknown> {
   fireEvent.click(screen.getByRole('checkbox', { name: /I confirm this review/ }));
+  fireEvent.click(screen.getByRole('checkbox', { name: REVIEW_CHECKLIST_COPY.identifyAcknowledgement }));
   fireEvent.submit(container.querySelector('form') as HTMLFormElement);
   const fetchMock = vi.mocked(fetch);
   expect(fetchMock).toHaveBeenCalledTimes(1);

@@ -15,13 +15,20 @@
 -- An id freed by a deleted notification (a review or user deleted) above that can be issued
 -- again. Nothing refers to a notification's id, so that is harmless.
 --
--- Re-running after a full run is safe: it rebuilds the table again with the same CHECK. If a
--- run stops between the DROP and the RENAME, a re-run stops at the INSERT (no notifications
--- table to copy from) and changes nothing; finish by hand with the RENAME and the two
--- CREATE INDEX statements below.
+-- A re-run is harmless only while this is the newest rebuild of the table. Once a later
+-- migration rebuilds it, re-running this file would put this CHECK list back, so after
+-- applying it, do not re-run it.
+--
+-- If a run stops after the INSERT and before the DROP, the original table is untouched and a
+-- re-run fails at the INSERT on a duplicate id. Drop the copy table
+-- (DROP TABLE notifications_v2) and run the file again. If a run stops between the DROP and
+-- the RENAME, a re-run stops at the INSERT (no notifications table to copy from) and changes
+-- nothing; finish by hand with the RENAME and the two CREATE INDEX statements below.
 --
 -- PRODUCTION NOTE: apply with `wrangler d1 execute --remote --file`, never
--- `migrations apply --remote`, and before the code that writes the two new events deploys.
+-- `migrations apply --remote`, and before the branch that writes the two new events is pushed
+-- or its preview is used. Previews share the production D1 binding, so a preview runs this
+-- code against production. In any case apply it before merging to main, which auto-deploys.
 -- See migrations/AGENTS.md for the confirm-first count.
 
 CREATE TABLE IF NOT EXISTS notifications_v2 (

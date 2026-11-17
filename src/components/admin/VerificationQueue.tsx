@@ -230,12 +230,20 @@ export default function VerificationQueue() {
               )}
             </div>
 
-            {/* Rejection Reason Input */}
+            {/* Rejection reason. It reaches the reviewer word for word, so the field says so. */}
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Rejection Reason (optional)
+              <label
+                htmlFor={`rejection-reason-${verification.id}`}
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                {VERIFICATION_ADMIN_COPY.rejectionReasonLabel}
               </label>
+              <p id={`rejection-reason-hint-${verification.id}`} className="text-sm text-gray-600 mb-1">
+                {VERIFICATION_ADMIN_COPY.rejectionReasonHint}
+              </p>
               <input
+                id={`rejection-reason-${verification.id}`}
+                aria-describedby={`rejection-reason-hint-${verification.id}`}
                 type="text"
                 value={rejectionReason[verification.id] || ''}
                 onChange={(e) => setRejectionReason((prev) => ({

@@ -12,13 +12,20 @@
 -- id, and no code deletes audit rows, so the AUTOINCREMENT counter carries on from the
 -- highest id as before.
 --
--- Re-running after a full run is safe: it rebuilds the table again with the same CHECK. If a
--- run stops between the DROP and the RENAME, a re-run stops at the INSERT (no audit_logs to
--- copy from) and changes nothing; finish by hand with the RENAME and the four CREATE INDEX
--- statements below.
+-- A re-run is harmless only while this is the newest rebuild of the table. Once a later
+-- migration rebuilds it, re-running this file would put this CHECK list back, so after
+-- applying it, do not re-run it.
+--
+-- If a run stops after the INSERT and before the DROP, the original table is untouched and a
+-- re-run fails at the INSERT on a duplicate id. Drop the copy table (DROP TABLE audit_logs_v5)
+-- and run the file again. If a run stops between the DROP and the RENAME, a re-run stops at
+-- the INSERT (no audit_logs to copy from) and changes nothing; finish by hand with the RENAME
+-- and the four CREATE INDEX statements below.
 --
 -- PRODUCTION NOTE: apply with `wrangler d1 execute --remote --file`, never
--- `migrations apply --remote`, BEFORE the code that writes verification_viewed deploys.
+-- `migrations apply --remote`, BEFORE the branch that writes verification_viewed is pushed or
+-- its preview is used. Previews share the production D1 binding, so a preview runs this code
+-- against production. In any case apply it before merging to main, which auto-deploys.
 -- Back up audit_logs first and verify the row count after. See migrations/AGENTS.md.
 
 CREATE TABLE IF NOT EXISTS audit_logs_v5 (

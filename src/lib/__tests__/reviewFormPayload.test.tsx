@@ -4,6 +4,7 @@ import ReviewForm from '../../components/reviews/ReviewForm';
 import ReviewEditForm from '../../components/reviews/ReviewEditForm';
 import { browserNav } from '../reviewPaths';
 import type { ReviewDetail } from '../../pages/api/reviews/[id]';
+import { REVIEW_CHECKLIST_COPY } from '../reviewChecklistCopy';
 
 // A11Y-04 changed how a rating is chosen (buttons became native radio groups) and nothing
 // else. These literals were captured on the button markup, before the change, and must pass
@@ -148,11 +149,12 @@ describe('edit review payload', () => {
     } as ReviewDetail;
   }
 
-  /** Tick consent, save with a request that never settles, and return the body it sent. */
+  /** Tick both boxes, save with a request that never settles, and return the body it sent. */
   function save(): string {
     const fetchMock = vi.fn((_url: string, _init: RequestInit) => new Promise<Response>(() => {}));
     vi.stubGlobal('fetch', fetchMock);
     fireEvent.click(screen.getByRole('checkbox', { name: /I confirm this review/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: REVIEW_CHECKLIST_COPY.identifyAcknowledgement }));
     fireEvent.submit(document.querySelector('form') as HTMLFormElement);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];

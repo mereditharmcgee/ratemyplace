@@ -35,7 +35,8 @@ export const REVIEW_STATUS_EMAIL_HINT =
 
 /**
  * Admin-facing. An admin opening a document is logged first, and the document is served only
- * when that entry is written (GET /api/admin/verification/[id] fails closed).
+ * when that entry is written (GET /api/admin/verification/[id] fails closed). Also the
+ * queue's rejection reason field, which tells the admin the reviewer reads the reason.
  */
 export const VERIFICATION_ADMIN_COPY = {
   /** The route's 503 error. A PDF opens in its own tab, which shows this. */
@@ -43,6 +44,13 @@ export const VERIFICATION_ADMIN_COPY = {
   /** The queue's line in place of an image that did not load. An image cannot read the error, so this covers a missing file too. */
   documentNotShown: 'This document could not be shown. Its view may not have been logged, or the file may be missing.',
   retry: 'Try again',
+  /**
+   * The queue's rejection reason field. The reason reaches the reviewer word for word, on My
+   * Reviews and in the rejection email (unless they turned status emails off), so the field
+   * says who reads it.
+   */
+  rejectionReasonLabel: 'Reason for the reviewer (optional)',
+  rejectionReasonHint: 'The reviewer sees this on their profile. We also email it to them, unless they turned off status emails.',
 } as const;
 
 /** Notification events that get the "Go to My Reviews" action. */

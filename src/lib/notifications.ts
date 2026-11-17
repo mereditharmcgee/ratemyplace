@@ -30,9 +30,11 @@ export const EVENT_MESSAGES: Record<NotificationEventType, (address: string) => 
   dispute_resolved: (address) =>
     `The dispute on your review of ${address} has been resolved.`,
   // Proof-of-address decisions. The rejection reason is not repeated here: My Reviews shows
-  // it beside the review, with the way to send a different document.
+  // it beside the review, with the way to send a different document. A document can be
+  // approved while its review is still pending or after it was rejected, when readers see no
+  // review at all, so the approval says the review "has" the badge, not that it "shows" one.
   verification_approved: (address) =>
-    `We verified your tenancy at ${address}. Your review now shows a Verified badge.`,
+    `We verified your tenancy at ${address}. Your review now has a Verified badge.`,
   verification_rejected: (address) =>
     `We could not verify your tenancy at ${address} with the document you sent. See My Reviews for what to do next.`,
 };

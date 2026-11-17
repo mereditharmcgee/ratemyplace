@@ -221,6 +221,21 @@ describe('the edit form checklist', () => {
     expect(save.disabled).toBe(true);
   });
 
+  it('a form submit with one box ticked sends nothing', () => {
+    // The disabled Save is not the only gate: the submit handler checks both boxes too.
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { container } = render(<ReviewEditForm review={review()} />);
+    fireEvent.click(termsBox());
+    fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(termsBox());
+    fireEvent.click(identifyBox());
+    fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('the disabled Save is described by both boxes and a hint that says why', () => {
     render(<ReviewEditForm review={review()} />);
     const save = button('Save Changes');

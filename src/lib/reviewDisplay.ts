@@ -113,6 +113,8 @@ export const SQUARE_FOOTAGE_BANDS: BandScale = { width: 250, openBelow: 500, ope
 /** Every word the range labels use, in one place for the owner to edit. */
 export const RANGE_COPY = {
   under: 'Under',
+  /** Starts a span that includes the open bottom band: "From under $1,000 to $2,750/mo". */
+  fromUnder: 'From under',
   to: 'to',
   andUp: '+',
   perMonth: '/mo',
@@ -154,7 +156,7 @@ function spanLabel(low: DisplayBand, high: DisplayBand, format: BandFormat): str
   const oneBand = low.lo === high.lo && low.hi === high.hi;
   if (oneBand && low.lo === null) return `${RANGE_COPY.under} ${amount(low.hi as number)}${suffix}`;
   if (oneBand && low.hi === null) return `${amount(low.lo as number)}${RANGE_COPY.andUp}${suffix}`;
-  const start = low.lo === null ? `${RANGE_COPY.under} ${amount(low.hi as number)}` : amount(low.lo);
+  const start = low.lo === null ? `${RANGE_COPY.fromUnder} ${amount(low.hi as number)}` : amount(low.lo);
   const end = high.hi === null ? `${amount(high.lo as number)}${RANGE_COPY.andUp}` : amount(high.hi);
   return `${start} ${RANGE_COPY.to} ${end}${suffix}`;
 }

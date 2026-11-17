@@ -191,7 +191,9 @@ began deleting the file. Or its review was deleted before review deletes removed
 delete failed at the decision, or its upload never got a row. Remove those by hand.
 
 **`0037` (notification events for proof-of-address decisions) is NOT YET APPLIED TO
-PRODUCTION. Apply it by hand BEFORE the code that writes the new events deploys.** It rebuilds
+PRODUCTION. Apply it by hand BEFORE the branch that writes the new events is pushed or its
+preview is used.** Previews share the production D1 binding, so a preview runs this code
+against production. In any case apply it before merging to `main`, which auto-deploys. It rebuilds
 `notifications` to widen its `event_type` CHECK with `verification_approved` and
 `verification_rejected`, the 0030 pattern: create `notifications_v2`, copy every row with
 its id, drop, rename, recreate `idx_notifications_user` and `idx_notifications_unread`.
@@ -201,15 +203,20 @@ compares the table's shape before and after. There is no PRAGMA: nothing referen
 in its transaction anyway. The next id is one above the highest kept id, so an id freed by
 a deleted notification can be issued again; nothing refers to notification ids.
 
-Order matters one way only. Code deployed before the file runs still makes every decision
-and still sends the rejection email, but each in-app notice fails the old CHECK and is lost,
-leaving a `notification_write_failed` log line with its `eventType`. Applying the file first
-is safe: the old code writes only the four review events, which the new CHECK keeps.
+Order matters one way only. Code deployed before the file runs, on a preview or on
+production, still makes every decision and still sends the rejection email, but each in-app
+notice fails the old CHECK and is lost, leaving a `notification_write_failed` log line with
+its `eventType`. Applying the file first is safe: the old code writes only the four review
+events, which the new CHECK keeps.
 
-Re-running it after a full run is safe (it rebuilds the table again with the same CHECK).
-If a run stops after the `DROP` and before the `RENAME`, a re-run stops at the `INSERT` and
-changes nothing; finish by hand with the file's `ALTER TABLE ... RENAME` and its two
-`CREATE INDEX` statements. Never `migrations apply --remote`.
+A re-run is harmless only while this is the newest rebuild of the table. Once a later
+migration rebuilds it, re-running this file would put this CHECK list back, so after
+applying it, do not re-run it. If a run stops after the `INSERT` and before the `DROP`, the
+original table is untouched and a re-run fails at the `INSERT` on a duplicate id. Drop the
+copy table (`DROP TABLE notifications_v2`) and run the file again. If a run stops after the
+`DROP` and before the `RENAME`, a re-run stops at the `INSERT` and changes nothing; finish by
+hand with the file's `ALTER TABLE ... RENAME` and its two `CREATE INDEX` statements. Never
+`migrations apply --remote`.
 
 Confirm first (read-only). The table's SQL must not mention `verification_approved` yet;
 note the row count and the id range; and the orphan count must be 0, because the copy keeps
@@ -239,7 +246,9 @@ npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT name FROM sq
 The second should list the two indexes and not `notifications_v2`.
 
 **`0038` (audit entry for viewing a proof-of-address document) is NOT YET APPLIED TO
-PRODUCTION. Apply it by hand BEFORE the code that writes `verification_viewed` deploys.** It
+PRODUCTION. Apply it by hand BEFORE the branch that writes `verification_viewed` is pushed or
+its preview is used.** Previews share the production D1 binding, so a preview runs this code
+against production. In any case apply it before merging to `main`, which auto-deploys. It
 rebuilds `audit_logs` exactly as `0030` did (`audit_logs_v5`, copy every row with its id,
 drop, rename, the four `idx_audit_*` indexes) with one more allowed action,
 `verification_viewed`. Every other allowed action and every allowed entity type is
@@ -249,13 +258,19 @@ the rows, columns, defaults, indexes and both CHECK lists before and after. No P
 
 Order matters more here than for `0037`. `GET /api/admin/verification/[id]` writes the
 entry before it serves a document and **fails closed**: if the write fails, the admin gets a
-503 and no document. Code deployed before this file runs therefore cannot open any
-proof-of-address document (the queue shows "This document could not be shown" and every
-attempt logs `audit_log_write_failed` with `actionType` `verification_viewed`) until the file
-is applied. Applying it first is safe: the old code writes only actions the new CHECK keeps.
-Re-running after a full run is safe; a run that stops after the `DROP` and before the
-`RENAME` is finished by hand with the file's `RENAME` and its four `CREATE INDEX`
-statements. Never `migrations apply --remote`.
+503 and no document. Code deployed before this file runs, on a preview or on production,
+therefore cannot open any proof-of-address document (the queue shows "This document could
+not be shown" and every attempt logs `audit_log_write_failed` with `actionType`
+`verification_viewed`) until the file is applied. Applying it first is safe: the old code
+writes only actions the new CHECK keeps.
+
+A re-run is harmless only while this is the newest rebuild of the table. Once a later
+migration rebuilds it, re-running this file would put this CHECK list back, so after
+applying it, do not re-run it. If a run stops after the `INSERT` and before the `DROP`, the
+original table is untouched and a re-run fails at the `INSERT` on a duplicate id. Drop the
+copy table (`DROP TABLE audit_logs_v5`) and run the file again. A run that stops after the
+`DROP` and before the `RENAME` is finished by hand with the file's `RENAME` and its four
+`CREATE INDEX` statements. Never `migrations apply --remote`.
 
 Confirm first (read-only). The table's SQL must not mention `verification_viewed` yet, and
 note the row count and id range:
