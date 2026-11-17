@@ -314,7 +314,7 @@ Must show address matching the reviewed building:
 4. Document **immediately deleted** regardless of decision
 5. User notified of outcome (**Planned**). Today no notification or email is sent. An approval shows only as the Verified badge. A rejection, and its optional reason, is stored but never shown to the user. The profile shows the same "Verify your tenancy" prompt on every unverified review, whether no document was sent, one is waiting for a decision or one was rejected.
 
-Only the uploaded file is deleted. The `verification_images` row stays, with the original filename, content type, size, status, the deciding moderator and any rejection reason. It is removed only when its review or user is deleted.
+Only the uploaded file is deleted. The `verification_images` row stays, with the content type, size, status, the deciding moderator and any rejection reason. The decision blanks the original filename (to an empty string, as the column is NOT NULL), since a tenant's filename often names their address or unit. The row is removed only when its review or user is deleted.
 
 A file still waiting for a decision does not outlive its review. When an admin deletes a review, or the building it belongs to, the route deletes the review's files from R2 first (`src/lib/verificationFiles.ts`). If R2 refuses one, the failure is logged without the file's key or name, the review or building is still deleted, and the audit entry records how many files were removed and how many failed. Orphan cleanup deletes only buildings with no reviews, so it never has files to remove.
 
@@ -452,7 +452,7 @@ Scores are computed when a page is read, from approved reviews (`src/lib/scoring
 - Review rows hold no IP. `rate_limits` holds a keyed hash of the client IP for the IP-keyed limiters, never the raw IP. Each of those rows expires at the end of its limiter's window (at most one hour), but expired rows are deleted only when a later limiter check runs, so a row can outlast its window when the site is quiet. `audit_logs.admin_ip` keeps each acting admin's IP permanently. The review-submit limiter is keyed on the account, not the IP.
 - `reviews.unit_number` is a private moderation field and is kept (see section 5).
 - Through the review and edit forms, tenancy is stored coarsely: `tenure_months` holds one of six bucket values and `move_out_year_new` holds `current`, a year or `2020_or_earlier`. Neither route checks these values against those lists, and the columns have no CHECK constraint, so a hand-made request can store other values. Move-in keeps only the season and year. A part the reviewer skipped holds a placeholder (winter, the current year) in the NOT NULL `move_in_year` and `move_in_season` columns, and `move_in_given` (0035) tells public pages which parts to show; it is NULL on reviews written before it existed. `move_out_season` is set only on reviews written before January 2026.
-- A verification document is deleted from R2 after the decision, but its `verification_images` row stays, with the user's original filename.
+- A verification document is deleted from R2 after the decision, and its `verification_images` row stays with the filename blanked.
 - `users.notification_opt_in` (default 1) turns off the review rejection email when it is 0. In-app notifications do not read it.
 
 **Other things to know:**
