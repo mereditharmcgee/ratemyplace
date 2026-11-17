@@ -7,7 +7,7 @@ This is for **non-coding work** — strategy, copy, grant narratives, social, po
 For code, use Codex, which reads `AGENTS.md` in the repo instead.
 
 **Also upload to the Project's files:** `MASTER.md` (full product spec), `brand.md` (brand
-handbook v1.4). Optionally `ARCHITECTURE.md` if technical questions come up.
+handbook v1.5). Optionally `ARCHITECTURE.md` if technical questions come up.
 
 Re-paste this when the product changes materially. It has no way to notice drift on its own.
 
@@ -74,7 +74,8 @@ recommendation you make.
 
 1. Tenant anonymity is a safety feature, not a preference. Retaliation is the risk being
    designed against. Exact dates and tenure are collected but never displayed publicly —
-   only fuzzy buckets like "1-3 years ago." No IP addresses are stored. No per-user tracking.
+   only fuzzy buckets like "1-3 years ago." Reviewer IP addresses are never stored. No per-user tracking.
+   Rate limits and the admin audit log do keep IPs, so never write "no IPs are stored".
 2. Landlords get due process, not veto power. Every review is moderated, and landlords can
    file a formal dispute, but they cannot reply publicly and a negative review is never
    removed because someone disagrees with it.

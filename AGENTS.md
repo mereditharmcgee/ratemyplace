@@ -532,6 +532,6 @@ when adding an endpoint.
 
 **Staleness warning:** everything in `docs/archive/` is stale, including
 `docs/archive/CLAUDE_CONTEXT.md` and `docs/archive/VERSION.md` (v1.1.0-alpha era, January
-2026) and two old handoff prompts. `.planning/STATE.md` is accurate only through April 2026.
+2026) and three old handoff notes. `.planning/STATE.md` is accurate only through April 2026.
 Trust the code and this file over those. When a doc and the source disagree, **the source
 wins** — verify before relying on any line-level specific in a doc.
