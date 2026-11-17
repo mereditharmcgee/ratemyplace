@@ -28,6 +28,8 @@ import {
   moveOutEditValue,
 } from '../../lib/privacy';
 import { tenureEditChoices, tenureEditValue } from '../../lib/tenure';
+import { REVIEW_CHECKLIST_COPY } from '../../lib/reviewChecklistCopy';
+import ReviewAcknowledgements from './ReviewAcknowledgements';
 
 interface Props {
   review: ReviewDetail;
@@ -37,7 +39,14 @@ export default function ReviewEditForm({ review }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  // A save sends the review back to moderation and then live again, with whatever the
+  // title and comments now say, so it needs the same two boxes as a first submit.
   const [consentAcknowledged, setConsentAcknowledged] = useState(false);
+  const [identifyAcknowledged, setIdentifyAcknowledged] = useState(false);
+  const acknowledged = consentAcknowledged && identifyAcknowledged;
+  const consentTextId = useId();
+  const identifyTextId = useId();
+  const saveNoteId = useId();
 
   // Save disables itself while it works, so a failed save moves focus to the error, and a
   // successful one to the panel that replaces the form. errorSeq counts every failed save,
@@ -167,6 +176,10 @@ export default function ReviewEditForm({ review }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Save needs both boxes. The disabled button is the visible gate; this one holds for a
+    // submit that does not come through the button.
+    if (!acknowledged) return;
 
     // Block a review with every rating cleared — the API rejects it too, but this
     // gives the reviewer clear feedback instead of a 400.
@@ -908,44 +921,36 @@ export default function ReviewEditForm({ review }: Props) {
         </div>
       </div>
 
-      {/* Consent Checkbox */}
-      <div className="bg-amber-50 border border-amber-200 rounded-[6px] p-4">
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={consentAcknowledged}
-            onChange={(e) => setConsentAcknowledged(e.target.checked)}
-            className="mt-0.5 rounded border-amber-400 text-amber-700 focus:ring-amber-500"
-          />
-          <span className="text-sm text-amber-800">
-            I confirm this review reflects my honest personal experience and agree to the{' '}
-            <a href="/terms" target="_blank" className="underline font-medium hover:text-amber-900">
-              Terms of Service
-            </a>{' '}
-            and{' '}
-            <a href="/guidelines" target="_blank" className="underline font-medium hover:text-amber-900">
-              Review Guidelines
-            </a>
-            .
-          </span>
-        </label>
-      </div>
+      <ReviewAcknowledgements
+        identifyAcknowledged={identifyAcknowledged}
+        onIdentifyChange={setIdentifyAcknowledged}
+        termsAcknowledged={consentAcknowledged}
+        onTermsChange={setConsentAcknowledged}
+        identifyTextId={identifyTextId}
+        termsTextId={consentTextId}
+      />
 
-      {/* Actions */}
-      <div className="flex gap-4 pt-4 border-t">
-        <a
-          href="/profile"
-          className="flex-1 px-6 py-3 border border-gray-300 rounded-[6px] text-gray-700 hover:bg-gray-50 text-center transition-colors"
-        >
-          Cancel
-        </a>
-        <button
-          type="submit"
-          disabled={loading || !consentAcknowledged}
-          className="flex-1 px-6 py-3 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {loading ? 'Saving...' : 'Save Changes'}
-        </button>
+      {/* Actions. The note under Save says why it is disabled, as on the new-review form. */}
+      <div>
+        <div className="flex gap-4 pt-4 border-t">
+          <a
+            href="/profile"
+            className="flex-1 px-6 py-3 border border-gray-300 rounded-[6px] text-gray-700 hover:bg-gray-50 text-center transition-colors"
+          >
+            Cancel
+          </a>
+          <button
+            type="submit"
+            disabled={loading || !acknowledged}
+            aria-describedby={`${identifyTextId} ${consentTextId} ${saveNoteId}`}
+            className="flex-1 px-6 py-3 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+        <p id={saveNoteId} aria-live="polite" className="mt-2 text-sm text-gray-600 text-right min-h-5">
+          {acknowledged ? '' : REVIEW_CHECKLIST_COPY.saveHint}
+        </p>
       </div>
     </form>
   );

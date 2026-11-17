@@ -70,7 +70,9 @@ describe('ReviewCard header layout at phone width', () => {
 
     expect(meta.textContent).toContain('Summer 2025');
     expect(meta.textContent).toContain('Within the last year');
-    expect(meta.textContent).toContain('$2,100/mo');
+    // The rent shows as its band, never the exact amount (rentSizeRanges.test.ts).
+    expect(meta.textContent).toContain('$2,000 to $2,250/mo');
+    expect(meta.textContent).not.toContain('2,100');
   });
 
   it('renders each non-chip meta child as a block-level <p> and the chip as inline-block', async () => {

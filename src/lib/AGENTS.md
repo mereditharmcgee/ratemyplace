@@ -196,6 +196,10 @@ React island imports it; `clientLeafModules.test.ts` enforces each one.
 - **`emailVerification.ts`** (server) is the 403 gate: `hasVerifiedEmail` (strict
   `emailVerified === true`) and `emailVerificationRequired()`, called right after the 401 in
   every review write and on both review pages.
+- **`reviewChecklistCopy.ts`** (leaf) is the "Before you submit" checklist and the "may be
+  able to identify me" box's text. Both review forms render it through
+  `components/reviews/ReviewAcknowledgements.tsx`, and Submit or Save stays disabled until that
+  box and the Terms box are both ticked. Neither box is sent to the server or checked there.
 - **`passwordPolicy.ts`** (leaf) is the password minimum (8) for sign-up, reset and settings,
   and sign-in's legacy floor (6) for passwords made before March 2026.
 
@@ -212,6 +216,17 @@ and edit routes store, and `givenMoveIn()` is the one reader: anything that show
 goes through it (or `reviewSeasonChipProps` / `formatMoveIn`), never the two columns
 directly. NULL means the review predates the column and is shown as stored. The module is
 a client leaf (`clientLeafModules.test.ts`): the edit form and admin table import it.
+
+### `reviewDisplay.ts` rent and size bands are a safety control too
+
+Exact rent and square footage, with bedrooms and bathrooms, can point at one unit and so at
+its tenant. Public surfaces show `rentRangeLabel` / `squareFootageRangeLabel` ($250 and
+250 sq ft bands, lower bound inclusive, open below $1,000 and 500 sq ft and from $6,000 and
+2,000 sq ft), and a line for several reviews uses `rentRangeAcross`, which bands each rent
+before it compares them, so a group of one never shows its exact rent through a min, max or
+average. The stored values stay exact; the admin review detail and the reviewer's own edit
+form show them. `rentSizeRanges.test.ts` lists every source file that names either field
+and fails on a new one until it is classified.
 
 ### `reviewEdit.ts` and `tenure.ts`: a review edit changes only what it sends
 
@@ -274,6 +289,13 @@ await createAuditLog(db, {
 Best-effort by design — a logging failure must never break the action it is logging.
 Admin grant/revoke went untracked until August 2026; do not let a new destructive action
 ship without a log entry.
+
+The one exception fails closed: an admin opening a proof-of-address document
+(`GET /api/admin/verification/[id]`) calls `tryCreateAuditLog`, which reports whether the
+entry landed, and the route serves the document only when it did, answering 503 otherwise.
+The entry is `verification_viewed` with the verification id and its `review_id`, never the
+filename or the R2 key. A new action type in that path must be in the `audit_logs` CHECK
+before the code ships, or every view is refused (see `migrations/AGENTS.md`, 0038).
 
 ### `records/` — public building records
 

@@ -3,6 +3,7 @@ import { render, cleanup, screen, fireEvent, within } from '@testing-library/rea
 import ReviewEditForm from '../../components/reviews/ReviewEditForm';
 import type { ReviewDetail } from '../../pages/api/reviews/[id]';
 import { supplementaryItems } from '../surveyItems';
+import { REVIEW_CHECKLIST_COPY } from '../reviewChecklistCopy';
 
 /**
  * A reviewer who skipped "Would you recommend this unit?" has would_recommend_new NULL, and
@@ -45,6 +46,7 @@ function recommendRadios(): HTMLInputElement[] {
 /** Submit the form and return the JSON body it sent. The request never settles. */
 function submittedBody(container: HTMLElement, fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> {
   fireEvent.click(screen.getByRole('checkbox', { name: /I confirm this review/ }));
+  fireEvent.click(screen.getByRole('checkbox', { name: REVIEW_CHECKLIST_COPY.identifyAcknowledgement }));
   fireEvent.submit(container.querySelector('form') as HTMLFormElement);
   expect(fetchMock).toHaveBeenCalledTimes(1);
   const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];

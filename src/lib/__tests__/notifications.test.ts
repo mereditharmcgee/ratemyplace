@@ -42,6 +42,8 @@ describe('createNotification', () => {
       review_rejected: `Your review of ${address} was not approved. See your dashboard for details.`,
       review_disputed: `Your review of ${address} has been disputed by the landlord.`,
       dispute_resolved: `The dispute on your review of ${address} has been resolved.`,
+      verification_approved: `We verified your tenancy at ${address}. Your review now has a Verified badge.`,
+      verification_rejected: `We could not verify your tenancy at ${address} with the document you sent. See My Reviews for what to do next.`,
     };
 
     for (const [eventType, expectedMessage] of Object.entries(expectedMessages)) {
@@ -83,6 +85,8 @@ describe('createNotification', () => {
       'review_rejected',
       'review_disputed',
       'dispute_resolved',
+      'verification_approved',
+      'verification_rejected',
     ];
 
     for (const eventType of eventTypes) {

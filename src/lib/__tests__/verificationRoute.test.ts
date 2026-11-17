@@ -132,6 +132,10 @@ describe('admin verification decisions', () => {
 });
 
 describe('admin verification document view', () => {
+  // Every view writes an audit entry first (verificationViewAudit.test.ts), so the fake
+  // database accepts that insert.
+  const writes: string[] = [];
+
   function getContext(): APIContext {
     const db = {
       prepare(sql: string) {
@@ -139,9 +143,13 @@ describe('admin verification document view', () => {
           bind(..._values: unknown[]) {
             return {
               async first() {
-                return sql.includes('SELECT r2_key, content_type, filename')
-                  ? { r2_key: verification.r2_key, content_type: 'application/pdf', filename: 'proof.pdf' }
+                return sql.includes('FROM verification_images')
+                  ? { review_id: verification.review_id, r2_key: verification.r2_key, content_type: 'application/pdf', filename: 'proof.pdf' }
                   : null;
+              },
+              async run() {
+                writes.push(sql);
+                return { success: true };
               },
             };
           },
@@ -169,5 +177,6 @@ describe('admin verification document view', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     expect(await response.text()).toBe('document bytes');
+    expect(writes.some((sql) => sql.includes('INSERT INTO audit_logs'))).toBe(true);
   });
 });

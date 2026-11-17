@@ -1,5 +1,6 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
+import type { VerificationStatus } from '../../../lib/verificationNotice';
 
 export interface UserReview {
   id: string;
@@ -16,6 +17,8 @@ export interface UserReview {
   review_title: string | null;
   moderation_notes: string | null;
   has_open_dispute: number | boolean;
+  verification_status: VerificationStatus | null;
+  verification_rejection_reason: string | null;
 }
 
 export async function GET(context: APIContext): Promise<Response> {
@@ -45,10 +48,21 @@ export async function GET(context: APIContext): Promise<Response> {
         r.updated_at,
         r.review_title,
         r.moderation_notes,
-        CASE WHEN d.id IS NOT NULL THEN 1 ELSE 0 END as has_open_dispute
+        CASE WHEN d.id IS NOT NULL THEN 1 ELSE 0 END as has_open_dispute,
+        -- The latest proof-of-address document, so the profile can say it is waiting or why
+        -- it was not accepted. Latest is the newest upload, the later row on a tie. The reason
+        -- is sent only for a rejected latest document; an older rejection is history.
+        latest_vi.status as verification_status,
+        CASE WHEN latest_vi.status = 'rejected' THEN latest_vi.rejection_reason END as verification_rejection_reason
       FROM reviews r
       JOIN buildings b ON r.building_id = b.id
       LEFT JOIN disputes d ON d.review_id = r.id AND d.status = 'pending'
+      LEFT JOIN verification_images latest_vi ON latest_vi.rowid = (
+        SELECT vi.rowid FROM verification_images vi
+        WHERE vi.review_id = r.id
+        ORDER BY vi.uploaded_at DESC, vi.rowid DESC
+        LIMIT 1
+      )
       WHERE r.user_id = ?
       ORDER BY r.created_at DESC
     `).bind(context.locals.user.id).all<UserReview>();

@@ -3,7 +3,16 @@ import StarRating from '../ratings/StarRating.astro';
 import VerifiedBadge from '../ui/VerifiedBadge.astro';
 import SeasonChip from '../ui/SeasonChip.astro';
 import { formatRecency, reviewSeasonChipProps } from '../../lib/privacy';
-import { RECOMMEND_LABELS, bedroomsLabel, recommendAnswer, resolveUnitType, unitTypeLabel, type RecommendAnswer } from '../../lib/reviewDisplay';
+import {
+  RECOMMEND_LABELS,
+  bedroomsLabel,
+  recommendAnswer,
+  rentRangeLabel,
+  resolveUnitType,
+  squareFootageRangeLabel,
+  unitTypeLabel,
+  type RecommendAnswer,
+} from '../../lib/reviewDisplay';
 import { calculateDomainScores, ITEM_WEIGHTS } from '../../lib/scoring';
 import { getScoreTextColor, getScoreColor, getScoreBgTint } from '../../lib/scoring-colors';
 
@@ -24,6 +33,11 @@ const unitDisplay = unitTypeLabel(resolveUnitType(review));
 const bedroomsDisplay = bedroomsLabel(review.bedrooms);
 
 const recencyLabel = formatRecency(review);
+
+// Rent and size are shown as ranges, never the exact numbers: with bedrooms and bathrooms an
+// exact rent or size can point at one unit, and so at the tenant (reviewDisplay.ts).
+const rentDisplay = rentRangeLabel(review.rent_amount);
+const sizeDisplay = squareFootageRangeLabel(review.square_footage);
 
 // The recommend question is optional. A skipped or unknown answer shows no badge, never
 // "Would not recommend".
@@ -219,8 +233,8 @@ const pestLabels: Record<string, string> = {
       {/* The dispute form matches a review by this range; reviewTenancyLabel reads the same props. */}
       <SeasonChip {...reviewSeasonChipProps(review)} class="sm:my-1" />
       <p>{recencyLabel}</p>
-      {review.rent_amount && (
-        <p class="text-teal-700 font-medium">${review.rent_amount.toLocaleString()}/mo</p>
+      {rentDisplay && (
+        <p class="text-teal-700 font-medium">{rentDisplay}</p>
       )}
     </div>
   </div>
@@ -231,7 +245,7 @@ const pestLabels: Record<string, string> = {
   )}
 
   <!-- Unit Details -->
-  {(bedroomsDisplay || review.bathrooms || review.square_footage) && (
+  {(bedroomsDisplay || review.bathrooms || sizeDisplay) && (
     <div class="flex flex-wrap gap-3 mb-4 text-sm">
       {bedroomsDisplay && (
         <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded">
@@ -243,9 +257,9 @@ const pestLabels: Record<string, string> = {
           {review.bathrooms} bath{review.bathrooms !== '1' ? 's' : ''}
         </span>
       )}
-      {review.square_footage && (
+      {sizeDisplay && (
         <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded">
-          {review.square_footage} sq ft
+          {sizeDisplay}
         </span>
       )}
     </div>

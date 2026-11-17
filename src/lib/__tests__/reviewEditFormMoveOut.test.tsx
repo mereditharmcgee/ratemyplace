@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/react';
 import ReviewEditForm from '../../components/reviews/ReviewEditForm';
 import type { ReviewDetail } from '../../pages/api/reviews/[id]';
+import { REVIEW_CHECKLIST_COPY } from '../reviewChecklistCopy';
 
 /**
  * The reviewer's own edit page shows the stored move-out in words beside the move-in, and the
@@ -117,6 +118,7 @@ describe('ReviewEditForm move-out select', () => {
     );
 
     fireEvent.click(screen.getByRole('checkbox', { name: /I confirm this review/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: REVIEW_CHECKLIST_COPY.identifyAcknowledgement }));
     fireEvent.submit(container.querySelector('form') as HTMLFormElement);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);

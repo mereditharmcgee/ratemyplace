@@ -58,7 +58,8 @@ function walkToConfirm({ rate = true } = {}) {
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   fireEvent.click(screen.getByRole('button', { name: 'Review & Submit' }));
-  fireEvent.click(screen.getByRole('checkbox'));
+  // Both boxes on the confirm step: the identify box and the Terms box.
+  for (const box of screen.getAllByRole('checkbox')) fireEvent.click(box);
 }
 
 const submitButton = () => screen.getByRole('button', { name: /Submit Review|Submitting/ }) as HTMLButtonElement;

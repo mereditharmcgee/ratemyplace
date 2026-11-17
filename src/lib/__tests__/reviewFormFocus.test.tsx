@@ -7,6 +7,7 @@ import {
 } from '../../components/reviews/form-steps/ConfirmStep';
 import { browserNav } from '../reviewPaths';
 import { SUBMIT_FAILED_COPY, SUBMIT_NETWORK_COPY } from '../reviewSubmitOutcome';
+import { REVIEW_CHECKLIST_COPY } from '../reviewChecklistCopy';
 
 // A11Y-05: the review form says where the reader is and what went wrong, once each.
 //
@@ -68,7 +69,8 @@ function walkToConfirm({ rate }: { rate: boolean }) {
   fireEvent.click(button('Continue')); // building rating
   fireEvent.click(button('Continue')); // landlord rating
   fireEvent.click(button('Review & Submit'));
-  fireEvent.click(screen.getByRole('checkbox'));
+  // Both boxes on the confirm step: the identify box and the Terms box.
+  for (const box of screen.getAllByRole('checkbox')) fireEvent.click(box);
 }
 
 function json(status: number, body: unknown) {
@@ -222,13 +224,14 @@ describe('review form Turnstile messages and the Submit description', () => {
     expect(alert.textContent).toBe('Bot verification failed. Please try again.');
   });
 
-  it('Submit is described by the confirmation text and the waiting message', () => {
+  it('Submit is described by both boxes and the waiting message', () => {
     walkToConfirm({ rate: true }); // no token yet, so the waiting message shows
 
     const submit = button('Submit Review');
     const ids = (submit.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean);
-    expect(ids).toHaveLength(2);
-    const [confirmation, waiting] = ids.map((id) => document.getElementById(id));
+    expect(ids).toHaveLength(3);
+    const [identify, confirmation, waiting] = ids.map((id) => document.getElementById(id));
+    expect(identify?.textContent).toBe(REVIEW_CHECKLIST_COPY.identifyAcknowledgement);
     expect(confirmation?.textContent).toContain('I confirm this review reflects my honest personal experience');
     expect(waiting?.getAttribute('aria-live')).toBe('polite');
     expect(waiting?.textContent).toBe(TURNSTILE_WAITING_COPY);

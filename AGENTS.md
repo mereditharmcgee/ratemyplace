@@ -41,7 +41,10 @@ and flag it explicitly if a requested change would erode one.
 
 1. **Tenant anonymity is a safety feature.** Retaliation is the risk being designed
    against. Exact timestamps and tenure are collected but **never displayed** — public
-   surfaces show fuzzy buckets only (`src/lib/privacy.ts`). No per-user analytics.
+   surfaces show fuzzy buckets only (`src/lib/privacy.ts`). Exact rent and square footage
+   are stored too, and public surfaces show them only as bands (`rentRangeLabel`,
+   `squareFootageRangeLabel` and `rentRangeAcross` in `src/lib/reviewDisplay.ts`). No
+   per-user analytics.
    *Accurate scope:* reviewer IPs are never stored. `rate_limits` keys are a keyed hash of
    the client IP, user id or building id, never the raw IP or id (see Rate limiting
    below). Admin IPs **are** kept: `audit_logs.admin_ip` records the acting admin's IP.
@@ -54,6 +57,8 @@ and flag it explicitly if a requested change would erode one.
 4. **Landlords get due process, not veto power.** Reviews are moderated and disputable.
    A negative review is never removed because someone disagrees with it.
 5. **Admin actions are audited.** Every destructive admin action writes an audit log entry.
+   So does every admin view of a proof-of-address document (`verification_viewed`), and that
+   one fails closed: no entry, no document.
 
 ## Stack
 
@@ -270,7 +275,14 @@ needs the owner's action calls `queueOwnerNotice(context, { kind, buildingId })`
 `lib/email.ts`; there is no env var for it. An email to a review's author about the
 review's status checks `wantsReviewStatusEmail` (`lib/notifications.ts`) first, which reads
 the profile's opt-out (`users.notification_opt_in`). The in-app notification is written
-either way.
+either way. Two emails follow that rule: the review-not-published notice and the
+tenancy-document-not-accepted notice (`verification_rejected`, from
+`POST /api/admin/verification/[id]`). Approving a review or a document sends no email.
+In-app notification types are `NotificationEventType` in `lib/notifications.ts`: the four
+review and dispute events, plus `verification_approved` and `verification_rejected` for a
+proof-of-address decision. Each must also be in the `notifications.event_type` CHECK (last
+rebuilt by `0037`). A type the CHECK lacks loses the notice, with only a
+`notification_write_failed` log line, so a new type ships with its table-rebuild migration.
 
 ## Traps
 
@@ -340,6 +352,16 @@ Things that have already cost time. Read before debugging.
 - **Production migrations 0025–0027 were applied via the Cloudflare dashboard**, not
   wrangler, so wrangler does not know they ran. `0027` is a non-idempotent `DROP COLUMN`
   batch. Never blindly run `migrations apply --remote`. See `migrations/AGENTS.md`.
+- **Migrations `0037` and `0038` were applied to production by hand on 2026-11-17, before the
+  branch that uses them was pushed.** Previews share the production D1 binding, so a
+  preview runs this code against production. `0037` rebuilds `notifications` to
+  allow `verification_approved` and `verification_rejected`; without it the decision and the
+  email still go through, but every proof-of-address notice is lost. `0038` rebuilds
+  `audit_logs` to allow `verification_viewed`; without it the view audit fails, and the
+  fail-closed route refuses every document with a 503, so no admin can open one. Each was
+  applied with `wrangler d1 execute --remote --file`, one file at a time, after the read-only
+  checks and the table backup in `migrations/AGENTS.md`. Do not re-run either: after a later
+  rebuild of the same table, a re-run would put the older CHECK list back.
 - **The domain is `ratemyplace.org`.** `ratemyplace.boston` does not resolve.
 - **Remote D1 CLI needs `CLOUDFLARE_API_TOKEN`** in the environment, or you get a 7403.
 - **`bg-coral-*` is not a Tailwind class.** Use `bg-red-*`.
@@ -496,8 +518,33 @@ Things that have already cost time. Read before debugging.
   trigger. A route test that needs two reviews submits the second as another account, and an
   e2e spec that submits, or opens the building-30 form, as the seed account calls
   `resetE2eAccountReviews()` (`e2e/fixtures.ts`), or a review left by another spec refuses it.
+- **Both review forms need two boxes ticked, and neither box reaches the server.** The
+  new-review form's confirm step and the edit form render the same "Before you submit"
+  block, `src/components/reviews/ReviewAcknowledgements.tsx`: a checklist of what to leave
+  out, the "may be able to identify me" box, and the Terms box. Submit and Save stay
+  disabled until both are ticked. The copy is `REVIEW_CHECKLIST_COPY` in
+  `src/lib/reviewChecklistCopy.ts`, and the unit tests and e2e specs read it from there, so a
+  copy edit does not break them. An e2e spec that submits or saves a review ticks both with
+  `tickAcknowledgements` (`e2e/review-helpers.ts`).
+- **Rent and square footage are public only as ranges, and a test lists every file that names
+  them.** Review cards use `rentRangeLabel` and `squareFootageRangeLabel` ($250 and 250 sq ft
+  bands, open below $1,000 and 500 sq ft and from $6,000 and 2,000 sq ft); a building page's
+  per-unit rent line uses `rentRangeAcross`, which bands each rent before comparing, so a
+  group of one never shows an exact rent through a min or max. All three are in
+  `src/lib/reviewDisplay.ts`, and the band words are `RANGE_COPY` there. Landlord and
+  property manager pages get the bands through `ReviewCard`. The admin review detail and the
+  reviewer's own edit form show exact values. `rentSizeRanges.test.ts` fails on a new source
+  file that names `rent_amount` or `square_footage` until it is added to `RENT_SIZE_READERS`
+  there with why it reads them. A public reader must go through the helpers.
+- **The sign-up page shows a made-up review through the real `ReviewCard`.**
+  `src/components/auth/ExampleReview.astro` renders data and copy from
+  `src/lib/exampleReview.ts`: no address, names, unit number or account, and no link to a
+  building. The page stays `noindex` with no structured data. `EXAMPLE_REVIEW_COPY.hidden`
+  tells people what readers never see, so a change to what a review card shows must update
+  that line too.
 - **React islands import only leaf modules from `src/lib`.** `reviewPaths`,
-  `reviewSubmitOutcome` and `authRedirect` have no runtime imports, which
+  `reviewSubmitOutcome`, `authRedirect` and the copy modules `reviewChecklistCopy` and
+  `verificationNotice` have no runtime imports, which
   `clientLeafModules.test.ts` enforces. Importing a server module such as `reviewHandoff`,
   `buildingResolve`, `places` or `records/*` into an island ships its module-level code to
   every browser.
@@ -518,6 +565,14 @@ Things that have already cost time. Read before debugging.
   the file stays in R2 with nothing pointing at it. No route deletes a user, so an account
   deleted by hand needs its files removed by hand. Keys and filenames name the tenant, so no
   log line carries either.
+- **Opening a proof-of-address document is audited, and fails closed.** Every `GET
+  /api/admin/verification/[id]` writes a `verification_viewed` audit entry (admin, admin IP,
+  verification id, review id; never the filename or R2 key) before serving the file, and
+  answers 503 without the file if the entry cannot be written. The admin queue's thumbnails
+  load the file, so opening `/admin/verify` logs one view per pending image; a PDF is logged
+  when it is opened. Migration `0038` adds the action to the CHECK. It was applied to production on 2026-11-17,
+  before this code was pushed (previews use the production database); without it no document
+  can be opened.
 - **An `_`-prefixed file under `src/pages/` is not a route.** Astro excludes it from
   file-based routing, which is how `src/pages/api/admin/records/queue/_json.ts` can be a
   shared helper next to the endpoints that import it. The rule cuts the other way for

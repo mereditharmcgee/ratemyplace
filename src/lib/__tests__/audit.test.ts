@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createAuditLog, type AuditLogEntry } from '../audit';
+import { createAuditLog, tryCreateAuditLog, type AuditLogEntry } from '../audit';
 
 function mockDB(shouldError: boolean = false) {
   const runFn = shouldError
@@ -81,6 +81,41 @@ describe('createAuditLog', () => {
       error: 'DB error',
     });
 
+    consoleSpy.mockRestore();
+  });
+});
+
+// The fail-closed caller (an admin opening a proof-of-address document) needs to know
+// whether the entry landed; everyone else keeps the best-effort createAuditLog.
+describe('tryCreateAuditLog', () => {
+  const entry: AuditLogEntry = {
+    adminUserId: 'admin-123',
+    adminIp: '1.2.3.4',
+    actionType: 'verification_viewed',
+    entityType: 'verification',
+    entityId: 'ver-1',
+    newValue: { review_id: 'review-1' },
+  };
+
+  it('reports true when the entry is written', async () => {
+    const db = mockDB();
+    await expect(tryCreateAuditLog(db, entry)).resolves.toBe(true);
+    expect(db._runFn).toHaveBeenCalledOnce();
+  });
+
+  it('reports false, never throws, and logs the same structured line when it is not', async () => {
+    const db = mockDB(true);
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(tryCreateAuditLog(db, entry)).resolves.toBe(false);
+
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(consoleSpy.mock.calls[0][0] as string)).toMatchObject({
+      event: 'audit_log_write_failed',
+      actionType: 'verification_viewed',
+      entityType: 'verification',
+      entityId: 'ver-1',
+    });
     consoleSpy.mockRestore();
   });
 });

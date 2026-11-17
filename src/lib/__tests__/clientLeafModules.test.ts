@@ -24,16 +24,24 @@ const LEAF_MODULES = [
   'src/lib/privacy.ts',
   // The admin reviews table labels its moderation signals with it.
   'src/lib/reviewFlags.ts',
+  // Both review forms take their pre-submit checklist and box text from it.
+  'src/lib/reviewChecklistCopy.ts',
   'src/lib/reviewPaths.ts',
   'src/lib/reviewSubmitOutcome.ts',
   // The review edit form starts its tenure select with it.
   'src/lib/tenure.ts',
+  // The profile's review list and notification list take their proof-of-address copy and
+  // display rule from it.
+  'src/lib/verificationNotice.ts',
 ];
 
 describe('client leaf modules have no runtime imports', () => {
   it.each(LEAF_MODULES.map((file) => [file]))('%s', (file) => {
     const source = readFileSync(join(process.cwd(), file), 'utf8');
     expect(source).not.toMatch(/^\s*import\s+(?!type\b)/m);
-    expect(source).not.toMatch(/^\s*export\s+[^;]*\sfrom\s/m);
+    // Every re-export shape (`export { a } from`, `export * from`, `export * as ns from`,
+    // `export type { T } from`), matched by its shape so that copy saying "from" inside an
+    // exported string is not read as one.
+    expect(source).not.toMatch(/^\s*export\s+(?:type\s+)?(?:\*(?:\s+as\s+\w+)?|\{[^}]*\})\s*from\s/m);
   });
 });

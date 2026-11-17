@@ -179,6 +179,13 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
     }
   };
 
+  // A verification notice's "Go to My Reviews": the tab switch unmounts the button that was
+  // pressed, so focus goes to the My Reviews tab, right above the list it opened.
+  const handleOpenReviews = () => {
+    handleTabSwitch('reviews');
+    reviewsTabRef.current?.focus();
+  };
+
   const handleVerifyClick = (reviewId: string, trigger: HTMLElement) => {
     verifyTriggerRef.current = trigger;
     setVerifyingReviewId(reviewId);
@@ -467,6 +474,7 @@ export default function ProfileDashboard({ userEmail, userName, avatarUrl, membe
             notifications={notifications}
             loading={notificationsLoading}
             error={notificationsError}
+            onOpenReviews={handleOpenReviews}
           />
         </div>
       )}

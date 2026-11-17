@@ -24,7 +24,7 @@ data, use Astro instead.
 | Directory | Contents |
 |-----------|----------|
 | `layout/` | `BaseLayout.astro`, `Header`, `Footer` |
-| `reviews/` | `ReviewForm`, `ReviewEditForm`, `ReviewCard`, `form-steps/` |
+| `reviews/` | `ReviewForm`, `ReviewEditForm`, `ReviewCard`, `ReviewAcknowledgements` (the pre-submit checklist and boxes both forms share), `form-steps/` |
 | `admin/` | 9 tables and queues + `AdminLayout.astro` |
 | `profile/` | Tenant dashboard, settings, notifications, verification |
 | `records/` | Public-records panel pieces: `FactsStrip`, `LedgerRow`, `SourceState`, `RecordList`, `YearBars`, `CategoryBars`, `StatusToken`, `CorrectionNotes` (all `.astro`) + the React islands `RecordCorrectionForm.tsx` and `RecordsRequestButton.tsx` |
@@ -98,6 +98,8 @@ surface that displays a score uses these helpers. `text-teal-600` is not a score
 
 Public-facing components must never render exact tenancy dates or submission timestamps.
 Route through `formatRecency` and the season/year formatters in `src/lib/privacy.ts`.
+Rent and square footage go through the range helpers in `src/lib/reviewDisplay.ts`
+(`rentRangeLabel`, `squareFootageRangeLabel`, `rentRangeAcross`), never the stored number.
 This is a tenant-safety control, not a formatting preference.
 
 ## Escaping

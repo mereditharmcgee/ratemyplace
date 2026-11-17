@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import ReviewEditForm from '../../components/reviews/ReviewEditForm';
 import { supplementaryItems } from '../surveyItems';
+import { REVIEW_CHECKLIST_COPY } from '../reviewChecklistCopy';
 import type { ReviewDetail } from '../../pages/api/reviews/[id]';
 
 // The reviewer's edit page (A11Y-04, A11Y-05, A11Y-08): every control has a name, the rating
@@ -64,6 +65,7 @@ async function flush() {
 
 function tickConsentAndSave() {
   fireEvent.click(screen.getByRole('checkbox', { name: /I confirm this review/ }));
+  fireEvent.click(screen.getByRole('checkbox', { name: REVIEW_CHECKLIST_COPY.identifyAcknowledgement }));
   fireEvent.submit(document.querySelector('form') as HTMLFormElement);
 }
 
@@ -188,8 +190,10 @@ describe('ReviewEditForm rating keys', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     render(<ReviewEditForm review={review()} />);
-    // Consent enables Save, which is when Enter on a radio would submit the form.
+    // Both boxes enable Save, which is when Enter on a radio would submit the form.
     await user.click(screen.getByRole('checkbox', { name: /I confirm this review/ }));
+    await user.click(screen.getByRole('checkbox', { name: REVIEW_CHECKLIST_COPY.identifyAcknowledgement }));
+    expect((screen.getByRole('button', { name: 'Save Changes' }) as HTMLButtonElement).disabled).toBe(false);
 
     const group = screen.getAllByRole('radiogroup')[0];
     const two = within(group).getByRole('radio', { name: '2' }) as HTMLInputElement;

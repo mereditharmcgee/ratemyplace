@@ -1,0 +1,28 @@
+---
+// The example review on /auth/signup: the real review card with made-up data, so a person
+// sees what readers will see before making an account. The copy and the data live in
+// src/lib/exampleReview.ts; this only renders them. No link to a building, and no structured
+// data (the sign-up page is noindex), so the example is never read as a real review.
+import ReviewCard from '../reviews/ReviewCard.astro';
+import { EXAMPLE_REVIEW_COPY, exampleReview } from '../../lib/exampleReview';
+import { getCurrentYear } from '../../lib/privacy';
+
+interface Props {
+  class?: string;
+}
+
+const { class: className } = Astro.props;
+const review = exampleReview(getCurrentYear());
+---
+
+<section class:list={['w-full', className]} aria-labelledby="example-review-heading" data-example-review>
+  <h2 id="example-review-heading" class="text-lg font-semibold text-gray-900">{EXAMPLE_REVIEW_COPY.heading}</h2>
+  <p class="mt-2 text-sm text-gray-700">{EXAMPLE_REVIEW_COPY.shown}</p>
+  <p class="mt-1 text-sm text-gray-700">{EXAMPLE_REVIEW_COPY.hidden}</p>
+  <p class="mt-4 mb-2">
+    <span class="inline-block rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-800" data-example-label>
+      {EXAMPLE_REVIEW_COPY.label}
+    </span>
+  </p>
+  <ReviewCard review={review} />
+</section>

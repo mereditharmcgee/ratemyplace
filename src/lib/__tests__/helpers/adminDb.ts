@@ -7,7 +7,7 @@ import type { TestD1Database } from './sqliteD1';
  * stub leaves out: building admin/owner fields (0009), landlord contact and note columns
  * (0001, 0009), and the review fields the admin reviews list reads (0001, 0004, 0017, 0019).
  * Built on `createRecordsTestDb()` so the FK cascades (record_pulls, records_queue) and the
- * full 0030 audit CHECK list are the real ones.
+ * full audit CHECK list (0038, the latest rebuild) are the real ones.
  *
  * `landlords.created_at` defaults to 0 here: SQLite's ALTER TABLE cannot add a column whose
  * default is an expression such as `unixepoch()`.

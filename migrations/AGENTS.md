@@ -1,6 +1,6 @@
 # `migrations/` — D1 Schema Changes
 
-Cloudflare D1 (SQLite). 36 migrations, `0001` through `0036`.
+Cloudflare D1 (SQLite). 38 migrations, `0001` through `0038`.
 
 ---
 
@@ -191,6 +191,122 @@ a pending row's key is a leftover. It was rejected before August 26, 2026, when 
 began deleting the file. Or its review was deleted before review deletes removed files, its
 delete failed at the decision, or its upload never got a row. Remove those by hand.
 
+**`0037` (notification events for proof-of-address decisions) was APPLIED TO PRODUCTION
+2026-11-17, by hand, before this branch was pushed.** Previews share the production D1
+binding, so a preview runs this code against production. It ran as 6 statements and copied
+44 rows. Afterwards the table held 44 rows, ids 1 to 44, with both indexes and no
+`notifications_v2` left; its CHECK lists `verification_approved` and
+`verification_rejected`, and the next id was 45. Every row matched a backup taken just
+before, and the production smoke test passed. It rebuilds
+`notifications` to widen its `event_type` CHECK with `verification_approved` and
+`verification_rejected`, the 0030 pattern: create `notifications_v2`, copy every row with
+its id, drop, rename, recreate `idx_notifications_user` and `idx_notifications_unread`.
+Every column, default and foreign key is 0021's, and `notificationsMigration0037.test.ts`
+compares the table's shape before and after. There is no PRAGMA: nothing references
+`notifications`, so the drop cascades nothing, and D1 ignores `PRAGMA foreign_keys = OFF`
+in its transaction anyway. The next id is one above the highest kept id, so an id freed by
+a deleted notification can be issued again; nothing refers to notification ids.
+
+Order matters one way only. Code deployed before the file runs, on a preview or on
+production, still makes every decision and still sends the rejection email, but each in-app
+notice fails the old CHECK and is lost, leaving a `notification_write_failed` log line with
+its `eventType`. Applying the file first is safe: the old code writes only the four review
+events, which the new CHECK keeps.
+
+A re-run is harmless only while this is the newest rebuild of the table. Once a later
+migration rebuilds it, re-running this file would put this CHECK list back, so after
+applying it, do not re-run it. If a run stops after the `INSERT` and before the `DROP`, the
+original table is untouched and a re-run fails at the `INSERT` on a duplicate id. Drop the
+copy table (`DROP TABLE notifications_v2`) and run the file again. If a run stops after the
+`DROP` and before the `RENAME`, a re-run stops at the `INSERT` and changes nothing; finish by
+hand with the file's `ALTER TABLE ... RENAME` and its two `CREATE INDEX` statements. Never
+`migrations apply --remote`.
+
+The runbook below is the one used on 2026-11-17, kept as the record. Its read-only checks
+still work: the table's SQL now mentions `verification_approved`, and the row count and id
+range can be compared with the figures above. The orphan count was 0 before the apply. It
+had to be, because the copy keeps both foreign keys and an orphan row would have failed it:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notifications'"
+npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT COUNT(*) AS n, MIN(id) AS min_id, MAX(id) AS max_id FROM notifications"
+npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT COUNT(*) AS orphans FROM notifications n WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = n.user_id) OR (n.review_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.id = n.review_id))"
+```
+
+The table was backed up outside the repo first (its messages name buildings and its rows name
+accounts; the backup is deleted once the branch that uses it has merged), then applied:
+
+```bash
+npx wrangler d1 export ratemyplace-db --remote --table notifications --output ../notifications-before-0037.sql
+npx wrangler d1 execute ratemyplace-db --remote --file migrations/0037_notifications_verification_events.sql
+```
+
+Then check: the same count and id range as before, both indexes, and no copy table left:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT COUNT(*) AS n, MIN(id) AS min_id, MAX(id) AS max_id FROM notifications"
+npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT name FROM sqlite_master WHERE name IN ('idx_notifications_user', 'idx_notifications_unread', 'notifications_v2')"
+```
+
+The second should list the two indexes and not `notifications_v2`.
+
+**`0038` (audit entry for viewing a proof-of-address document) was APPLIED TO PRODUCTION
+2026-11-17, by hand, before this branch was pushed.** Previews share the production D1
+binding, so a preview runs this code against production. It ran as 8 statements and copied
+70 rows. Afterwards the table held 70 rows, ids 1 to 70, with all four `idx_audit_*`
+indexes and no `audit_logs_v5` left, and its CHECK lists `verification_viewed`. Every row
+matched a backup taken just before, and the production smoke test passed. It
+rebuilds `audit_logs` exactly as `0030` did (`audit_logs_v5`, copy every row with its id,
+drop, rename, the four `idx_audit_*` indexes) with one more allowed action,
+`verification_viewed`. Every other allowed action and every allowed entity type is
+unchanged; `verification` was already an entity type. `auditMigration0038.test.ts` compares
+the rows, columns, defaults, indexes and both CHECK lists before and after. No PRAGMA:
+`audit_logs` has no foreign keys and nothing references it.
+
+Order matters more here than for `0037`. `GET /api/admin/verification/[id]` writes the
+entry before it serves a document and **fails closed**: if the write fails, the admin gets a
+503 and no document. Code deployed before this file runs, on a preview or on production,
+therefore cannot open any proof-of-address document (the queue shows "This document could
+not be shown" and every attempt logs `audit_log_write_failed` with `actionType`
+`verification_viewed`) until the file is applied. Applying it first is safe: the old code
+writes only actions the new CHECK keeps.
+
+A re-run is harmless only while this is the newest rebuild of the table. Once a later
+migration rebuilds it, re-running this file would put this CHECK list back, so after
+applying it, do not re-run it. If a run stops after the `INSERT` and before the `DROP`, the
+original table is untouched and a re-run fails at the `INSERT` on a duplicate id. Drop the
+copy table (`DROP TABLE audit_logs_v5`) and run the file again. A run that stops after the
+`DROP` and before the `RENAME` is finished by hand with the file's `RENAME` and its four
+`CREATE INDEX` statements. Never `migrations apply --remote`.
+
+The runbook below is the one used on 2026-11-17, kept as the record. Its read-only checks
+still work: the first command now returns 1, because the table's SQL mentions
+`verification_viewed`, and the row count and id range can be compared with the figures above:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT instr(sql, 'verification_viewed') > 0 AS already FROM sqlite_master WHERE type = 'table' AND name = 'audit_logs'"
+npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT COUNT(*) AS n, MIN(id) AS min_id, MAX(id) AS max_id FROM audit_logs"
+```
+
+The table was backed up outside the repo first (it holds admin IPs; the backup is deleted once
+the branch that uses it has merged), then applied:
+
+```bash
+npx wrangler d1 export ratemyplace-db --remote --table audit_logs --output ../audit_logs-before-0038.sql
+npx wrangler d1 execute ratemyplace-db --remote --file migrations/0038_audit_verification_viewed.sql
+```
+
+Then check the same count and id range, all four indexes, and no copy table:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT COUNT(*) AS n, MIN(id) AS min_id, MAX(id) AS max_id FROM audit_logs"
+npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT name FROM sqlite_master WHERE name LIKE 'idx_audit_%' OR name = 'audit_logs_v5' ORDER BY name"
+```
+
+The second should list `idx_audit_action`, `idx_audit_admin`, `idx_audit_created` and
+`idx_audit_entity`, and not `audit_logs_v5`. `0037` and `0038` are independent and can be
+applied in either order.
+
 **`app_settings` keys in use.** The table is a key/value store for operator switches; the
 records pipeline owns four, defined once in `SETTING_KEYS` in `src/lib/records/settings.ts`:
 
@@ -240,7 +356,8 @@ highest number.
 
 Two filenames are misleading: `0021_reserved.sql` actually creates the `notifications`
 table despite its name, and `0022_reserved.sql` is a genuine no-op (`SELECT 1;`). Do not
-assume either is empty — read before touching.
+assume either is empty: read before touching. `0037` rebuilds `notifications`, so its
+current CHECK list is in `0037`, not `0021`.
 
 ### Rules
 
@@ -276,8 +393,8 @@ Dropping a column that deployed code still reads takes the site down.
 | `reviews` | 27 rating columns + tenancy, unit type, rent, free text, status |
 | `verification_images`, `verification_tokens` | Proof-of-address pipeline, email tokens |
 | `disputes` | Landlord dispute submissions and resolutions |
-| `audit_logs` | Destructive admin actions, old value → new value |
-| `notifications` | In-app tenant notifications |
+| `audit_logs` | Destructive admin actions, old value → new value, and every admin view of a proof-of-address document (`verification_viewed`, 0038) |
+| `notifications` | In-app tenant notifications. `event_type` is CHECKed: the four review and dispute events, plus `verification_approved` and `verification_rejected` (0037) |
 | `saved_buildings` | Bookmarks |
 | `record_pulls`, `building_records` | Public building records from city open data. `record_pulls` is insert-only provenance, one row per source run; `building_records` holds the typed JSON payloads, unique on `(building_id, kind, source_key)` |
 | `record_corrections` | Public "report a record error" claims and their resolutions. Stores the claim and an optional email, nothing else about the filer |
