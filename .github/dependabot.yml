@@ -4,6 +4,32 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    # Major versions of these 9 packages wait for the Astro to Workers move
+    # (docs/superpowers/plans/2026-10-26-astro-workers-move.md). Astro 6 and later need
+    # @astrojs/cloudflare 13 or later, which drops Cloudflare Pages. React 19 waits for
+    # @astrojs/react past 3.6.3 (plan follow-up F1). TypeScript 7 is outside
+    # @astrojs/check's peer range. workers-types 5 breaks the wrangler that adapter 12 pins.
+    # PR #78 has the details. Patch and minor updates still come through.
+    # Remove these rules as part of the move.
+    ignore:
+      - dependency-name: astro
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@astrojs/cloudflare"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@astrojs/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react-dom
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@cloudflare/workers-types"
+        update-types: ["version-update:semver-major"]
     groups:
       version-updates:
         applies-to: version-updates
