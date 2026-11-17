@@ -22,6 +22,16 @@ export const EVENT_MESSAGES: Record<NotificationEventType, (address: string) => 
     `The dispute on your review of ${address} has been resolved.`,
 };
 
+/**
+ * Whether a review's author gets email about its status: the profile setting "Email me when
+ * my review status changes", stored as `users.notification_opt_in`. Only an explicit 0 opts
+ * out; 1 is the column default and NULL reads as opted in. In-app notifications are written
+ * either way.
+ */
+export function wantsReviewStatusEmail(optIn: number | null | undefined): boolean {
+  return optIn !== 0;
+}
+
 export interface CreateNotificationParams {
   userId: string;
   eventType: NotificationEventType;

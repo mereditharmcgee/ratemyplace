@@ -3,7 +3,7 @@ import { getDB } from '../../../../lib/db';
 import { getEnv } from '../../../../lib/runtime';
 import { createAuditLog } from '../../../../lib/audit';
 import { getClientIP } from '../../../../lib/rateLimit';
-import { createNotification } from '../../../../lib/notifications';
+import { createNotification, wantsReviewStatusEmail } from '../../../../lib/notifications';
 import { sendReviewRejectedEmail } from '../../../../lib/email';
 import { trackSend } from '../../../../lib/trackSend';
 import { logError } from '../../../../lib/logger';
@@ -106,11 +106,13 @@ export async function PATCH(context: APIContext): Promise<Response> {
       // Rejected: in-app notification + email — a tenant who put real time into
       // a review and gets it rejected may not log back in to find out, so the
       // email is the load-bearing channel for telling them what happened and
-      // pointing them at edit-and-resubmit (audit CG2).
+      // pointing them at edit-and-resubmit (audit CG2). The email honours the
+      // author's "Email me when my review status changes" setting; the in-app
+      // notification does not depend on it.
       if (status === 'approved' || status === 'rejected') {
         const reviewWithBuilding = await db.prepare(
-          'SELECT r.user_id, b.address, u.email FROM reviews r JOIN buildings b ON r.building_id = b.id JOIN users u ON r.user_id = u.id WHERE r.id = ?'
-        ).bind(reviewId).first<{ user_id: string; address: string; email: string }>();
+          'SELECT r.user_id, b.address, u.email, u.notification_opt_in FROM reviews r JOIN buildings b ON r.building_id = b.id JOIN users u ON r.user_id = u.id WHERE r.id = ?'
+        ).bind(reviewId).first<{ user_id: string; address: string; email: string; notification_opt_in: number | null }>();
 
         if (reviewWithBuilding) {
           await createNotification(db, {
@@ -120,7 +122,7 @@ export async function PATCH(context: APIContext): Promise<Response> {
             buildingAddress: reviewWithBuilding.address,
           });
 
-          if (status === 'rejected') {
+          if (status === 'rejected' && wantsReviewStatusEmail(reviewWithBuilding.notification_opt_in)) {
             const env = getEnv(context);
             const siteUrl = env.SITE_URL || 'https://ratemyplace.org';
             // trackSend runs it in the background so the moderator's PATCH returns

@@ -396,7 +396,7 @@ A review can be disputed only once (`review_id` is unique in `disputes`), so it 
 
 ### User notifications
 
-**Built today:** Review approval or rejection attempts to create an in-app notification. When email delivery is configured, rejection also queues an email with any supplied moderator reason and a link to the edit-and-resubmit flow. The reviewer also gets an in-app notification when a landlord disputes their review (`review_disputed`) and when that dispute is resolved (`dispute_resolved`). The profile setting "Email me when my review status changes" is stored in `users.notification_opt_in`, but no send path reads it yet.
+**Built today:** Review approval or rejection attempts to create an in-app notification. When email delivery is configured, rejection also queues an email with any supplied moderator reason and a link to the edit-and-resubmit flow. The reviewer also gets an in-app notification when a landlord disputes their review (`review_disputed`) and when that dispute is resolved (`dispute_resolved`). The profile setting "Email me when my review status changes" is stored in `users.notification_opt_in`. The rejection email is the only email a reviewer gets about a review's status, and it is skipped when they have turned the setting off (`wantsReviewStatusEmail` in `src/lib/notifications.ts`). The in-app notification is written either way.
 
 **Planned:** When a moderator edits or redacts content, the user will receive an email explaining what changed, why, and how to appeal or resubmit.
 
@@ -451,7 +451,7 @@ Scores are computed when a page is read, from approved reviews (`src/lib/scoring
 - `reviews.unit_number` is a private moderation field and is kept (see section 5).
 - Through the review and edit forms, tenancy is stored coarsely: `tenure_months` holds one of six bucket values and `move_out_year_new` holds `current`, a year or `2020_or_earlier`. Neither route checks these values against those lists, and the columns have no CHECK constraint, so a hand-made request can store other values. Move-in keeps only the season and year. A part the reviewer skipped holds a placeholder (winter, the current year) in the NOT NULL `move_in_year` and `move_in_season` columns, and `move_in_given` (0035) tells public pages which parts to show; it is NULL on reviews written before it existed. `move_out_season` is set only on reviews written before January 2026.
 - A verification document is deleted from R2 after the decision, but its `verification_images` row stays, with the user's original filename.
-- `users.notification_opt_in` is stored, but no send path honors it.
+- `users.notification_opt_in` (default 1) turns off the review rejection email when it is 0. In-app notifications do not read it.
 
 **Other things to know:**
 - Four of the 27 item columns accept N/A, stored as NULL and left out of every aggregate: `building_laundry`, `building_parking`, `landlord_deposit` and `landlord_rent_practices`. Every item column allows NULL.
