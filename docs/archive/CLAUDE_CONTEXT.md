@@ -6,9 +6,9 @@
 > maintained since. It still describes dropped columns, a score cache that no longer
 > exists, and a worktree workflow that is no longer used.
 >
-> **Read [`AGENTS.md`](AGENTS.md) instead** — it is the canonical agent instruction file,
+> **Read [`AGENTS.md`](../../AGENTS.md) instead** — it is the canonical agent instruction file,
 > with nested guides in `src/lib/`, `src/pages/api/`, `src/components/`, and `migrations/`.
-> For product context read [`MASTER.md`](MASTER.md); for architecture, [`ARCHITECTURE.md`](ARCHITECTURE.md).
+> For product context read [`MASTER.md`](../../MASTER.md); for architecture, [`ARCHITECTURE.md`](../../ARCHITECTURE.md).
 >
 > Kept for historical reference only. Verify anything here against the source before
 > relying on it.

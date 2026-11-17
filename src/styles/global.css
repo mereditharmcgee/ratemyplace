@@ -5,7 +5,6 @@
    quote old class names, so scanning them kept dead rules for retired classes in the live CSS.
    Paths are relative to this file. */
 @source not "../lib/__tests__";
-@source not "../../CLAUDE_CONTEXT.md";
 @source not "../../brand.md";
 @source not "../../.planning";
 @source not "../../docs";

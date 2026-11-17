@@ -141,7 +141,10 @@ rate rule; any such edge configuration needs separate approval.
 **Documented exception to "parameterized queries always":** Boston's CKAN SQL endpoint
 (`datastore_search_sql`) has no parameter binding, so `src/lib/records/` is the one place
 in this repo that builds SQL by interpolation. It is scoped to that directory and to
-queries sent to `data.boston.gov`, never to D1. The invariant that keeps it safe: every
+queries sent to `data.boston.gov`, never to D1 at request time. The one D1 use is offline:
+the seed and backfills in `src/lib/records/seed/` quote values with the same `sqlLiteral`
+(through `lit()`) to write SQL files that a person reviews and applies by hand. The
+invariant that keeps it safe: every
 interpolated value passes through `sqlLiteral` or `addressLikeClauses` or a digits-only
 guard, and every identifier (resource id, column name) is a code constant, never user
 input. After touching an adapter, run `npm run records:check` against the records fixture.
@@ -331,7 +334,7 @@ Things that have already cost time. Read before debugging.
 - **Tailwind reads more than `src/`, so a backslash path in Markdown can break the build.**
   Tailwind v4 scans every file git does not ignore for class names, except the paths
   `src/styles/global.css` excludes with `@source not`: `src/lib/__tests__/`, `docs/`,
-  `.planning/`, `brand.md`, `CLAUDE_CONTEXT.md` and the OG image source. Root Markdown (this
+  `.planning/`, `dashboard/`, `brand.md` and the OG image source. Root Markdown (this
   file included), `ops/`, `e2e/`, `scripts/` and the nested guides are still scanned. A
   Windows path with a `--name` segment followed by a backslash and hex digits, such as a
   Claude scratchpad path ending in its session id, reads as a candidate carrying an
@@ -528,8 +531,10 @@ when adding an endpoint.
 | [`SECURITY.md`](SECURITY.md) | Security policy |
 | `.planning/` | Milestone system — `STATE.md`, `ROADMAP.md`, `PROJECT.md`, per-milestone requirements and audits |
 | `.planning/audits/csrf-2026-04.md` | The CSRF posture audit. Read before adding any endpoint |
+| [`docs/archive/`](docs/archive/README.md) | Retired docs kept for history. Not current |
 
-**Staleness warning:** `CLAUDE_CONTEXT.md` and `VERSION.md` are stale (v1.1.0-alpha era,
-January 2026) and `.planning/STATE.md` is accurate only through April 2026. Trust the code
-and this file over those. When a doc and the source disagree, **the source wins** — verify
-before relying on any line-level specific in a doc.
+**Staleness warning:** everything in `docs/archive/` is stale, including
+`docs/archive/CLAUDE_CONTEXT.md` and `docs/archive/VERSION.md` (v1.1.0-alpha era, January
+2026) and three old handoff notes. `.planning/STATE.md` is accurate only through April 2026.
+Trust the code and this file over those. When a doc and the source disagree, **the source
+wins** — verify before relying on any line-level specific in a doc.
