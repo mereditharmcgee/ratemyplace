@@ -107,7 +107,7 @@ describe('admin verification decisions', () => {
             structuredLogs.push(parsed as Record<string, unknown>);
           }
         } catch {
-          // deleteVerificationImage also emits its legacy non-JSON error.
+          // Not a structured line; checked as raw text below.
         }
       }
       const deleteFailureLogs = structuredLogs.filter(
@@ -119,9 +119,14 @@ describe('admin verification decisions', () => {
       expect(deleteFailureLogs[0]).toMatchObject({
         level: 'error',
         event: 'verification_document_delete_failed',
-        r2_key: 'users/user-1/verifications/review-1/proof.pdf',
+        verificationId: 'verification-1',
         decision,
       });
+      // The key names the user and the review, so no log line carries it.
+      const logged = consoleSpy.mock.calls.map((call) => call.map(String).join(' ')).join(' ');
+      expect(logged).not.toContain('users/user-1');
+      expect(logged).not.toContain('proof.pdf');
+      expect(deleteFailureLogs[0]).not.toHaveProperty('r2_key');
     },
   );
 });

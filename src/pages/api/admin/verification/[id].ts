@@ -167,7 +167,7 @@ export async function POST(context: APIContext): Promise<Response> {
         if (!deleted) {
           logError('verification_document_delete_failed', {
             endpoint: '/api/admin/verification/[id]',
-            r2_key: verification.r2_key,
+            verificationId: id,
             decision: 'approve',
           });
         }
@@ -206,7 +206,7 @@ export async function POST(context: APIContext): Promise<Response> {
         if (!deleted) {
           logError('verification_document_delete_failed', {
             endpoint: '/api/admin/verification/[id]',
-            r2_key: verification.r2_key,
+            verificationId: id,
             decision: 'reject',
           });
         }

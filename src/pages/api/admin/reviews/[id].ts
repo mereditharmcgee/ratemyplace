@@ -10,6 +10,7 @@ import { logError } from '../../../../lib/logger';
 import { errorMessage } from '../../../../lib/records/errors';
 import { recordsRequestState } from '../../../../lib/records/coverage';
 import { enqueue } from '../../../../lib/records/queue';
+import { removeVerificationFiles, verificationKeysForReview } from '../../../../lib/verificationFiles';
 
 export async function PATCH(context: APIContext): Promise<Response> {
   // Require authentication
@@ -285,6 +286,15 @@ export async function DELETE(context: APIContext): Promise<Response> {
       });
     }
 
+    // Remove any proof-of-address file first: the delete below cascades to its
+    // verification_images row, and nothing would point at the file after that. A failed
+    // file delete is logged and counted, and the review is still deleted.
+    const verificationFiles = await removeVerificationFiles(
+      getEnv(context).VERIFICATION_BUCKET,
+      await verificationKeysForReview(db, reviewId),
+      '/api/admin/reviews/[id]',
+    );
+
     // Audit log the deletion with forensic data
     await createAuditLog(db, {
       adminUserId: context.locals.user.id,
@@ -293,7 +303,7 @@ export async function DELETE(context: APIContext): Promise<Response> {
       entityType: 'review',
       entityId: reviewId,
       oldValue: { status: review.status, userId: review.user_id, buildingId: review.building_id, title: review.review_title, score: review.overall_score },
-      newValue: { deleted: true }
+      newValue: { deleted: true, verificationFiles }
     });
 
     // Delete the review (cascades to verification_images, review_votes)

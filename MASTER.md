@@ -316,6 +316,8 @@ Must show address matching the reviewed building:
 
 Only the uploaded file is deleted. The `verification_images` row stays, with the original filename, content type, size, status, the deciding moderator and any rejection reason. It is removed only when its review or user is deleted.
 
+A file still waiting for a decision does not outlive its review. When an admin deletes a review, or the building it belongs to, the route deletes the review's files from R2 first (`src/lib/verificationFiles.ts`). If R2 refuses one, the failure is logged without the file's key or name, the review or building is still deleted, and the audit entry records how many files were removed and how many failed. Orphan cleanup deletes only buildings with no reviews, so it never has files to remove.
+
 ### Security
 
 - Documents stored in encrypted temporary bucket
