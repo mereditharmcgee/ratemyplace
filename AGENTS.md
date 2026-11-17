@@ -141,7 +141,10 @@ rate rule; any such edge configuration needs separate approval.
 **Documented exception to "parameterized queries always":** Boston's CKAN SQL endpoint
 (`datastore_search_sql`) has no parameter binding, so `src/lib/records/` is the one place
 in this repo that builds SQL by interpolation. It is scoped to that directory and to
-queries sent to `data.boston.gov`, never to D1. The invariant that keeps it safe: every
+queries sent to `data.boston.gov`, never to D1 at request time. The one D1 use is offline:
+the seed and backfills in `src/lib/records/seed/` quote values with the same `sqlLiteral`
+(through `lit()`) to write SQL files that a person reviews and applies by hand. The
+invariant that keeps it safe: every
 interpolated value passes through `sqlLiteral` or `addressLikeClauses` or a digits-only
 guard, and every identifier (resource id, column name) is a code constant, never user
 input. After touching an adapter, run `npm run records:check` against the records fixture.
