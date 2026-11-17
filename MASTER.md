@@ -1,6 +1,6 @@
 # RateMyPlace Boston — Master Project Document
 
-*Version 1.3 | November 2026*
+*Version 1.4 | November 2026*
 
 ---
 
@@ -247,11 +247,7 @@ We collect precise data for analysis and moderation but display fuzzy data to pr
 
 **Built today, before account creation:** The sign-up page shows links to the Terms of Service and Privacy Policy. Visitors who arrive from "Write a review" also see the building they are reviewing and one line: "Your name and email do not appear on your review and are not given to the landlord." Every visitor also sees "How your review will look": the real review card with made-up data (no address, no names), labelled as an example, with two lines on what readers see and never see. The copy and data are in `src/lib/exampleReview.ts`.
 
-**Built today, before review submission:** The confirm step shows a "Before you submit" paragraph: "Your landlord may be able to identify you based on details in your review. Avoid mentioning specific dates, unit numbers, or personal details." Submit stays disabled until the reviewer ticks a checkbox that reads "I confirm this review reflects my honest personal experience and agree to the Terms of Service and Review Guidelines." The comments placeholder also asks reviewers to avoid identifying information.
-
-**Planned (from the original spec, not built):**
-- Before account creation: a list of what we collect and don't collect (the example of how a review will appear is built, above)
-- Before review submission: a checklist of things to avoid (names, unit numbers, specific dates) and a checkbox reading "I understand my landlord may be able to identify me based on details in my review"
+**Built today, before review submission:** The confirm step, and the edit form before Save, show a "Before you submit" box: "Your landlord may be able to identify you based on details in your review. Leave these out of your title and comments:", then a checklist of four things to leave out (names of people, unit or apartment numbers, exact dates, and other details that point to the reviewer). Two checkboxes follow: "I understand my landlord may be able to identify me based on details in my review." and "I confirm this review reflects my honest personal experience and agree to the Terms of Service and Review Guidelines." Submit, and Save on the edit form, stay disabled until both are ticked. Neither box is sent to the server or checked there. The copy is in `src/lib/reviewChecklistCopy.ts`, and both forms render it through `src/components/reviews/ReviewAcknowledgements.tsx`. The comments placeholder also asks reviewers to avoid identifying information.
 
 ### Technical protections
 
@@ -314,7 +310,7 @@ This is the upload form's list (`src/components/profile/VerificationModal.tsx`),
 2. Moderator reviews: Does address match building?
 3. Decision: Approved or Rejected (with reason)
 4. Document **immediately deleted** regardless of decision
-5. User notified of outcome (**Planned**). Today no notification or email is sent. An approval shows only as the Verified badge. A rejection, and its optional reason, is stored but never shown to the user. The profile shows the same "Verify your tenancy" prompt on every unverified review, whether no document was sent, one is waiting for a decision or one was rejected.
+5. User notified of outcome. Both decisions write an in-app notification for the review's author. A rejection also emails the author, with the moderator's reason when one was given, unless they turned off "Email me when my review status changes". An approval sends no email and adds the Verified badge. On the profile's My Reviews, an unverified review shows where its latest document stands: the "Verify your tenancy" prompt when none was sent, a waiting line while one is pending (a second upload is refused until then), or the rejection, its reason and a "Send a different document" button. The in-app notices need migration `0037` on production; before it runs, the decision and the email still go through but the notice is lost (see `migrations/AGENTS.md`).
 
 Only the uploaded file is deleted. The `verification_images` row stays, with the content type, size, status, the deciding moderator and any rejection reason. The decision blanks the original filename (to an empty string, as the column is NOT NULL), since a tenant's filename often names their address or unit. The row is removed only when its review or user is deleted. Rows decided before this change keep their filename until migration `0036` is applied by hand (see `migrations/AGENTS.md`).
 
@@ -326,7 +322,7 @@ A file still waiting for a decision does not outlive its review. When an admin d
 - Only designated moderators can view
 - The admin view is sent with `Cache-Control: private, no-store`, so browsers and proxies are told not to keep a copy
 - Automatic deletion after decision, or when the review or its building is deleted
-- Audit log of each decision (`verification_approved`, `verification_rejected`), with the admin's id and IP. Logging who viewed a document is **Planned**; viewing is not logged today.
+- Audit log of each decision (`verification_approved`, `verification_rejected`) and each view (`verification_viewed`), with the admin's id and IP. A view entry names the verification and its review, never the filename or storage key. It is written before the file is served, and when it cannot be written the document is not shown. The admin queue's thumbnails load the file, so opening the queue logs one view per pending image. View logging needs migration `0038` on production before this code deploys, or no document can be opened (see `migrations/AGENTS.md`).
 
 ---
 
@@ -401,7 +397,7 @@ A review can be disputed only once (`review_id` is unique in `disputes`), so it 
 
 ### User notifications
 
-**Built today:** Review approval or rejection attempts to create an in-app notification. When email delivery is configured, rejection also queues an email with any supplied moderator reason and a link to the edit-and-resubmit flow. The reviewer also gets an in-app notification when a landlord disputes their review (`review_disputed`) and when that dispute is resolved (`dispute_resolved`). The profile setting "Email me when my review status changes" is stored in `users.notification_opt_in`. The rejection email is the only email a reviewer gets about a review's status, and it is skipped when they have turned the setting off (`wantsReviewStatusEmail` in `src/lib/notifications.ts`). The in-app notification is written either way.
+**Built today:** Review approval or rejection attempts to create an in-app notification. When email delivery is configured, rejection also queues an email with any supplied moderator reason and a link to the edit-and-resubmit flow. The reviewer also gets an in-app notification when a landlord disputes their review (`review_disputed`), when that dispute is resolved (`dispute_resolved`), and when a proof-of-address document is approved or rejected (section 6). The profile setting "Email me when my review status changes" is stored in `users.notification_opt_in`. The rejection email and the tenancy-document-not-accepted email (section 6) are the only emails a reviewer gets about a review's status, and both are skipped when they have turned the setting off (`wantsReviewStatusEmail` in `src/lib/notifications.ts`). The in-app notification is written either way.
 
 **Planned:** When a moderator edits or redacts content, the user will receive an email explaining what changed, why, and how to appeal or resubmit.
 
@@ -457,11 +453,11 @@ Scores are computed when a page is read, from approved reviews (`src/lib/scoring
 - Through the review and edit forms, tenancy is stored coarsely: `tenure_months` holds one of six bucket values and `move_out_year_new` holds `current`, a year or `2020_or_earlier`. Neither route checks these values against those lists, and the columns have no CHECK constraint, so a hand-made request can store other values. Move-in keeps only the season and year. A part the reviewer skipped holds a placeholder (winter, the current year) in the NOT NULL `move_in_year` and `move_in_season` columns, and `move_in_given` (0035) tells public pages which parts to show; it is NULL on reviews written before it existed. `move_out_season` is set only on reviews written before January 2026.
 - A verification document is deleted from R2 at the decision, or earlier if its review or building is deleted. After a decision its `verification_images` row stays, with the filename blanked.
 - A building's sitemap `lastmod` is the later of `buildings.updated_at` and its newest records pull. Landlord entries carry none, and no sitemap date is read from a review. The date can still land near a review: a building a reviewer adds is created just before the review, linking a landlord during moderation bumps `updated_at`, and approving a review of a building with no deeper records queues a pull that runs about a minute later.
-- `users.notification_opt_in` (default 1) turns off the review rejection email when it is 0. In-app notifications do not read it.
+- `users.notification_opt_in` (default 1) turns off the review rejection email and the tenancy-document-not-accepted email when it is 0. In-app notifications do not read it.
 
 **Other things to know:**
 - Four of the 27 item columns accept N/A, stored as NULL and left out of every aggregate: `building_laundry`, `building_parking`, `landlord_deposit` and `landlord_rent_practices`. Every item column allows NULL.
-- `audit_logs.action_type` and `entity_type` each carry a CHECK list. A new action type needs a table-rebuild migration in the same change. Otherwise the audit insert fails the CHECK, the admin action still succeeds, the audit row is lost, and the only trace is an `audit_log_write_failed` log line. The table is insert-only by convention; no trigger enforces it.
+- `audit_logs.action_type` and `entity_type` each carry a CHECK list. A new action type needs a table-rebuild migration in the same change. Otherwise the audit insert fails the CHECK, the admin action still succeeds, the audit row is lost, and the only trace is an `audit_log_write_failed` log line. The one exception is opening a proof-of-address document, which fails closed: with no audit row, the document is not served (section 6). The table is insert-only by convention; no trigger enforces it.
 - Despite its name, `0021_reserved.sql` creates the `notifications` table and adds `users.notification_opt_in`. `0005`, `0017` and `0022` are `SELECT 1;` placeholders.
 - **Dormant columns and tables.** These exist, but nothing in `src/` or `workers/` reads or writes them, so do not assume the features exist: `reviews.has_onsite_manager`; `reviews.moderated_at` and `moderated_by` (the approval time is only in `audit_logs`); `reviews.rejection_reason` (the moderator's reason is stored in `moderation_notes`); `reviews.laundry_wash_cost` and `laundry_dry_cost`; `buildings.public_info`; `landlords.owner_entity`; `total_units` and `verified` on both `landlords` and `property_managers`; `property_managers.admin_notes`; and the `review_votes` table (there is no helpful-vote feature).
 
@@ -624,6 +620,7 @@ The phase lists below are the original plan, ticked as items shipped. Milestone 
 
 ## Changelog
 
+- **v1.4 (November 17, 2026)**: Owner decisions of November 17, and the tenant protections built on them. §5: rent and square footage are shown publicly only as ranges ($250 and 250 sq ft bands, open below $1,000 and 500 sq ft and from $6,000 and 2,000 sq ft); the exact values stay stored for admins and the reviewer's own edit form. The owner removed the planned list of what we collect and don't collect, shown before account creation, from the spec. The example review on the sign-up page, the pre-submit checklist and the "I understand my landlord may be able to identify me" checkbox are built and described as built (the edit form shows the same checklist and both boxes), so "User communication" has no Planned items left. §6: outcome notification (an in-app notice on both outcomes, an email on rejection unless the reviewer opted out, and the reason on the profile) and logging every document view (`verification_viewed`, failing closed) are built. Both need migrations `0037` and `0038` applied to production by hand before this code deploys. §7 and §8: the email setting also covers the tenancy-document email, and the audit CHECK note names the fail-closed exception.
 - **v1.3 (November 17, 2026)**: Owner-approved wording. §3 and §9: deleting an account and its data, or sending a copy, is on request, and §9 keeps the right to ask us to remove a review. The privacy page offers the deletion on request but does not yet offer the copy. §4: the overall score is shown with the three domain scores beside it, and every item is recommended, with at least one answered item needed. §6: the accepted documents are the upload form's list, and photo IDs are still not accepted. §7: a dispute gets an automatic receipt and has no fixed review deadline, as the Terms say. Built-today text updated for the November 17 privacy fixes: rate limiter keys are a keyed hash, sitemap dates no longer come from reviews, the email setting is honored, and verification files go with their review or building, are not cached and lose their filename at the decision.
 - **v1.2 (November 17, 2026)**: Checked the built-today text against the code. §4: tenure ranges, title and comment limits, and scoring logic as coded (per-item weights, pooled overall, recency bands, early ratings, unenforced required items and "Not rated" rows). §5: collection-vs-display table corrected (move-in row, coarse move-out and tenure, unit details, IP scope, reviewer account), `unit_number` kept as a private field with no drop planned, sign-up and pre-submit copy as built (the unbuilt items kept as Planned), records request behavior, owner of record list, search order, seed page count removed. §6: no outcome notification yet; only decisions are audited; the submission row outlives the file. §7: admin review delete and building cascade, submission limits and advisory signals now built, dispute outcomes and notifications as built. §8: stack table completed (password auth, email, Turnstile, maps, Cron Worker, records source, tests); the column-by-column schema and the file tree replaced with short summaries that point to `migrations/`, `migrations/AGENTS.md` and `ARCHITECTURE.md`; fraud prevention split corrected. §9: pointer to the published terms. §10: pointer to `.planning/ROADMAP.md`, Phase 2 and 3 items reworded, shipped work listed. Policy statements that disagree with the code were raised with the owner, not changed here.
 - **November 17, 2026 (earlier the same day, unversioned)**: File tree pointed at `AGENTS.md` after older root docs were archived; public records checkbox ticked in §10.
@@ -635,4 +632,4 @@ The phase lists below are the original plan, ticked as items shipped. Milestone 
 
 ---
 
-*Document version 1.3 | November 2026*
+*Document version 1.4 | November 2026*

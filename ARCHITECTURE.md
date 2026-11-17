@@ -50,12 +50,12 @@ The product commitments (tenant anonymity, sign-off for scoring changes, a true 
 
 A short map of what ships today. [`MASTER.md`](MASTER.md) is the product spec and describes the full feature set. Where it and the code differ, the code wins.
 
-- **Reviews.** A multi-step review form, review editing, moderation, landlord disputes, and tenancy verification uploads (stored in R2). Writing or editing a review needs a verified email. Each account gets one review per building, with a daily limit and a pause between submissions.
+- **Reviews.** A multi-step review form, review editing, moderation, landlord disputes, and tenancy verification uploads (stored in R2). Writing or editing a review needs a verified email. Each account gets one review per building, with a daily limit and a pause between submissions. Both review forms end with a "Before you submit" checklist and two boxes that must be ticked. Public pages show rent and square footage only as ranges.
 - **Scores.** Evidence-based weighted scoring, plus recency weighting. A building score shows from the first approved review and is an "Early rating" below 3 reviews. Landlord and property-manager scores stay hidden until 3 approved reviews. See [Scoring Methodology](#scoring-methodology).
 - **Profile pages.** Building, landlord and property-manager pages. A building page groups its reviews by unit type (bedroom count), never by unit number.
 - **City records.** The Public records panel, the reader request button, record corrections, and the owner-of-record list.
 - **Search and map.** Site search includes seeded Boston pages. Browse mode and the interactive map show only buildings with at least one approved review. Map markers are clustered.
-- **Accounts.** Email and password or Google sign-in, email verification, password reset, a profile page, saved buildings, and in-app notifications.
+- **Accounts.** Email and password or Google sign-in (the sign-up page shows an example review), email verification, password reset, a profile page that shows where each review's tenancy document stands, saved buildings, and in-app notifications, including proof-of-address decisions.
 - **Site.** The public `/methodology` page with citations, contact and bug-report forms, a D1-backed sitemap, a `robots.txt` route, and a `/api/health` endpoint.
 - **Admin.** Pages for the dashboard, reviews, buildings, landlords, property managers, users, disputes, tenancy verification, bug reports, contact messages, the audit log, and public records (`/admin/records`).
 
@@ -124,14 +124,15 @@ The schema is `migrations/*.sql`, read in order. Later migrations alter, rebuild
 
 Migration history worth knowing:
 - `0005`, `0017` and `0022` are no-ops (`SELECT 1`). `0021_reserved.sql` is not a no-op despite its name: it creates `notifications` and adds `users.notification_opt_in`.
-- `0016` rebuilds `users`, so `hashed_password` can be null for Google-only accounts. `0014`, `0028` and `0030` rebuild `audit_logs`.
+- `0016` rebuilds `users`, so `hashed_password` can be null for Google-only accounts. `0014`, `0028`, `0030` and `0038` rebuild `audit_logs`, and `0037` rebuilds `notifications`, each to widen a CHECK list.
+- `0037` and `0038` have not run on production yet. Both must be applied by hand before the code that uses them deploys. See [Migrations](#migrations).
 - `0025` dropped the three score cache tables. `0026` backfilled the `*_new` review columns, and `0027` dropped 15 legacy review columns.
 
 ### Tables Overview
 
 | Table | Purpose |
 |-------|---------|
-| `users` | User accounts (Lucia auth). `hashed_password` is null for Google-only accounts. `notification_opt_in` set to 0 turns off the review rejection email |
+| `users` | User accounts (Lucia auth). `hashed_password` is null for Google-only accounts. `notification_opt_in` set to 0 turns off the review rejection email and the tenancy-document-not-accepted email |
 | `sessions` | Auth sessions |
 | `verification_tokens` | Email verification links |
 | `password_reset_tokens` | Password reset links |
@@ -142,10 +143,10 @@ Migration history worth knowing:
 | `review_votes` | Unused. Created by `0001`; no code reads or writes it |
 | `verification_images` | Tenancy verification uploads. The files are in R2 until the decision or until their review is deleted. See [`verification_images`](#verification_images) below |
 | `disputes` | Landlord disputes, at most one per review |
-| `notifications` | In-app notifications (created by `0021_reserved.sql`) |
+| `notifications` | In-app notifications (created by `0021_reserved.sql`, rebuilt by `0037`). `event_type` is one of `NotificationEventType` in `src/lib/notifications.ts`: the four review and dispute events, plus `verification_approved` and `verification_rejected` |
 | `saved_buildings` | Buildings a user has saved |
 | `rate_limits` | D1-backed rate-limit entries, keyed `<endpoint>:<digest>`, never a raw IP or id |
-| `audit_logs` | The admin action log |
+| `audit_logs` | The admin action log, including every view of a proof-of-address document (`verification_viewed`, `0038`) |
 | `bug_reports` | Bug-report form submissions |
 | `contact_messages` | Contact form submissions |
 | `record_pulls` | One row per source per city records pull: the query, status, row count and reason |
@@ -201,13 +202,15 @@ Read the migrations for full column lists. These notes cover what a column list 
 - `unit_type` and the season columns have CHECK lists. The issue flags and `is_current_tenant` are NOT NULL.
 - The rest hold the written review (`review_title`, `review_text`, `comments`), unit details, rent, laundry, parking, pets, utilities, amenities, pest types, the issue flags, housing-voucher acceptance and night lighting. Most were added by `0004`, `0008` and `0019`.
 
-**Privacy columns.** `unit_number` is collected for moderation only. It is never shown on a public page or used for grouping. `tenure_months` and exact timestamps are collected but never displayed: public pages show fuzzy season and year buckets only. Every `admin_notes` column (on buildings, landlords, property managers, bug reports and contact messages) is internal and must never reach a public SELECT.
+**Privacy columns.** `unit_number` is collected for moderation only. It is never shown on a public page or used for grouping. `tenure_months` and exact timestamps are collected but never displayed: public pages show fuzzy season and year buckets only. `rent_amount` and `square_footage` are stored exact, and public pages show them only as bands (`reviewDisplay.ts`, see [Other load-bearing modules](#other-load-bearing-modules)). Every `admin_notes` column (on buildings, landlords, property managers, bug reports and contact messages) is internal and must never reach a public SELECT.
 
 #### `verification_images`
 - One row per proof-of-address upload. The file is in R2 (`VERIFICATION_BUCKET`) under a key that names the user and the review, so no log line carries a key or a filename.
 - Approving or rejecting deletes the file and blanks `filename` to `''` (the column is NOT NULL). The row keeps the content type, size, status, moderator and any rejection reason. Rows decided before the route did this are blanked by `0036`, which the owner applies by hand (see `migrations/AGENTS.md`).
 - Deleting a review, or a building with reviews, deletes their files from R2 before the rows go (`src/lib/verificationFiles.ts`). A failed file delete is logged by count, recorded on the audit entry as `verificationFiles` (`removed`, `failed`), and never stops the delete. Orphan cleanup deletes only buildings with no reviews, so it has no files to remove. No route deletes a user, so an account deleted by hand needs its files removed by hand.
-- `GET /api/admin/verification/[id]` serves the file with `Cache-Control: private, no-store`.
+- `GET /api/admin/verification/[id]` logs the view before it serves the file, and fails closed. Once R2 has the file, it writes a `verification_viewed` audit entry through `tryCreateAuditLog` (`src/lib/audit.ts`): the admin, the admin IP, the verification id and the `review_id`, never the filename or the R2 key. If the entry cannot be written, it releases the R2 stream and answers 503 with no file. Otherwise it serves the file with `Cache-Control: private, no-store`. No entry is written for a non-admin or for a file missing from R2. The `/admin/verify` thumbnails load the file, so opening the queue logs one view per pending image, and a PDF is logged when it is opened. An image that fails to load is replaced by a message and a Try again button. Without migration `0038` on production, every view is refused.
+- `POST /api/admin/verification/[id]` tells the review's author how the decision went, after the decision is written. Both outcomes write an in-app notice (`verification_approved` or `verification_rejected`). A rejection also sends `sendVerificationRejectedEmail` (`src/lib/email.ts`), tracked as `verification_rejected`, unless `wantsReviewStatusEmail` reads the author's opt-out. The email carries the moderator's reason when there is one. The reason is trimmed, and a blank one is stored as none. A notice that cannot be written (before migration `0037`, for example) is logged as `notification_write_failed`, and the decision stands.
+- `GET /api/reviews/user` returns each review's latest document status (the newest upload, the later row on a tie) and, only when that document was rejected, its reason. On the profile, `verificationPrompt` (`src/lib/verificationNotice.ts`) picks one line per review: nothing for a verified review, the "Verify your tenancy" prompt when there is no document, a waiting line with no button while one is pending, or the rejection with its reason and a "Send a different document" button. In the notification list, the two verification notices get a "Go to My Reviews" action.
 - The checklist on `/admin/verify` names the same documents as the upload modal (`src/components/profile/VerificationModal.tsx`), and `adminVerifyChecklist.test.ts` fails when the two drift apart.
 
 ---
@@ -350,7 +353,7 @@ Routes are the files under `src/pages/api/`, and that tree is the full list. A f
 
 - **Buildings.** `GET /api/buildings` is an address lookup, not site search. It has two modes. `?placeId=` matches an exact Google place id, and the review form calls this mode. `?q=` (2 or more characters) runs a LIKE over address and neighborhood with LIMIT 10; no UI calls it today, only the release smoke's `buildings-search` probe. Both modes share a limit of 120 a minute per IP. `POST /api/buildings` creates or matches a building. It needs a signed-in user with a verified email and is limited to 20 an hour per user. `GET /api/buildings/map` feeds the map. `POST` and `DELETE /api/buildings/[id]/save` and `GET /api/buildings/saved` handle saved buildings.
 - **Search.** Site search is the `/search` page (the first page, server-rendered) and `GET /api/search/results` (Load more, 60 a minute per IP). Both build the query from `buildingSearchWhere`, `buildingSearchSelect` and `buildingSearchOrder` in `src/lib/searchSql.ts`. `GET /api/search/autocomplete` (the homepage search box and the review form's address step, 120 a minute per IP) has its own SQL and does not use `searchSql.ts`.
-- **Reviews.** `POST /api/reviews` answers 401 when signed out and 403 `email_verification_required` when the account's email is not verified. It requires Turnstile and is limited to 10 an hour per user. `REVIEW_GUARD_SQL` (`src/lib/reviewLimits.ts`) guards the insert: one review per account per building, at most `REVIEW_DAILY_LIMIT` (5) in a rolling 24 hours, and at least `REVIEW_SUBMIT_PAUSE_SECONDS` (60) between submissions. A refused insert gets 409 or 429 in the reason envelope. `GET` and `PATCH /api/reviews/[id]` read and edit a review, and `GET /api/reviews/user` lists the signed-in user's reviews.
+- **Reviews.** `POST /api/reviews` answers 401 when signed out and 403 `email_verification_required` when the account's email is not verified. It requires Turnstile and is limited to 10 an hour per user. `REVIEW_GUARD_SQL` (`src/lib/reviewLimits.ts`) guards the insert: one review per account per building, at most `REVIEW_DAILY_LIMIT` (5) in a rolling 24 hours, and at least `REVIEW_SUBMIT_PAUSE_SECONDS` (60) between submissions. A refused insert gets 409 or 429 in the reason envelope. `GET` and `PATCH /api/reviews/[id]` read and edit a review, and `GET /api/reviews/user` lists the signed-in user's reviews, each with its latest proof-of-address status (see [`verification_images`](#verification_images)).
 - **City records.** `POST /api/records/request` (the reader request button) and `POST /api/records/corrections` (report a record error).
 - **Places.** `/api/places/autocomplete` and `/api/places/details` proxy the Google Places API (New).
 - **Other public routes.** Disputes (`POST /api/disputes`), contact, bug reports, user settings (`/api/user/email`, `/api/user/password`, `/api/user/profile`), notifications, `POST /api/verification/upload`, and `GET` and `HEAD /api/health`.
@@ -363,7 +366,7 @@ Routes are the files under `src/pages/api/`, and that tree is the full list. A f
 One entry per key page. The source files are the reference.
 
 ### Building Page (`/building/[slug]`)
-- Reviews are grouped by unit type, resolved by `resolveUnitType` (`src/lib/reviewDisplay.ts`): a stored 'house' first, then the bedrooms answer, then the stored `unit_type`. The groups run from Studio through 4+ bedrooms, then House. Each group is collapsible, and the first is open. Each shows its own recency-weighted score (from the stored `overall_score`), rent range and recommend line.
+- Reviews are grouped by unit type, resolved by `resolveUnitType` (`src/lib/reviewDisplay.ts`): a stored 'house' first, then the bedrooms answer, then the stored `unit_type`. The groups run from Studio through 4+ bedrooms, then House. Each group is collapsible, and the first is open. Each shows its own recency-weighted score (from the stored `overall_score`), rent range and recommend line. The rent range comes from `rentRangeAcross`: from the lowest review's $250 band to the highest, never an exact rent.
 - Unit numbers are never used for grouping or shown, because they identify tenants.
 - The sidebar `ScoreCard` becomes an early rating below 3 reviews, and the "Common issues reported" rates become counts (`issueRateText`).
 - A Building details block shows type, year built and units. Units reads "Units (estimated from land use)" when the count is the seed's land-use estimate.
@@ -384,7 +387,8 @@ One entry per key page. The source files are the reference.
 - `/search`: query mode (built from `searchSql.ts`, includes seeded pages) and browse mode (reviewed buildings only).
 - `/map`: `src/components/BuildingMap.tsx`, reviewed buildings only.
 - `/owner-of-record?name=`: an owner's list of buildings, read from `building_owners`.
-- `/review/new` and `/review/edit/[id]`: behind the verified-email gate.
+- `/review/new` and `/review/edit/[id]`: behind the verified-email gate. The new-review form's confirm step and the edit form end with the same "Before you submit" block (`src/components/reviews/ReviewAcknowledgements.tsx`, copy in `src/lib/reviewChecklistCopy.ts`): a checklist of what to leave out, the "I understand my landlord may be able to identify me" box and the Terms box. Submit and Save stay disabled until both boxes are ticked. Neither box is sent to the server or checked there.
+- `/auth/signup`: the form, then "How your review will look" (`src/components/auth/ExampleReview.astro`), beside the form on wide screens and below it on narrow ones. It is the real `ReviewCard` with made-up data from `src/lib/exampleReview.ts`, labelled as an example, with no address, names or unit number and no link to a building. Every visitor sees it. The page is `noindex` with no structured data.
 - `/profile`, `/methodology`, `/dispute`, the auth pages, the content pages, and `/admin/*`, including `/admin/records`.
 - `/sitemap.xml` and `/sitemaps/*.xml` read D1. A building's `lastmod` is the later of its `updated_at` and its newest records pull. No sitemap date is read from a review, and landlord entries and the static pages carry none. Root AGENTS.md lists the ways the date can still land near a review, under "Traps". `/robots.txt` does not read D1: it compares the request host with `SITE_URL` and serves `Disallow: /` on any other host.
 
@@ -397,8 +401,8 @@ Component rules (Astro or React, islands, brand tokens) are in [`src/components/
 ### ReviewCard (`src/components/reviews/ReviewCard.astro`)
 Displays one review. It never shows a unit number. It shows:
 - The overall score and stars, the review title, and a Verified badge for verified reviews (which also get a blue left border).
-- The unit type label (resolved the same way), a tenancy season chip, a fuzzy recency label (`formatRecency`: "Current tenant", "Past tenant", "Within the last year" through "10+ years ago"), and rent per month.
-- The review text and bedroom, bath and square-footage chips.
+- The unit type label (resolved the same way), a tenancy season chip, a fuzzy recency label (`formatRecency`: "Current tenant", "Past tenant", "Within the last year" through "10+ years ago"), and rent as a $250 band (`rentRangeLabel`, for example "$2,250 to $2,500/mo").
+- The review text and bedroom, bath and square-footage chips. Square footage is a 250 sq ft band (`squareFootageRangeLabel`).
 - All 27 items in the score breakdown. Skipped items read "Not rated", and health-weighted items are starred.
 - A Security Deposit highlight, utilities included, amenities, laundry (type and cost per load), parking, pets allowed, pest types and the issue flags.
 - Section 8 voucher and night-lighting tags.
@@ -457,7 +461,10 @@ Keeps exact dates off public surfaces.
 | `runtime.ts` | `getEnv(context)`, the sanctioned way for routes to reach bindings and env; `maybeEnv` for render paths that must not throw; `fireAndForget`; `recipientHash` |
 | `validation.ts` | Shared validators, including `isSafeHttpUrl` |
 | `rateLimit.ts`, `turnstile.ts` | The fail-closed `checkRateLimit`, and Turnstile verification |
-| `audit.ts` | `createAuditLog` for destructive admin actions |
+| `audit.ts` | `createAuditLog` for destructive admin actions (best-effort), and `tryCreateAuditLog`, which reports whether the entry landed. Only the proof-of-address view uses it directly, and it fails closed on false |
+| `reviewDisplay.ts` | Review card display rules: unit type, the recommend answer, and the rent and square-footage bands (`RENT_BANDS`, `SQUARE_FOOTAGE_BANDS`, the band words in `RANGE_COPY`, `rentRangeLabel`, `squareFootageRangeLabel` and `rentRangeAcross`). Bands are $250 and 250 sq ft wide, include their lower bound, and are open below $1,000 and 500 sq ft and from $6,000 and 2,000 sq ft. A zero, missing or unreadable value shows nothing. Every public rent or size goes through them, and `rentSizeRanges.test.ts` fails on a new file that names either field until it is listed there |
+| `notifications.ts` | `NotificationEventType`, the message for each (`EVENT_MESSAGES`) and the best-effort `createNotification`, which logs `notification_write_failed` with the event type. `wantsReviewStatusEmail` gates the review-not-published and tenancy-document-not-accepted emails. Every event type must be in the `notifications.event_type` CHECK (`0037`) |
+| `reviewChecklistCopy.ts`, `verificationNotice.ts`, `exampleReview.ts` | Copy the owner edits in one place: the "Before you submit" checklist and box, the profile's verification lines and the admin queue's view-failure text (with `verificationPrompt`), and the sign-up example review and its made-up data. The first two are client leaf modules (`clientLeafModules.test.ts`) |
 | `password.ts`, `passwordPolicy.ts` | PBKDF2 hashing and the password length rules |
 | `tokens.ts`, `emailVerification.ts`, `authRedirect.ts` | Verification and reset tokens, the verified-email gate, and safe return paths |
 | `email.ts`, `trackSend.ts`, `emailHealth.ts`, `ownerNotify.ts` | Email templates, tracked sends, delivery health and owner notices |
@@ -653,6 +660,7 @@ Read [`migrations/AGENTS.md`](migrations/AGENTS.md) before touching production. 
 npx wrangler d1 execute ratemyplace-db --remote --file=migrations/XXXX_name.sql
 ```
 
+- `0037` and `0038` are **not yet applied to production**. Apply both by hand, one file at a time, **before** the code that uses them deploys. Without `0037`, every proof-of-address notice fails the old CHECK and is lost. Without `0038`, the view audit fails and no admin can open any verification document. Each rebuilds its table, so run the read-only checks and take the table backup in `migrations/AGENTS.md` first. Either order works, and each is safe to re-run after a full run.
 - Remote CLI needs `CLOUDFLARE_API_TOKEN` in the environment, or it fails with error 7403.
 - Locally, use `npx wrangler d1 migrations apply ratemyplace-db --local` or `npm run db:setup`.
 

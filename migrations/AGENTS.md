@@ -371,7 +371,7 @@ Dropping a column that deployed code still reads takes the site down.
 | `verification_images`, `verification_tokens` | Proof-of-address pipeline, email tokens |
 | `disputes` | Landlord dispute submissions and resolutions |
 | `audit_logs` | Destructive admin actions, old value → new value, and every admin view of a proof-of-address document (`verification_viewed`, 0038) |
-| `notifications` | In-app tenant notifications |
+| `notifications` | In-app tenant notifications. `event_type` is CHECKed: the four review and dispute events, plus `verification_approved` and `verification_rejected` (0037) |
 | `saved_buildings` | Bookmarks |
 | `record_pulls`, `building_records` | Public building records from city open data. `record_pulls` is insert-only provenance, one row per source run; `building_records` holds the typed JSON payloads, unique on `(building_id, kind, source_key)` |
 | `record_corrections` | Public "report a record error" claims and their resolutions. Stores the claim and an optional email, nothing else about the filer |
