@@ -90,6 +90,13 @@ suite('sitemap privacy (SEO-06)', () => {
     }
   });
 
+  it('publishes no review date: every review is dated 2023-11-14 and no lastmod says so', async () => {
+    const { index, statics, chunk } = await bodies(await seed());
+    for (const body of [index, statics, chunk]) expect(body).not.toContain('2023-11-14');
+    // The landlord entry carries no date at all.
+    expect(statics).toContain(`<url><loc>${SITE}/landlord/thin-fixture-holdings</loc></url>`);
+  });
+
   it('lists only allowlisted public URLs', async () => {
     const { index, statics, chunk } = await bodies(await seed());
     const all = [...locs(index), ...locs(statics), ...locs(chunk)];

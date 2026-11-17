@@ -7,12 +7,13 @@ import { SITEMAP_DEGRADED_HEADERS, SITEMAP_HEADERS, STATIC_SITEMAP_PATHS, landlo
 export async function GET(context: APIContext): Promise<Response> {
   const site = siteUrlFrom(getEnv(context));
   // The allowlisted pages carry no lastmod: they change when the code changes, and a date
-  // we would have to guess is worse than none.
+  // we would have to guess is worse than none. Landlord pages carry none either: every date
+  // a landlord has tracks its reviews (see `landlordSitemapEntries`).
   const entries: UrlEntry[] = STATIC_SITEMAP_PATHS.map((path) => ({ loc: `${site}${path}`, lastmod: null }));
   let headers = SITEMAP_HEADERS;
   try {
     for (const landlord of await landlordSitemapEntries(getDB(context))) {
-      entries.push({ loc: `${site}/landlord/${landlord.slug}`, lastmod: landlord.lastmod });
+      entries.push({ loc: `${site}/landlord/${landlord.slug}`, lastmod: null });
     }
   } catch (err) {
     // The static pages alone are still a useful, valid urlset — better than a 500. The short
