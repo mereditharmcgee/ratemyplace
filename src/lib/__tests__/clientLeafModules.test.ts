@@ -28,6 +28,9 @@ const LEAF_MODULES = [
   'src/lib/reviewSubmitOutcome.ts',
   // The review edit form starts its tenure select with it.
   'src/lib/tenure.ts',
+  // The profile's review list and notification list take their proof-of-address copy and
+  // display rule from it.
+  'src/lib/verificationNotice.ts',
 ];
 
 describe('client leaf modules have no runtime imports', () => {

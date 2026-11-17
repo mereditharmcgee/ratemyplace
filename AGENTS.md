@@ -270,7 +270,9 @@ needs the owner's action calls `queueOwnerNotice(context, { kind, buildingId })`
 `lib/email.ts`; there is no env var for it. An email to a review's author about the
 review's status checks `wantsReviewStatusEmail` (`lib/notifications.ts`) first, which reads
 the profile's opt-out (`users.notification_opt_in`). The in-app notification is written
-either way.
+either way. Two emails follow that rule: the review-not-published notice and the
+tenancy-document-not-accepted notice (`verification_rejected`, from
+`POST /api/admin/verification/[id]`). Approving a review or a document sends no email.
 
 ## Traps
 

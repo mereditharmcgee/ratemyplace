@@ -1,5 +1,6 @@
 import React from 'react';
 import EmptyState from '../ui/EmptyState';
+import { VERIFICATION_COPY, VERIFICATION_NOTICE_EVENTS } from '../../lib/verificationNotice';
 
 export interface Notification {
   id: number;
@@ -14,6 +15,8 @@ interface Props {
   notifications: Notification[];
   loading: boolean;
   error: string | null;
+  /** Switches the profile to My Reviews. A verification notice offers it as its action. */
+  onOpenReviews?: () => void;
 }
 
 function timeAgo(timestampSeconds: number): string {
@@ -38,7 +41,7 @@ function timeAgo(timestampSeconds: number): string {
 }
 
 function EventIcon({ eventType }: { eventType: string }) {
-  if (eventType === 'review_approved') {
+  if (eventType === 'review_approved' || eventType === 'verification_approved') {
     return (
       <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
         <svg className="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -53,6 +56,16 @@ function EventIcon({ eventType }: { eventType: string }) {
       <div className="flex-shrink-0 w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
         <svg className="w-4 h-4 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (eventType === 'verification_rejected') {
+    return (
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+        <svg className="w-4 h-4 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
         </svg>
       </div>
     );
@@ -78,7 +91,7 @@ function EventIcon({ eventType }: { eventType: string }) {
   );
 }
 
-export default function NotificationsTab({ notifications, loading, error }: Props) {
+export default function NotificationsTab({ notifications, loading, error, onOpenReviews }: Props) {
   if (loading) {
     return (
       <div role="status" className="flex justify-center py-12">
@@ -123,6 +136,15 @@ export default function NotificationsTab({ notifications, loading, error }: Prop
               {notification.message}
             </p>
             <p className="text-xs text-gray-600 mt-1">{timeAgo(notification.created_at)}</p>
+            {onOpenReviews && VERIFICATION_NOTICE_EVENTS.includes(notification.event_type) && (
+              <button
+                type="button"
+                onClick={onOpenReviews}
+                className="mt-2 text-sm font-medium text-teal-700 underline hover:text-teal-800"
+              >
+                {VERIFICATION_COPY.notificationAction}
+              </button>
+            )}
           </div>
         </div>
       ))}
