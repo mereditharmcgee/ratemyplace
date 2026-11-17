@@ -191,10 +191,13 @@ a pending row's key is a leftover. It was rejected before August 26, 2026, when 
 began deleting the file. Or its review was deleted before review deletes removed files, its
 delete failed at the decision, or its upload never got a row. Remove those by hand.
 
-**`0037` (notification events for proof-of-address decisions) is NOT YET APPLIED TO
-PRODUCTION. Apply it by hand BEFORE the branch that writes the new events is pushed or its
-preview is used.** Previews share the production D1 binding, so a preview runs this code
-against production. In any case apply it before merging to `main`, which auto-deploys. It rebuilds
+**`0037` (notification events for proof-of-address decisions) was APPLIED TO PRODUCTION
+2026-11-17, by hand, before this branch was pushed.** Previews share the production D1
+binding, so a preview runs this code against production. It ran as 6 statements and copied
+44 rows. Afterwards the table held 44 rows, ids 1 to 44, with both indexes and no
+`notifications_v2` left; its CHECK lists `verification_approved` and
+`verification_rejected`, and the next id was 45. Every row matched a backup taken just
+before, and the production smoke test passed. It rebuilds
 `notifications` to widen its `event_type` CHECK with `verification_approved` and
 `verification_rejected`, the 0030 pattern: create `notifications_v2`, copy every row with
 its id, drop, rename, recreate `idx_notifications_user` and `idx_notifications_unread`.
@@ -219,9 +222,10 @@ copy table (`DROP TABLE notifications_v2`) and run the file again. If a run stop
 hand with the file's `ALTER TABLE ... RENAME` and its two `CREATE INDEX` statements. Never
 `migrations apply --remote`.
 
-Confirm first (read-only). The table's SQL must not mention `verification_approved` yet;
-note the row count and the id range; and the orphan count must be 0, because the copy keeps
-both foreign keys and an orphan row would fail it:
+The runbook below is the one used on 2026-11-17, kept as the record. Its read-only checks
+still work: the table's SQL now mentions `verification_approved`, and the row count and id
+range can be compared with the figures above. The orphan count was 0 before the apply. It
+had to be, because the copy keeps both foreign keys and an orphan row would have failed it:
 
 ```bash
 npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notifications'"
@@ -229,8 +233,8 @@ npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT COUNT(*) AS 
 npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT COUNT(*) AS orphans FROM notifications n WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = n.user_id) OR (n.review_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.id = n.review_id))"
 ```
 
-Back the table up outside the repo (its messages name buildings and its rows name accounts;
-delete the file once the check below passes), then apply:
+The table was backed up outside the repo first (its messages name buildings and its rows name
+accounts; the backup is deleted once the branch that uses it has merged), then applied:
 
 ```bash
 npx wrangler d1 export ratemyplace-db --remote --table notifications --output ../notifications-before-0037.sql
@@ -246,10 +250,12 @@ npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT name FROM sq
 
 The second should list the two indexes and not `notifications_v2`.
 
-**`0038` (audit entry for viewing a proof-of-address document) is NOT YET APPLIED TO
-PRODUCTION. Apply it by hand BEFORE the branch that writes `verification_viewed` is pushed or
-its preview is used.** Previews share the production D1 binding, so a preview runs this code
-against production. In any case apply it before merging to `main`, which auto-deploys. It
+**`0038` (audit entry for viewing a proof-of-address document) was APPLIED TO PRODUCTION
+2026-11-17, by hand, before this branch was pushed.** Previews share the production D1
+binding, so a preview runs this code against production. It ran as 8 statements and copied
+70 rows. Afterwards the table held 70 rows, ids 1 to 70, with all four `idx_audit_*`
+indexes and no `audit_logs_v5` left, and its CHECK lists `verification_viewed`. Every row
+matched a backup taken just before, and the production smoke test passed. It
 rebuilds `audit_logs` exactly as `0030` did (`audit_logs_v5`, copy every row with its id,
 drop, rename, the four `idx_audit_*` indexes) with one more allowed action,
 `verification_viewed`. Every other allowed action and every allowed entity type is
@@ -273,16 +279,17 @@ copy table (`DROP TABLE audit_logs_v5`) and run the file again. A run that stops
 `DROP` and before the `RENAME` is finished by hand with the file's `RENAME` and its four
 `CREATE INDEX` statements. Never `migrations apply --remote`.
 
-Confirm first (read-only). The table's SQL must not mention `verification_viewed` yet, and
-note the row count and id range:
+The runbook below is the one used on 2026-11-17, kept as the record. Its read-only checks
+still work: the first command now returns 1, because the table's SQL mentions
+`verification_viewed`, and the row count and id range can be compared with the figures above:
 
 ```bash
 npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT instr(sql, 'verification_viewed') > 0 AS already FROM sqlite_master WHERE type = 'table' AND name = 'audit_logs'"
 npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT COUNT(*) AS n, MIN(id) AS min_id, MAX(id) AS max_id FROM audit_logs"
 ```
 
-Back the table up outside the repo (it holds admin IPs; delete the file once the check below
-passes), then apply:
+The table was backed up outside the repo first (it holds admin IPs; the backup is deleted once
+the branch that uses it has merged), then applied:
 
 ```bash
 npx wrangler d1 export ratemyplace-db --remote --table audit_logs --output ../audit_logs-before-0038.sql

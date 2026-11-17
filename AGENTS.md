@@ -352,18 +352,16 @@ Things that have already cost time. Read before debugging.
 - **Production migrations 0025–0027 were applied via the Cloudflare dashboard**, not
   wrangler, so wrangler does not know they ran. `0027` is a non-idempotent `DROP COLUMN`
   batch. Never blindly run `migrations apply --remote`. See `migrations/AGENTS.md`.
-- **Migrations `0037` and `0038` must be applied to production by hand before the branch that
-  uses them is pushed or its preview is used.** Previews share the production D1 binding, so a
-  preview runs this code against production. In any case apply them before merging to `main`,
-  which auto-deploys. Neither has run on production yet. `0037` rebuilds `notifications` to
+- **Migrations `0037` and `0038` were applied to production by hand on 2026-11-17, before the
+  branch that uses them was pushed.** Previews share the production D1 binding, so a
+  preview runs this code against production. `0037` rebuilds `notifications` to
   allow `verification_approved` and `verification_rejected`; without it the decision and the
   email still go through, but every proof-of-address notice is lost. `0038` rebuilds
   `audit_logs` to allow `verification_viewed`; without it the view audit fails, and the
-  fail-closed route refuses every document with a 503, so no admin can open one. Apply each
-  with `wrangler d1 execute --remote --file`, one file at a time, after the read-only checks
-  and the table backup in `migrations/AGENTS.md`. Either order works. Once applied, do not
-  re-run either: after a later rebuild of the same table, a re-run would put the older CHECK
-  list back.
+  fail-closed route refuses every document with a 503, so no admin can open one. Each was
+  applied with `wrangler d1 execute --remote --file`, one file at a time, after the read-only
+  checks and the table backup in `migrations/AGENTS.md`. Do not re-run either: after a later
+  rebuild of the same table, a re-run would put the older CHECK list back.
 - **The domain is `ratemyplace.org`.** `ratemyplace.boston` does not resolve.
 - **Remote D1 CLI needs `CLOUDFLARE_API_TOKEN`** in the environment, or you get a 7403.
 - **`bg-coral-*` is not a Tailwind class.** Use `bg-red-*`.
@@ -572,9 +570,9 @@ Things that have already cost time. Read before debugging.
   verification id, review id; never the filename or R2 key) before serving the file, and
   answers 503 without the file if the entry cannot be written. The admin queue's thumbnails
   load the file, so opening `/admin/verify` logs one view per pending image; a PDF is logged
-  when it is opened. Migration `0038` adds the action to the CHECK and must run before this
-  code is pushed (previews use the production database) or deployed, or no document can be
-  opened.
+  when it is opened. Migration `0038` adds the action to the CHECK. It was applied to production on 2026-11-17,
+  before this code was pushed (previews use the production database); without it no document
+  can be opened.
 - **An `_`-prefixed file under `src/pages/` is not a route.** Astro excludes it from
   file-based routing, which is how `src/pages/api/admin/records/queue/_json.ts` can be a
   shared helper next to the endpoints that import it. The rule cuts the other way for

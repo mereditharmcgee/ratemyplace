@@ -125,7 +125,7 @@ The schema is `migrations/*.sql`, read in order. Later migrations alter, rebuild
 Migration history worth knowing:
 - `0005`, `0017` and `0022` are no-ops (`SELECT 1`). `0021_reserved.sql` is not a no-op despite its name: it creates `notifications` and adds `users.notification_opt_in`.
 - `0016` rebuilds `users`, so `hashed_password` can be null for Google-only accounts. `0014`, `0028`, `0030` and `0038` rebuild `audit_logs`, and `0037` rebuilds `notifications`, each to widen a CHECK list.
-- `0037` and `0038` have not run on production yet. Both must be applied by hand before the branch that uses them is pushed or its preview is used, because previews share the production D1 binding, and in any case before merging to `main`. See [Migrations](#migrations).
+- `0037` and `0038` were applied to production by hand on 2026-11-17, one file at a time, before the branch that uses them was pushed, because previews share the production D1 binding. See [Migrations](#migrations).
 - `0025` dropped the three score cache tables. `0026` backfilled the `*_new` review columns, and `0027` dropped 15 legacy review columns.
 
 ### Tables Overview
@@ -660,7 +660,7 @@ Read [`migrations/AGENTS.md`](migrations/AGENTS.md) before touching production. 
 npx wrangler d1 execute ratemyplace-db --remote --file=migrations/XXXX_name.sql
 ```
 
-- `0037` and `0038` are **not yet applied to production**. Apply both by hand, one file at a time, **before** this branch is pushed or its preview is used. Previews share the production D1 binding, so a preview runs this code against production. In any case apply them before merging to `main`, which auto-deploys. Without `0037`, every proof-of-address notice fails the old CHECK and is lost. Without `0038`, the view audit fails and no admin can open any verification document. Each rebuilds its table, so run the read-only checks and take the table backup in `migrations/AGENTS.md` first. Either order works.
+- `0037` and `0038` were **applied to production on 2026-11-17**, by hand, one file at a time, **before** this branch was pushed. Previews share the production D1 binding, so a preview runs this code against production. Without `0037`, every proof-of-address notice fails the old CHECK and is lost. Without `0038`, the view audit fails and no admin can open any verification document. Each rebuilds its table, so do not re-run either (see above).
 - Remote CLI needs `CLOUDFLARE_API_TOKEN` in the environment, or it fails with error 7403.
 - Locally, use `npx wrangler d1 migrations apply ratemyplace-db --local` or `npm run db:setup`.
 
