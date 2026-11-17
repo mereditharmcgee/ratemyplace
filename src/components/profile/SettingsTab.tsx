@@ -163,7 +163,7 @@ export default function SettingsTab({
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Display Name</h3>
         <form onSubmit={handleNameSave}>
           <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-1">
-            Name shown on your reviews
+            Your name (never shown on your reviews)
           </label>
           <input
             id="displayName"

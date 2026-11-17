@@ -169,8 +169,11 @@ describe('sendDisputeResolutionEmail', () => {
     expect(args.from).toBe('RateMyPlace Boston <meredith@ratemyplace.org>');
     expect(args.subject).toBe('We upheld your dispute');
     expect(args.html).toContain('We upheld your dispute');
-    expect(args.html).toContain("We've upheld your dispute");
+    expect(args.html).toContain('decided to uphold it');
     expect(args.html).toContain('content guidelines');
+    // Resolving a dispute does not change the review, so the email never says it did.
+    expect(args.html).toContain('Any action we took on the review is described in the notes below.');
+    expect(args.html).not.toContain('has been updated');
     expect(args.html).toContain('Removed the offending paragraph.');
   });
 
@@ -186,9 +189,11 @@ describe('sendDisputeResolutionEmail', () => {
     const args = mockSend.mock.calls[0][0];
     expect(args.subject).toBe('We did not uphold your dispute');
     expect(args.html).toContain('We did not uphold your dispute');
+    expect(args.html).toContain('decided not to uphold it');
     expect(args.html).toContain('The review stands');
     // Audit-mandated framing: disagreement is legitimate
     expect(args.html).toContain('Reviews can be valid even when a landlord disagrees');
+    expect(args.html).toContain('Our reasons are in the notes below.');
     expect(args.html).toContain('Review meets guidelines.');
   });
 
@@ -204,8 +209,9 @@ describe('sendDisputeResolutionEmail', () => {
     const args = mockSend.mock.calls[0][0];
     expect(args.subject).toBe('We partially upheld your dispute');
     expect(args.html).toContain('We partially upheld your dispute');
-    expect(args.html).toContain('found some of your concerns valid');
-    expect(args.html).toContain('Other parts of the review stand');
+    expect(args.html).toContain('found some of your concerns valid, but not all of them');
+    expect(args.html).toContain('Any action we took on the review is described in the notes below.');
+    expect(args.html).not.toContain('addressed them');
     expect(args.html).toContain('Removed one sentence; rest stands.');
   });
 

@@ -232,7 +232,7 @@ describe('the privacy page on the rate limiter', () => {
 
   it('says the limiter keeps a one-way code, not the IP address', () => {
     expect(privacy).not.toContain('keeps your IP address');
-    expect(privacy.match(/keeps a one-way code made from your IP address for about an hour, not the address itself/g)).toHaveLength(2);
+    expect(privacy.match(/keeps only a scrambled form of your IP address, which expires within an hour/g)).toHaveLength(2);
   });
 
   it('never says no IPs are stored, since the audit log keeps admin IPs', () => {

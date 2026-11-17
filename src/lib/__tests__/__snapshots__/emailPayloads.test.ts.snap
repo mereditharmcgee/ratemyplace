@@ -289,7 +289,7 @@ exports[`email payloads (snapshot) > sendDisputeResolutionEmail (dismiss) 1`] = 
 
   <p>Hi Acme &lt;LLC&gt;,</p>
 
-  <p>We reviewed your dispute and decided not to act on it. The review stands. Reviews can be valid even when a landlord disagrees, so long as they meet our <a href="https://ratemyplace.org/guidelines" style="color: #0f766e;">content guidelines</a>.</p>
+  <p>We reviewed your dispute and decided not to uphold it. The review stands. Reviews can be valid even when a landlord disagrees, so long as they meet our <a href="https://ratemyplace.org/guidelines" style="color: #0f766e;">content guidelines</a>. Our reasons are in the notes below.</p>
 
   <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
     <p style="margin: 0 0 10px 0;"><strong>Resolution notes:</strong></p>
@@ -324,7 +324,7 @@ exports[`email payloads (snapshot) > sendDisputeResolutionEmail (partially_valid
 
   <p>Hi Acme &lt;LLC&gt;,</p>
 
-  <p>We found some of your concerns valid and addressed them. Other parts of the review stand. Specifics are in the resolution notes below.</p>
+  <p>We reviewed your dispute and found some of your concerns valid, but not all of them. Any action we took on the review is described in the notes below.</p>
 
   <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
     <p style="margin: 0 0 10px 0;"><strong>Resolution notes:</strong></p>
@@ -359,7 +359,7 @@ exports[`email payloads (snapshot) > sendDisputeResolutionEmail (uphold) 1`] = `
 
   <p>Hi Acme &lt;LLC&gt;,</p>
 
-  <p>We've upheld your dispute. The review has been updated according to our <a href="https://ratemyplace.org/guidelines" style="color: #0f766e;">content guidelines</a>.</p>
+  <p>We reviewed your dispute against our <a href="https://ratemyplace.org/guidelines" style="color: #0f766e;">content guidelines</a> and decided to uphold it. Any action we took on the review is described in the notes below.</p>
 
   <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
     <p style="margin: 0 0 10px 0;"><strong>Resolution notes:</strong></p>

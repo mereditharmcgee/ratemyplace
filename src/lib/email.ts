@@ -393,21 +393,24 @@ interface DisputeOutcomeCopy {
   lede: string;
 }
 
+// Resolving a dispute changes nothing on the review by itself: an admin who acts on a
+// review does it separately (for example by rejecting it), and says so in the notes. So
+// each lede states the decision and points at the notes, never claims an action was taken.
 const DISPUTE_OUTCOME_COPY: Record<DisputeResolutionOutcome, DisputeOutcomeCopy> = {
   uphold: {
     subject: 'We upheld your dispute',
     heading: 'We upheld your dispute',
-    lede: 'We\'ve upheld your dispute. The review has been updated according to our <a href="https://ratemyplace.org/guidelines" style="color: #0f766e;">content guidelines</a>.',
+    lede: 'We reviewed your dispute against our <a href="https://ratemyplace.org/guidelines" style="color: #0f766e;">content guidelines</a> and decided to uphold it. Any action we took on the review is described in the notes below.',
   },
   dismiss: {
     subject: 'We did not uphold your dispute',
     heading: 'We did not uphold your dispute',
-    lede: 'We reviewed your dispute and decided not to act on it. The review stands. Reviews can be valid even when a landlord disagrees, so long as they meet our <a href="https://ratemyplace.org/guidelines" style="color: #0f766e;">content guidelines</a>.',
+    lede: 'We reviewed your dispute and decided not to uphold it. The review stands. Reviews can be valid even when a landlord disagrees, so long as they meet our <a href="https://ratemyplace.org/guidelines" style="color: #0f766e;">content guidelines</a>. Our reasons are in the notes below.',
   },
   partially_valid: {
     subject: 'We partially upheld your dispute',
     heading: 'We partially upheld your dispute',
-    lede: 'We found some of your concerns valid and addressed them. Other parts of the review stand. Specifics are in the resolution notes below.',
+    lede: 'We reviewed your dispute and found some of your concerns valid, but not all of them. Any action we took on the review is described in the notes below.',
   },
 };
 

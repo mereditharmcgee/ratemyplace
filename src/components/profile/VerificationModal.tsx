@@ -192,6 +192,7 @@ export default function VerificationModal({ reviewId, onClose, onSuccess, return
                 <li>Rent receipt or payment confirmation</li>
                 <li>Piece of mail showing your name and this address</li>
               </ul>
+              <p className="mb-2">We do not accept photo IDs, such as a driver's license or passport.</p>
               <p className="font-medium">You may redact:</p>
               <p>Account numbers, dates of birth, SSN, or other sensitive info</p>
             </div>

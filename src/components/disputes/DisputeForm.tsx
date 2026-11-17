@@ -208,7 +208,7 @@ export default function DisputeForm({ siteUrl }: Props) {
             <h3 className="text-sm font-medium text-green-800">Dispute submitted successfully</h3>
             <div className="mt-2 text-sm text-green-700">
               <p>A confirmation email has been sent to your email address.</p>
-              <p className="mt-2">Our admin team will review your dispute and you will be notified if it is upheld.</p>
+              <p className="mt-2">Our admin team will review your dispute and email you the outcome.</p>
             </div>
             <div className="mt-4">
               <button

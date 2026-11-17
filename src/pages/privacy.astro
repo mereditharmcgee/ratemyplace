@@ -7,11 +7,26 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
     <h1 class="text-3xl font-bold text-gray-900 mb-8">Privacy Policy</h1>
 
     <div class="space-y-6 text-gray-700">
-      <p class="text-sm text-gray-600">Last updated: February 2026</p>
+      <p class="text-sm text-gray-600">Last updated: November 2026</p>
 
       <section>
         <h2 class="text-xl font-semibold text-gray-900 mb-3">Information We Collect</h2>
-        <p>When you create an account, we collect your email address and password (stored securely). When you submit a review, we collect information about your rental experience including move-in/move-out dates, ratings, and written feedback.</p>
+        <p class="mb-3">We keep what the site needs to work. Here is what we store.</p>
+        <ul class="list-disc pl-6 space-y-2">
+          <li><strong>Your account:</strong> Your email address and password. We store your password only as a hash, never the password itself. We also store whether you have confirmed your email address, your choice for the "Email me when my review status changes" setting, and a display name if you add one. When we email you a link to confirm your address or reset your password, we store the one-time code in that link so we can check it when you use it.</li>
+          <li><strong>Signing in with Google:</strong> If you sign in with Google, we store the email address, name and profile photo link that Google shares with us, along with your Google account ID. You can change your name in your account settings.</li>
+          <li><strong>Your reviews:</strong> Your ratings, your written comments and the details you give about your home, such as when you moved in and out, how long you lived there, rent, unit size, amenities, and the landlord or manager you name. We also store when you submitted the review. Reviews are public, but never with your name or email address.</li>
+          <li><strong>Unit number:</strong> Adding your unit number is optional. We never show it publicly. Only you and our moderation team can see it.</li>
+          <li><strong>Proof of address:</strong> If you upload a document to verify a review, we keep the file in private storage until a moderator makes a decision. We delete the file once they do. We keep a record of the decision, with the file's type and size, but not its name or the file itself.</li>
+          <li><strong>Saved buildings:</strong> The buildings you save, so they show on your profile.</li>
+          <li><strong>Notices about your reviews:</strong> The notices on your profile, such as when a review is approved or disputed.</li>
+          <li><strong>Contact form:</strong> Your name, email address, the topic you pick and your message.</li>
+          <li><strong>Landlord disputes:</strong> The name, email address and phone number of the person filing, the reasons they pick and any details they add. Only our moderation team sees these. The review's author is told that the review was disputed, but not who filed it.</li>
+          <li><strong>Bug reports:</strong> Your description, the kind of problem, the page link if you give one, and an email address only if you give one. If you are signed in, the report is linked to your account.</li>
+          <li><strong>Public records:</strong> Reporting a record error and requesting a building's city records are covered under Public Records below.</li>
+          <li><strong>Your location:</strong> The map asks your browser for your location. If you allow it and you are inside the area the map covers, the map centers on you. Google Maps then loads that area, and our site asks our server for the buildings in it. We do not store your location.</li>
+          <li><strong>Admin audit log:</strong> When someone on our team approves or rejects a review, resolves a dispute or makes another admin change, our audit log records who did it, when, what changed and the IP address they used. If a review is deleted, the log keeps its title, its score and the account it came from.</li>
+        </ul>
       </section>
 
       <section>
@@ -35,6 +50,22 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
       </section>
 
       <section>
+        <h2 class="text-xl font-semibold text-gray-900 mb-3">IP Addresses</h2>
+        <p>Our rate limits stop anyone from flooding the site's forms and searches. To count requests, they keep only a scrambled form of your IP address (a keyed hash), never the address itself. Each entry expires within an hour, and we delete expired entries as new requests come in. We do not store your IP address with your account, your reviews or anything you send through our forms. The one place we keep a full IP address is our admin audit log, which records the IP address of the team member who made each change. Cloudflare's bot check, Turnstile, runs on our public forms and sees your IP address.</p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-gray-900 mb-3">Services That Receive Data</h2>
+        <p class="mb-3">A few outside services help run the site. Here is what each one receives.</p>
+        <ul class="list-disc pl-6 space-y-2">
+          <li><strong>Cloudflare:</strong> Hosts the site, our database and the private storage for proof-of-address files, so what you send us is stored with Cloudflare. Every visit to the site passes through Cloudflare. Its bot check, Turnstile, runs on our public forms and sees your IP address. Email sent to an @ratemyplace.org address passes through Cloudflare, which forwards it to our inbox.</li>
+          <li><strong>Resend:</strong> Sends our email, so it receives the email address each message goes to and what the message says. That includes account emails, such as confirming your address or resetting your password, a note if your review is not published, receipts for contact messages and disputes, dispute decisions, updates on record error reports, and the start of each new contact message, which comes to us by email. If an email cannot be sent, we keep only a short scrambled code made from the address, so we can spot repeated failures.</li>
+          <li><strong>Google:</strong> Runs Sign in with Google. If you use it, Google shares your email address, name and profile photo link with us. The text you type into an address search, and the address you pick, go to Google to find and confirm the address. Our map is Google Maps, and our fonts load from Google Fonts, so your browser contacts Google when it loads them. Our team inbox is Gmail, so email you send us, and the contact form alerts we receive, are stored with Google.</li>
+          <li><strong>City open data:</strong> To show public records, we ask public open data sites, such as the City of Boston's, about a building's address or parcel. We send nothing about you.</li>
+        </ul>
+      </section>
+
+      <section>
         <h2 class="text-xl font-semibold text-gray-900 mb-3">Cookies</h2>
         <p>We use essential cookies to keep you logged in and maintain your session. We do not use tracking cookies or share data with advertisers.</p>
       </section>
@@ -45,14 +76,14 @@ import BaseLayout from '../components/layout/BaseLayout.astro';
         <ul class="list-disc pl-6 space-y-2">
           <li><strong>Owner of record:</strong> shown as the city publishes it.</li>
           <li><strong>Mailing addresses:</strong> When the owner of record is an individual we do not show the mailing address. When an entity's mailing address names a person, including a care-of line, we omit that name and show only the street and city.</li>
-          <li><strong>Reporting a record error:</strong> Reporting a record error stores your description and, only if you give one, an email address. The rate limiter that protects the form keeps a one-way code made from your IP address for about an hour, not the address itself, as it does for every public form on the site, and nothing else about you is kept.</li>
-          <li><strong>Requesting a building's records:</strong> Pressing "Get this building's city records" or "Ask for newer records" stores the building and the time of the request, not who pressed it. The rate limiter that protects the button keeps a one-way code made from your IP address for about an hour, not the address itself, as it does for every public form on the site.</li>
+          <li><strong>Reporting a record error:</strong> Reporting a record error stores your description and, only if you give one, an email address. The rate limiter that protects the form keeps only a scrambled form of your IP address, which expires within an hour, as on every public form on the site. Nothing else about you is kept.</li>
+          <li><strong>Requesting a building's records:</strong> Pressing "Get this building's city records" or "Ask for newer records" stores the building and the time of the request, not who pressed it. The rate limiter that protects the button keeps only a scrambled form of your IP address, which expires within an hour, as on every public form on the site.</li>
         </ul>
       </section>
 
       <section>
         <h2 class="text-xl font-semibold text-gray-900 mb-3">Your Rights</h2>
-        <p>You can request to delete your account and all associated reviews at any time by contacting us. You can also update your email address through your account settings.</p>
+        <p>You can request to delete your account and all associated reviews at any time by contacting us. You can also ask us for a copy of the data we hold about you. You can change your name in your account settings. You can change your email address there too, unless you have signed in with Google. Then contact us to change it.</p>
       </section>
 
       <section>
