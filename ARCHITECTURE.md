@@ -131,7 +131,7 @@ Migration history worth knowing:
 
 | Table | Purpose |
 |-------|---------|
-| `users` | User accounts (Lucia auth). `hashed_password` is null for Google-only accounts |
+| `users` | User accounts (Lucia auth). `hashed_password` is null for Google-only accounts. `notification_opt_in` set to 0 turns off the review rejection email |
 | `sessions` | Auth sessions |
 | `verification_tokens` | Email verification links |
 | `password_reset_tokens` | Password reset links |
@@ -140,11 +140,11 @@ Migration history worth knowing:
 | `buildings` | One row per building page, added by a user or by the records seed |
 | `reviews` | Tenant reviews: answers, details, the stored `overall_score`, and moderation state |
 | `review_votes` | Unused. Created by `0001`; no code reads or writes it |
-| `verification_images` | Tenancy verification uploads (the files are in R2) |
+| `verification_images` | Tenancy verification uploads. The files are in R2 until the decision or until their review is deleted. See [`verification_images`](#verification_images) below |
 | `disputes` | Landlord disputes, at most one per review |
 | `notifications` | In-app notifications (created by `0021_reserved.sql`) |
 | `saved_buildings` | Buildings a user has saved |
-| `rate_limits` | D1-backed rate-limit entries |
+| `rate_limits` | D1-backed rate-limit entries, keyed `<endpoint>:<digest>`, never a raw IP or id |
 | `audit_logs` | The admin action log |
 | `bug_reports` | Bug-report form submissions |
 | `contact_messages` | Contact form submissions |
@@ -159,7 +159,7 @@ The `building_scores`, `landlord_scores` and `property_manager_scores` cache tab
 
 **Landlords, managers and owners are different things.** `landlords` and `property_managers` are admin-created profiles, linked through `buildings.landlord_id` and `buildings.property_manager_id`. The names a reviewer types are free text in `reviews.landlord_name` and `reviews.property_manager_name`. Neither table is the owner of record. The assessor's owner of record is in `building_owners`, written by each site or Worker records pull (`src/lib/records/owners.ts`) and by the SQL files that the one-time `npm run records:owners-backfill` writes for a person to apply. The records seed writes no owner rows. `buildings.owner_name`, `owner_entity` and `owner_website` are separate fields that an admin enters.
 
-**IP addresses** are stored raw in one place only: `audit_logs.admin_ip`, the acting admin's IP. `rate_limits.rate_key` holds `<endpoint>:<digest>`, never the raw value. The digest is an HMAC-SHA256 of the client IP, keyed by `RATE_LIMIT_KEY` or, when that is unset, `TURNSTILE_SECRET_KEY`, and cut to 32 hex characters. Some limiters hash a user id instead (signed-in limits such as review submit, building create, save and verification upload), a building id (the admin records pull) or a notice kind (the owner-notice caps). Root AGENTS.md has the rule under "Non-negotiables".
+**IP addresses** are stored raw in one place only: `audit_logs.admin_ip`, the acting admin's IP. `rate_limits.rate_key` holds `<endpoint>:<digest>`, never the raw identifier. The digest is an HMAC-SHA256 of the endpoint and the identifier, keyed by `RATE_LIMIT_KEY` or, when that is unset, `TURNSTILE_SECRET_KEY`, and cut to 32 hex characters. The identifier is the client IP for public limiters. Some limiters use a user id instead (signed-in limits such as review submit, building create, save and verification upload), a building id (the admin records pull) or a notice kind (the owner-notice caps), hashed the same way. No log line carries the client IP. Root AGENTS.md has the rule under "Non-negotiables".
 
 ### Entity Relationships
 
@@ -185,7 +185,7 @@ The diagram shows the core. The other foreign keys:
 Read the migrations for full column lists. These notes cover what a column list does not tell you.
 
 #### `buildings`
-- The core columns come from `0001`: address, `slug`, neighborhood, city, state, ZIP, coordinates, year built, unit count and building type. `slug` is the public URL; never regenerate it. `state` is nullable with no default. `created_at` and `updated_at` are `INTEGER NOT NULL DEFAULT (unixepoch())`, and `updated_at` feeds the sitemap's `lastmod`.
+- The core columns come from `0001`: address, `slug`, neighborhood, city, state, ZIP, coordinates, year built, unit count and building type. `slug` is the public URL; never regenerate it. `state` is nullable with no default. `created_at` and `updated_at` are `INTEGER NOT NULL DEFAULT (unixepoch())`, and `updated_at` feeds the sitemap's `lastmod` (see [Other Pages](#other-pages)).
 - `landlord_id` and `property_manager_id` link the admin-created profiles.
 - `google_place_id` (`0002`) is unique when not null.
 - `0009` added `admin_notes`, plus `public_info`, `owner_name`, `owner_entity` and `owner_website`.
@@ -202,6 +202,13 @@ Read the migrations for full column lists. These notes cover what a column list 
 - The rest hold the written review (`review_title`, `review_text`, `comments`), unit details, rent, laundry, parking, pets, utilities, amenities, pest types, the issue flags, housing-voucher acceptance and night lighting. Most were added by `0004`, `0008` and `0019`.
 
 **Privacy columns.** `unit_number` is collected for moderation only. It is never shown on a public page or used for grouping. `tenure_months` and exact timestamps are collected but never displayed: public pages show fuzzy season and year buckets only. Every `admin_notes` column (on buildings, landlords, property managers, bug reports and contact messages) is internal and must never reach a public SELECT.
+
+#### `verification_images`
+- One row per proof-of-address upload. The file is in R2 (`VERIFICATION_BUCKET`) under a key that names the user and the review, so no log line carries a key or a filename.
+- Approving or rejecting deletes the file and blanks `filename` to `''` (the column is NOT NULL). The row keeps the content type, size, status, moderator and any rejection reason.
+- Deleting a review, or a building with reviews, deletes their files from R2 before the rows go (`src/lib/verificationFiles.ts`). A failed file delete is logged by count, recorded on the audit entry as `verificationFiles` (`removed`, `failed`), and never stops the delete. Orphan cleanup deletes only buildings with no reviews, so it has no files to remove. No route deletes a user, so an account deleted by hand needs its files removed by hand.
+- `GET /api/admin/verification/[id]` serves the file with `Cache-Control: private, no-store`.
+- The checklist on `/admin/verify` names the same documents as the upload modal (`src/components/profile/VerificationModal.tsx`), and `adminVerifyChecklist.test.ts` fails when the two drift apart.
 
 ---
 
@@ -243,7 +250,7 @@ Route-level checks (auth, admin, verified email) are the checklist in root AGENT
 
 ### Security
 - **CSRF:** three layers, audited 2026-04-28 (`.planning/audits/csrf-2026-04.md`). SameSite=Lax on the session cookie and the OAuth-state cookie, Turnstile on the public POSTs listed below (reset-password, though unauthenticated, has none and relies on its single-use token and a rate limit instead), and Astro's `checkOrigin`. `checkOrigin` does not cover `application/json`, so an unauthenticated JSON endpoint must add a content-type guard, a rate limit and Turnstile. `src/pages/api/disputes.ts` is the reference implementation. Root AGENTS.md has the details under "CSRF".
-- **Rate limits:** D1-backed and fail-closed (`checkRateLimit` in `src/lib/rateLimit.ts`). The auth limits are all per IP and listed above. Not every public route has one. `GET /api/buildings/map`, `GET /api/auth/verify-email` and the two Google OAuth GETs have no application limiter, and neither do the D1-backed pages (building, landlord and property manager pages, `/search`, `/owner-of-record`) or the sitemap routes (`/sitemap.xml`, `/sitemaps/*.xml`). `/api/health` is exempt by design.
+- **Rate limits:** D1-backed and fail-closed (`checkRateLimit` in `src/lib/rateLimit.ts`). Each row's key is a keyed hash, never the raw IP (see [Database Schema](#database-schema)). The auth limits are all per IP and listed above. Not every public route has one. `GET /api/buildings/map`, `GET /api/auth/verify-email` and the two Google OAuth GETs have no application limiter, and neither do the D1-backed pages (building, landlord and property manager pages, `/search`, `/owner-of-record`) or the sitemap routes (`/sitemap.xml`, `/sitemaps/*.xml`). `/api/health` is exempt by design.
 - **Turnstile:** on sign-up, sign-in, forgot-password, contact, disputes, bug reports, reviews, record corrections and the records request.
 - **Admin:** every admin API route checks `context.locals.user.isAdmin` in each handler and answers 403. Every `/admin/*` page, and `AdminLayout.astro`, redirects non-admins.
 - **SQL:** request-time D1 queries are parameterized. Two places in `src/lib/records/` build SQL text instead. CKAN SQL for `data.boston.gov` is built by interpolation, guarded by `sqlLiteral`, `addressLikeClauses` and digits-only checks. The offline seed, suffix backfill and owners backfill write D1 SQL files whose values are quoted through `lit()`; `wrangler d1 execute --file` binds nothing. Nothing applies them at request time: the seed applies its own files when a person runs it with `--apply`, and the suffix and owners backfills only write files for a person to apply.
@@ -379,7 +386,7 @@ One entry per key page. The source files are the reference.
 - `/owner-of-record?name=`: an owner's list of buildings, read from `building_owners`.
 - `/review/new` and `/review/edit/[id]`: behind the verified-email gate.
 - `/profile`, `/methodology`, `/dispute`, the auth pages, the content pages, and `/admin/*`, including `/admin/records`.
-- `/sitemap.xml` and `/sitemaps/*.xml` read D1. `/robots.txt` does not: it compares the request host with `SITE_URL` and serves `Disallow: /` on any other host.
+- `/sitemap.xml` and `/sitemaps/*.xml` read D1. A building's `lastmod` is the later of its `updated_at` and its newest records pull. No sitemap date is read from a review, and landlord entries and the static pages carry none. Root AGENTS.md lists the ways the date can still land near a review, under "Traps". `/robots.txt` does not read D1: it compares the request host with `SITE_URL` and serves `Disallow: /` on any other host.
 
 ---
 
@@ -395,7 +402,7 @@ Displays one review. It never shows a unit number. It shows:
 - All 27 items in the score breakdown. Skipped items read "Not rated", and health-weighted items are starred.
 - A Security Deposit highlight, utilities included, amenities, laundry (type and cost per load), parking, pets allowed, pest types and the issue flags.
 - Section 8 voucher and night-lighting tags.
-- A recommend badge with three states: Would recommend, "Maybe / It depends", and Would not recommend.
+- A recommend badge only for the three answers the form offers (`recommendAnswer` in `src/lib/reviewDisplay.ts`): Would recommend, "Maybe / It depends", and Would not recommend. A skipped or unknown answer shows no badge and no empty footer row. The aggregate rates classify answers on their own: they skip a NULL, count a legacy `1` or `true` as yes, and count any other unknown value as no.
 
 ### ScoreCard (`src/components/ratings/ScoreCard.astro`)
 The score sidebar.

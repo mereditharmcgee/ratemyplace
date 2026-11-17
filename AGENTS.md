@@ -42,10 +42,10 @@ and flag it explicitly if a requested change would erode one.
 1. **Tenant anonymity is a safety feature.** Retaliation is the risk being designed
    against. Exact timestamps and tenure are collected but **never displayed** — public
    surfaces show fuzzy buckets only (`src/lib/privacy.ts`). No per-user analytics.
-   *Accurate scope:* reviewer IPs are never stored. `rate_limits` holds only a keyed
-   digest of the client IP, user id or building id, never the raw value (see Rate
-   limiting below). One raw IP **is** persisted: `audit_logs.admin_ip` records the acting
-   admin. Don't widen that, and don't state "no IPs are stored" in public copy.
+   *Accurate scope:* reviewer IPs are never stored. `rate_limits` keys are a keyed hash of
+   the client IP, user id or building id, never the raw IP or id (see Rate limiting
+   below). Admin IPs **are** kept: `audit_logs.admin_ip` records the acting admin's IP.
+   Don't widen that, and don't state "no IPs are stored" in public copy.
 2. **Scoring changes are retroactive and require sign-off.** Touching `ITEM_WEIGHTS`,
    `RECENCY_BANDS`, or the aggregation formula silently rewrites every score in the
    database. Never adjust them as a side effect of another change.
@@ -215,11 +215,13 @@ Rate limiting is **fail-closed**. If the limiter itself errors, the request is r
 allowed through. Preserve that.
 
 The identifier is never stored or logged raw. `checkRateLimit` writes `rate_key` as
-`<endpoint>:<digest>`, an HMAC-SHA256 of the identifier keyed by `RATE_LIMIT_KEY`, or by
-`TURNSTILE_SECRET_KEY` when that is unset; with neither (unit tests, local dev) it is a plain
-SHA-256. The sixth argument is required so a new caller cannot leave it out, and
-`rateLimitKeys.test.ts` fails on a call that does not pass `rateLimitSecret`. Never put the
-client IP in a log line.
+`<endpoint>:<digest>`. The digest is an HMAC-SHA256 of the endpoint and the identifier, cut
+to 32 hex characters and keyed by `RATE_LIMIT_KEY`, or by `TURNSTILE_SECRET_KEY` when that
+is unset. With neither (unit tests, local dev) it is a plain SHA-256. `RATE_LIMIT_KEY` is an
+optional Pages secret, typed in `src/env.d.ts`. Setting or changing it resets every counter
+once, which is harmless. The sixth argument is required so a new caller cannot leave it
+out, and `rateLimitKeys.test.ts` fails on a call that does not pass `rateLimitSecret`. Never
+put the client IP in a log line.
 
 ### CSRF — read before adding any endpoint
 
@@ -265,7 +267,10 @@ A failed or unconfigured send is recorded in `app_settings` as
 "Email delivery"; `emailTrackingContract.test.ts` fails on an untracked send. An intake that
 needs the owner's action calls `queueOwnerNotice(context, { kind, buildingId })`
 (`lib/ownerNotify.ts`) after its write commits. The owner inbox is `OWNER_NOTIFY_EMAIL` in
-`lib/email.ts`; there is no env var for it.
+`lib/email.ts`; there is no env var for it. An email to a review's author about the
+review's status checks `wantsReviewStatusEmail` (`lib/notifications.ts`) first, which reads
+the profile's opt-out (`users.notification_opt_in`). The in-app notification is written
+either way.
 
 ## Traps
 
@@ -496,10 +501,23 @@ Things that have already cost time. Read before debugging.
   `clientLeafModules.test.ts` enforces. Importing a server module such as `reviewHandoff`,
   `buildingResolve`, `places` or `records/*` into an island ships its module-level code to
   every browser.
-- **`buildings.updated_at` feeds sitemap `lastmod`.** Do not bump it on a no-op write; a
-  write-through that stamps nothing new would move a page's date for every crawler with no
-  content change behind it. `POST /api/buildings` only stamps a matched row when it has
-  something to add and the row lacks it.
+- **A building's sitemap `lastmod` is the later of `buildings.updated_at` and its newest
+  records pull.** No sitemap date is read from a review, and landlord entries carry none: a
+  date that moved on approval would publish the day a tenant posted. Do not bump
+  `updated_at` on a no-op write; a write-through that stamps nothing new would move a page's
+  date for every crawler with no content change behind it. `POST /api/buildings` only stamps
+  a matched row when it has something to add and the row lacks it. The date can still land
+  near a review: a building a reviewer adds is created just before the review, linking a
+  landlord during moderation bumps `updated_at`, and approving a review of a building with
+  no deeper records queues a pull that the Worker runs about a minute later.
+- **Deleting a review deletes its proof-of-address files first.** The review and building
+  `DELETE` routes look up the affected `verification_images` keys, delete the files from R2
+  (`src/lib/verificationFiles.ts`), then delete the rows, and record `verificationFiles`
+  (`removed`, `failed`) on the audit entry. A failed file delete is logged by count only and
+  never stops the admin's delete. Any new path that deletes reviews needs the same step, or
+  the file stays in R2 with nothing pointing at it. No route deletes a user, so an account
+  deleted by hand needs its files removed by hand. Keys and filenames name the tenant, so no
+  log line carries either.
 - **An `_`-prefixed file under `src/pages/` is not a route.** Astro excludes it from
   file-based routing, which is how `src/pages/api/admin/records/queue/_json.ts` can be a
   shared helper next to the endpoints that import it. The rule cuts the other way for
