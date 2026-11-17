@@ -196,6 +196,10 @@ React island imports it; `clientLeafModules.test.ts` enforces each one.
 - **`emailVerification.ts`** (server) is the 403 gate: `hasVerifiedEmail` (strict
   `emailVerified === true`) and `emailVerificationRequired()`, called right after the 401 in
   every review write and on both review pages.
+- **`reviewChecklistCopy.ts`** (leaf) is the "Before you submit" checklist and the "may be
+  able to identify me" box's text. Both review forms render it through
+  `components/reviews/ReviewAcknowledgements.tsx`, and Submit or Save stays disabled until that
+  box and the Terms box are both ticked. Neither box is sent to the server or checked there.
 - **`passwordPolicy.ts`** (leaf) is the password minimum (8) for sign-up, reset and settings,
   and sign-in's legacy floor (6) for passwords made before March 2026.
 

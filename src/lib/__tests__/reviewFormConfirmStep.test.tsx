@@ -66,6 +66,8 @@ function Harness({ resetSignal = 0, authExpired = false, onSubmit = () => {}, on
       scores={{}}
       privacyAcknowledged
       onPrivacyChange={() => {}}
+      identifyRiskAcknowledged
+      onIdentifyRiskChange={() => {}}
       turnstileToken={token}
       onTurnstileToken={(value) => {
         onToken(value);

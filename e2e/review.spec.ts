@@ -8,8 +8,9 @@ import {
   TURNSTILE_SCRIPT,
   TURNSTILE_TEST_TOKEN,
 } from './test-harness';
-import { rateAllItemsInStep } from './review-helpers';
+import { rateAllItemsInStep, tickAcknowledgements } from './review-helpers';
 import { EMAIL_GATE_COPY } from '../src/lib/contributionCopy';
+import { REVIEW_CHECKLIST_COPY } from '../src/lib/reviewChecklistCopy';
 import { REVIEW_LIMIT_COPY } from '../src/lib/reviewLimits';
 
 const BASE_URL = resolveLocalE2EBaseURL();
@@ -75,11 +76,11 @@ test.describe('Review Form', () => {
     // ── Step 7: Confirm step ─────────────────────────────────────────────────
     await expect(authedPage.locator('text=Review Summary').first()).toBeVisible({ timeout: 10000 });
 
-    // Submit button must be disabled until privacy checkbox is checked
+    // Submit button must be disabled until both acknowledgement boxes are ticked
     await expect(authedPage.locator('button[type="button"]', { hasText: 'Submit Review' })).toBeDisabled();
 
-    // Check the privacy acknowledgment checkbox
-    await authedPage.locator('input[type="checkbox"]').check();
+    // Tick the identify box and the Terms box
+    await tickAcknowledgements(authedPage);
 
     // Submit button should now be enabled
     await expect(authedPage.locator('button[type="button"]', { hasText: 'Submit Review' })).toBeEnabled();
@@ -196,12 +197,17 @@ test.describe('Review Form', () => {
     await expect(authedPage.locator('text=How long did you live').first()).toBeVisible({ timeout: 10000 });
     await authedPage.locator('button[type="button"]', { hasText: 'Review & Submit' }).click();
 
-    // Confirm step — Submit Review should be disabled without checkbox
+    // Confirm step — Submit Review should be disabled until both boxes are ticked
     await expect(authedPage.locator('text=Review Summary').first()).toBeVisible({ timeout: 10000 });
     await expect(authedPage.locator('button[type="button"]', { hasText: 'Submit Review' })).toBeDisabled();
+    await expect(authedPage.getByText(REVIEW_CHECKLIST_COPY.submitHint)).toBeVisible();
 
-    // Check the privacy acknowledgment checkbox
-    await authedPage.locator('input[type="checkbox"]').check();
+    // The Terms box alone is not enough
+    await authedPage.getByRole('checkbox', { name: /I confirm this review/ }).check();
+    await expect(authedPage.locator('button[type="button"]', { hasText: 'Submit Review' })).toBeDisabled();
+
+    // Tick the identify box too
+    await authedPage.getByRole('checkbox', { name: REVIEW_CHECKLIST_COPY.identifyAcknowledgement }).check();
 
     // Now Submit Review should be enabled
     await expect(authedPage.locator('button[type="button"]', { hasText: 'Submit Review' })).toBeEnabled();
@@ -322,9 +328,9 @@ test.describe('Concurrent Submissions', () => {
       await page.waitForSelector('text=How long did you live', { timeout: 10000 });
       await page.locator('button[type="button"]', { hasText: 'Review & Submit' }).click();
 
-      // Confirm — check privacy checkbox and wait for Submit to be enabled
+      // Confirm — tick both acknowledgement boxes and wait for Submit to be enabled
       await page.waitForSelector('text=Review Summary', { timeout: 10000 });
-      await page.locator('input[type="checkbox"]').check();
+      await tickAcknowledgements(page);
       await page.waitForFunction(
         () => {
           const btn = Array.from(document.querySelectorAll('button[type="button"]')).find(
@@ -415,7 +421,7 @@ test.describe('Review form funnel', () => {
     await expect(page.locator('text=How long did you live').first()).toBeVisible({ timeout: 10000 });
     await page.locator('button[type="button"]', { hasText: 'Review & Submit' }).click();
     await expect(page.locator('text=Review Summary').first()).toBeVisible({ timeout: 10000 });
-    await page.locator('input[type="checkbox"]').check();
+    await tickAcknowledgements(page);
   }
 
   async function signIn(page: Page, email = SEED_EMAIL) {

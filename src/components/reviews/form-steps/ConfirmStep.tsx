@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { unitItems, buildingItems, landlordItems, supplementaryItems } from '../../../lib/surveyItems';
 import { bedroomOptions, bathroomOptions } from '../../../lib/formOptions';
+import { REVIEW_CHECKLIST_COPY } from '../../../lib/reviewChecklistCopy';
+import ReviewAcknowledgements from '../ReviewAcknowledgements';
 import type { Building, UnitDetails, Tenancy, ReviewData } from './types';
 
 const TURNSTILE_SITEKEY = '0x4AAAAAACo4KpkxsacPhM2r';
@@ -25,8 +27,12 @@ interface Props {
   tenancy: Tenancy;
   review: ReviewData;
   scores: Record<string, number | null>;
+  /** The Terms of Service box. */
   privacyAcknowledged: boolean;
   onPrivacyChange: (acknowledged: boolean) => void;
+  /** The "my landlord may be able to identify me" box. Submit needs both. */
+  identifyRiskAcknowledged: boolean;
+  onIdentifyRiskChange: (acknowledged: boolean) => void;
   turnstileToken: string | null;
   onTurnstileToken: (token: string | null) => void;
   loading: boolean;
@@ -52,6 +58,8 @@ export default function ConfirmStep({
   scores,
   privacyAcknowledged,
   onPrivacyChange,
+  identifyRiskAcknowledged,
+  onIdentifyRiskChange,
   turnstileToken,
   onTurnstileToken,
   loading,
@@ -72,6 +80,7 @@ export default function ConfirmStep({
   // an error from an earlier visit.
   const lastErrorSeqRef = useRef(errorSeq);
   const confirmTextId = useId();
+  const identifyTextId = useId();
   const waitingId = useId();
 
   // The script never arrived within POLL_TICKS. "Try again" clears it and polls again.
@@ -175,7 +184,11 @@ export default function ConfirmStep({
   // which is on the page before the message is. A submit error still takes precedence, as it
   // did when the two shared one banner.
   const turnstileMessage = error ? null : turnstileError || (loadFailed ? TURNSTILE_LOAD_FAILED_COPY : null);
-  const waiting = privacyAcknowledged && !turnstileToken && !turnstileError && !loadFailed && !loading;
+  const acknowledged = privacyAcknowledged && identifyRiskAcknowledged;
+  const waiting = acknowledged && !turnstileToken && !turnstileError && !loadFailed && !loading;
+  // Says why Submit is disabled: a box left unticked, or the widget still working. It sits in
+  // the live region under Submit, which is also part of Submit's description.
+  const submitNote = !acknowledged ? REVIEW_CHECKLIST_COPY.submitHint : waiting ? TURNSTILE_WAITING_COPY : '';
 
   const unitScoreCount = unitItems.filter((item) => scores[item.key] !== undefined).length;
   const buildingScoreCount = buildingItems.filter((item) => scores[item.key] !== undefined).length;
@@ -183,46 +196,14 @@ export default function ConfirmStep({
 
   return (
     <div className="space-y-6">
-      <div className="bg-amber-50 border border-amber-200 rounded-[6px] p-4">
-        <div className="flex gap-3">
-          <div className="shrink-0">
-            <svg aria-hidden="true" className="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-          </div>
-          <div className="flex-1">
-            <h4 className="font-semibold text-amber-800 mb-1">Before you submit</h4>
-            <p className="text-sm text-amber-700 mb-3">
-              Your landlord may be able to identify you based on details in your review. Avoid mentioning
-              specific dates, unit numbers, or personal details.
-            </p>
-            <label className="flex items-start gap-3 py-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={privacyAcknowledged}
-                onChange={(e) => onPrivacyChange(e.target.checked)}
-                className="mt-0.5 h-5 w-5 shrink-0 accent-amber-600"
-              />
-              <span id={confirmTextId} className="text-sm text-amber-800">
-                I confirm this review reflects my honest personal experience and agree to the{' '}
-                <a href="/terms" target="_blank" className="underline font-medium hover:text-amber-900">
-                  Terms of Service
-                </a>{' '}
-                and{' '}
-                <a href="/guidelines" target="_blank" className="underline font-medium hover:text-amber-900">
-                  Review Guidelines
-                </a>
-                .
-              </span>
-            </label>
-          </div>
-        </div>
-      </div>
+      <ReviewAcknowledgements
+        identifyAcknowledged={identifyRiskAcknowledged}
+        onIdentifyChange={onIdentifyRiskChange}
+        termsAcknowledged={privacyAcknowledged}
+        onTermsChange={onPrivacyChange}
+        identifyTextId={identifyTextId}
+        termsTextId={confirmTextId}
+      />
 
       {error && (
         <div ref={submitErrorRef} tabIndex={-1} className="bg-red-50 border border-red-200 rounded-[6px] p-4 text-red-700">
@@ -315,8 +296,8 @@ export default function ConfirmStep({
         <button
           type="button"
           onClick={onSubmit}
-          disabled={loading || !privacyAcknowledged || !turnstileToken}
-          aria-describedby={`${confirmTextId} ${waitingId}`}
+          disabled={loading || !acknowledged || !turnstileToken}
+          aria-describedby={`${identifyTextId} ${confirmTextId} ${waitingId}`}
           className="h-11 inline-flex items-center justify-center px-6 bg-teal-700 text-white font-semibold rounded-[4px] hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Submitting...' : 'Submit Review'}
@@ -324,7 +305,7 @@ export default function ConfirmStep({
       </div>
 
       <p id={waitingId} aria-live="polite" className="text-sm text-gray-600 text-right min-h-5">
-        {waiting ? TURNSTILE_WAITING_COPY : ''}
+        {submitNote}
       </p>
     </div>
   );

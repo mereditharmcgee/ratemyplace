@@ -5,7 +5,7 @@ import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import { test, expect, clearRateLimits, resetE2eAccountReviews } from './fixtures';
 import { executeLocalD1 } from './test-harness';
-import { prepare, rateAllItemsInStep } from './review-helpers';
+import { prepare, rateAllItemsInStep, tickAcknowledgements } from './review-helpers';
 import { FY2026_RESOURCE_ID } from '../src/lib/records/sources/boston/assessor';
 import { PERMITS_RESOURCE_ID } from '../src/lib/records/sources/boston/permits';
 import { VIOLATIONS_RESOURCE_ID } from '../src/lib/records/sources/boston/violations';
@@ -631,7 +631,7 @@ for (const viewport of VIEWPORTS) {
       await button(page, 'Review & Submit').click();
 
       await page.getByRole('heading', { name: 'Review Summary' }).waitFor();
-      await page.locator('input[type="checkbox"]').check();
+      await tickAcknowledgements(page);
       await waitForEnabled(page, 'Submit Review');
       await scan(page, viewport, at('confirm', 'ready to submit'));
 
