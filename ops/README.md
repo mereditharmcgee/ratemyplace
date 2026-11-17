@@ -39,9 +39,9 @@ conversations, or record what someone said off the record.
 
 Every file carries a `Last reviewed:` date. That is a claim, and it can be wrong.
 
-Two rules, both learned the hard way in this repo — `VERSION.md` sat frozen at
-v1.1.0-alpha for seven months, and `MASTER.md` described fraud controls that were never
-built:
+Two rules, both learned the hard way in this repo — `VERSION.md` (now
+`docs/archive/VERSION.md`) sat frozen at v1.1.0-alpha for seven months, and `MASTER.md`
+described fraud controls that were never built:
 
 1. **Numbers are generated, never typed.** Anything countable comes from
    `npx tsx scripts/ops-metrics.ts`. If you find yourself typing a figure into a document,

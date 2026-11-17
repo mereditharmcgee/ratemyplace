@@ -568,4 +568,6 @@ The scoring methodology is grounded in peer-reviewed public health research:
 
 ## Version History
 
-See [VERSION.md](./VERSION.md) for full changelog.
+Release history is in [`.planning/ROADMAP.md`](.planning/ROADMAP.md) (milestones) and the git
+history. The old changelog, which stops at v1.1.0-alpha, is archived at
+[`docs/archive/VERSION.md`](docs/archive/VERSION.md).

@@ -733,7 +733,7 @@ ratemyplace-boston/
 ├── tailwind.config.cjs
 ├── package.json
 ├── CLAUDE.md                          # Coding conventions
-├── CLAUDE_CONTEXT.md                  # Project context for Claude Code agents
+├── AGENTS.md                          # Agent instructions (canonical)
 ├── ARCHITECTURE.md                    # Technical architecture reference
 ├── brand.md                           # Brand bible (voice + visual)
 ├── MASTER.md                          # This document — canonical product spec
