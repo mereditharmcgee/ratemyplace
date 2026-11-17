@@ -62,9 +62,10 @@ export default function ReviewEditForm({ review }: Props) {
   const [propertyManagerName, setPropertyManagerName] = useState((review as any).property_manager_name || '');
   const [reviewText, setReviewText] = useState(review.review_text || review.comments || '');
 
-  // Would recommend - canonical text column
+  // Would recommend - canonical text column. A skipped answer starts with no radio checked
+  // and is saved as NULL, never as 'no', which would show "Would not recommend".
   const [wouldRecommend, setWouldRecommend] = useState<string>(
-    review.would_recommend_new || 'no'
+    review.would_recommend_new ?? ''
   );
 
   // Amenities & utilities
@@ -206,7 +207,7 @@ export default function ReviewEditForm({ review }: Props) {
           property_manager_name: hasSeparateManager && propertyManagerName ? propertyManagerName : null,
           review_text: reviewText || null,
           comments: reviewText || null,
-          would_recommend_new: wouldRecommend,
+          would_recommend_new: wouldRecommend || null,
           had_pest_issues: hadPestIssues,
           had_heat_issues: hadHeatIssues,
           had_water_issues: hadWaterIssues,

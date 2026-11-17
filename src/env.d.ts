@@ -33,6 +33,9 @@ declare namespace App {
       DB: D1Database;
       VERIFICATION_BUCKET: R2Bucket;
       TURNSTILE_SECRET_KEY: string;
+      // Optional key for the rate_limits digest (`rateLimitSecret` in src/lib/rateLimit.ts).
+      // Unset falls back to TURNSTILE_SECRET_KEY.
+      RATE_LIMIT_KEY?: string;
       GOOGLE_CLIENT_ID: string;
       GOOGLE_CLIENT_SECRET: string;
       GOOGLE_MAPS_API_KEY: string;

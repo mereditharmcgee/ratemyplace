@@ -1,6 +1,6 @@
 # RateMyPlace Boston — Master Project Document
 
-*Version 1.2 | November 2026*
+*Version 1.3 | November 2026*
 
 ---
 
@@ -102,7 +102,7 @@ RateMyPlace Boston is a tenant-powered housing review platform that allows rente
 - Your identity is protected through anonymization
 - We clearly communicate risks and best practices
 - We never share your information with landlords
-- You can delete your account and data
+- Ask us and we delete your account and its data, or send you a copy of it
 
 **To landlords:**
 - Reviews go through moderation
@@ -133,11 +133,11 @@ Design rules:
 - **Standardized scales**: All scored items use a 5-point Likert (Strongly Disagree → Strongly Agree)
 - **Behavioral anchoring**: Items describe observable conditions, not opinions
 - **Health-relevant dimensions**: Every item maps to a documented health pathway
-- **Domain-separated scoring**: Scores are reported separately for unit, building, and landlord rather than as a single number
+- **Overall and domain scores**: An overall score is shown with the unit, building and landlord scores beside it, so readers can see where a place is strong or weak
 
 The total instrument is **27 scored items** (Unit 10 + Building 9 + Landlord 8) plus 5 ancillary supplementary items that capture context but are not fed into the score. Canonical source: `src/lib/surveyItems.ts`.
 
-### Unit rating (10 items, all required)
+### Unit rating (10 items, all recommended)
 
 | Code | Dimension | Survey item |
 |------|-----------|-------------|
@@ -216,7 +216,7 @@ Weights are set item by item for health and safety risk, not by source instrumen
 - Building scores: shown with 1+ approved review. A building score from 1-2 approved reviews (below `NAMED_PARTY_MIN_REVIEWS`) is shown as an early rating on the building page, in search results and home search suggestions, in the building lists on landlord and property manager pages, and in the map's info window. The number is muted gray with a dot in its band color, and issue and recommend figures on the building page appear as counts, not percentages (`src/lib/earlyRating.ts`). Map pins and the saved-buildings list on a signed-in user's own profile page (`/profile`) still show the plain score in its band color.
 - Named-party aggregates (landlords and property managers): shown only with 3+ approved reviews across the named party's portfolio
 
-Only B7, B8, L6 and L7 offer an N/A button. The other 23 items are marked required with an asterisk, but nothing enforces it: the rating steps never block Continue, and the form and server need only one answered item. Every unanswered item (N/A, skipped, or absent on a legacy or API-written review) is left out of every average and shows on the review card as a muted "Not rated" row, so readers can tell a skipped item from a low score.
+Every item is recommended, and a review needs at least one answered item, which the form and server check. Only B7, B8, L6 and L7 offer an N/A button. The form still marks the other 23 with the red asterisk that usually means required, but the rating steps never block Continue. Every unanswered item (N/A, skipped, or absent on a legacy or API-written review) is left out of every average and shows on the review card as a muted "Not rated" row, so readers can tell a skipped item from a low score.
 
 For the full methodology including weighting tables, item-level rationale, and academic citations, see the live methodology page (`src/pages/methodology.astro`) and `src/lib/scoring.ts`.
 
@@ -232,13 +232,13 @@ We collect precise data for analysis and moderation but display fuzzy data to pr
 
 | Data point | Collected | Displayed | Rationale |
 |------------|-----------|-----------|-----------|
-| Submission date | Exact timestamp | Never shown | Prevents identification |
+| Submission date | Exact timestamp | Never shown. No sitemap date is read from a review (see section 8) | Prevents identification |
 | Move-in | Optional month and year. Only the season and year are stored, never the month. `move_in_given` (migration 0035) records which parts were given | Season chip: season and year, or the year alone. On reviews written since migration 0035 (October 27, 2026), a skipped part is never shown. Older reviews (`move_in_given` NULL) show the stored move-in. There a skipped part holds a placeholder (winter for a skipped month, the submission year for a skipped year), and the move-in is dropped only when it would fall after the move-out year | The month is never kept |
 | Move-out timing | One choice from the form's list: a recent year, "2020 or earlier", or "I still live here" (the default). The years are hard-coded in `supplementaryItems.moveOutTiming` in `src/lib/surveyItems.ts` | The year in the season chip (for example "Summer 2024 · 2025"), plus a years-ago label from `formatRecency` | Year only |
 | Tenure | One of six ranges (preselected to 1-2 years), stored as 6, 9, 18, 36, 48 or 72 months | Never shown on any public page | Context only |
 | Unit details | Unit type, monthly rent, bedrooms, bathrooms, square footage | Shown on review cards (rent as $X/mo) | Lets readers compare units |
 | Unit number | Optional, private moderation field | Never shown publicly. Admins see it, and the reviewer sees it on their own edit form | See note below |
-| IP address | Never stored with a review. Rate limiters keep client IPs for each limiter's window, and the audit log keeps admin IPs (see technical protections) | N/A | Privacy protection |
+| IP address | Never stored with a review. Rate limiters keep a keyed hash of the client IP for each limiter's window, never the IP itself, and the audit log keeps admin IPs (see technical protections) | N/A | Privacy protection |
 | Reviewer account | Linked in DB | Never shown | Lets the reviewer edit the review and upload proof of address. Reviewers cannot delete a review; only an admin can |
 
 **Note on `reviews.unit_number`:** The column was added in migration `0004_survey_scores.sql` for per-unit grouping of reviews on building pages. Since commit `e003645` it is not shown on any public surface, and building pages group reviews by bedroom count. It is kept as an optional field on the review form and the edit form, labelled "For our moderation team only. Never shown publicly." `POST /api/reviews` and `PATCH /api/reviews/[id]` write it. Only admins see it (review detail and the admin list API), and the reviewer sees it on their own edit form. No migration drops it, and the 2026-08-26 trust-density design keeps it. The earlier plan to drop it around May 14, 2026 lapsed.
@@ -255,7 +255,7 @@ We collect precise data for analysis and moderation but display fuzzy data to pr
 
 ### Technical protections
 
-- No IP address is stored with a review. IPs are kept in two operational places. Public limiters write `rate_limits` rows keyed `<endpoint>:<ip>`, each kept for its window: one hour for most public forms, 15 minutes for sign-in, 60 seconds for search, autocomplete, Places and building lookups. Expired rows are purged on a later limiter call. `audit_logs.admin_ip` records the acting admin. Turnstile also sends the client IP to Cloudflare. Some limiters key on the account or the building instead of the IP.
+- No IP address is stored with a review. Public limiters write `rate_limits` rows keyed `<endpoint>:<digest>`, where the digest is a keyed hash of the client IP, never the IP itself. Each row is kept for its window: one hour for most public forms, 15 minutes for sign-in, 60 seconds for search, autocomplete, Places and building lookups. Expired rows are purged on a later limiter call. `audit_logs.admin_ip` records the acting admin, the one place an IP is kept. Turnstile also sends the client IP to Cloudflare. Some limiters key on the account or the building instead of the IP, and those are hashed the same way.
 - Fuzzy date display: `formatTenancyRange` (`src/lib/privacy.ts`), rendered by `SeasonChip`, shows the move-in season and year and the move-out year. `formatRecency` adds a label counted from the move-out year: "Current tenant", "Past tenant", "Within the last year", "About 1 year ago", "1–3 years ago" and so on up to "10+ years ago". Cards show both.
 - Rate limiting to prevent enumeration attacks
 - No analytics that track individual users
@@ -299,12 +299,14 @@ Reviews without verification simply lack the badge — they are not labeled "Unv
 ### Accepted documents
 
 Must show address matching the reviewed building:
-- Utility bill (electric, gas, water, internet)
-- Bank statement
-- Government mail
-- Lease agreement (sensitive terms may be redacted)
+- Lease or rental agreement (sensitive terms may be redacted)
+- Utility bill (gas, electric or water)
+- Rent receipt or payment confirmation
+- Any piece of mail showing the tenant's name and the building's address
 
-**Not accepted:** ID cards (we verify residence, not identity)
+This is the upload form's list (`src/components/profile/VerificationModal.tsx`), and the admin checklist on `/admin/verify` matches it.
+
+**Not accepted:** photo IDs (we verify residence, not identity)
 
 ### Verification workflow
 
@@ -314,13 +316,16 @@ Must show address matching the reviewed building:
 4. Document **immediately deleted** regardless of decision
 5. User notified of outcome (**Planned**). Today no notification or email is sent. An approval shows only as the Verified badge. A rejection, and its optional reason, is stored but never shown to the user. The profile shows the same "Verify your tenancy" prompt on every unverified review, whether no document was sent, one is waiting for a decision or one was rejected.
 
-Only the uploaded file is deleted. The `verification_images` row stays, with the original filename, content type, size, status, the deciding moderator and any rejection reason. It is removed only when its review or user is deleted.
+Only the uploaded file is deleted. The `verification_images` row stays, with the content type, size, status, the deciding moderator and any rejection reason. The decision blanks the original filename (to an empty string, as the column is NOT NULL), since a tenant's filename often names their address or unit. The row is removed only when its review or user is deleted. Rows decided before this change keep their filename until migration `0036` is applied by hand (see `migrations/AGENTS.md`).
+
+A file still waiting for a decision does not outlive its review. When an admin deletes a review, or the building it belongs to, the route deletes the review's files from R2 first (`src/lib/verificationFiles.ts`). If R2 refuses one, the failure is logged without the file's key or name, the review or building is still deleted, and the audit entry records how many files were removed and how many failed. Orphan cleanup deletes only buildings with no reviews, so it never has files to remove. No route deletes an account. An account deleted on request is deleted by hand, and any file it still has in R2 must be removed by hand too.
 
 ### Security
 
 - Documents stored in encrypted temporary bucket
 - Only designated moderators can view
-- Automatic deletion after decision
+- The admin view is sent with `Cache-Control: private, no-store`, so browsers and proxies are told not to keep a copy
+- Automatic deletion after decision, or when the review or its building is deleted
 - Audit log of each decision (`verification_approved`, `verification_rejected`), with the admin's id and IP. Logging who viewed a document is **Planned**; viewing is not logged today.
 
 ---
@@ -383,7 +388,7 @@ These signals will prioritize human review; they will not make publication or re
 - Supporting documentation uploads (optional)
 
 **Dispute review process:**
-1. Received within 5 business days
+1. Automatic receipt sent on submission. Reviewed in a reasonable time, with no fixed deadline
 2. Compare claims to review content
 3. Decision: No action / Flag for detailed review / Remove specific content
 4. Notify landlord of outcome (general terms only)
@@ -396,7 +401,7 @@ A review can be disputed only once (`review_id` is unique in `disputes`), so it 
 
 ### User notifications
 
-**Built today:** Review approval or rejection attempts to create an in-app notification. When email delivery is configured, rejection also queues an email with any supplied moderator reason and a link to the edit-and-resubmit flow. The reviewer also gets an in-app notification when a landlord disputes their review (`review_disputed`) and when that dispute is resolved (`dispute_resolved`). The profile setting "Email me when my review status changes" is stored in `users.notification_opt_in`, but no send path reads it yet.
+**Built today:** Review approval or rejection attempts to create an in-app notification. When email delivery is configured, rejection also queues an email with any supplied moderator reason and a link to the edit-and-resubmit flow. The reviewer also gets an in-app notification when a landlord disputes their review (`review_disputed`) and when that dispute is resolved (`dispute_resolved`). The profile setting "Email me when my review status changes" is stored in `users.notification_opt_in`. The rejection email is the only email a reviewer gets about a review's status, and it is skipped when they have turned the setting off (`wantsReviewStatusEmail` in `src/lib/notifications.ts`). The in-app notification is written either way.
 
 **Planned:** When a moderator edits or redacts content, the user will receive an email explaining what changed, why, and how to appeal or resubmit.
 
@@ -440,18 +445,19 @@ The schema is the SQL files in [`migrations/`](migrations/), read in order. Late
 | `notifications`, `saved_buildings` | In-app tenant notifications and saved buildings |
 | `contact_messages`, `bug_reports` | Inbound forms with admin queues |
 | `audit_logs` | Admin actions, old value to new value, with the acting admin's id and IP |
-| `rate_limits` | Rate limiter rows, keyed `<endpoint>:<identifier>` and windowed |
+| `rate_limits` | Rate limiter rows, keyed `<endpoint>:<digest>` and windowed. The digest is a keyed hash of the IP, account or building, never the raw value |
 | `record_pulls`, `building_records`, `record_corrections`, `records_queue`, `building_owners` | Public building records: per-run provenance, typed record payloads, "report a record error" claims, the pull queue the Cron Worker drains, and the assessor's owner of record |
 | `app_settings` | Key/value operator settings: the records pipeline's keys (`records_fill_paused`, the breaker state and the last fixture result; `SETTING_KEYS` in `src/lib/records/settings.ts`) and the site's email-health and owner-notice records (`SITE_SETTING_KEYS` in `src/lib/siteSettings.ts`) |
 
 Scores are computed when a page is read, from approved reviews (`src/lib/scoring.ts`, with its SQL mirror in `src/lib/scoring-sql.ts`). There is no score cache table, and adding one back needs a deliberate decision.
 
 **Facts that matter for privacy:**
-- Review rows hold no IP. `rate_limits` holds raw client IPs for the IP-keyed limiters. Each of those rows expires at the end of its limiter's window (at most one hour), but expired rows are deleted only when a later limiter check runs, so a row can outlast its window when the site is quiet. `audit_logs.admin_ip` keeps each acting admin's IP permanently. The review-submit limiter is keyed on the account, not the IP.
+- Review rows hold no IP. `rate_limits` holds a keyed hash of each limiter's identifier (the client IP, an account or a building), never the raw value. Each of those rows expires at the end of its limiter's window (at most one hour), but expired rows are deleted only when a later limiter check runs, so a row can outlast its window when the site is quiet. `audit_logs.admin_ip` keeps each acting admin's IP permanently. The review-submit limiter is keyed on the account, not the IP.
 - `reviews.unit_number` is a private moderation field and is kept (see section 5).
 - Through the review and edit forms, tenancy is stored coarsely: `tenure_months` holds one of six bucket values and `move_out_year_new` holds `current`, a year or `2020_or_earlier`. Neither route checks these values against those lists, and the columns have no CHECK constraint, so a hand-made request can store other values. Move-in keeps only the season and year. A part the reviewer skipped holds a placeholder (winter, the current year) in the NOT NULL `move_in_year` and `move_in_season` columns, and `move_in_given` (0035) tells public pages which parts to show; it is NULL on reviews written before it existed. `move_out_season` is set only on reviews written before January 2026.
-- A verification document is deleted from R2 after the decision, but its `verification_images` row stays, with the user's original filename.
-- `users.notification_opt_in` is stored, but no send path honors it.
+- A verification document is deleted from R2 at the decision, or earlier if its review or building is deleted. After a decision its `verification_images` row stays, with the filename blanked.
+- A building's sitemap `lastmod` is the later of `buildings.updated_at` and its newest records pull. Landlord entries carry none, and no sitemap date is read from a review. The date can still land near a review: a building a reviewer adds is created just before the review, linking a landlord during moderation bumps `updated_at`, and approving a review of a building with no deeper records queues a pull that runs about a minute later.
+- `users.notification_opt_in` (default 1) turns off the review rejection email when it is 0. In-app notifications do not read it.
 
 **Other things to know:**
 - Four of the 27 item columns accept N/A, stored as NULL and left out of every aggregate: `building_laundry`, `building_parking`, `landlord_deposit` and `landlord_rent_practices`. Every item column allows NULL.
@@ -499,7 +505,7 @@ A short map, without per-file lists. For full listings use `git ls-files`. For c
 - The `review-submit` limiter (10 attempts per account per hour) still runs before the guarded insert.
 - Building creation is limited per account (the `building-create` limiter).
 - Email and password sign-up is limited per IP (the `signup` limiter, 3 per hour). Google OAuth creates accounts in its callback with no app rate limit and no Turnstile.
-- Public forms and lookups are rate limited per IP through `checkRateLimit` (`src/lib/rateLimit.ts`): sign-in, forgot and reset password, verification resend, contact, disputes, bug reports, record corrections, search, Places and building lookup. Each limiter's key, count and window sit at its call site under `src/pages/api/`.
+- Public forms and lookups are rate limited per IP through `checkRateLimit` (`src/lib/rateLimit.ts`): sign-in, forgot and reset password, verification resend, contact, disputes, bug reports, record corrections, search, Places and building lookup. Each limiter's key, count and window sit at its call site under `src/pages/api/`. The stored key is a keyed hash of the IP or account, never the raw value.
 - The records request button is limited per IP and by a site-wide daily cap (`REQUEST_PER_IP` and `REQUEST_DAILY_CAP` in `src/lib/records/request.ts`).
 - The server validates Cloudflare Turnstile on sign-up, sign-in, forgot-password, contact, dispute, bug-report, review-submission, record-correction and records-request forms.
 - A review that is at least the fifth review of its building in the 24 hours up to its own submission shows the advisory `building_velocity` badge on `/admin/reviews`; the first four in a burst do not (`BUILDING_VELOCITY_MIN` and `VELOCITY_WINDOW_SECONDS` in `src/lib/reviewFlags.ts`, built 2026-11-14). The other advisory badges are `possible_email`, `possible_phone` and `possible_link`, for a possible email address, phone number or web link in the title, text, comments, landlord name or manager name, and `repeat_reviewer`, for an account with more than one review of the same building (each of those reviews shows it).
@@ -540,7 +546,7 @@ The published terms are at `/terms` (`src/pages/terms.astro`).
 
 **Who sees data:** Public sees anonymized reviews; team sees email and verification docs; no one else
 
-**Your rights:** Delete account, download data, edit/remove reviews
+**Your rights:** Ask us and we delete your account and its data, reviews included, or send you a copy of it. You can edit your own reviews, and ask us to remove one.
 
 ### Future legal review
 
@@ -618,6 +624,7 @@ The phase lists below are the original plan, ticked as items shipped. Milestone 
 
 ## Changelog
 
+- **v1.3 (November 17, 2026)**: Owner-approved wording. §3 and §9: deleting an account and its data, or sending a copy, is on request, and §9 keeps the right to ask us to remove a review. The privacy page offers the deletion on request but does not yet offer the copy. §4: the overall score is shown with the three domain scores beside it, and every item is recommended, with at least one answered item needed. §6: the accepted documents are the upload form's list, and photo IDs are still not accepted. §7: a dispute gets an automatic receipt and has no fixed review deadline, as the Terms say. Built-today text updated for the November 17 privacy fixes: rate limiter keys are a keyed hash, sitemap dates no longer come from reviews, the email setting is honored, and verification files go with their review or building, are not cached and lose their filename at the decision.
 - **v1.2 (November 17, 2026)**: Checked the built-today text against the code. §4: tenure ranges, title and comment limits, and scoring logic as coded (per-item weights, pooled overall, recency bands, early ratings, unenforced required items and "Not rated" rows). §5: collection-vs-display table corrected (move-in row, coarse move-out and tenure, unit details, IP scope, reviewer account), `unit_number` kept as a private field with no drop planned, sign-up and pre-submit copy as built (the unbuilt items kept as Planned), records request behavior, owner of record list, search order, seed page count removed. §6: no outcome notification yet; only decisions are audited; the submission row outlives the file. §7: admin review delete and building cascade, submission limits and advisory signals now built, dispute outcomes and notifications as built. §8: stack table completed (password auth, email, Turnstile, maps, Cron Worker, records source, tests); the column-by-column schema and the file tree replaced with short summaries that point to `migrations/`, `migrations/AGENTS.md` and `ARCHITECTURE.md`; fraud prevention split corrected. §9: pointer to the published terms. §10: pointer to `.planning/ROADMAP.md`, Phase 2 and 3 items reworded, shipped work listed. Policy statements that disagree with the code were raised with the owner, not changed here.
 - **November 17, 2026 (earlier the same day, unversioned)**: File tree pointed at `AGENTS.md` after older root docs were archived; public records checkbox ticked in §10.
 - **September 10, 2026 (unversioned)**: §5 public records as built for Boston coverage: reader-requested pulls, assessor-seeded pages for every whole-building rental parcel, and the companion Cron Worker.
@@ -628,4 +635,4 @@ The phase lists below are the original plan, ticked as items shipped. Milestone 
 
 ---
 
-*Document version 1.2 | November 2026*
+*Document version 1.3 | November 2026*

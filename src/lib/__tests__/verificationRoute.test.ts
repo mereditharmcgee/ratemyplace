@@ -1,6 +1,6 @@
 import type { APIContext } from 'astro';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '../../pages/api/admin/verification/[id]';
+import { GET, POST } from '../../pages/api/admin/verification/[id]';
 
 const verification = {
   id: 'verification-1',
@@ -107,7 +107,7 @@ describe('admin verification decisions', () => {
             structuredLogs.push(parsed as Record<string, unknown>);
           }
         } catch {
-          // deleteVerificationImage also emits its legacy non-JSON error.
+          // Not a structured line; checked as raw text below.
         }
       }
       const deleteFailureLogs = structuredLogs.filter(
@@ -119,9 +119,55 @@ describe('admin verification decisions', () => {
       expect(deleteFailureLogs[0]).toMatchObject({
         level: 'error',
         event: 'verification_document_delete_failed',
-        r2_key: 'users/user-1/verifications/review-1/proof.pdf',
+        verificationId: 'verification-1',
         decision,
       });
+      // The key names the user and the review, so no log line carries it.
+      const logged = consoleSpy.mock.calls.map((call) => call.map(String).join(' ')).join(' ');
+      expect(logged).not.toContain('users/user-1');
+      expect(logged).not.toContain('proof.pdf');
+      expect(deleteFailureLogs[0]).not.toHaveProperty('r2_key');
     },
   );
+});
+
+describe('admin verification document view', () => {
+  function getContext(): APIContext {
+    const db = {
+      prepare(sql: string) {
+        return {
+          bind(..._values: unknown[]) {
+            return {
+              async first() {
+                return sql.includes('SELECT r2_key, content_type, filename')
+                  ? { r2_key: verification.r2_key, content_type: 'application/pdf', filename: 'proof.pdf' }
+                  : null;
+              },
+            };
+          },
+        };
+      },
+    };
+    return {
+      params: { id: verification.id },
+      request: new Request('https://ratemyplace.org/api/admin/verification/verification-1'),
+      locals: {
+        user: { id: 'admin-1', isAdmin: true },
+        runtime: {
+          env: {
+            DB: db,
+            VERIFICATION_BUCKET: { get: async () => ({ body: 'document bytes' }) },
+          },
+        },
+      },
+    } as unknown as APIContext;
+  }
+
+  it('tells every cache not to keep the document', async () => {
+    const response = await GET(getContext());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(await response.text()).toBe('document bytes');
+  });
 });

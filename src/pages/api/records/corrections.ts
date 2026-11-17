@@ -1,7 +1,7 @@
 import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../../lib/db';
 import { getEnv } from '../../../lib/runtime';
-import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
+import { checkRateLimit, getClientIP, buildRateLimitHeaders, rateLimitSecret } from '../../../lib/rateLimit';
 import { verifyTurnstile } from '../../../lib/turnstile';
 import { sanitizeMultilineText } from '../../../lib/validation';
 import { logError } from '../../../lib/logger';
@@ -44,7 +44,7 @@ export const POST: APIRoute = async (context: APIContext) => {
 
     // Rate limiting: 3 correction reports per hour per IP
     const clientIP = getClientIP(context);
-    const rateLimit = await checkRateLimit(db, clientIP, 'record_correction', 3, 3600);
+    const rateLimit = await checkRateLimit(db, clientIP, 'record_correction', 3, 3600, rateLimitSecret(getEnv(context)));
 
     if (!rateLimit.allowed) {
       const status = rateLimit.error ? 503 : 429;

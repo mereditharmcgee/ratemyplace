@@ -2,7 +2,7 @@ import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../../lib/db';
 import { getEnv } from '../../../lib/runtime';
 import { logError } from '../../../lib/logger';
-import { buildRateLimitHeaders, checkRateLimit, getClientIP } from '../../../lib/rateLimit';
+import { buildRateLimitHeaders, checkRateLimit, getClientIP, rateLimitSecret } from '../../../lib/rateLimit';
 import { verifyTurnstile } from '../../../lib/turnstile';
 import { enqueue } from '../../../lib/records/queue';
 import { recordsRequestState } from '../../../lib/records/coverage';
@@ -55,6 +55,7 @@ export const POST: APIRoute = async (context: APIContext) => {
       'records_request',
       REQUEST_PER_IP,
       REQUEST_WINDOW_SECONDS,
+      rateLimitSecret(getEnv(context)),
     );
     if (!rateLimit.allowed) {
       const status = rateLimit.error ? 503 : 429;

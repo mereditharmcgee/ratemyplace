@@ -3,7 +3,7 @@ import { getDB } from '../../lib/db';
 import { getEnv } from '../../lib/runtime';
 import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
-import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
+import { getClientIP, checkRateLimit, buildRateLimitHeaders, rateLimitSecret } from '../../lib/rateLimit';
 import { validateBugReport, isSafeHttpUrl } from '../../lib/validation';
 import { queueOwnerNotice } from '../../lib/ownerNotify';
 
@@ -24,7 +24,7 @@ export async function POST(context: APIContext): Promise<Response> {
     const ip = getClientIP(context);
 
     // 2. Rate limit: 5 / hour per IP (SEC-04)
-    const rateLimit = await checkRateLimit(db, ip, 'bug-report', 5, 3600);
+    const rateLimit = await checkRateLimit(db, ip, 'bug-report', 5, 3600, rateLimitSecret(getEnv(context)));
     if (!rateLimit.allowed) {
       const status = rateLimit.error ? 503 : 429;
       const message = rateLimit.error

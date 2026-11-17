@@ -88,6 +88,9 @@ export async function POST(context: APIContext): Promise<Response> {
       return json({ error: 'Cleanup refused: it would touch seeded or reviewed buildings' }, 409);
     }
 
+    // No proof-of-address files to remove here, unlike the single building delete: those hang
+    // off reviews, and this delete is limited to buildings with no review at all.
+    //
     // One statement, re-evaluating the predicate at delete time, with no per-id binds (D1
     // caps bound parameters per statement). RETURNING hands back exactly the rows removed, so
     // the audit names what was deleted rather than a sample read beforehand. The trailing

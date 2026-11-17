@@ -680,8 +680,12 @@ think of it. Sources live in `records/sources/boston/`, one module per dataset.
 - **`sitemap.ts` owns the allowlist and the chunking.** `STATIC_SITEMAP_PATHS` is the
   hand-kept list of public pages (property-manager pages are deliberately absent);
   `SITEMAP_CHUNK` is 10,000 URLs per chunk; `buildingChunkCount` has no floor of 1, so an
-  empty table advertises no chunk at all. `lastmod` is the newest of the building's
-  `updated_at`, its newest approved review, and its newest pull.
+  empty table advertises no chunk at all. A building's `lastmod` is the later of its
+  `updated_at` and its newest pull. No sitemap date comes from a review: a date that moved on
+  approval would publish the day a tenant posted. Landlord entries carry no `lastmod`, because
+  a landlord profile is usually created while an admin moderates a review, so even its own
+  timestamps track review dates. `recordsSitemap.test.ts` and `seoSitemapPrivacy.test.ts`
+  hold this.
 - **`bostonLocalities.ts` is the one Boston locality vocabulary.** `BOSTON_LOCALITY_NAMES`
   holds the 26 names in display form — every USPS city name for a Boston-only ZIP plus the
   neighborhood names people type, minus `CHESTNUT HILL`, whose 02467 also covers Newton and

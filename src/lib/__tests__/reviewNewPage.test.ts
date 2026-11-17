@@ -256,7 +256,7 @@ suite('/review/new handoff', () => {
 
   it('past 30 lookups an hour the handoff is unavailable and Google is not called', async () => {
     const db = await seeded();
-    for (let i = 0; i < 30; i += 1) await checkRateLimit(db, 'u-1', 'review-handoff', 30, 3600);
+    for (let i = 0; i < 30; i += 1) await checkRateLimit(db, 'u-1', 'review-handoff', 30, 3600, undefined);
     const fetchMock = stubGoogleCrawford();
     const before = await buildingCount(db);
     const html = await (await request(db, '?placeId=ChIJcrawford', { GOOGLE_PLACES_API_KEY: 'k' })).text();

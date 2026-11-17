@@ -14,7 +14,8 @@ import { createMemoryDatabase, TestD1Database } from './sqliteD1';
 export function createRecordsStubDb(): TestD1Database {
   const db = new TestD1Database(createMemoryDatabase());
   db.exec(`
-    CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, is_admin INTEGER DEFAULT 0);
+    -- notification_opt_in mirrors 0021: the moderation route reads it before emailing an author.
+    CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, is_admin INTEGER DEFAULT 0, notification_opt_in INTEGER NOT NULL DEFAULT 1);
     CREATE TABLE buildings (
       id TEXT PRIMARY KEY,
       landlord_id TEXT,
