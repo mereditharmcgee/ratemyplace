@@ -17,13 +17,17 @@ export interface AuditLogEntry {
 }
 
 /**
- * Create an audit log entry for an admin action
- * Best-effort: logs error but doesn't throw to avoid breaking admin actions
+ * Write an audit log entry and report whether it landed. Never throws: a failure is logged
+ * as `audit_log_write_failed` and comes back as false.
+ *
+ * Use this directly only where the action must not happen without its entry: an admin
+ * opening a proof-of-address document fails closed on false. Everything else calls
+ * createAuditLog, which ignores the result.
  */
-export async function createAuditLog(
+export async function tryCreateAuditLog(
   db: any,
   entry: AuditLogEntry
-): Promise<void> {
+): Promise<boolean> {
   try {
     await db.prepare(`
       INSERT INTO audit_logs (
@@ -40,9 +44,8 @@ export async function createAuditLog(
       entry.newValue ? JSON.stringify(entry.newValue) : null,
       entry.notes || null
     ).run();
+    return true;
   } catch (error) {
-    // Best-effort logging - don't fail the admin action if audit fails.
-    //
     // Log structurally, not via console.error. A CHECK-constraint violation here
     // (action_type or entity_type not in the allowed list) is indistinguishable
     // from a transient DB error at the call site, and silently drops the audit
@@ -56,5 +59,18 @@ export async function createAuditLog(
       entityId: entry.entityId,
       error: error instanceof Error ? error.message : String(error),
     });
+    return false;
   }
+}
+
+/**
+ * Create an audit log entry for an admin action
+ * Best-effort: logs error but doesn't throw to avoid breaking admin actions
+ */
+export async function createAuditLog(
+  db: any,
+  entry: AuditLogEntry
+): Promise<void> {
+  // Best-effort logging - don't fail the admin action if audit fails.
+  await tryCreateAuditLog(db, entry);
 }

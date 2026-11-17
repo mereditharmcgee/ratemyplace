@@ -3,12 +3,13 @@ import type { D1Database } from '@cloudflare/workers-types';
 import { getDB } from '../../../../lib/db';
 import { getEnv } from '../../../../lib/runtime';
 import { getVerificationImage, deleteVerificationImage } from '../../../../lib/storage';
-import { createAuditLog } from '../../../../lib/audit';
+import { createAuditLog, tryCreateAuditLog } from '../../../../lib/audit';
 import { getClientIP } from '../../../../lib/rateLimit';
 import { logError } from '../../../../lib/logger';
 import { createNotification, wantsReviewStatusEmail } from '../../../../lib/notifications';
 import { sendVerificationRejectedEmail } from '../../../../lib/email';
 import { trackSend } from '../../../../lib/trackSend';
+import { VERIFICATION_ADMIN_COPY } from '../../../../lib/verificationNotice';
 
 const ENDPOINT = '/api/admin/verification/[id]';
 
@@ -62,7 +63,8 @@ async function notifyAuthor(
   }
 }
 
-// GET - Stream the verification image
+// GET - Stream the verification image. Every view is logged first (verification_viewed,
+// migration 0038), and the document is served only if that entry is written.
 export async function GET(context: APIContext): Promise<Response> {
   const { id } = context.params;
 
@@ -82,13 +84,20 @@ export async function GET(context: APIContext): Promise<Response> {
     });
   }
 
+  if (!id) {
+    return new Response(JSON.stringify({ error: 'Verification ID required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
   try {
     const db = getDB(context);
 
     // Get verification record
     const verification = await db.prepare(`
-      SELECT r2_key, content_type, filename FROM verification_images WHERE id = ?
-    `).bind(id).first<{ r2_key: string; content_type: string; filename: string }>();
+      SELECT review_id, r2_key, content_type, filename FROM verification_images WHERE id = ?
+    `).bind(id).first<{ review_id: string; r2_key: string; content_type: string; filename: string }>();
 
     if (!verification) {
       return new Response(JSON.stringify({ error: 'Verification not found' }), {
@@ -112,6 +121,30 @@ export async function GET(context: APIContext): Promise<Response> {
       return new Response(JSON.stringify({ error: 'Image not found in storage' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Log the view before a byte is served, and fail closed: the promise is that every view
+    // of a tenant's document is logged. The entry names the admin, the verification and its
+    // review, never the filename or the storage key, which name the tenant.
+    const logged = await tryCreateAuditLog(db, {
+      adminUserId: context.locals.user.id,
+      adminIp: getClientIP(context),
+      actionType: 'verification_viewed',
+      entityType: 'verification',
+      entityId: id,
+      newValue: { review_id: verification.review_id },
+    });
+    if (!logged) {
+      // Release the stream R2 opened; nothing will read it.
+      try {
+        await r2Object.body.cancel();
+      } catch {
+        // Already closed, or nothing to release.
+      }
+      return new Response(JSON.stringify({ error: VERIFICATION_ADMIN_COPY.viewNotLogged }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' }
       });
     }
 

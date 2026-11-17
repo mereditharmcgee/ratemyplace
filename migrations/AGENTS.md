@@ -1,6 +1,6 @@
 # `migrations/` — D1 Schema Changes
 
-Cloudflare D1 (SQLite). 37 migrations, `0001` through `0037`.
+Cloudflare D1 (SQLite). 38 migrations, `0001` through `0038`.
 
 ---
 
@@ -238,6 +238,52 @@ npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT name FROM sq
 
 The second should list the two indexes and not `notifications_v2`.
 
+**`0038` (audit entry for viewing a proof-of-address document) is NOT YET APPLIED TO
+PRODUCTION. Apply it by hand BEFORE the code that writes `verification_viewed` deploys.** It
+rebuilds `audit_logs` exactly as `0030` did (`audit_logs_v5`, copy every row with its id,
+drop, rename, the four `idx_audit_*` indexes) with one more allowed action,
+`verification_viewed`. Every other allowed action and every allowed entity type is
+unchanged; `verification` was already an entity type. `auditMigration0038.test.ts` compares
+the rows, columns, defaults, indexes and both CHECK lists before and after. No PRAGMA:
+`audit_logs` has no foreign keys and nothing references it.
+
+Order matters more here than for `0037`. `GET /api/admin/verification/[id]` writes the
+entry before it serves a document and **fails closed**: if the write fails, the admin gets a
+503 and no document. Code deployed before this file runs therefore cannot open any
+proof-of-address document (the queue shows "This document could not be shown" and every
+attempt logs `audit_log_write_failed` with `actionType` `verification_viewed`) until the file
+is applied. Applying it first is safe: the old code writes only actions the new CHECK keeps.
+Re-running after a full run is safe; a run that stops after the `DROP` and before the
+`RENAME` is finished by hand with the file's `RENAME` and its four `CREATE INDEX`
+statements. Never `migrations apply --remote`.
+
+Confirm first (read-only). The table's SQL must not mention `verification_viewed` yet, and
+note the row count and id range:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT instr(sql, 'verification_viewed') > 0 AS already FROM sqlite_master WHERE type = 'table' AND name = 'audit_logs'"
+npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT COUNT(*) AS n, MIN(id) AS min_id, MAX(id) AS max_id FROM audit_logs"
+```
+
+Back the table up outside the repo (it holds admin IPs; delete the file once the check below
+passes), then apply:
+
+```bash
+npx wrangler d1 export ratemyplace-db --remote --table audit_logs --output ../audit_logs-before-0038.sql
+npx wrangler d1 execute ratemyplace-db --remote --file migrations/0038_audit_verification_viewed.sql
+```
+
+Then check the same count and id range, all four indexes, and no copy table:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT COUNT(*) AS n, MIN(id) AS min_id, MAX(id) AS max_id FROM audit_logs"
+npx wrangler d1 execute ratemyplace-db --remote --command   "SELECT name FROM sqlite_master WHERE name LIKE 'idx_audit_%' OR name = 'audit_logs_v5' ORDER BY name"
+```
+
+The second should list `idx_audit_action`, `idx_audit_admin`, `idx_audit_created` and
+`idx_audit_entity`, and not `audit_logs_v5`. `0037` and `0038` are independent and can be
+applied in either order.
+
 **`app_settings` keys in use.** The table is a key/value store for operator switches; the
 records pipeline owns four, defined once in `SETTING_KEYS` in `src/lib/records/settings.ts`:
 
@@ -324,7 +370,7 @@ Dropping a column that deployed code still reads takes the site down.
 | `reviews` | 27 rating columns + tenancy, unit type, rent, free text, status |
 | `verification_images`, `verification_tokens` | Proof-of-address pipeline, email tokens |
 | `disputes` | Landlord dispute submissions and resolutions |
-| `audit_logs` | Destructive admin actions, old value → new value |
+| `audit_logs` | Destructive admin actions, old value → new value, and every admin view of a proof-of-address document (`verification_viewed`, 0038) |
 | `notifications` | In-app tenant notifications |
 | `saved_buildings` | Bookmarks |
 | `record_pulls`, `building_records` | Public building records from city open data. `record_pulls` is insert-only provenance, one row per source run; `building_records` holds the typed JSON payloads, unique on `(building_id, kind, source_key)` |

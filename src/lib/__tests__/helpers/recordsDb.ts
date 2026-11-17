@@ -107,7 +107,8 @@ export function createRecordsStubDb(): TestD1Database {
  * 0034's `building_owners` references `buildings`, which the stub creates. A test that needs
  * the database as it was before 0034 ran drops the table after this.
  * 0037 rebuilds the stub's `notifications` (0021's definition) with the two proof-of-address
- * events, so a route that writes one sees production's CHECK, not the older one.
+ * events, and 0038 rebuilds 0030's `audit_logs` with `verification_viewed`, so a route that
+ * writes either sees production's CHECK, not the older one.
  */
 export function applyRecordsMigrations(db: TestD1Database): void {
   for (const file of [
@@ -118,6 +119,7 @@ export function applyRecordsMigrations(db: TestD1Database): void {
     '0033_records_queue_reason_requested.sql',
     '0034_building_owners.sql',
     '0037_notifications_verification_events.sql',
+    '0038_audit_verification_viewed.sql',
   ]) {
     db.exec(readFileSync(join(process.cwd(), 'migrations', file), 'utf8'));
   }

@@ -1,6 +1,7 @@
 // What the profile tells a reviewer about their proof-of-address document, and the one rule
-// for which line a review shows. A client leaf: the profile's review list and notification
-// list (React islands) import it, so it has no runtime imports (clientLeafModules.test.ts).
+// for which line a review shows; plus what the admin queue says when a document cannot be
+// shown. A client leaf: the profile's review list and notification list and the admin queue
+// (React islands) import it, so it has no runtime imports (clientLeafModules.test.ts).
 //
 // Every string here is a proposal the owner may edit. The notification messages themselves
 // live in EVENT_MESSAGES (notifications.ts), because they are written when the decision is
@@ -31,6 +32,18 @@ export const VERIFICATION_COPY = {
  */
 export const REVIEW_STATUS_EMAIL_HINT =
   'Today that means an email if a review is not approved, or if we cannot verify your tenancy with a document you sent. Your dashboard shows every update either way.';
+
+/**
+ * Admin-facing. An admin opening a document is logged first, and the document is served only
+ * when that entry is written (GET /api/admin/verification/[id] fails closed).
+ */
+export const VERIFICATION_ADMIN_COPY = {
+  /** The route's 503 error. A PDF opens in its own tab, which shows this. */
+  viewNotLogged: 'This document was not shown because its view could not be logged. Try again in a minute.',
+  /** The queue's line in place of an image that did not load. An image cannot read the error, so this covers a missing file too. */
+  documentNotShown: 'This document could not be shown. Its view may not have been logged, or the file may be missing.',
+  retry: 'Try again',
+} as const;
 
 /** Notification events that get the "Go to My Reviews" action. */
 export const VERIFICATION_NOTICE_EVENTS: readonly string[] = ['verification_approved', 'verification_rejected'];
