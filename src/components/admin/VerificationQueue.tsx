@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import type { PendingVerification } from '../../pages/api/admin/pending-verifications';
 import Dialog from '../ui/Dialog';
+import { VERIFICATION_ADMIN_COPY } from '../../lib/verificationNotice';
+
+/** The id of a row's Try again button, where focus goes when its full-size view fails. */
+const retryId = (verificationId: string) => `verification-retry-${verificationId}`;
 
 /** The full-size view covers the screen, dark, with the document centered as before. */
 const OVERLAY_DIALOG_CLASS =
@@ -13,6 +17,9 @@ export default function VerificationQueue() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState<Record<string, string>>({});
+  // Images that did not load. The route serves a document only when it can log the view, so
+  // a failed load is shown as a message with a retry, not a broken image.
+  const [unshown, setUnshown] = useState<Record<string, boolean>>({});
   const overlayCloseRef = useRef<HTMLButtonElement>(null);
   // The thumbnail that opened the full-size view, named to the dialog because Safari does not
   // focus a button on click.
@@ -22,9 +29,14 @@ export default function VerificationQueue() {
     fetchVerifications();
   }, []);
 
+  const markUnshown = (id: string, shown: boolean) => {
+    setUnshown((prev) => ({ ...prev, [id]: !shown }));
+  };
+
   const fetchVerifications = async () => {
     try {
       setLoading(true);
+      setUnshown({});
       const response = await fetch('/api/admin/pending-verifications');
       const data = await response.json();
 
@@ -167,7 +179,19 @@ export default function VerificationQueue() {
 
             {/* Image Preview */}
             <div className="mb-4">
-              {verification.content_type.startsWith('image/') ? (
+              {verification.content_type.startsWith('image/') && unshown[verification.id] ? (
+                <div className="flex flex-wrap items-center gap-3 bg-gray-50 border border-gray-200 rounded-[6px] px-4 py-3">
+                  <p className="text-sm text-gray-700">{VERIFICATION_ADMIN_COPY.documentNotShown}</p>
+                  <button
+                    id={retryId(verification.id)}
+                    type="button"
+                    onClick={() => markUnshown(verification.id, true)}
+                    className="text-sm font-medium text-teal-700 hover:text-teal-800 underline"
+                  >
+                    {VERIFICATION_ADMIN_COPY.retry}
+                  </button>
+                </div>
+              ) : verification.content_type.startsWith('image/') ? (
                 <button
                   type="button"
                   aria-haspopup="dialog"
@@ -180,6 +204,7 @@ export default function VerificationQueue() {
                   <img
                     src={`/api/admin/verification/${verification.id}`}
                     alt="Verification document"
+                    onError={() => markUnshown(verification.id, false)}
                     className={`rounded-[6px] border border-gray-200 transition-all ${
                       expandedImage === verification.id
                         ? 'max-h-[600px] w-auto'
@@ -257,6 +282,8 @@ export default function VerificationQueue() {
           onClose={() => setExpandedImage(null)}
           initialFocusRef={overlayCloseRef}
           returnFocusRef={thumbnailRef}
+          // A view that failed replaces the thumbnail with its Try again button.
+          returnFocusFallback={() => document.getElementById(retryId(expandedImage))}
           className={OVERLAY_DIALOG_CLASS}
         >
           <button
@@ -275,6 +302,10 @@ export default function VerificationQueue() {
             alt="Verification document"
             className="max-w-full max-h-full object-contain"
             onClick={() => setExpandedImage(null)}
+            onError={() => {
+              markUnshown(expandedImage, false);
+              setExpandedImage(null);
+            }}
           />
         </Dialog>
       )}

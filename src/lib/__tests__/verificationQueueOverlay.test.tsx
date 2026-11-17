@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import VerificationQueue from '../../components/admin/VerificationQueue';
 import type { PendingVerification } from '../../pages/api/admin/pending-verifications';
+import { VERIFICATION_ADMIN_COPY } from '../verificationNotice';
 
 // A11Y-06 on the admin verification queue: the thumbnail is a button that reports whether
 // the full-size view is open, and the full-size view is the shared Dialog. One fictional
@@ -112,5 +113,34 @@ describe('VerificationQueue full-size view', () => {
     await renderQueue();
     fireEvent.click(thumbnail());
     expect(screen.getByRole('dialog').className).toContain('[--focus-ring:#fff]');
+  });
+});
+
+// The document route serves a document only when it can log the view (fail closed), so an
+// image can fail to load. The queue then says so in place of the image, with a way to try
+// again, rather than leaving a broken image.
+describe('VerificationQueue when a document cannot be shown', () => {
+  const image = () => thumbnail().querySelector('img')!;
+
+  it('replaces a thumbnail that fails to load with a message and a Try again button', async () => {
+    await renderQueue();
+    fireEvent.error(image());
+    expect(screen.getByText(VERIFICATION_ADMIN_COPY.documentNotShown)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Verification document/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: VERIFICATION_ADMIN_COPY.retry }));
+    expect(screen.queryByText(VERIFICATION_ADMIN_COPY.documentNotShown)).toBeNull();
+    expect(thumbnail()).toBeTruthy();
+  });
+
+  it('closes a full-size view that fails to load and moves focus to Try again', async () => {
+    await renderQueue();
+    thumbnail().focus();
+    fireEvent.click(thumbnail());
+    const dialog = screen.getByRole('dialog');
+    fireEvent.error(dialog.querySelector('img')!);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByText(VERIFICATION_ADMIN_COPY.documentNotShown)).toBeTruthy();
+    expect(focused()).toBe(screen.getByRole('button', { name: VERIFICATION_ADMIN_COPY.retry }));
   });
 });

@@ -270,7 +270,9 @@ needs the owner's action calls `queueOwnerNotice(context, { kind, buildingId })`
 `lib/email.ts`; there is no env var for it. An email to a review's author about the
 review's status checks `wantsReviewStatusEmail` (`lib/notifications.ts`) first, which reads
 the profile's opt-out (`users.notification_opt_in`). The in-app notification is written
-either way.
+either way. Two emails follow that rule: the review-not-published notice and the
+tenancy-document-not-accepted notice (`verification_rejected`, from
+`POST /api/admin/verification/[id]`). Approving a review or a document sends no email.
 
 ## Traps
 
@@ -518,6 +520,13 @@ Things that have already cost time. Read before debugging.
   the file stays in R2 with nothing pointing at it. No route deletes a user, so an account
   deleted by hand needs its files removed by hand. Keys and filenames name the tenant, so no
   log line carries either.
+- **Opening a proof-of-address document is audited, and fails closed.** Every `GET
+  /api/admin/verification/[id]` writes a `verification_viewed` audit entry (admin, admin IP,
+  verification id, review id; never the filename or R2 key) before serving the file, and
+  answers 503 without the file if the entry cannot be written. The admin queue's thumbnails
+  load the file, so opening `/admin/verify` logs one view per pending image; a PDF is logged
+  when it is opened. Migration `0038` adds the action to the CHECK and must run before this
+  code deploys, or no document can be opened.
 - **An `_`-prefixed file under `src/pages/` is not a route.** Astro excludes it from
   file-based routing, which is how `src/pages/api/admin/records/queue/_json.ts` can be a
   shared helper next to the endpoints that import it. The rule cuts the other way for

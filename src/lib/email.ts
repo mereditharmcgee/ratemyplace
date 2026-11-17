@@ -525,6 +525,74 @@ ${reasonBlock}
 }
 
 
+/** The subject (and heading) of the email that says a tenancy document was not accepted. */
+export const VERIFICATION_REJECTED_SUBJECT = 'We could not verify your tenancy';
+
+/**
+ * Tell a reviewer that the proof-of-address document they sent was not accepted, why (when
+ * the moderator said), and how to send a different one. Sent alongside the in-app notice, and
+ * only when the author has not turned off "Email me when my review status changes"
+ * (`wantsReviewStatusEmail`). An approval sends no email: the badge and the in-app notice
+ * cover it. Never names the document: its filename is the tenant's own and often names their
+ * address or unit, and the decision blanks it.
+ *
+ * @param apiKey - Resend API key from environment
+ * @param siteUrl - Base URL for the profile link
+ * @param toEmail - The review author's email address
+ * @param buildingAddress - Address of the reviewed building (for context)
+ * @param rejectionReason - The moderator's reason, or null/blank when they gave none
+ */
+export async function sendVerificationRejectedEmail(
+  apiKey: string,
+  siteUrl: string,
+  toEmail: string,
+  buildingAddress: string,
+  rejectionReason: string | null
+): Promise<EmailResult> {
+  const profileUrl = `${siteUrl}/profile`;
+
+  const reasonBlock = rejectionReason && rejectionReason.trim()
+    ? `
+  <div style="background-color: #f9fafb; border-left: 4px solid #0d9488; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 10px 0;"><strong>What we noted:</strong></p>
+    <p style="margin: 0; color: #666;">${escapeHtml(rejectionReason)}</p>
+  </div>
+`
+    : '';
+
+  return deliver(apiKey, {
+    // From meredith@, like the review-not-published email, so a reply with a question lands
+    // in the Workspace inbox.
+    from: 'RateMyPlace Boston <meredith@ratemyplace.org>',
+    to: toEmail,
+    subject: VERIFICATION_REJECTED_SUBJECT,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0d9488;">${VERIFICATION_REJECTED_SUBJECT}</h2>
+
+  <p>Thank you for sending a document to verify your review of <strong>${escapeHtml(buildingAddress)}</strong>. We could not use it to confirm that you lived there.</p>
+${reasonBlock}
+  <p>Your review has not changed. It just does not have the Verified badge yet.</p>
+
+  <p>To try again, open My Reviews on your <a href="${profileUrl}" style="color: #0f766e;">profile</a> and choose Send a different document. A lease, a utility bill, a rent receipt or a piece of mail with your name and this address all work. You can cover account numbers and other private details first.</p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #6b7280; font-size: 12px;">
+    Sent automatically. Reach us via <a href="https://ratemyplace.org/contact" style="color: #0f766e;">ratemyplace.org/contact</a> if you think this was a mistake.
+  </p>
+</body>
+</html>
+      `,
+  });
+}
+
 /**
  * Outcome of an admin's resolution of a public-record correction report.
  * Mirrors `CorrectionResolution` in `lib/records/corrections.ts` — kept as its

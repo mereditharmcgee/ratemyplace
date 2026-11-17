@@ -9,6 +9,7 @@
 // into a browser bundle. A runtime import from here would.
 import type { QueueReason } from './records/types';
 import type { ReviewFlagCode } from './reviewFlags';
+import type { VerificationStatus } from './verificationNotice';
 
 // =============================================================================
 // Common Types
@@ -62,6 +63,10 @@ export interface UserReview {
   review_title: string | null;
   moderation_notes: string | null;
   has_open_dispute: boolean;
+  /** The status of the review's latest proof-of-address document, or null when it has none. */
+  verification_status: VerificationStatus | null;
+  /** The moderator's reason, sent only when the latest document was rejected and they gave one. */
+  verification_rejection_reason: string | null;
 }
 
 export interface UserReviewsResponse {

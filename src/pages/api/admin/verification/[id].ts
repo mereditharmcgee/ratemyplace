@@ -1,12 +1,70 @@
 import type { APIContext } from 'astro';
+import type { D1Database } from '@cloudflare/workers-types';
 import { getDB } from '../../../../lib/db';
 import { getEnv } from '../../../../lib/runtime';
 import { getVerificationImage, deleteVerificationImage } from '../../../../lib/storage';
-import { createAuditLog } from '../../../../lib/audit';
+import { createAuditLog, tryCreateAuditLog } from '../../../../lib/audit';
 import { getClientIP } from '../../../../lib/rateLimit';
 import { logError } from '../../../../lib/logger';
+import { createNotification, wantsReviewStatusEmail } from '../../../../lib/notifications';
+import { sendVerificationRejectedEmail } from '../../../../lib/email';
+import { trackSend } from '../../../../lib/trackSend';
+import { VERIFICATION_ADMIN_COPY } from '../../../../lib/verificationNotice';
 
-// GET - Stream the verification image
+const ENDPOINT = '/api/admin/verification/[id]';
+
+/**
+ * Tell the review's author how the decision went: an in-app notice either way, and on a
+ * rejection an email with the reason, unless they turned off "Email me when my review status
+ * changes". Runs after the decision is written and never throws: a notice that cannot be
+ * written (for example before migration 0037 widens the event CHECK) is logged, and the
+ * decision still stands.
+ */
+async function notifyAuthor(
+  context: APIContext,
+  db: D1Database,
+  verificationId: string,
+  reviewId: string,
+  decision: 'approve' | 'reject',
+  reason: string | null,
+): Promise<void> {
+  try {
+    const author = await db.prepare(
+      'SELECT r.user_id, b.address, u.email, u.notification_opt_in FROM reviews r JOIN buildings b ON r.building_id = b.id JOIN users u ON r.user_id = u.id WHERE r.id = ?'
+    ).bind(reviewId).first<{ user_id: string; address: string; email: string; notification_opt_in: number | null }>();
+    if (!author) return;
+
+    await createNotification(db, {
+      userId: author.user_id,
+      eventType: decision === 'approve' ? 'verification_approved' : 'verification_rejected',
+      reviewId,
+      buildingAddress: author.address,
+    });
+
+    if (decision === 'reject' && wantsReviewStatusEmail(author.notification_opt_in)) {
+      const env = getEnv(context);
+      const siteUrl = env.SITE_URL || 'https://ratemyplace.org';
+      // In the background, so the admin's decision returns at once; a failed or unconfigured
+      // send is recorded on /admin.
+      trackSend(
+        context,
+        'verification_rejected',
+        author.email,
+        sendVerificationRejectedEmail(env.RESEND_API_KEY, siteUrl, author.email, author.address, reason)
+      );
+    }
+  } catch (err) {
+    logError('verification_outcome_notice_failed', {
+      endpoint: ENDPOINT,
+      verificationId,
+      decision,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+// GET - Stream the verification image. Every view is logged first (verification_viewed,
+// migration 0038), and the document is served only if that entry is written.
 export async function GET(context: APIContext): Promise<Response> {
   const { id } = context.params;
 
@@ -26,13 +84,20 @@ export async function GET(context: APIContext): Promise<Response> {
     });
   }
 
+  if (!id) {
+    return new Response(JSON.stringify({ error: 'Verification ID required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
   try {
     const db = getDB(context);
 
     // Get verification record
     const verification = await db.prepare(`
-      SELECT r2_key, content_type, filename FROM verification_images WHERE id = ?
-    `).bind(id).first<{ r2_key: string; content_type: string; filename: string }>();
+      SELECT review_id, r2_key, content_type, filename FROM verification_images WHERE id = ?
+    `).bind(id).first<{ review_id: string; r2_key: string; content_type: string; filename: string }>();
 
     if (!verification) {
       return new Response(JSON.stringify({ error: 'Verification not found' }), {
@@ -56,6 +121,30 @@ export async function GET(context: APIContext): Promise<Response> {
       return new Response(JSON.stringify({ error: 'Image not found in storage' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Log the view before a byte is served, and fail closed: the promise is that every view
+    // of a tenant's document is logged. The entry names the admin, the verification and its
+    // review, never the filename or the storage key, which name the tenant.
+    const logged = await tryCreateAuditLog(db, {
+      adminUserId: context.locals.user.id,
+      adminIp: getClientIP(context),
+      actionType: 'verification_viewed',
+      entityType: 'verification',
+      entityId: id,
+      newValue: { review_id: verification.review_id },
+    });
+    if (!logged) {
+      // Release the stream R2 opened; nothing will read it.
+      try {
+        await r2Object.body.cancel();
+      } catch {
+        // Already closed, or nothing to release.
+      }
+      return new Response(JSON.stringify({ error: VERIFICATION_ADMIN_COPY.viewNotLogged }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' }
       });
     }
 
@@ -116,6 +205,10 @@ export async function POST(context: APIContext): Promise<Response> {
   try {
     const body = await context.request.json();
     const { action, rejection_reason } = body;
+    // The reason reaches the author now (profile and email), so only a non-blank string counts.
+    const reason = typeof rejection_reason === 'string' && rejection_reason.trim()
+      ? rejection_reason.trim()
+      : null;
 
     if (!['approve', 'reject'].includes(action)) {
       return new Response(JSON.stringify({ error: 'Invalid action' }), {
@@ -171,7 +264,7 @@ export async function POST(context: APIContext): Promise<Response> {
         const deleted = await deleteVerificationImage(bucket, verification.r2_key);
         if (!deleted) {
           logError('verification_document_delete_failed', {
-            endpoint: '/api/admin/verification/[id]',
+            endpoint: ENDPOINT,
             verificationId: id,
             decision: 'approve',
           });
@@ -189,6 +282,8 @@ export async function POST(context: APIContext): Promise<Response> {
         newValue: { review_id: verification.review_id, is_verified: 1 },
       });
 
+      await notifyAuthor(context, db, id, verification.review_id, 'approve', null);
+
       return new Response(JSON.stringify({
         success: true,
         message: 'Verification approved'
@@ -201,7 +296,7 @@ export async function POST(context: APIContext): Promise<Response> {
         UPDATE verification_images
         SET status = 'rejected', reviewed_at = ?, reviewed_by = ?, rejection_reason = ?, filename = ''
         WHERE id = ?
-      `).bind(now, context.locals.user.id, rejection_reason || null, id).run();
+      `).bind(now, context.locals.user.id, reason, id).run();
 
       // Delete image from R2 immediately after the decision. Verification
       // documents are temporary evidence and are never retained after review,
@@ -210,7 +305,7 @@ export async function POST(context: APIContext): Promise<Response> {
         const deleted = await deleteVerificationImage(bucket, verification.r2_key);
         if (!deleted) {
           logError('verification_document_delete_failed', {
-            endpoint: '/api/admin/verification/[id]',
+            endpoint: ENDPOINT,
             verificationId: id,
             decision: 'reject',
           });
@@ -224,8 +319,10 @@ export async function POST(context: APIContext): Promise<Response> {
         entityType: 'verification',
         entityId: id,
         newValue: { review_id: verification.review_id },
-        notes: rejection_reason || undefined,
+        notes: reason ?? undefined,
       });
+
+      await notifyAuthor(context, db, id, verification.review_id, 'reject', reason);
 
       return new Response(JSON.stringify({
         success: true,

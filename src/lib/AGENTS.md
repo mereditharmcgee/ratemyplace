@@ -290,6 +290,13 @@ Best-effort by design — a logging failure must never break the action it is lo
 Admin grant/revoke went untracked until August 2026; do not let a new destructive action
 ship without a log entry.
 
+The one exception fails closed: an admin opening a proof-of-address document
+(`GET /api/admin/verification/[id]`) calls `tryCreateAuditLog`, which reports whether the
+entry landed, and the route serves the document only when it did, answering 503 otherwise.
+The entry is `verification_viewed` with the verification id and its `review_id`, never the
+filename or the R2 key. A new action type in that path must be in the `audit_logs` CHECK
+before the code ships, or every view is refused (see `migrations/AGENTS.md`, 0038).
+
 ### `records/` — public building records
 
 The read-only public-records panel: what the city says about a building, never what we

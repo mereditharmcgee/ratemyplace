@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { REVIEW_STATUS_EMAIL_HINT } from '../../lib/verificationNotice';
 
 interface SettingsTabProps {
   userName: string | null;
@@ -204,7 +205,7 @@ export default function SettingsTab({
                 Email me when my review status changes
               </span>
               <p className="text-xs text-gray-500 mt-0.5">
-                Today that means an email if a review is not approved. Your dashboard shows every update either way.
+                {REVIEW_STATUS_EMAIL_HINT}
               </p>
             </div>
           </label>

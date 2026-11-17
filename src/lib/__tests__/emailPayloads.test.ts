@@ -21,6 +21,7 @@ import {
   sendContactNotificationEmail,
   sendDisputeResolutionEmail,
   sendReviewRejectedEmail,
+  sendVerificationRejectedEmail,
   sendRecordCorrectionOutcomeEmail,
   sendRecordsBreakerEmail,
   sendRecordsResumedEmail,
@@ -98,6 +99,20 @@ describe('email payloads (snapshot)', () => {
   it('sendReviewRejectedEmail without a reason', async () => {
     expect(
       await payloadOf(() => sendReviewRejectedEmail('k', 'https://ratemyplace.org', 'reviewer@example.com', '1 Main St', null)),
+    ).toMatchSnapshot();
+  });
+
+  it('sendVerificationRejectedEmail with a reason', async () => {
+    expect(
+      await payloadOf(() =>
+        sendVerificationRejectedEmail('k', 'https://ratemyplace.org', 'reviewer@example.com', 'Sample Building <b>', 'No <name> on it'),
+      ),
+    ).toMatchSnapshot();
+  });
+
+  it('sendVerificationRejectedEmail without a reason', async () => {
+    expect(
+      await payloadOf(() => sendVerificationRejectedEmail('k', 'https://ratemyplace.org', 'reviewer@example.com', 'Sample Building', null)),
     ).toMatchSnapshot();
   });
 

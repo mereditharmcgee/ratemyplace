@@ -5,11 +5,20 @@
  * Best-effort: swallows errors so callers are never broken.
  */
 
+import { logError } from './logger';
+
+/**
+ * Every value here must also be in the `notifications.event_type` CHECK (latest rebuild:
+ * migration 0037). A value the CHECK lacks fails the insert, which createNotification
+ * swallows and logs as `notification_write_failed`.
+ */
 export type NotificationEventType =
   | 'review_approved'
   | 'review_rejected'
   | 'review_disputed'
-  | 'dispute_resolved';
+  | 'dispute_resolved'
+  | 'verification_approved'
+  | 'verification_rejected';
 
 export const EVENT_MESSAGES: Record<NotificationEventType, (address: string) => string> = {
   review_approved: (address) =>
@@ -20,6 +29,12 @@ export const EVENT_MESSAGES: Record<NotificationEventType, (address: string) => 
     `Your review of ${address} has been disputed by the landlord.`,
   dispute_resolved: (address) =>
     `The dispute on your review of ${address} has been resolved.`,
+  // Proof-of-address decisions. The rejection reason is not repeated here: My Reviews shows
+  // it beside the review, with the way to send a different document.
+  verification_approved: (address) =>
+    `We verified your tenancy at ${address}. Your review now shows a Verified badge.`,
+  verification_rejected: (address) =>
+    `We could not verify your tenancy at ${address} with the document you sent. See My Reviews for what to do next.`,
 };
 
 /**
@@ -58,6 +73,12 @@ export async function createNotification(
       .bind(params.userId, params.eventType, params.reviewId, message)
       .run();
   } catch (error) {
-    console.error('Failed to create notification:', error);
+    // Structured, with the event type, so a CHECK that lacks a new event (a migration not yet
+    // applied) is greppable. Never the address or the message: they name the building.
+    logError('notification_write_failed', {
+      eventType: params.eventType,
+      reviewId: params.reviewId,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
