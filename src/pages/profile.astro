@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../components/layout/BaseLayout.astro';
 import ProfileDashboard from '../components/profile/ProfileDashboard';
+import { wantsReviewStatusEmail } from '../lib/notifications';
 
 const user = Astro.locals.user;
 
@@ -37,7 +38,7 @@ const emailVerified = dbUser ? Boolean(dbUser.email_verified) : false;
 // Compute settings-related props
 const hasPassword = !!dbUser?.hashed_password;
 const isGoogleUser = !!dbUser?.google_id;
-const notificationOptIn = dbUser?.notification_opt_in !== 0;
+const notificationOptIn = wantsReviewStatusEmail(dbUser?.notification_opt_in);
 
 // Get unread notification count
 const unreadResult = await db.prepare(

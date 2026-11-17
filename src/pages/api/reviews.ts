@@ -4,7 +4,7 @@ import { getEnv } from '../../lib/runtime';
 import { calculateDomainScores, ALL_SCORE_FIELDS } from '../../lib/scoring';
 import { generateIdFromEntropySize } from 'lucia';
 import { verifyTurnstile } from '../../lib/turnstile';
-import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../lib/rateLimit';
+import { getClientIP, checkRateLimit, buildRateLimitHeaders, rateLimitSecret } from '../../lib/rateLimit';
 import { moveInFromAnswer } from '../../lib/moveIn';
 import { unitTypeFromBedrooms } from '../../lib/reviewDisplay';
 import { validateReviewText } from '../../lib/validation';
@@ -37,7 +37,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     // Rate limit: 10 review submissions per hour per user — prevents flooding
     // the moderation queue from a single account.
-    const rateLimit = await checkRateLimit(db, context.locals.user.id, 'review-submit', 10, 3600);
+    const rateLimit = await checkRateLimit(db, context.locals.user.id, 'review-submit', 10, 3600, rateLimitSecret(getEnv(context)));
     if (!rateLimit.allowed) {
       const status = rateLimit.error ? 503 : 429;
       const message = rateLimit.error

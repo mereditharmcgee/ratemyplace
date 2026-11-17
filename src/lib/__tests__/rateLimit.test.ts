@@ -94,7 +94,7 @@ function mockDB(attemptCount: number = 0, shouldError: boolean = false) {
 describe('checkRateLimit', () => {
   it('allows requests under the limit', async () => {
     const db = mockDB(2); // 2 attempts, limit is 5
-    const result = await checkRateLimit(db, '1.2.3.4', 'signin', 5, 900);
+    const result = await checkRateLimit(db, '1.2.3.4', 'signin', 5, 900, undefined);
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(2); // 5 - 2 - 1 = 2
     expect(result.retryAfterSeconds).toBe(0);
@@ -102,7 +102,7 @@ describe('checkRateLimit', () => {
 
   it('blocks requests at the limit', async () => {
     const db = mockDB(5); // 5 attempts, limit is 5
-    const result = await checkRateLimit(db, '1.2.3.4', 'signin', 5, 900);
+    const result = await checkRateLimit(db, '1.2.3.4', 'signin', 5, 900, undefined);
     expect(result.allowed).toBe(false);
     expect(result.remaining).toBe(0);
     expect(result.retryAfterSeconds).toBeGreaterThan(0);
@@ -110,13 +110,13 @@ describe('checkRateLimit', () => {
 
   it('blocks requests over the limit', async () => {
     const db = mockDB(10); // 10 attempts, limit is 5
-    const result = await checkRateLimit(db, '1.2.3.4', 'signin', 5, 900);
+    const result = await checkRateLimit(db, '1.2.3.4', 'signin', 5, 900, undefined);
     expect(result.allowed).toBe(false);
   });
 
   it('gracefully handles database errors by failing closed', async () => {
     const db = mockDB(0, true);
-    const result = await checkRateLimit(db, '1.2.3.4', 'signin', 5, 900);
+    const result = await checkRateLimit(db, '1.2.3.4', 'signin', 5, 900, undefined);
     // Should BLOCK the request when DB fails (fail-closed)
     expect(result.allowed).toBe(false);
     expect(result.error).toBe(true);
@@ -126,7 +126,7 @@ describe('checkRateLimit', () => {
 
   it('returns correct remaining count', async () => {
     const db = mockDB(0); // 0 attempts, limit is 3
-    const result = await checkRateLimit(db, '1.2.3.4', 'signup', 3, 3600);
+    const result = await checkRateLimit(db, '1.2.3.4', 'signup', 3, 3600, undefined);
     expect(result.remaining).toBe(2); // 3 - 0 - 1 = 2
   });
 });

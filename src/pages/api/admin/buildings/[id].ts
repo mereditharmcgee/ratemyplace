@@ -2,6 +2,8 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
 import { createAuditLog } from '../../../../lib/audit';
 import { getClientIP } from '../../../../lib/rateLimit';
+import { getEnv } from '../../../../lib/runtime';
+import { removeVerificationFiles, verificationKeysForBuilding } from '../../../../lib/verificationFiles';
 
 export async function PATCH(context: APIContext): Promise<Response> {
   // Require authentication
@@ -198,11 +200,20 @@ export async function DELETE(context: APIContext): Promise<Response> {
     // Check if building has reviews - warn but still allow deletion
     const reviewCount = await db.prepare('SELECT COUNT(*) as count FROM reviews WHERE building_id = ?').bind(buildingId).first<{ count: number }>();
 
+    // Remove the proof-of-address files of the building's reviews first: the delete below
+    // cascades to the reviews and their verification_images rows. A failed file delete is
+    // logged and counted, and the building is still deleted.
+    const verificationFiles = await removeVerificationFiles(
+      getEnv(context).VERIFICATION_BUCKET,
+      await verificationKeysForBuilding(db, buildingId),
+      '/api/admin/buildings/[id]',
+    );
+
     // Delete building (cascades to reviews due to ON DELETE CASCADE)
     await db.prepare('DELETE FROM buildings WHERE id = ?').bind(buildingId).run();
 
     // Audit log — this can silently destroy tenant reviews via the cascade, so
-    // record what was deleted and how many reviews went with it.
+    // record what was deleted and how many reviews and files went with it.
     await createAuditLog(db, {
       adminUserId: context.locals.user.id,
       adminIp: getClientIP(context),
@@ -210,6 +221,7 @@ export async function DELETE(context: APIContext): Promise<Response> {
       entityType: 'building',
       entityId: buildingId,
       oldValue: { address: building.address, reviewsDeleted: reviewCount?.count || 0 },
+      newValue: { verificationFiles },
     });
 
     return new Response(JSON.stringify({

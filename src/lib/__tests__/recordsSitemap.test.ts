@@ -53,7 +53,9 @@ suite('sitemap', () => {
     expect(slugs).toEqual(['a', 'c']);
   });
 
-  it('lastmod is the latest of updated_at, the last pull, and the last approved review', async () => {
+  it('lastmod is the later of updated_at and the last pull, never a review date', async () => {
+    // A sitemap date that tracks reviews tells anyone watching it when a tenant posted, so a
+    // newer approved review (or a pending one) must not move it.
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'a', slug: 'a', parcel_id: '1' });
     await db.prepare("UPDATE buildings SET updated_at = 1600000000 WHERE id = 'a'").run();
@@ -61,12 +63,19 @@ suite('sitemap', () => {
     await review(db, 'a', 1_700_000_000);
     await review(db, 'a', 1_800_000_000, 'pending');
     const [entry] = await buildingSitemapEntries(db, 1);
-    expect(entry.lastmod).toBe(1_700_000_000);
+    expect(entry.lastmod).toBe(1_650_000_000);
   });
 
-  it('lastmod is the last pull when the pull is the newest of the three', async () => {
-    // The mirror of the case above: whichever of the three is newest has to win, so the pull
-    // subquery is not just along for the ride when a review happens to be later.
+  it('a reviewed building with no pull keeps updated_at as its lastmod', async () => {
+    const db = createRecordsTestDb();
+    await insertBuilding(db, { id: 'c', slug: 'c', city: 'New Haven', parcel_id: null });
+    await db.prepare("UPDATE buildings SET updated_at = 1600000000 WHERE id = 'c'").run();
+    await review(db, 'c', 1_700_000_000);
+    const [entry] = await buildingSitemapEntries(db, 1);
+    expect(entry).toEqual({ slug: 'c', lastmod: 1_600_000_000 });
+  });
+
+  it('lastmod is the last pull when the pull is newer than updated_at', async () => {
     const db = createRecordsTestDb();
     await insertBuilding(db, { id: 'a', slug: 'a', parcel_id: '1' });
     await db.prepare("UPDATE buildings SET updated_at = 1600000000 WHERE id = 'a'").run();
@@ -100,14 +109,21 @@ suite('sitemap', () => {
     expect(await buildingChunkCount(db)).toBe(0);
   });
 
-  it('lists landlords with an approved review only', async () => {
+  it('lists landlords with an approved review only, once each and with no date', async () => {
+    // No lastmod: the only landlord timestamps are review dates and the profile's own
+    // created/updated time, which is usually set while an admin moderates a review.
     const db = createRecordsTestDb();
-    await db.prepare("INSERT INTO landlords (id, name, slug) VALUES ('l1', 'A', 'a'), ('l2', 'B', 'b')").run();
+    await db.prepare("INSERT INTO landlords (id, name, slug) VALUES ('l1', 'A', 'a'), ('l2', 'B', 'b'), ('l3', 'C', 'c')").run();
     await insertBuilding(db, { id: 'x', slug: 'x' });
-    await db.prepare("UPDATE buildings SET landlord_id = 'l1' WHERE id = 'x'").run();
+    await insertBuilding(db, { id: 'y', slug: 'y', parcel_id: '2' });
+    await insertBuilding(db, { id: 'z', slug: 'z', parcel_id: '3' });
+    await db.prepare("UPDATE buildings SET landlord_id = 'l1' WHERE id IN ('x', 'y')").run();
+    await db.prepare("UPDATE buildings SET landlord_id = 'l3' WHERE id = 'z'").run();
     await review(db, 'x', 1_650_000_000);
     await review(db, 'x', 1_700_000_000);
-    expect(await landlordSitemapEntries(db)).toEqual([{ slug: 'a', lastmod: 1_700_000_000 }]);
+    await review(db, 'y', 1_710_000_000);
+    await review(db, 'z', 1_720_000_000, 'pending');
+    expect(await landlordSitemapEntries(db)).toEqual([{ slug: 'a' }]);
   });
 
   it('renders valid XML with escaped locations and ISO dates', () => {
@@ -168,7 +184,7 @@ suite('sitemap routes', () => {
     const body = await res.text();
     expect(body).toContain(`<loc>${SITE}/about</loc>`);
     expect(body).toContain(`<loc>${SITE}/</loc>`);
-    expect(body).toContain(`<loc>${SITE}/landlord/acme-realty</loc>`);
+    expect(body).toContain(`<url><loc>${SITE}/landlord/acme-realty</loc></url>`);
   });
 
   it('serves a building chunk, 404s past the end, and 404s a non-chunk parameter', async () => {

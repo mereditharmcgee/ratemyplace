@@ -1,6 +1,6 @@
 # `migrations/` — D1 Schema Changes
 
-Cloudflare D1 (SQLite). 35 migrations, `0001` through `0035`.
+Cloudflare D1 (SQLite). 36 migrations, `0001` through `0036`.
 
 ---
 
@@ -161,6 +161,34 @@ No rows means it has not run; then apply it once:
 ```bash
 npx wrangler d1 execute ratemyplace-db --remote --file migrations/0035_review_move_in_given.sql
 ```
+
+**`0036` (blank decided verification filenames) is NOT YET APPLIED TO PRODUCTION.** It is
+one `UPDATE` that sets `verification_images.filename` to `''` on every approved or rejected
+row that still has one. The decision route has blanked the filename since November 2026, but
+rows decided before that still hold the tenant's original filename, which often names their
+address or unit. Pending rows are left alone. It binds nothing and is idempotent: a second
+run matches no rows. The owner applies it once by hand, after the code that blanks new
+decisions is live, never through `migrations apply --remote`. First see how many rows it
+will touch (read-only):
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --command \
+  "SELECT COUNT(*) FROM verification_images WHERE status <> 'pending' AND filename <> ''"
+```
+
+Then apply it, and run the count again. It should be 0:
+
+```bash
+npx wrangler d1 execute ratemyplace-db --remote --file migrations/0036_blank_decided_verification_filenames.sql
+```
+
+The same pass is a good time to look for proof-of-address files left in R2. List the
+objects under `users/*/verifications/` in the `ratemyplace-verification` bucket (the
+Cloudflare dashboard lists a bucket's objects) and compare them with
+`SELECT r2_key FROM verification_images WHERE status = 'pending'`. Any object that is not
+a pending row's key is a leftover. It was rejected before August 26, 2026, when a rejection
+began deleting the file. Or its review was deleted before review deletes removed files, its
+delete failed at the decision, or its upload never got a row. Remove those by hand.
 
 **`app_settings` keys in use.** The table is a key/value store for operator switches; the
 records pipeline owns four, defined once in `SETTING_KEYS` in `src/lib/records/settings.ts`:

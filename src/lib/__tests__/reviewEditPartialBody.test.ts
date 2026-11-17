@@ -259,3 +259,38 @@ suite('tenure on edit', () => {
     expect(await tenure(db, id)).toBeNull();
   });
 });
+
+// A skipped recommend answer is NULL, and the card shows no recommend badge for it. An edit
+// that sends it back blank or null must keep it NULL, never store 'no'.
+suite('recommend answer on edit', () => {
+  const SKIPPED_RECOMMEND = Object.fromEntries(
+    Object.entries(FULL_REVIEW).filter(([key]) => key !== 'would_recommend'),
+  );
+
+  async function recommend(db: TestD1Database, id: string): Promise<unknown> {
+    return (await row(db, id, ['would_recommend_new'])).would_recommend_new;
+  }
+
+  it('keeps a skipped answer NULL through an edit that sends it blank or null', async () => {
+    const db = schemaDb();
+    await seed(db);
+    const nulled = await submit(db, SKIPPED_RECOMMEND);
+    const blank = await submit(db, SKIPPED_RECOMMEND, 'u2');
+    expect(await recommend(db, nulled)).toBeNull();
+    expect(await recommend(db, blank)).toBeNull();
+
+    await edit(db, nulled, { unit_structural: 4, would_recommend_new: null });
+    await edit(db, blank, { unit_structural: 4, would_recommend_new: '' }, 'u2');
+
+    expect(await recommend(db, nulled)).toBeNull();
+    expect(await recommend(db, blank)).toBeNull();
+  });
+
+  it('stores the answer an edit sends', async () => {
+    const db = schemaDb();
+    await seed(db);
+    const id = await submit(db, SKIPPED_RECOMMEND);
+    await edit(db, id, { unit_structural: 4, would_recommend_new: 'yes' });
+    expect(await recommend(db, id)).toBe('yes');
+  });
+});

@@ -68,11 +68,13 @@ export async function GET(context: APIContext): Promise<Response> {
 
     // Stream the image. r2Object.body is a workers-types ReadableStream, which
     // the DOM Response BodyInit type doesn't recognize; cast. Type-only.
+    // no-store: a proof-of-address document must not sit in the admin's browser
+    // cache after the decision deletes it from R2.
     return new Response(r2Object.body as unknown as ReadableStream, {
       headers: {
         'Content-Type': verification.content_type,
         'Content-Disposition': `inline; filename="${safeFilename}"`,
-        'Cache-Control': 'private, max-age=3600'
+        'Cache-Control': 'private, no-store'
       }
     });
   } catch (error) {
@@ -146,11 +148,14 @@ export async function POST(context: APIContext): Promise<Response> {
     const bucket = getEnv(context).VERIFICATION_BUCKET;
     const now = Math.floor(Date.now() / 1000);
 
+    // Both decisions blank the filename: it is the tenant's own and often names their
+    // address or unit, and nothing needs it once the document is decided. The column is
+    // NOT NULL, so blank is ''.
     if (action === 'approve') {
       // Update verification_images
       await db.prepare(`
         UPDATE verification_images
-        SET status = 'approved', reviewed_at = ?, reviewed_by = ?
+        SET status = 'approved', reviewed_at = ?, reviewed_by = ?, filename = ''
         WHERE id = ?
       `).bind(now, context.locals.user.id, id).run();
 
@@ -167,7 +172,7 @@ export async function POST(context: APIContext): Promise<Response> {
         if (!deleted) {
           logError('verification_document_delete_failed', {
             endpoint: '/api/admin/verification/[id]',
-            r2_key: verification.r2_key,
+            verificationId: id,
             decision: 'approve',
           });
         }
@@ -194,7 +199,7 @@ export async function POST(context: APIContext): Promise<Response> {
       // Reject
       await db.prepare(`
         UPDATE verification_images
-        SET status = 'rejected', reviewed_at = ?, reviewed_by = ?, rejection_reason = ?
+        SET status = 'rejected', reviewed_at = ?, reviewed_by = ?, rejection_reason = ?, filename = ''
         WHERE id = ?
       `).bind(now, context.locals.user.id, rejection_reason || null, id).run();
 
@@ -206,7 +211,7 @@ export async function POST(context: APIContext): Promise<Response> {
         if (!deleted) {
           logError('verification_document_delete_failed', {
             endpoint: '/api/admin/verification/[id]',
-            r2_key: verification.r2_key,
+            verificationId: id,
             decision: 'reject',
           });
         }

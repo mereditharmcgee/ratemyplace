@@ -3,7 +3,7 @@ import { initializeLucia } from '../../../lib/auth';
 import { getDB } from '../../../lib/db';
 import { getEnv } from '../../../lib/runtime';
 import { verifyPassword } from '../../../lib/password';
-import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../../lib/rateLimit';
+import { checkRateLimit, getClientIP, buildRateLimitHeaders, rateLimitSecret } from '../../../lib/rateLimit';
 import { logError } from '../../../lib/logger';
 import { verifyTurnstile } from '../../../lib/turnstile';
 import { LEGACY_SIGNIN_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '../../../lib/passwordPolicy';
@@ -54,7 +54,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     // Rate limiting: 5 attempts per 15 minutes per IP
     const clientIP = getClientIP(context);
-    const rateLimit = await checkRateLimit(db, clientIP, 'signin', 5, 900);
+    const rateLimit = await checkRateLimit(db, clientIP, 'signin', 5, 900, rateLimitSecret(getEnv(context)));
 
     if (!rateLimit.allowed) {
       const status = rateLimit.error ? 503 : 429;
@@ -64,8 +64,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
       if (rateLimit.error) {
         logError('rate_limit_db_failure', {
-          endpoint: 'signin',
-          ip: clientIP
+          endpoint: 'signin'
         });
       }
 

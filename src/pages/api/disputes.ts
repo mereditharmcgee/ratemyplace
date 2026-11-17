@@ -5,7 +5,7 @@ import { DISPUTE_REASONS } from '../../lib/disputes';
 import { resolveDisputedReview } from '../../lib/disputeTarget';
 import { sanitizeText, validateDisputeForm } from '../../lib/validation';
 import { sendDisputeConfirmationEmail } from '../../lib/email';
-import { checkRateLimit, getClientIP, buildRateLimitHeaders } from '../../lib/rateLimit';
+import { checkRateLimit, getClientIP, buildRateLimitHeaders, rateLimitSecret } from '../../lib/rateLimit';
 import { createNotification } from '../../lib/notifications';
 import { verifyTurnstile } from '../../lib/turnstile';
 import { queueOwnerNotice } from '../../lib/ownerNotify';
@@ -27,7 +27,7 @@ export const POST: APIRoute = async (context: APIContext) => {
 
     // Rate limiting: 3 dispute submissions per hour per IP
     const clientIP = getClientIP(context);
-    const rateLimit = await checkRateLimit(db, clientIP, 'dispute', 3, 3600);
+    const rateLimit = await checkRateLimit(db, clientIP, 'dispute', 3, 3600, rateLimitSecret(getEnv(context)));
 
     if (!rateLimit.allowed) {
       const status = rateLimit.error ? 503 : 429;

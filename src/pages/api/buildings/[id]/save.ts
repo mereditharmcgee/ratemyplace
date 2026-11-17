@@ -1,7 +1,8 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../../lib/db';
 import { logError } from '../../../../lib/logger';
-import { buildRateLimitHeaders, checkRateLimit } from '../../../../lib/rateLimit';
+import { buildRateLimitHeaders, checkRateLimit, rateLimitSecret } from '../../../../lib/rateLimit';
+import { getEnv } from '../../../../lib/runtime';
 import { errorMessage } from '../../../../lib/records/errors';
 import { recordsRequestState } from '../../../../lib/records/coverage';
 import { enqueue } from '../../../../lib/records/queue';
@@ -30,7 +31,7 @@ export async function POST(context: APIContext): Promise<Response> {
     // row, and unlike the reader-facing button it asks for no Turnstile and counts against
     // no daily cap. So the save itself is the only thing that can bound that path, and it
     // has to. DELETE is left alone: unsaving enqueues nothing.
-    const rateLimit = await checkRateLimit(db, context.locals.user.id, 'building-save', 20, 3600);
+    const rateLimit = await checkRateLimit(db, context.locals.user.id, 'building-save', 20, 3600, rateLimitSecret(getEnv(context)));
     if (!rateLimit.allowed) {
       const status = rateLimit.error ? 503 : 429;
       const message = rateLimit.error

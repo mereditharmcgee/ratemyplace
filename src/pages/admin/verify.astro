@@ -33,7 +33,9 @@ if (!user.isAdmin) {
           <p class="font-medium mb-1">What to look for:</p>
           <ul class="list-disc list-inside space-y-1">
             <li>Document shows the user's name and the property address</li>
-            <li>Valid document types: lease agreement, utility bill, bank statement with address</li>
+            {/* The upload modal's list (profile/VerificationModal.tsx) is the official one; keep these in step. */}
+            <li>Accepted documents: lease or rental agreement, utility bill (gas, electric, water), rent receipt or payment confirmation, or any mail showing the user's name and this address</li>
+            <li>Photo IDs are not accepted</li>
             <li>Document appears genuine and unaltered</li>
           </ul>
         </div>

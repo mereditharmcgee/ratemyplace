@@ -57,6 +57,24 @@ export function bedroomsLabel(bedrooms: unknown): string | null {
   return `${value} bed${value === '1' ? '' : 's'}`;
 }
 
+/** The answers the review form offers to "Would you recommend this unit?" (`supplementaryItems`). */
+export type RecommendAnswer = 'yes' | 'maybe' | 'no';
+
+export const RECOMMEND_LABELS: Record<RecommendAnswer, string> = {
+  yes: 'Would recommend',
+  maybe: 'Maybe / It depends',
+  no: 'Would not recommend',
+};
+
+/**
+ * The review card's recommend answer, or null when the reviewer skipped the optional question
+ * or the stored value is not one the form offers. Null shows no badge. The aggregate rate in
+ * `scoring.ts` classifies answers its own way and is not changed by this.
+ */
+export function recommendAnswer(value: unknown): RecommendAnswer | null {
+  return value === 'yes' || value === 'maybe' || value === 'no' ? value : null;
+}
+
 /**
  * Shown in the building page's "Common issues reported" box when no review checked any of
  * the four yes/no issue questions. It names those questions, so it does not read as "these

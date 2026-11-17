@@ -2,7 +2,7 @@ import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
 import { getEnv } from '../../../lib/runtime';
 import { uploadVerificationImage } from '../../../lib/storage';
-import { checkRateLimit, buildRateLimitHeaders } from '../../../lib/rateLimit';
+import { checkRateLimit, buildRateLimitHeaders, rateLimitSecret } from '../../../lib/rateLimit';
 import { generateIdFromEntropySize } from 'lucia';
 import { queueOwnerNotice } from '../../../lib/ownerNotify';
 
@@ -23,7 +23,7 @@ export async function POST(context: APIContext): Promise<Response> {
     // stops re-uploads only while a request is pending — once one is rejected it
     // no longer blocks, so without this a user could loop large uploads and fill
     // the R2 bucket. 10 / hour is well above any honest verification flow.
-    const rateLimit = await checkRateLimit(db, context.locals.user.id, 'verification-upload', 10, 3600);
+    const rateLimit = await checkRateLimit(db, context.locals.user.id, 'verification-upload', 10, 3600, rateLimitSecret(getEnv(context)));
     if (!rateLimit.allowed) {
       const status = rateLimit.error ? 503 : 429;
       const message = rateLimit.error

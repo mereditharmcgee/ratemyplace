@@ -1,7 +1,8 @@
 import type { APIContext, APIRoute } from 'astro';
 import { getDB } from '../../../../../../lib/db';
 import { createAuditLog } from '../../../../../../lib/audit';
-import { checkRateLimit, getClientIP } from '../../../../../../lib/rateLimit';
+import { checkRateLimit, getClientIP, rateLimitSecret } from '../../../../../../lib/rateLimit';
+import { getEnv } from '../../../../../../lib/runtime';
 import { logError } from '../../../../../../lib/logger';
 import { pullBuildingRecords } from '../../../../../../lib/records/pull';
 import { diffRecordSnapshots, type RecordSnapshot } from '../../../../../../lib/records/corrections';
@@ -64,7 +65,7 @@ export const POST: APIRoute = async (context: APIContext) => {
     // and a manual pull hitting the same building at once would race on the
     // delete-then-insert each source performs. Sharing the key means only one of
     // them can start inside the window, whichever route it came from.
-    const guard = await checkRateLimit(db, `building:${building.id}`, 'records_pull', 1, 120);
+    const guard = await checkRateLimit(db, `building:${building.id}`, 'records_pull', 1, 120, rateLimitSecret(getEnv(context)));
     if (!guard.allowed) {
       if (guard.error) {
         return json({ error: 'Rate limiter unavailable' }, 503);

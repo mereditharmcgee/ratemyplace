@@ -2,6 +2,10 @@
 // pages; every Boston building with a parcel; any other building, and any landlord, with an
 // approved review. Excluded by construction: auth, profile, admin, review forms, property
 // managers (their pages carry the named-party threshold and are reachable from buildings).
+//
+// No date in these files comes from a review. A lastmod that moved when a review was approved
+// would tell anyone watching the sitemap the day a tenant posted, so a building's lastmod
+// reads only its own row and its record pulls, and a landlord entry carries none.
 import type { RecordsDb } from './records/types';
 
 export const STATIC_SITEMAP_PATHS: readonly string[] = ['/', '/about', '/contact', '/guidelines', '/map', '/methodology', '/privacy', '/search', '/terms'];
@@ -9,18 +13,17 @@ export const SITEMAP_CHUNK = 10_000;
 
 export interface BuildingSitemapEntry {
   slug: string;
-  /** Unix seconds: the latest of updated_at, the last record pull, and the last approved review. */
+  /** Unix seconds: the later of updated_at and the last record pull. Never a review date. */
   lastmod: number;
 }
 
-// Membership is a WHERE with an EXISTS, and the timestamps are correlated subqueries in the
+// Membership is a WHERE with an EXISTS, and the pull timestamp is a correlated subquery in the
 // select list. The earlier shape pre-grouped `record_pulls` and `reviews` into derived tables
 // and LEFT JOINed them, which scanned both tables in full on every chunk request and built a
-// transient automatic index over each; the correlated form runs the two MAX seeks only for the
+// transient automatic index over each; the correlated form runs the MAX seek only for the
 // rows actually emitted, because SQLite does not evaluate result-column subqueries for rows
 // skipped by OFFSET. `idx_record_pulls_building (building_id, source_id, retrieved_at)` serves
-// the pull seek; `idx_reviews_building_status (building_id, status)` serves both the EXISTS and
-// the review seek.
+// the pull seek; `idx_reviews_building_status (building_id, status)` serves the EXISTS.
 const BUILDING_FROM = `
   FROM buildings b
   WHERE (b.city = 'Boston' AND b.parcel_id IS NOT NULL)
@@ -38,18 +41,17 @@ export async function buildingChunkCount(db: RecordsDb): Promise<number> {
 
 /** Chunk `n` (1-based) of the building URLs, ordered by id so chunk membership is stable between requests. */
 export async function buildingSitemapEntries(db: RecordsDb, n: number): Promise<BuildingSitemapEntry[]> {
-  // Scalar three-argument MAX(), not the aggregate: the largest of the three timestamps. It
-  // returns NULL if any argument is NULL, hence the COALESCEs around the subqueries, which are
-  // NULL for a building with no pull or no approved review; `buildings.updated_at` is NOT NULL
-  // and needs none. The pull seek is deliberately not filtered to the deeper sources: the
-  // assessor pull's `retrieved_at` is the "as of" date the records panel shows, so it is
-  // exactly the date a crawler should read as this page's last modification.
+  // Scalar two-argument MAX(), not the aggregate: the larger of the two timestamps. It returns
+  // NULL if any argument is NULL, hence the COALESCE around the subquery, which is NULL for a
+  // building with no pull; `buildings.updated_at` is NOT NULL and needs none. The pull seek is
+  // deliberately not filtered to the deeper sources: the assessor pull's `retrieved_at` is the
+  // "as of" date the records panel shows, so it is exactly the date a crawler should read as
+  // this page's last modification. Review timestamps stay out (see the top of this file).
   const { results } = await db
     .prepare(
       `SELECT b.slug,
               MAX(b.updated_at,
-                  COALESCE((SELECT MAX(retrieved_at) FROM record_pulls p WHERE p.building_id = b.id), 0),
-                  COALESCE((SELECT MAX(created_at) FROM reviews r WHERE r.building_id = b.id AND r.status = 'approved'), 0)) AS lastmod
+                  COALESCE((SELECT MAX(retrieved_at) FROM record_pulls p WHERE p.building_id = b.id), 0)) AS lastmod
        ${BUILDING_FROM} ORDER BY b.id LIMIT ? OFFSET ?`,
     )
     .bind(SITEMAP_CHUNK, (n - 1) * SITEMAP_CHUNK)
@@ -57,15 +59,19 @@ export async function buildingSitemapEntries(db: RecordsDb, n: number): Promise<
   return results;
 }
 
+/**
+ * A landlord's slug and nothing else. There is no lastmod: a landlord's only timestamps are its
+ * reviews' dates and the profile's own `created_at` / `updated_at`, and a profile is usually
+ * created (or linked) while an admin moderates a review, so those track review dates too.
+ */
 export interface LandlordSitemapEntry {
   slug: string;
-  lastmod: number;
 }
 
 export async function landlordSitemapEntries(db: RecordsDb): Promise<LandlordSitemapEntry[]> {
   const { results } = await db
     .prepare(
-      "SELECT l.slug, MAX(r.created_at) AS lastmod FROM landlords l JOIN buildings b ON b.landlord_id = l.id JOIN reviews r ON r.building_id = b.id AND r.status = 'approved' GROUP BY l.id ORDER BY l.id",
+      "SELECT l.slug FROM landlords l WHERE EXISTS (SELECT 1 FROM buildings b JOIN reviews r ON r.building_id = b.id AND r.status = 'approved' WHERE b.landlord_id = l.id) ORDER BY l.id",
     )
     .all<LandlordSitemapEntry>();
   return results;

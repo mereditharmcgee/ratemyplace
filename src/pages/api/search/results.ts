@@ -1,6 +1,7 @@
 import type { APIContext } from 'astro';
 import { getDB } from '../../../lib/db';
-import { getClientIP, checkRateLimit, buildRateLimitHeaders } from '../../../lib/rateLimit';
+import { getClientIP, checkRateLimit, buildRateLimitHeaders, rateLimitSecret } from '../../../lib/rateLimit';
+import { getEnv } from '../../../lib/runtime';
 import { validateSearch, escapeLikePattern, fitsLikePattern } from '../../../lib/validation';
 import { buildingSearchOrder, buildingSearchSelect, buildingSearchWhere } from '../../../lib/searchSql';
 import { currentReviewYear, namedPartyOverallSql, recencyWeightedOverallSql } from '../../../lib/scoring-sql';
@@ -13,7 +14,7 @@ export async function GET(context: APIContext): Promise<Response> {
   const currentYear = currentReviewYear();
 
   // 1. Rate limit: 60 / minute per IP (SEC-05)
-  const rateLimit = await checkRateLimit(db, ip, 'search-results', 60, 60);
+  const rateLimit = await checkRateLimit(db, ip, 'search-results', 60, 60, rateLimitSecret(getEnv(context)));
   if (!rateLimit.allowed) {
     const status = rateLimit.error ? 503 : 429;
     const message = rateLimit.error

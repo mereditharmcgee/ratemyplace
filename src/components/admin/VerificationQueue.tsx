@@ -161,7 +161,7 @@ export default function VerificationQueue() {
                 </p>
               </div>
               <div className="text-sm text-gray-500">
-                {verification.filename} ({formatFileSize(verification.size_bytes)})
+                {verification.filename.trim() || 'Unnamed file'} ({formatFileSize(verification.size_bytes)})
               </div>
             </div>
 

@@ -204,7 +204,7 @@ export default function SettingsTab({
                 Email me when my review status changes
               </span>
               <p className="text-xs text-gray-500 mt-0.5">
-                Email notifications coming soon — your preference will be applied when enabled.
+                Today that means an email if a review is not approved. Your dashboard shows every update either way.
               </p>
             </div>
           </label>
