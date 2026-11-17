@@ -197,7 +197,7 @@ test.describe('Review Form', () => {
     await expect(authedPage.locator('text=How long did you live').first()).toBeVisible({ timeout: 10000 });
     await authedPage.locator('button[type="button"]', { hasText: 'Review & Submit' }).click();
 
-    // Confirm step — Submit Review should be disabled until both boxes are ticked
+    // Confirm step: Submit Review should be disabled until both boxes are ticked
     await expect(authedPage.locator('text=Review Summary').first()).toBeVisible({ timeout: 10000 });
     await expect(authedPage.locator('button[type="button"]', { hasText: 'Submit Review' })).toBeDisabled();
     await expect(authedPage.getByText(REVIEW_CHECKLIST_COPY.submitHint)).toBeVisible();
@@ -328,7 +328,7 @@ test.describe('Concurrent Submissions', () => {
       await page.waitForSelector('text=How long did you live', { timeout: 10000 });
       await page.locator('button[type="button"]', { hasText: 'Review & Submit' }).click();
 
-      // Confirm — tick both acknowledgement boxes and wait for Submit to be enabled
+      // Confirm: tick both acknowledgement boxes and wait for Submit to be enabled
       await page.waitForSelector('text=Review Summary', { timeout: 10000 });
       await tickAcknowledgements(page);
       await page.waitForFunction(

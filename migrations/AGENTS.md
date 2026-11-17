@@ -349,7 +349,7 @@ highest number.
 
 Two filenames are misleading: `0021_reserved.sql` actually creates the `notifications`
 table despite its name, and `0022_reserved.sql` is a genuine no-op (`SELECT 1;`). Do not
-assume either is empty — read before touching. `0037` rebuilds `notifications`, so its
+assume either is empty: read before touching. `0037` rebuilds `notifications`, so its
 current CHECK list is in `0037`, not `0021`.
 
 ### Rules
