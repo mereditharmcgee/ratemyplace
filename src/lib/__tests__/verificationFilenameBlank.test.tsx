@@ -7,6 +7,7 @@ import VerificationQueue from '../../components/admin/VerificationQueue';
 import type { PendingVerification } from '../../pages/api/admin/pending-verifications';
 import { GET, POST } from '../../pages/api/admin/verification/[id]';
 import { createAdminTestDb } from './helpers/adminDb';
+import { previousMigration, schemaDb } from './helpers/migratedDb';
 import { insertBuilding } from './helpers/recordsDb';
 import { sqliteAvailable, type TestD1Database } from './helpers/sqliteD1';
 
@@ -146,5 +147,66 @@ describe('the admin queue with a blank filename', () => {
     render(<VerificationQueue />);
     await screen.findByText('12 Example Rd');
     expect(screen.getByText('example-lease.pdf (2.0 KB)')).toBeTruthy();
+  });
+});
+
+// Rows decided before the route blanked the filename still hold it. Migration 0036 blanks
+// every decided row once and leaves pending rows alone, since an admin still needs those.
+suite('migration 0036 blanks filenames on decided rows', () => {
+  const MIGRATION = '0036_blank_decided_verification_filenames.sql';
+  const sql = readFileSync(join(process.cwd(), 'migrations', MIGRATION), 'utf8');
+
+  async function seeded(): Promise<TestD1Database> {
+    const db = schemaDb({ through: previousMigration(MIGRATION) });
+    await db.prepare("INSERT INTO users (id, email) VALUES ('tenant-1', 'tenant-1@example.test')").run();
+    await db
+      .prepare("INSERT INTO buildings (id, address, slug, city, state) VALUES ('bldg-a', '1 Test Street', '1-test-street-boston', 'Boston', 'MA')")
+      .run();
+    await db
+      .prepare(
+        "INSERT INTO reviews (id, user_id, building_id, move_in_year, move_in_season, unit_type, status) VALUES ('rev-1', 'tenant-1', 'bldg-a', 2022, 'fall', '1br', 'approved')",
+      )
+      .run();
+    const rows: Array<[string, string, string]> = [
+      ['ver-pending', 'pending', FILENAME],
+      ['ver-approved', 'approved', FILENAME],
+      ['ver-rejected', 'rejected', FILENAME],
+      ['ver-blank', 'approved', ''],
+    ];
+    for (const [id, status, filename] of rows) {
+      await db
+        .prepare(
+          "INSERT INTO verification_images (id, review_id, user_id, r2_key, filename, content_type, size_bytes, status) VALUES (?, 'rev-1', 'tenant-1', ?, ?, 'application/pdf', 2048, ?)",
+        )
+        .bind(id, `users/tenant-1/verifications/rev-1/${id}.pdf`, filename, status)
+        .run();
+    }
+    return db;
+  }
+
+  async function filenames(db: TestD1Database): Promise<Record<string, unknown>> {
+    const { results } = await db
+      .prepare('SELECT id, filename FROM verification_images ORDER BY id')
+      .all<{ id: string; filename: string }>();
+    return Object.fromEntries(results.map((r) => [r.id, r.filename]));
+  }
+
+  it('blanks approved and rejected rows and keeps pending ones', async () => {
+    const db = await seeded();
+    db.exec(sql);
+    expect(await filenames(db)).toEqual({
+      'ver-approved': '',
+      'ver-blank': '',
+      'ver-pending': FILENAME,
+      'ver-rejected': '',
+    });
+  });
+
+  it('is safe to run twice', async () => {
+    const db = await seeded();
+    db.exec(sql);
+    const once = await filenames(db);
+    db.exec(sql);
+    expect(await filenames(db)).toEqual(once);
   });
 });

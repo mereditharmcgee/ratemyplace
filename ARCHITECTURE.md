@@ -205,7 +205,7 @@ Read the migrations for full column lists. These notes cover what a column list 
 
 #### `verification_images`
 - One row per proof-of-address upload. The file is in R2 (`VERIFICATION_BUCKET`) under a key that names the user and the review, so no log line carries a key or a filename.
-- Approving or rejecting deletes the file and blanks `filename` to `''` (the column is NOT NULL). The row keeps the content type, size, status, moderator and any rejection reason.
+- Approving or rejecting deletes the file and blanks `filename` to `''` (the column is NOT NULL). The row keeps the content type, size, status, moderator and any rejection reason. Rows decided before the route did this are blanked by `0036`, which the owner applies by hand (see `migrations/AGENTS.md`).
 - Deleting a review, or a building with reviews, deletes their files from R2 before the rows go (`src/lib/verificationFiles.ts`). A failed file delete is logged by count, recorded on the audit entry as `verificationFiles` (`removed`, `failed`), and never stops the delete. Orphan cleanup deletes only buildings with no reviews, so it has no files to remove. No route deletes a user, so an account deleted by hand needs its files removed by hand.
 - `GET /api/admin/verification/[id]` serves the file with `Cache-Control: private, no-store`.
 - The checklist on `/admin/verify` names the same documents as the upload modal (`src/components/profile/VerificationModal.tsx`), and `adminVerifyChecklist.test.ts` fails when the two drift apart.

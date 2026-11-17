@@ -77,8 +77,10 @@ export async function uploadVerificationImage(
       contentType: file.type,
       sizeBytes: file.size
     };
-  } catch (error) {
-    console.error('R2 upload error:', error);
+  } catch {
+    // Never log the error itself: an R2 error can echo the key, which names the user and the
+    // review.
+    console.error('R2 upload error');
     return {
       success: false,
       error: 'Failed to upload file. Please try again.'
@@ -95,8 +97,9 @@ export async function getVerificationImage(
 ): Promise<R2ObjectBody | null> {
   try {
     return await bucket.get(key);
-  } catch (error) {
-    console.error('R2 get error:', error);
+  } catch {
+    // Never log the error itself: an R2 error can echo the key.
+    console.error('R2 get error');
     return null;
   }
 }

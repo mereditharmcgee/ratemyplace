@@ -224,3 +224,18 @@ describe('rate limit callers', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+// The public privacy page describes what the limiter keeps. It kept the raw IP once, and the
+// page said so; it must not go on saying so now that only a one-way code is kept.
+describe('the privacy page on the rate limiter', () => {
+  const privacy = readFileSync(join(ROOT, 'src', 'pages', 'privacy.astro'), 'utf8');
+
+  it('says the limiter keeps a one-way code, not the IP address', () => {
+    expect(privacy).not.toContain('keeps your IP address');
+    expect(privacy.match(/keeps a one-way code made from your IP address for one hour, not the address itself/g)).toHaveLength(2);
+  });
+
+  it('never says no IPs are stored, since the audit log keeps admin IPs', () => {
+    expect(privacy).not.toMatch(/no IP(s| address(es)?) (are|is) (stored|kept)/i);
+  });
+});
