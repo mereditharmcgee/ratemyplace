@@ -821,7 +821,7 @@ Flag for eventual lawyer review:
 ### Phase 3: Community and scale
 
 - [ ] Partner organization feedback incorporated
-- [ ] Public records integration (code violations)
+- [x] Public records integration (code violations)
 - [ ] Data export for advocacy orgs
 - [ ] Additional neighborhoods/cities
 - [ ] Multi-language support (when budget allows)

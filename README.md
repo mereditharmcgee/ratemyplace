@@ -15,11 +15,19 @@ Tenants rate their apartment unit, building, and landlord using a structured sur
 - Email-verified anonymous reviews
 - Landlord dispute submission system
 - Admin moderation dashboard
+- Public records panel on Boston building pages, from City of Boston open data: property assessments, building permits, building and property violations, Public Works code enforcement, 311 service requests, and RentSmart (never part of a score)
+- A page for every whole-building rental parcel in Boston, so a building can be found before anyone reviews it
+- Readers can ask for a building's city records, and ask for newer ones once they are a month old
+- "Report a record error" form on every records panel
+- Owner of record lists that gather the Boston buildings held under one owner name in the city's assessing data
+- Map of reviewed buildings, colored by score
+- Tenant dashboard with saved buildings and review history
 
 ## Tech Stack
 
 - **Framework**: Astro 5
 - **Hosting**: Cloudflare Pages
+- **Scheduled jobs**: a separate Cloudflare Cron Worker (`workers/records-scheduler/`) that fetches city records
 - **Database**: Cloudflare D1 (SQLite)
 - **Auth**: Lucia + Google OAuth
 - **Email**: Resend

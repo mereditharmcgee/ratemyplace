@@ -4,6 +4,10 @@
 **Last Updated:** January 27, 2026
 **Codename:** "Evidence-Based Scoring"
 
+> Most of this file describes the January 2026 codebase and has not been re-checked since.
+> The [City records](#city-records) section was added in November 2026. Root
+> [`AGENTS.md`](AGENTS.md) is kept current, and where a doc and the code disagree, the code wins.
+
 ---
 
 ## Table of Contents
@@ -17,7 +21,8 @@
 7. [Page Components](#page-components)
 8. [Shared Components](#shared-components)
 9. [Library/Utility Files](#libraryutility-files)
-10. [Deployment](#deployment)
+10. [City records](#city-records)
+11. [Deployment](#deployment)
 
 ---
 
@@ -484,6 +489,94 @@ Survey question definitions with help text for all 32 items: 27 scored rating it
 
 ### `db.ts`
 - `getDB()` - Extracts D1 from Cloudflare runtime
+
+---
+
+## City records
+
+Boston building pages carry a **Public records** panel: what City of Boston open data says
+about the building. Records are reference, not judgment, and they are never part of a score.
+The code is in `src/lib/records/`. Read [`src/lib/AGENTS.md`](src/lib/AGENTS.md) before
+changing it.
+
+### Sources
+
+One module per dataset in `src/lib/records/sources/boston/`, all on Analyze Boston
+(`data.boston.gov`, a CKAN portal): property assessment (the current fiscal year and the five
+before it), approved building permits, building and property violations, Public Works code
+enforcement, 311 service requests (sixteen yearly legacy files plus the new system), and
+RentSmart. `sourcesForCity` in `jurisdictions.ts` returns that list for Boston and an empty
+list for every other city.
+
+Boston's CKAN SQL endpoint has no parameter binding, so this directory is the repo's one
+documented exception to parameterized queries. The rules that keep it safe are in root
+[`AGENTS.md`](AGENTS.md), under "API routes".
+
+### From the city into D1
+
+`pullBuildingRecords` (`pull.ts`) pulls one building. It builds every address and parcel
+form worth querying (`identity.ts`), resolves the parcel through the current assessor year
+when the building has none, then runs each source. Each source gets one `record_pulls` row
+(the query sent, the status, the row count and why the pull ran), and its rows replace that
+source's earlier rows in `building_records` in one batch. A source that fails keeps its last
+good rows. Each assessor year's batch also writes the building's owner of record to
+`building_owners`.
+
+Pages exist before any pull. `npm run records:seed`, applied by hand, creates a building for
+every whole-building rental parcel in Boston from the assessor and the city's SAM address
+data (`source = 'seed'`, ids `seed-<parcel>`).
+
+### Onto the page
+
+`BuildingRecords.astro` renders the panel from what is stored (`getBuildingRecords` in
+`query.ts`). Nothing is fetched from a city API on a page view. On a building with no
+approved review the records come first; otherwise they sit below the reviews.
+
+### What starts a pull
+
+Two admin actions pull inside the request: the pull button on a building, and the re-pull
+that checks a record correction. Everything else is a row in `records_queue`, pulled later by
+the Worker:
+
+| Reason | Comes from |
+|--------|------------|
+| `button` | A reader pressing "Get this building's city records" or "Ask for newer records" (`POST /api/records/request`, with Turnstile and per-IP and site-wide caps) |
+| `follower` | Saving a building or approving a review, when the building has no city records yet and nothing is queued for it; also a one-time admin backfill |
+| `refresh` | The daily planner, for saved, reviewed or requested buildings whose records are more than 30 days old |
+| `fill` | The daily planner, keeping the city-wide pass topped up |
+
+Readers can also file "Report a record error" (`POST /api/records/corrections`). An admin
+resolves it on `/admin/records`. Every resolution needs a fresh re-pull, and when the city's
+own data is wrong, a dated public note goes under that section of the panel.
+
+### The records-scheduler Worker
+
+Cloudflare Pages has no cron triggers, so `workers/records-scheduler/` is a second
+deployable: a Cron Worker bound to the same D1 database. It has no logic of its own. It calls
+`drain` and `plan` in `src/lib/records/scheduler.ts`. Pushing `main` does not deploy it;
+`npm run records:worker:deploy` does.
+
+- **Every minute, `drain`.** Claims up to three people-facing rows (button, follower,
+  refresh), then one `fill` row unless the fill is paused. Each row is claimed just before
+  its pull, and a drain stops claiming after 45 seconds. `attempts` counts claims, and a row
+  parks for a person after three.
+- **06:00 UTC daily, `plan`.** Purges old finished rows, enqueues refreshes, tops up the fill
+  queue, runs the daily fixture check, and works out each source's error rate.
+- **Daily fixture check.** `runRecordsFixture` (`fixture.ts`) queries every source for one
+  known building, a public-agency building, and checks the answers against recorded values.
+  It catches a query that broke or a city dataset that moved. Its report-only notices, such as
+  a 311 file the city left empty, never pause anything.
+- **Circuit breaker.** At the end of `plan`, a failed fixture check, or a source with at
+  least 20 attempts in 24 hours and more than half of them errors, sets
+  `app_settings.records_fill_paused` and sends one email. Button, follower and refresh pulls
+  keep running. A pause the fixture caused lifts itself on the first morning the fixture
+  passes with no source over the error threshold. An error-rate pause or a hand pause waits
+  for a person.
+
+How to operate it (first deploy, the admin panel, unpausing, expected numbers) is in
+[`docs/runbooks/records-scheduler.md`](docs/runbooks/records-scheduler.md). The module rules
+(queue leases, address matching, the fixture, the panel's privacy gates) are in
+[`src/lib/AGENTS.md`](src/lib/AGENTS.md), under `records/`.
 
 ---
 

@@ -56,6 +56,19 @@ methodology, including every citation, is published publicly at /methodology.
 anything — a theoretical maximum shift of about 0.2, usually under 0.1. Do not overstate
 its effect in any copy. This is a known open question, not a hidden flaw.
 
+**City records.** Boston building pages also carry a public records panel built from City
+of Boston open data: property assessments, building permits, building and property
+violations, Public Works code enforcement, 311 service requests, and RentSmart. Every
+whole-building rental parcel in Boston has a page, so a renter can look a building up before
+anyone has reviewed it. The panel shows what the city's files say, with the date each was
+retrieved and a link to its dataset. It has no grades, comparisons, or color coding, and
+records are never part of a score: reviews are the judgment, records are the reference. The
+owner of record comes from the city's assessing data. A tax mailing address is shown only
+when the owner is a company or other organization, never for a person. Records are fetched
+on a schedule or when a reader asks, never when someone opens a page, and anyone can report
+a record error. City data has gaps and address-matching mistakes, so describe records as what
+the city's files say, never as findings about a landlord.
+
 **Non-negotiable commitments.** These are ethical constraints and should shape any
 recommendation you make.
 
