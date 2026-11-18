@@ -53,3 +53,8 @@ just-tech-application/
 # (see ops/AGENTS.md — this is a safety rule, not tidiness)
 ops/private/*
 !ops/private/README.md
+
+# status notes that parallel agent sessions share while they work. They can name people,
+# so they stay out of the repo. One copy lives in the main checkout; worktrees read and
+# write it there by full path.
+docs/coordination/
